@@ -824,6 +824,144 @@ def create_dummy_data(
     return {"message": f"Generated {count} dummy listings"}
 
 
+# ============================================================
+# CSV Upload Endpoints - 공급처 CSV 파이프라인
+# ============================================================
+
+from fastapi import File, UploadFile
+from .csv_processor import (
+    process_supplier_csv,
+    generate_csv_template,
+    get_unmatched_listings,
+    CSVProcessingResult
+)
+
+
+class CSVUploadResponse(BaseModel):
+    """CSV 업로드 응답 스키마"""
+    success: bool
+    message: str
+    result: Optional[Dict] = None
+
+
+@app.post("/api/upload-supplier-csv", response_model=CSVUploadResponse)
+async def upload_supplier_csv(
+    file: UploadFile = File(...),
+    user_id: str = "default-user",
+    dry_run: bool = False,
+    db: Session = Depends(get_db)
+):
+    """
+    공급처 CSV 파일 업로드 및 처리
+    
+    - **file**: CSV 파일 (필수)
+    - **user_id**: 사용자 ID
+    - **dry_run**: True면 실제 DB 업데이트 없이 시뮬레이션
+    
+    지원 CSV 형식:
+    - SKU, UPC, EAN 컬럼 중 하나 이상 필수
+    - SupplierName 컬럼 필수
+    """
+    try:
+        # 파일 타입 검증
+        if not file.filename.endswith(('.csv', '.CSV')):
+            raise HTTPException(
+                status_code=400,
+                detail="CSV 파일만 업로드 가능합니다"
+            )
+        
+        # 파일 크기 제한 (10MB)
+        content = await file.read()
+        if len(content) > 10 * 1024 * 1024:
+            raise HTTPException(
+                status_code=400,
+                detail="파일 크기는 10MB 이하여야 합니다"
+            )
+        
+        # CSV 처리
+        result = process_supplier_csv(
+            file_content=content,
+            user_id=user_id,
+            dry_run=dry_run
+        )
+        
+        # 결과 반환
+        return CSVUploadResponse(
+            success=result.updated_listings > 0 or result.matched_listings > 0,
+            message=f"처리 완료: {result.total_rows}개 행 중 {result.matched_listings}개 매칭, {result.updated_listings}개 업데이트",
+            result={
+                "total_rows": result.total_rows,
+                "valid_rows": result.valid_rows,
+                "invalid_rows": result.invalid_rows,
+                "matched_listings": result.matched_listings,
+                "updated_listings": result.updated_listings,
+                "unmatched_rows": result.unmatched_rows,
+                "processing_time_ms": result.processing_time_ms,
+                "match_details": result.match_details,
+                "errors": result.errors[:10]  # 최대 10개 에러만 반환
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"CSV 처리 실패: {str(e)}"
+        )
+
+
+@app.get("/api/csv-template")
+def download_csv_template():
+    """
+    공급처 CSV 템플릿 다운로드
+    사용자가 업로드할 CSV 형식 예시
+    """
+    template = generate_csv_template()
+    
+    return Response(
+        content=template,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": "attachment; filename=supplier_template.csv"
+        }
+    )
+
+
+@app.get("/api/unmatched-listings")
+def get_unmatched_listings_endpoint(
+    user_id: str = "default-user",
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    """
+    공급처 정보가 없는 리스팅 목록 조회
+    사용자가 CSV에 추가해야 할 리스팅들
+    """
+    try:
+        listings = get_unmatched_listings(db, user_id, limit)
+        
+        return {
+            "count": len(listings),
+            "listings": listings,
+            "message": f"공급처 정보가 없는 리스팅 {len(listings)}개"
+        }
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"조회 실패: {str(e)}"
+        )
+
+
+# ============================================================
+# Lemon Squeezy Webhook
+# ============================================================
+
 @app.post("/webhooks/lemonsqueezy")
 async def lemonsqueezy_webhook(request: Request, db: Session = Depends(get_db)):
     """
