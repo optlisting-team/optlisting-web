@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from .models import Listing
 
 
-def generate_dummy_listings(db: Session, count: int = 50):
+def generate_dummy_listings(db: Session, count: int = 50, user_id: str = "default-user"):
     """
     Generate dummy listings for testing
     Mix of Amazon/Walmart, some zombies, some active
@@ -162,19 +162,45 @@ def generate_dummy_listings(db: Session, count: int = 50):
             if brand:
                 title = f"{brand} {title}"
             
+            # Build metrics JSONB
+            metrics = {
+                "sales": sold_qty,
+                "views": watch_count,
+                "price": price,
+                "date_listed": date_listed.isoformat()
+            }
+            
+            # Build analysis_meta JSONB (for CSV export testing)
+            analysis_meta = {
+                "recommendation": {
+                    "action": "delete" if is_zombie else "keep",
+                    "reason": "Low interest item" if is_zombie else "Active listing"
+                },
+                "zombie_score": random.uniform(0.7, 1.0) if is_zombie else random.uniform(0.0, 0.3)
+            }
+            
             listing = Listing(
                 ebay_item_id=ebay_item_id,
+                item_id=ebay_item_id,
                 title=title,
                 sku=sku,
                 image_url=image_url,
                 brand=brand,
                 upc=upc,
                 marketplace=marketplace,
+                platform=marketplace,
                 source=source,
+                supplier_name=source,
+                supplier_id=sku,
+                user_id=user_id,
                 price=price,
                 date_listed=date_listed,
                 sold_qty=sold_qty,
-                watch_count=watch_count
+                watch_count=watch_count,
+                metrics=metrics,
+                analysis_meta=analysis_meta,
+                is_zombie=is_zombie,
+                zombie_score=analysis_meta["zombie_score"]
             )
             
             batch_listings.append(listing)

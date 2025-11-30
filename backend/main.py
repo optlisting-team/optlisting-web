@@ -24,6 +24,28 @@ app = FastAPI(title="OptListing API", version="1.1.2")
 kpi_cache: Dict[str, Dict] = {}
 CACHE_TTL_SECONDS = 300  # 5 minutes
 
+
+def get_cache_key(user_id: str, store_id: Optional[str], marketplace: str, filters: Dict) -> str:
+    """Generate a unique cache key for KPI metrics"""
+    filter_str = "_".join(f"{k}={v}" for k, v in sorted(filters.items()))
+    return f"{user_id}_{store_id or 'all'}_{marketplace}_{filter_str}"
+
+
+def get_cached_kpi(cache_key: str) -> Optional[Dict]:
+    """Get cached KPI data if not expired"""
+    if cache_key in kpi_cache:
+        cached = kpi_cache[cache_key]
+        if (datetime.now() - cached["timestamp"]).seconds < CACHE_TTL_SECONDS:
+            return cached["data"]
+        else:
+            del kpi_cache[cache_key]
+    return None
+
+
+def set_cached_kpi(cache_key: str, data: Dict):
+    """Set KPI data in cache"""
+    kpi_cache[cache_key] = {"data": data, "timestamp": datetime.now()}
+
 # CORS middleware for React frontend
 # Allow both local development and production frontend URLs
 import os

@@ -1,14 +1,7 @@
-{
+﻿{
   "mcpServers": {
     "supabase": {
-      "url": "https://mcp.supabase.com/mcp"
-    },
-    "Railway": {
-      "command": "npx",
-      "args": ["-y", "@railway/mcp-server"]
-    },
-    "vercel": {
-      "url": "https://mcp.vercel.com"
+      "url": "https://mcp.supabase.com/mcp?project_ref=hjbmoncohuuwnywrpwpi"
     }
   }
 }
