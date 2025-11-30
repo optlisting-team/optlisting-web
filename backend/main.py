@@ -18,7 +18,7 @@ from .dummy_data import generate_dummy_listings
 from .webhooks import verify_webhook_signature, process_webhook_event
 from .ebay_webhook import router as ebay_webhook_router
 
-app = FastAPI(title="OptListing API", version="1.2.0")
+app = FastAPI(title="OptListing API", version="1.2.1")
 
 # eBay Webhook Router 등록
 app.include_router(ebay_webhook_router)
