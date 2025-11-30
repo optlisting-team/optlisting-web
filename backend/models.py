@@ -76,6 +76,13 @@ class Profile(Base):
     # 플랜 제한
     total_listings_limit = Column(Integer, default=100)  # Pro 플랜: 무제한 또는 큰 수, Free: 100
     
+    # eBay OAuth 토큰
+    ebay_access_token = Column(String, nullable=True)  # eBay Access Token (2시간 만료)
+    ebay_refresh_token = Column(String, nullable=True)  # eBay Refresh Token (18개월 만료)
+    ebay_token_expires_at = Column(DateTime, nullable=True)  # Access Token 만료 시간
+    ebay_user_id = Column(String, nullable=True)  # eBay User ID
+    ebay_token_updated_at = Column(DateTime, nullable=True)  # 토큰 마지막 갱신 시간
+    
     # 메타데이터
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
