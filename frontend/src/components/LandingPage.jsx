@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ArrowRight, TrendingDown, Ban, DollarSign, Check, CheckCircle, Zap, TrendingUp, Clock, Puzzle } from 'lucide-react'
+import { ArrowRight, TrendingDown, Ban, DollarSign, Check, CheckCircle, Zap, TrendingUp, Clock, Puzzle, Table } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from './ui/card'
 import { Button } from './ui/button'
 
@@ -333,170 +333,83 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* Pricing Section */}
+      {/* Pricing Section - Simplified Table */}
       <section className="py-24 px-4 bg-zinc-900 dark:bg-zinc-900" id="pricing">
-        <div className="container mx-auto max-w-6xl">
+        <div className="container mx-auto max-w-3xl">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="text-center mb-20"
           >
-            <h2 className="text-4xl md:text-5xl font-bold text-white dark:text-white mb-4 font-sans">
-              Simple, Transparent Pricing
-            </h2>
-            <p className="text-xl text-zinc-400 dark:text-zinc-400 max-w-2xl mx-auto font-sans">
-              Choose the plan that fits your business size
-            </p>
-          </motion.div>
+            {/* Header */}
+            <div className="text-center mb-10">
+              <h2 className="text-3xl md:text-4xl font-bold text-white mb-2 flex items-center justify-center gap-3">
+                <span className="text-3xl">💰</span>
+                OptListing 단순화된 가격 플랜
+              </h2>
+            </div>
 
-          <motion.div
-            variants={staggerContainer}
-            initial="initial"
-            whileInView="animate"
-            viewport={{ once: true }}
-            className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto"
-          >
-            {/* Starter */}
-            <motion.div variants={fadeInUp}>
-              <Card className="h-full flex flex-col border-2 border-slate-200 hover:border-slate-300 transition-colors">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-sm font-semibold uppercase tracking-widest text-white dark:text-white mb-2">
-                    Starter
-                  </CardTitle>
-                  <div className="mt-4">
-                    <span className="text-5xl font-extrabold tracking-tight text-white dark:text-white">$19.99</span>
-                    <span className="text-zinc-400 dark:text-zinc-400 text-lg ml-1">/mo</span>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex-1">
-                  <ul className="space-y-3">
-                    <li className="flex items-start gap-3">
-                      <CheckCircle className="h-5 w-5 text-white dark:text-white flex-shrink-0 mt-0.5" />
-                      <span className="text-zinc-300 dark:text-zinc-300 font-medium">Up to 5,000 total listings</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <CheckCircle className="h-5 w-5 text-white dark:text-white flex-shrink-0 mt-0.5" />
-                      <span className="text-zinc-300 dark:text-zinc-300 font-medium">1 Store</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <CheckCircle className="h-5 w-5 text-white dark:text-white flex-shrink-0 mt-0.5" />
-                      <span className="text-zinc-300 dark:text-zinc-300 font-medium">Basic detection</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <CheckCircle className="h-5 w-5 text-white dark:text-white flex-shrink-0 mt-0.5" />
-                      <span className="text-zinc-300 dark:text-zinc-300 font-medium">Daily CSV export</span>
-                    </li>
-                  </ul>
-                </CardContent>
-                <CardFooter>
-                  <Button asChild className="w-full" variant="outline">
-                    <a href="/dashboard">Get Started</a>
-                  </Button>
-                </CardFooter>
-              </Card>
-            </motion.div>
-
-            {/* Pro (Recommended) - Premium Highlight */}
-            <motion.div variants={fadeInUp} className="relative">
-              {/* Recommended Badge */}
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20">
-                <span className="bg-white dark:bg-white text-black dark:text-black text-xs font-bold px-4 py-1.5 rounded-full shadow-lg">
-                  RECOMMENDED
-                </span>
+            {/* Pricing Table */}
+            <div className="bg-zinc-800/50 rounded-2xl border border-zinc-700 overflow-hidden">
+              {/* Table Header */}
+              <div className="grid grid-cols-4 gap-4 px-6 py-4 border-b border-zinc-700 bg-zinc-800/80">
+                <div className="text-zinc-400 text-sm font-medium">플랜</div>
+                <div className="text-zinc-400 text-sm font-medium">가격 / 월</div>
+                <div className="text-zinc-400 text-sm font-medium">최대 총 리스팅 수</div>
+                <div className="text-zinc-400 text-sm font-medium text-right">최대 스토어 수</div>
               </div>
-              
-              {/* Card with Blue Border */}
-              <Card className="h-full flex flex-col border-2 border-white dark:border-white bg-zinc-800 dark:bg-zinc-800 shadow-xl relative">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-sm font-semibold uppercase tracking-widest text-white dark:text-white mb-2">
-                    Pro
-                  </CardTitle>
-                  <div className="mt-4">
-                    <span className="text-5xl font-extrabold tracking-tight text-white dark:text-white">$49.99</span>
-                    <span className="text-zinc-400 dark:text-zinc-400 text-lg ml-1">/mo</span>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex-1">
-                  <ul className="space-y-3">
-                    <li className="flex items-start gap-3">
-                      <CheckCircle className="h-5 w-5 text-white dark:text-white flex-shrink-0 mt-0.5" />
-                      <span className="text-zinc-300 dark:text-zinc-300 font-medium">Up to 35,000 total listings</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <CheckCircle className="h-5 w-5 text-white dark:text-white flex-shrink-0 mt-0.5" />
-                      <span className="text-zinc-300 dark:text-zinc-300 font-medium">2 Stores</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <CheckCircle className="h-5 w-5 text-white dark:text-white flex-shrink-0 mt-0.5" />
-                      <span className="text-zinc-300 dark:text-zinc-300 font-medium">Advanced detection</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <CheckCircle className="h-5 w-5 text-white dark:text-white flex-shrink-0 mt-0.5" />
-                      <span className="text-zinc-300 dark:text-zinc-300 font-medium">Unlimited CSV export</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <CheckCircle className="h-5 w-5 text-white dark:text-white flex-shrink-0 mt-0.5" />
-                      <span className="text-zinc-300 dark:text-zinc-300 font-medium">Fast scan speed</span>
-                    </li>
-                  </ul>
-                </CardContent>
-                <CardFooter>
-                  <Button asChild className="w-full bg-white dark:bg-white hover:bg-zinc-200 dark:hover:bg-zinc-200 text-black dark:text-black shadow-lg">
-                    <a href="/dashboard">Get Started</a>
-                  </Button>
-                </CardFooter>
-              </Card>
-            </motion.div>
 
-            {/* Power Seller */}
-            <motion.div variants={fadeInUp}>
-              <Card className="h-full flex flex-col border-2 border-white dark:border-white hover:border-zinc-200 dark:hover:border-zinc-200 transition-colors bg-zinc-900 dark:bg-zinc-900">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-sm font-semibold uppercase tracking-widest text-white dark:text-white mb-2">
-                    Power Seller
-                  </CardTitle>
-                  <div className="mt-4">
-                    <span className="text-5xl font-extrabold tracking-tight text-white dark:text-white">$99.99</span>
-                    <span className="text-zinc-400 dark:text-zinc-400 text-lg ml-1">/mo</span>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex-1">
-                  <ul className="space-y-3">
-                    <li className="flex items-start gap-3">
-                      <CheckCircle className="h-5 w-5 text-white dark:text-white flex-shrink-0 mt-0.5" />
-                      <span className="text-zinc-300 dark:text-zinc-300 font-medium">Up to 100,000 total listings</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <CheckCircle className="h-5 w-5 text-white dark:text-white flex-shrink-0 mt-0.5" />
-                      <span className="text-zinc-300 dark:text-zinc-300 font-medium">Unlimited stores</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <CheckCircle className="h-5 w-5 text-white dark:text-white flex-shrink-0 mt-0.5" />
-                      <span className="text-zinc-300 dark:text-zinc-300 font-medium">Priority detection</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <CheckCircle className="h-5 w-5 text-white dark:text-white flex-shrink-0 mt-0.5" />
-                      <span className="text-zinc-300 dark:text-zinc-300 font-medium">Unlimited CSV export</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <CheckCircle className="h-5 w-5 text-white dark:text-white flex-shrink-0 mt-0.5" />
-                      <span className="text-zinc-300 dark:text-zinc-300 font-medium">Fastest scan speed</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <CheckCircle className="h-5 w-5 text-white dark:text-white flex-shrink-0 mt-0.5" />
-                      <span className="text-zinc-300 dark:text-zinc-300 font-medium">Priority support</span>
-                    </li>
-                  </ul>
-                </CardContent>
-                <CardFooter>
-                  <Button asChild className="w-full" variant="outline">
-                    <a href="/dashboard">Get Started</a>
-                  </Button>
-                </CardFooter>
-              </Card>
-            </motion.div>
+              {/* STARTER Row */}
+              <div className="grid grid-cols-4 gap-4 px-6 py-5 border-b border-zinc-700/50 hover:bg-zinc-800/30 transition-colors">
+                <div className="text-white font-bold text-lg">STARTER</div>
+                <div className="text-emerald-400 font-bold text-xl">$19</div>
+                <div className="text-zinc-300">Up to 5,000</div>
+                <div className="text-zinc-300 text-right">1 Store</div>
+              </div>
+
+              {/* PRO Row */}
+              <div className="grid grid-cols-4 gap-4 px-6 py-5 border-b border-zinc-700/50 hover:bg-zinc-800/30 transition-colors">
+                <div className="text-white font-bold text-lg">PRO</div>
+                <div className="text-emerald-400 font-bold text-xl">$49</div>
+                <div className="text-zinc-300">Up to 30,000</div>
+                <div className="text-zinc-300 text-right">3 Stores</div>
+              </div>
+
+              {/* POWER SELLER Row */}
+              <div className="grid grid-cols-4 gap-4 px-6 py-5 hover:bg-zinc-800/30 transition-colors">
+                <div className="text-white font-bold text-lg">POWER SELLER</div>
+                <div className="text-emerald-400 font-bold text-xl">$99</div>
+                <div className="text-zinc-300">Up to 100,000</div>
+                <div className="text-zinc-300 text-right">10 Stores</div>
+              </div>
+            </div>
+
+            {/* Sheets Export Button */}
+            <div className="mt-6">
+              <a 
+                href="/dashboard" 
+                className="flex items-center justify-between w-full px-6 py-4 bg-zinc-800/50 rounded-xl border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-600 transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <Table className="w-6 h-6 text-emerald-500" />
+                  <span className="text-white font-medium">Sheets로 내보내기</span>
+                </div>
+                <div className="w-5 h-5 border-2 border-zinc-600 rounded group-hover:border-emerald-500 transition-colors"></div>
+              </a>
+            </div>
+
+            {/* CTA Button */}
+            <div className="mt-8 text-center">
+              <a 
+                href="/dashboard" 
+                className="inline-flex items-center gap-2 px-10 py-4 bg-white hover:bg-zinc-200 text-black font-bold rounded-xl transition-all shadow-lg hover:shadow-xl hover:-translate-y-1"
+              >
+                Start 30-Day Free Trial
+                <ArrowRight className="w-5 h-5" />
+              </a>
+              <p className="text-zinc-500 text-sm mt-3">Credit card required. Cancel anytime.</p>
+            </div>
           </motion.div>
         </div>
       </section>
@@ -527,4 +440,3 @@ function LandingPage() {
 }
 
 export default LandingPage
-
