@@ -88,6 +88,13 @@ class Profile(Base):
 # Use Supabase PostgreSQL if DATABASE_URL is set, otherwise fall back to SQLite
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 
+# Debug: Print DATABASE_URL status
+print(f"DEBUG: DATABASE_URL exists: {bool(DATABASE_URL)}")
+print(f"DEBUG: DATABASE_URL starts with postgresql: {DATABASE_URL.startswith(('postgresql://', 'postgres://')) if DATABASE_URL else False}")
+if DATABASE_URL:
+    # Print first 50 chars only (hide password)
+    print(f"DEBUG: DATABASE_URL prefix: {DATABASE_URL[:50]}...")
+
 # ✅ FIX: DATABASE_URL 검증 강화 (빈 문자열, None, 잘못된 형식 체크)
 if DATABASE_URL and DATABASE_URL.startswith(("postgresql://", "postgres://")):
     # Supabase PostgreSQL connection
