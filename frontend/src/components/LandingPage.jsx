@@ -346,7 +346,7 @@ function LandingPage() {
             <div className="text-center mb-10">
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-2 flex items-center justify-center gap-3">
                 <span className="text-3xl">💰</span>
-                OptListing 단순화된 가격 플랜
+                OptListing 최종 확정 가격 플랜
               </h2>
             </div>
 
