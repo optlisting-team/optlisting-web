@@ -206,6 +206,86 @@ def root():
     return {"message": "OptListing API is running"}
 
 
+@app.get("/api/health")
+def health_check():
+    """
+    서비스 Health Check 엔드포인트
+    - API 상태
+    - DB 연결 상태
+    - eBay Worker 상태
+    """
+    from datetime import datetime
+    
+    health = {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": app.version,
+        "services": {
+            "api": "ok",
+            "database": "unknown",
+            "ebay_worker": "unknown"
+        }
+    }
+    
+    # DB 연결 테스트
+    try:
+        from .models import engine
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        health["services"]["database"] = "ok"
+    except Exception as e:
+        health["services"]["database"] = f"error: {str(e)[:50]}"
+        health["status"] = "degraded"
+    
+    # Worker 상태 확인 (import 시도)
+    try:
+        from .workers.ebay_token_worker import get_worker_status
+        worker_status = get_worker_status()
+        health["services"]["ebay_worker"] = {
+            "status": "running" if worker_status.get("is_running") else "idle",
+            "last_run": worker_status.get("last_run"),
+            "total_refreshed": worker_status.get("total_refreshed", 0),
+            "ebay_configured": worker_status.get("ebay_configured", False)
+        }
+    except ImportError:
+        health["services"]["ebay_worker"] = "not_loaded"
+    except Exception as e:
+        health["services"]["ebay_worker"] = f"error: {str(e)[:50]}"
+    
+    return health
+
+
+@app.post("/api/worker/trigger-refresh")
+async def trigger_token_refresh(
+    admin_key: str = None
+):
+    """
+    수동으로 eBay Token 갱신 작업 트리거 (관리자용)
+    
+    참고: 이 엔드포인트는 Worker 프로세스와 별개로 동작합니다.
+    실제 갱신은 Worker가 처리합니다.
+    """
+    # 간단한 보안 체크 (프로덕션에서는 더 강력한 인증 필요)
+    expected_key = os.getenv("ADMIN_API_KEY", "")
+    if expected_key and admin_key != expected_key:
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+    
+    try:
+        from .workers.ebay_token_worker import run_token_refresh_job
+        result = run_token_refresh_job()
+        return {
+            "success": result.get("success", False),
+            "message": "Token refresh job executed",
+            "stats": result.get("stats", {}),
+            "elapsed_time": result.get("elapsed_time", 0)
+        }
+    except ImportError:
+        raise HTTPException(status_code=500, detail="Worker module not available")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Job failed: {str(e)}")
+
+
 @app.get("/api/listings")
 def get_listings(
     skip: int = 0,
