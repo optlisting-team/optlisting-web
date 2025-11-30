@@ -16,8 +16,12 @@ from .models import init_db, get_db, Listing, DeletionLog, Profile, Base, engine
 from .services import detect_source, extract_supplier_info, analyze_zombie_listings, generate_export_csv
 from .dummy_data import generate_dummy_listings
 from .webhooks import verify_webhook_signature, process_webhook_event
+from .ebay_webhook import router as ebay_webhook_router
 
-app = FastAPI(title="OptListing API", version="1.1.2")
+app = FastAPI(title="OptListing API", version="1.1.3")
+
+# eBay Webhook Router 등록
+app.include_router(ebay_webhook_router)
 
 # In-memory cache for KPI metrics (5-minute TTL)
 # Structure: {cache_key: {"data": {...}, "timestamp": datetime}}

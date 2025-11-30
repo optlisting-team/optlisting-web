@@ -12,6 +12,10 @@ DATABASE_URL=postgresql://postgres.xxx:password@xxx.pooler.supabase.com:5432/pos
 EBAY_CLIENT_ID=your_ebay_app_client_id
 EBAY_CLIENT_SECRET=your_ebay_app_client_secret
 EBAY_ENVIRONMENT=PRODUCTION  # SANDBOX or PRODUCTION
+
+# eBay Webhook (Keysel 활성화 필수!)
+EBAY_VERIFICATION_SECRET=your_verification_token
+EBAY_WEBHOOK_ENDPOINT=https://optlisting-production.up.railway.app/api/ebay/deletion
 ```
 
 ### 선택적 환경변수
@@ -23,6 +27,49 @@ ENVIRONMENT=production
 
 # 기타
 PORT=8080
+```
+
+---
+
+## eBay Webhook (Marketplace Account Deletion) 설정
+
+### 1. eBay Developer Console에서 Webhook 설정
+
+1. https://developer.ebay.com → **Alerts & Notifications**
+2. **Marketplace Account Deletion** 섹션
+3. **Endpoint URL** 설정:
+   ```
+   https://optlisting-production.up.railway.app/api/ebay/deletion
+   ```
+4. **Verification Token** 생성 및 저장
+
+### 2. Railway 환경변수 추가
+
+```bash
+EBAY_VERIFICATION_SECRET=your_verification_token_from_ebay
+EBAY_WEBHOOK_ENDPOINT=https://optlisting-production.up.railway.app/api/ebay/deletion
+```
+
+### 3. Challenge-Response 검증 방식
+
+```
+eBay Request:
+GET /api/ebay/deletion?challenge_code=abc123
+
+Backend Response:
+{
+  "challengeResponse": "sha256(challenge_code + verification_token + endpoint_url)"
+}
+```
+
+### 4. 테스트
+
+```bash
+# Health Check
+curl https://optlisting-production.up.railway.app/api/ebay/health
+
+# Challenge Simulation (로컬)
+curl "http://localhost:8000/api/ebay/deletion?challenge_code=test123"
 ```
 
 ---
