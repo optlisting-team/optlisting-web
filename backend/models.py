@@ -88,6 +88,10 @@ class Profile(Base):
 # Use Supabase PostgreSQL if DATABASE_URL is set, otherwise fall back to SQLite
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 
+# Fix: Remove quotes and leading = if present (Railway sometimes adds these)
+if DATABASE_URL:
+    DATABASE_URL = DATABASE_URL.strip('"').strip("'").lstrip('=').strip()
+
 # Debug: Print DATABASE_URL status
 print(f"DEBUG: DATABASE_URL exists: {bool(DATABASE_URL)}")
 print(f"DEBUG: DATABASE_URL starts with postgresql: {DATABASE_URL.startswith(('postgresql://', 'postgres://')) if DATABASE_URL else False}")
