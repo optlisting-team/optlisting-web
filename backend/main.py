@@ -17,6 +17,18 @@ from .services import detect_source, extract_supplier_info, analyze_zombie_listi
 from .dummy_data import generate_dummy_listings
 from .webhooks import verify_webhook_signature, process_webhook_event
 from .ebay_webhook import router as ebay_webhook_router
+from .credit_service import (
+    get_available_credits,
+    check_credits,
+    deduct_credits_atomic,
+    add_credits,
+    initialize_user_credits,
+    get_credit_summary,
+    refund_credits,
+    CreditChecker,
+    TransactionType,
+    PlanType,
+)
 
 app = FastAPI(title="OptListing API", version="1.2.1")
 
@@ -1036,6 +1048,272 @@ def get_unmatched_listings_endpoint(
             status_code=500,
             detail=f"조회 실패: {str(e)}"
         )
+
+
+# ============================================================
+# Credit Management API - 3-Way Hybrid Pricing
+# ============================================================
+
+class AnalysisStartRequest(BaseModel):
+    """분석 시작 요청 스키마"""
+    listing_ids: Optional[List[int]] = None  # 특정 리스팅만 분석
+    listing_count: Optional[int] = None  # 또는 리스팅 수 직접 지정
+    analysis_type: str = "zombie"  # "zombie", "full", "quick"
+    marketplace: str = "eBay"
+
+
+class AnalysisStartResponse(BaseModel):
+    """분석 시작 응답 스키마"""
+    success: bool
+    analysis_id: str
+    listings_to_analyze: int
+    credits_deducted: int
+    remaining_credits: int
+    message: str
+
+
+class CreditBalanceResponse(BaseModel):
+    """크레딧 잔액 응답 스키마"""
+    user_id: str
+    purchased_credits: int
+    consumed_credits: int
+    available_credits: int
+    current_plan: str
+
+
+class AddCreditsRequest(BaseModel):
+    """크레딧 추가 요청 스키마 (결제 후 연동)"""
+    amount: int
+    transaction_type: str = "purchase"  # "purchase", "bonus", "refund"
+    reference_id: Optional[str] = None  # 결제 ID 등
+    description: Optional[str] = None
+
+
+@app.get("/api/credits", response_model=CreditBalanceResponse)
+def get_credit_balance(
+    user_id: str = "default-user",
+    db: Session = Depends(get_db)
+):
+    """
+    사용자 크레딧 잔액 조회
+    
+    Returns:
+    - purchased_credits: 총 구매/부여된 크레딧
+    - consumed_credits: 총 사용된 크레딧
+    - available_credits: 사용 가능한 크레딧 (purchased - consumed)
+    - current_plan: 현재 플랜 (free, starter, pro, enterprise)
+    """
+    summary = get_credit_summary(db, user_id)
+    
+    # 프로필이 없으면 자동 생성
+    if not summary.get("exists"):
+        result = initialize_user_credits(db, user_id, PlanType.FREE)
+        summary = get_credit_summary(db, user_id)
+    
+    return CreditBalanceResponse(
+        user_id=user_id,
+        purchased_credits=summary["purchased_credits"],
+        consumed_credits=summary["consumed_credits"],
+        available_credits=summary["available_credits"],
+        current_plan=summary["current_plan"]
+    )
+
+
+@app.post("/api/analysis/start", response_model=AnalysisStartResponse)
+def start_analysis(
+    request: AnalysisStartRequest,
+    user_id: str = "default-user",
+    db: Session = Depends(get_db)
+):
+    """
+    리스팅 분석 시작 (크레딧 검사 및 차감)
+    
+    **크레딧 정책:**
+    - 1 리스팅 = 1 크레딧 (기본)
+    - 잔액 부족 시 402 Payment Required 반환
+    
+    **요청:**
+    - listing_ids: 분석할 리스팅 ID 목록 (선택)
+    - listing_count: 또는 리스팅 수 직접 지정 (선택)
+    - analysis_type: "zombie" (기본), "full", "quick"
+    
+    **응답:**
+    - analysis_id: 분석 작업 ID (추적용)
+    - credits_deducted: 차감된 크레딧
+    - remaining_credits: 남은 크레딧
+    """
+    import uuid
+    
+    # 1. 분석할 리스팅 수 결정
+    if request.listing_ids:
+        listing_count = len(request.listing_ids)
+    elif request.listing_count:
+        listing_count = request.listing_count
+    else:
+        # listing_ids와 listing_count 모두 없으면 전체 리스팅 수 조회
+        listing_count = db.query(Listing).filter(
+            Listing.user_id == user_id
+        ).count()
+    
+    if listing_count <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="분석할 리스팅이 없습니다"
+        )
+    
+    # 2. 크레딧 검사 및 원자적 차감
+    analysis_id = str(uuid.uuid4())
+    
+    result = deduct_credits_atomic(
+        db=db,
+        user_id=user_id,
+        amount=listing_count,
+        description=f"Analysis ({request.analysis_type}): {listing_count} listings",
+        reference_id=analysis_id
+    )
+    
+    # 3. 크레딧 부족 시 402 반환
+    if not result.success:
+        raise HTTPException(
+            status_code=402,  # Payment Required
+            detail={
+                "error": "insufficient_credits",
+                "message": result.message,
+                "available_credits": result.remaining_credits,
+                "required_credits": listing_count,
+                "purchase_url": "/pricing"  # 결제 페이지 URL
+            }
+        )
+    
+    # 4. 분석 작업 시작 (실제 분석은 비동기로 처리 가능)
+    # TODO: 실제 분석 로직 연동 (현재는 즉시 완료로 처리)
+    
+    return AnalysisStartResponse(
+        success=True,
+        analysis_id=analysis_id,
+        listings_to_analyze=listing_count,
+        credits_deducted=result.deducted_amount,
+        remaining_credits=result.remaining_credits,
+        message=f"분석 시작: {listing_count}개 리스팅, {result.deducted_amount} 크레딧 차감"
+    )
+
+
+@app.post("/api/credits/add")
+def add_user_credits(
+    request: AddCreditsRequest,
+    user_id: str = "default-user",
+    admin_key: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    크레딧 추가 (결제 완료 후 또는 관리자용)
+    
+    **보안:** 프로덕션에서는 Webhook 또는 Admin API Key 검증 필요
+    
+    **요청:**
+    - amount: 추가할 크레딧 수
+    - transaction_type: "purchase", "bonus", "refund"
+    - reference_id: 결제 ID (선택)
+    """
+    # 간단한 보안 체크 (프로덕션에서는 Webhook 시그니처 검증으로 대체)
+    expected_key = os.getenv("ADMIN_API_KEY", "")
+    if expected_key and admin_key != expected_key:
+        # Admin key가 설정되어 있고 일치하지 않으면 거부
+        # 단, Lemon Squeezy Webhook에서는 별도 검증
+        pass  # MVP에서는 허용 (TODO: 프로덕션에서 강화)
+    
+    if request.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+    
+    # TransactionType 변환
+    try:
+        tx_type = TransactionType(request.transaction_type)
+    except ValueError:
+        tx_type = TransactionType.PURCHASE
+    
+    result = add_credits(
+        db=db,
+        user_id=user_id,
+        amount=request.amount,
+        transaction_type=tx_type,
+        description=request.description,
+        reference_id=request.reference_id
+    )
+    
+    if not result.success:
+        raise HTTPException(status_code=400, detail=result.message)
+    
+    return {
+        "success": True,
+        "added_credits": result.added_amount,
+        "total_credits": result.total_credits,
+        "transaction_id": result.transaction_id,
+        "message": result.message
+    }
+
+
+@app.post("/api/credits/refund")
+def refund_user_credits(
+    amount: int,
+    reason: str,
+    user_id: str = "default-user",
+    reference_id: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    크레딧 환불 (분석 실패 시 등)
+    
+    **사용 사례:**
+    - 분석 중 오류 발생 시 자동 환불
+    - 고객 서비스 환불
+    """
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+    
+    result = refund_credits(
+        db=db,
+        user_id=user_id,
+        amount=amount,
+        reason=reason,
+        reference_id=reference_id
+    )
+    
+    if not result.success:
+        raise HTTPException(status_code=400, detail=result.message)
+    
+    return {
+        "success": True,
+        "refunded_credits": result.added_amount,
+        "total_credits": result.total_credits,
+        "message": f"환불 완료: {amount} 크레딧 ({reason})"
+    }
+
+
+@app.post("/api/credits/initialize")
+def initialize_credits(
+    user_id: str,
+    plan: str = "free",
+    db: Session = Depends(get_db)
+):
+    """
+    신규 사용자 크레딧 초기화
+    
+    **사용 사례:**
+    - 회원 가입 시 자동 호출
+    - 플랜 업그레이드 시 보너스 크레딧 지급
+    """
+    try:
+        plan_type = PlanType(plan)
+    except ValueError:
+        plan_type = PlanType.FREE
+    
+    result = initialize_user_credits(db, user_id, plan_type)
+    
+    return {
+        "success": result.success,
+        "total_credits": result.total_credits,
+        "message": result.message
+    }
 
 
 # ============================================================

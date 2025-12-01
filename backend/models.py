@@ -76,6 +76,11 @@ class Profile(Base):
     # 플랜 제한
     total_listings_limit = Column(Integer, default=100)  # Pro 플랜: 무제한 또는 큰 수, Free: 100
     
+    # 크레딧 시스템 (3-Way Hybrid Pricing)
+    purchased_credits = Column(Integer, default=0, nullable=False)  # 총 구매/부여 크레딧
+    consumed_credits = Column(Integer, default=0, nullable=False)   # 총 사용 크레딧
+    current_plan = Column(String, default='free')  # 'free', 'starter', 'pro', 'enterprise'
+    
     # eBay OAuth 토큰
     ebay_access_token = Column(String, nullable=True)  # eBay Access Token (2시간 만료)
     ebay_refresh_token = Column(String, nullable=True)  # eBay Refresh Token (18개월 만료)
