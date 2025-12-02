@@ -51,10 +51,10 @@ function Dashboard() {
   const [error, setError] = useState(null)
   const [selectedIds, setSelectedIds] = useState([])
   const [queue, setQueue] = useState([])
-  const [viewMode, setViewMode] = useState('total') // 'total', 'all', 'zombies', 'queue', or 'history' - Default to 'total' for initial statistical view
+  const [viewMode, setViewMode] = useState(DEMO_MODE ? 'zombies' : 'total') // 'total', 'all', 'zombies', 'queue', or 'history' - DEMO_MODE starts with zombies view
   const [historyLogs, setHistoryLogs] = useState([])
   const [totalDeleted, setTotalDeleted] = useState(DEMO_MODE ? 23 : 0)
-  const [showFilter, setShowFilter] = useState(false) // Filter panel visibility
+  const [showFilter, setShowFilter] = useState(DEMO_MODE ? true : false) // Filter panel visibility - DEMO_MODE starts with filter open
   const [filters, setFilters] = useState({
     marketplace_filter: 'eBay',  // MVP Scope: Default to eBay (only eBay and Shopify supported)
     analytics_period_days: 7,    // 1. 분석 기준 기간
