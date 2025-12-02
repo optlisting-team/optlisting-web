@@ -366,46 +366,6 @@ function LandingPage() {
             </div>
 
             {/* ═══════════════════════════════════════════════════════════════════ */}
-            {/* P0: Credit Rollover Banner - TOP (Full Width, Maximum Emphasis) */}
-            {/* ═══════════════════════════════════════════════════════════════════ */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.1 }}
-              className="mb-16 p-8 bg-gradient-to-r from-emerald-600/20 via-teal-500/20 to-emerald-600/20 border-2 border-emerald-500/50 rounded-3xl relative overflow-hidden"
-            >
-              {/* Background Glow */}
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[200px] bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
-              
-              <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="flex items-center gap-5">
-                  <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center shadow-xl shadow-emerald-500/30 animate-pulse">
-                    <span className="text-3xl">🔄</span>
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-teal-200 mb-1">
-                      100% Credit Rollover Guarantee
-                    </h3>
-                    <p className="text-emerald-200/90 text-base">
-                      Unused credits roll over to next month. <strong className="text-white">Your analysis resources never expire.</strong>
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-xl">
-                    <CheckCircle className="w-5 h-5 text-emerald-400" />
-                    <span className="text-emerald-300 font-semibold text-sm">1 Credit = 1 Listing Scan</span>
-                  </div>
-                  <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-xl">
-                    <CheckCircle className="w-5 h-5 text-emerald-400" />
-                    <span className="text-emerald-300 font-semibold text-sm">Never Expires</span>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* ═══════════════════════════════════════════════════════════════════ */}
             {/* P1: Credit Pack Section (Pay-Per-Scan) - Volume Discount */}
             {/* ═══════════════════════════════════════════════════════════════════ */}
             <motion.div
