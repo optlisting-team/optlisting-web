@@ -406,7 +406,7 @@ function LandingPage() {
             </motion.div>
 
             {/* ═══════════════════════════════════════════════════════════════════ */}
-            {/* P1: Credit Pack Section (Pay-Per-Scan) - Entry Point */}
+            {/* P1: Credit Pack Section (Pay-Per-Scan) - Volume Discount */}
             {/* ═══════════════════════════════════════════════════════════════════ */}
             <motion.div
               initial={{ opacity: 0, y: 30 }}
@@ -416,81 +416,201 @@ function LandingPage() {
               className="mb-16"
             >
               {/* Section Header */}
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
-                  <span className="text-xl">💰</span>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
+                    <span className="text-xl">💰</span>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white">Credit Packs</h3>
+                    <p className="text-zinc-400 text-sm">One-time purchase • No commitment • Volume discounts</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white">Credit Packs</h3>
-                  <p className="text-zinc-400 text-sm">One-time purchase • No commitment</p>
+                <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                  <span className="text-emerald-400 text-sm font-semibold">💡 Buy more, save more!</span>
                 </div>
               </div>
 
-              {/* Credit Pack Card */}
-              <div className="relative bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-zinc-800/80 border border-amber-500/30 rounded-2xl p-8 hover:border-amber-500/50 transition-all">
-                {/* Badge */}
-                <div className="absolute -top-3 right-6">
-                  <span className="px-4 py-1.5 bg-gradient-to-r from-amber-600 to-orange-500 text-white text-xs font-bold rounded-full shadow-lg shadow-amber-500/30">
-                    💰 STARTER PACK
-                  </span>
-                </div>
-
-                <div className="grid md:grid-cols-3 gap-8 items-center mt-2">
-                  {/* Left: Price & Value */}
-                  <div className="text-center md:text-left">
-                    <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Pay-Per-Scan</span>
-                    <h4 className="text-3xl font-bold text-white mt-2">STARTER</h4>
-                    <div className="flex items-baseline gap-2 mt-3 justify-center md:justify-start">
-                      <span className="text-6xl font-black text-white">$5</span>
-                      <span className="text-zinc-400 text-lg">one-time</span>
+              {/* Credit Pack Cards - 3 Column */}
+              <div className="grid md:grid-cols-3 gap-6">
+                
+                {/* $5 Pack - Starter */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.25 }}
+                  className="relative bg-zinc-800/50 border border-zinc-700 rounded-2xl p-6 hover:border-amber-500/30 transition-all group"
+                >
+                  <div className="mb-4">
+                    <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Starter</span>
+                    <div className="flex items-baseline gap-2 mt-2">
+                      <span className="text-4xl font-black text-white">$5</span>
+                      <span className="text-zinc-500 text-sm">one-time</span>
                     </div>
-                    <p className="text-zinc-500 text-sm mt-2">Try before you subscribe</p>
                   </div>
 
-                  {/* Center: Credit Value Highlight */}
-                  <div className="p-6 bg-amber-500/15 border border-amber-500/30 rounded-2xl">
-                    <div className="flex items-center justify-center gap-3 mb-3">
-                      <span className="text-4xl">🎁</span>
-                      <span className="text-amber-300 font-black text-2xl">1,000 Credits</span>
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl mb-4">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <span className="text-2xl">🎁</span>
+                      <span className="text-amber-300 font-black text-xl">1,000</span>
+                      <span className="text-amber-300/70 text-sm">Credits</span>
                     </div>
-                    <p className="text-center text-amber-200/80 text-sm mb-3">
-                      Pay $5 USD → Receive <strong className="text-white">1,000 Credits</strong> instantly
+                    <p className="text-center text-zinc-400 text-xs">
+                      $0.005 per credit
                     </p>
-                    <div className="pt-3 border-t border-amber-500/20 text-center">
-                      <p className="text-amber-400 font-semibold text-sm">
-                        1 Credit = 1 Listing Scan
-                      </p>
+                  </div>
+
+                  <div className="space-y-2 mb-5 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-amber-400" />
+                      <span className="text-zinc-300">1,000 Listing Scans</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-amber-400" />
+                      <span className="text-zinc-300">1 Store Connected</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-emerald-400" />
+                      <span className="text-emerald-300 font-semibold">Credit Rollover ✨</span>
                     </div>
                   </div>
 
-                  {/* Right: Features & CTA */}
-                  <div>
-                    <div className="space-y-2 mb-6">
-                      <div className="flex items-center gap-2">
-                        <Check className="w-4 h-4 text-amber-400" />
-                        <span className="text-zinc-300 text-sm">1,000 Listing Scans</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check className="w-4 h-4 text-amber-400" />
-                        <span className="text-zinc-300 text-sm">1 Store Connected</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check className="w-4 h-4 text-amber-400" />
-                        <span className="text-zinc-300 text-sm">CSV Export (AutoDS, eBay)</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check className="w-4 h-4 text-emerald-400" />
-                        <span className="text-emerald-300 text-sm font-semibold">Credit Rollover ✨ 100%</span>
-                      </div>
-                    </div>
-                    <a
-                      href="https://optlisting.lemonsqueezy.com/checkout/starter"
-                      className="block w-full py-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-bold rounded-xl text-center transition-all shadow-lg shadow-amber-500/20"
-                    >
-                      Buy Credits →
-                    </a>
+                  <a
+                    href="https://optlisting.lemonsqueezy.com/checkout/credit-5"
+                    className="block w-full py-3 bg-zinc-700 hover:bg-amber-600 text-white font-bold rounded-xl text-center transition-all group-hover:shadow-lg group-hover:shadow-amber-500/20"
+                  >
+                    Buy $5 Pack
+                  </a>
+                </motion.div>
+
+                {/* $10 Pack - Popular (Highlighted) */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.3 }}
+                  className="relative bg-gradient-to-b from-amber-500/15 to-zinc-800/80 border-2 border-amber-500/50 rounded-2xl p-6 shadow-xl shadow-amber-500/10"
+                >
+                  {/* Popular Badge */}
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="px-4 py-1 bg-gradient-to-r from-amber-600 to-orange-500 text-white text-xs font-bold rounded-full shadow-lg shadow-amber-500/30">
+                      🔥 POPULAR
+                    </span>
                   </div>
-                </div>
+
+                  <div className="mb-4 mt-2">
+                    <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Best Value</span>
+                    <div className="flex items-baseline gap-2 mt-2">
+                      <span className="text-4xl font-black text-white">$10</span>
+                      <span className="text-zinc-500 text-sm">one-time</span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-amber-500/20 border border-amber-500/30 rounded-xl mb-4">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <span className="text-2xl">🎁</span>
+                      <span className="text-amber-300 font-black text-xl">2,500</span>
+                      <span className="text-amber-300/70 text-sm">Credits</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-emerald-400 text-xs font-bold bg-emerald-500/20 px-2 py-0.5 rounded">+25% BONUS</span>
+                    </div>
+                    <p className="text-center text-zinc-400 text-xs mt-2">
+                      $0.004 per credit <span className="text-emerald-400">(Save 20%)</span>
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 mb-5 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-amber-400" />
+                      <span className="text-zinc-300">2,500 Listing Scans</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-amber-400" />
+                      <span className="text-zinc-300">2 Stores Connected</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-emerald-400" />
+                      <span className="text-emerald-300 font-semibold">Credit Rollover ✨</span>
+                    </div>
+                  </div>
+
+                  <a
+                    href="https://optlisting.lemonsqueezy.com/checkout/credit-10"
+                    className="block w-full py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-bold rounded-xl text-center transition-all shadow-lg shadow-amber-500/20"
+                  >
+                    Buy $10 Pack →
+                  </a>
+                </motion.div>
+
+                {/* $20 Pack - Pro */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.35 }}
+                  className="relative bg-gradient-to-b from-orange-500/10 to-zinc-800/80 border border-orange-500/30 rounded-2xl p-6 hover:border-orange-500/50 transition-all group"
+                >
+                  {/* Max Value Badge */}
+                  <div className="absolute -top-3 right-4">
+                    <span className="px-3 py-1 bg-orange-500/20 text-orange-400 text-xs font-bold rounded-full border border-orange-500/30">
+                      💎 MAX VALUE
+                    </span>
+                  </div>
+
+                  <div className="mb-4 mt-2">
+                    <span className="text-xs font-bold text-orange-400 uppercase tracking-wider">Pro Pack</span>
+                    <div className="flex items-baseline gap-2 mt-2">
+                      <span className="text-4xl font-black text-white">$20</span>
+                      <span className="text-zinc-500 text-sm">one-time</span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-orange-500/15 border border-orange-500/25 rounded-xl mb-4">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <span className="text-2xl">🎁</span>
+                      <span className="text-orange-300 font-black text-xl">6,000</span>
+                      <span className="text-orange-300/70 text-sm">Credits</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-emerald-400 text-xs font-bold bg-emerald-500/20 px-2 py-0.5 rounded">+50% BONUS</span>
+                    </div>
+                    <p className="text-center text-zinc-400 text-xs mt-2">
+                      $0.0033 per credit <span className="text-emerald-400">(Save 33%)</span>
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 mb-5 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-orange-400" />
+                      <span className="text-zinc-300">6,000 Listing Scans</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-orange-400" />
+                      <span className="text-zinc-300">3 Stores Connected</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-emerald-400" />
+                      <span className="text-emerald-300 font-semibold">Credit Rollover ✨</span>
+                    </div>
+                  </div>
+
+                  <a
+                    href="https://optlisting.lemonsqueezy.com/checkout/credit-20"
+                    className="block w-full py-3 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white font-bold rounded-xl text-center transition-all shadow-lg shadow-orange-500/20"
+                  >
+                    Buy $20 Pack →
+                  </a>
+                </motion.div>
+              </div>
+
+              {/* Credit Pack Footer Info */}
+              <div className="mt-6 text-center">
+                <p className="text-zinc-500 text-sm">
+                  All credit packs include <span className="text-amber-400">CSV Export</span> and <span className="text-emerald-400">100% Rollover</span> • 
+                  <span className="text-zinc-400"> 1 Credit = 1 Listing Scan</span>
+                </p>
               </div>
             </motion.div>
 
