@@ -380,27 +380,31 @@ def detect_listing_source(
 
 @app.get("/api/analyze")
 def analyze_zombies(
-    min_days: int = 3,
-    max_sales: int = 0,
-    max_watch_count: int = 10,
+    # 새 필터 파라미터 (순서대로)
+    analytics_period_days: int = 7,  # 1. 분석 기준 기간
+    min_days: int = 7,               # Legacy compatibility
+    max_sales: int = 0,              # 2. 기간 내 판매 건수
+    max_watches: int = 0,            # 3. 찜하기 (Watch)
+    max_watch_count: int = 0,        # Legacy compatibility
+    max_impressions: int = 100,      # 4. 총 노출 횟수
+    max_views: int = 10,             # 5. 총 조회 횟수
     supplier_filter: str = "All",
-    marketplace: str = "eBay",  # MVP Scope: Default to eBay (only eBay and Shopify supported)
-    store_id: Optional[str] = None,  # Store ID filter - 'all' or None means all stores
-    user_id: str = "default-user",  # Default user ID for backward compatibility
-    skip: int = 0,  # Pagination: skip N records
-    limit: int = 100,  # Pagination: limit to N records (default 100, max 1000)
+    marketplace: str = "eBay",       # MVP Scope: Default to eBay
+    store_id: Optional[str] = None,
+    user_id: str = "default-user",
+    skip: int = 0,
+    limit: int = 100,
     db: Session = Depends(get_db)
 ):
     """
-    Zombie Filter API
-    Filters listings based on dynamic criteria:
-    - marketplace: Filter by marketplace - MVP Scope: "eBay" or "Shopify" only (default: "eBay")
-    - min_days: Minimum days old (default: 3)
-    - max_sales: Maximum sales count (default: 0)
-    - max_watch_count: Maximum watch count/views (default: 10)
-    - supplier_filter: Filter by supplier - "All", "Amazon", "Walmart", etc. (default: "All")
-    - skip: Pagination offset (default: 0)
-    - limit: Pagination limit (default: 100, max: 1000)
+    OptListing 최종 좀비 분석 필터 API
+    
+    필터 순서 (판매 → 관심 → 트래픽):
+    1. analytics_period_days: 분석 기준 기간 (기본 7일)
+    2. max_sales: 기간 내 판매 건수 (기본 0건)
+    3. max_watches: 찜하기/Watch (기본 0건)
+    4. max_impressions: 총 노출 횟수 (기본 100회 미만)
+    5. max_views: 총 조회 횟수 (기본 10회 미만)
     
     Returns:
     - total_count: Total number of ALL listings in the database
@@ -518,12 +522,20 @@ def analyze_zombies(
     # Cache will be set after zombie analysis if this is a full page request
     
     # Get zombie listings (filtered) - pass user_id, skip, and limit
+    # Use analytics_period_days if provided, otherwise fall back to min_days
+    effective_period = analytics_period_days if analytics_period_days != 7 else min_days
+    # Use max_watches if provided, otherwise fall back to max_watch_count
+    effective_watches = max_watches if max_watches > 0 else max_watch_count
+    
     zombies, zombie_breakdown = analyze_zombie_listings(
         db,
         user_id=user_id,
-        min_days=min_days, 
+        min_days=effective_period,
         max_sales=max_sales,
-        max_watch_count=max_watch_count,
+        max_watch_count=effective_watches,  # Legacy param
+        max_watches=effective_watches,       # New param
+        max_impressions=max_impressions,
+        max_views=max_views,
         supplier_filter=supplier_filter,
         platform_filter=marketplace,
         store_id=store_id,

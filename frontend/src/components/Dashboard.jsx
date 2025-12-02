@@ -30,9 +30,13 @@ function Dashboard() {
   const [totalDeleted, setTotalDeleted] = useState(0)
   const [filters, setFilters] = useState({
     marketplace_filter: 'eBay',  // MVP Scope: Default to eBay (only eBay and Shopify supported)
-    min_days: 3,
-    max_sales: 0,
-    max_watch_count: 10,
+    analytics_period_days: 7,    // 1. 분석 기준 기간
+    min_days: 7,                 // Legacy compatibility
+    max_sales: 0,                // 2. 기간 내 판매 건수
+    max_watches: 0,              // 3. 찜하기 (Watch)
+    max_watch_count: 0,          // Legacy compatibility
+    max_impressions: 100,        // 4. 총 노출 횟수
+    max_views: 10,               // 5. 총 조회 횟수
     supplier_filter: 'All'
   })
 
@@ -49,9 +53,14 @@ function Dashboard() {
         user_id: CURRENT_USER_ID,
         store_id: selectedStore?.id, // Use selected store ID (no fallback to 'all')
         marketplace: marketplace,
-        min_days: filterParams.min_days,
-        max_sales: filterParams.max_sales,
-        max_watch_count: filterParams.max_watch_count,
+        // 새 필터 파라미터 (순서대로)
+        analytics_period_days: filterParams.analytics_period_days || filterParams.min_days || 7,
+        min_days: filterParams.analytics_period_days || filterParams.min_days || 7, // Legacy
+        max_sales: filterParams.max_sales || 0,
+        max_watches: filterParams.max_watches || filterParams.max_watch_count || 0,
+        max_watch_count: filterParams.max_watches || filterParams.max_watch_count || 0, // Legacy
+        max_impressions: filterParams.max_impressions || 100,
+        max_views: filterParams.max_views || 10,
         supplier_filter: filterParams.supplier_filter || filterParams.source_filter
       }
       

@@ -292,36 +292,46 @@ def check_global_health(
 def analyze_zombie_listings(
     db: Session,
     user_id: str,
-    min_days: int = 60,
-    max_sales: int = 0,
-    max_watch_count: int = 10,
+    min_days: int = 7,               # Legacy: analytics_period_days
+    max_sales: int = 0,              # 2. 기간 내 판매 건수
+    max_watch_count: int = 0,        # Legacy: max_watches
+    max_watches: int = 0,            # 3. 찜하기 (Watch)
+    max_impressions: int = 100,      # 4. 총 노출 횟수
+    max_views: int = 10,             # 5. 총 조회 횟수
     supplier_filter: str = "All",
-    platform_filter: str = "eBay",  # MVP Scope: Default to eBay (only eBay and Shopify supported)
+    platform_filter: str = "eBay",   # MVP Scope: Default to eBay (only eBay and Shopify supported)
     store_id: Optional[str] = None,
-    skip: int = 0,  # Pagination: skip N records
-    limit: int = 100  # Pagination: limit to N records
+    skip: int = 0,                   # Pagination: skip N records
+    limit: int = 100                 # Pagination: limit to N records
 ) -> Tuple[List[Listing], Dict[str, int]]:
     """
-    Low Interest Items Filter Logic (formerly Zombie Filter)
-    Filters listings based on dynamic criteria using new hybrid schema.
+    OptListing 최종 좀비 분석 필터
+    순서: 판매(Sales) → 관심(Watch) → 트래픽(Traffic)
+    
+    필터 순서 (eBay 셀러의 자연스러운 판단 흐름):
+    1. analytics_period_days (min_days): 분석 기준 기간 (기본 7일)
+    2. max_sales: 기간 내 판매 건수 (기본 0건 = No Sale)
+    3. max_watches: 찜하기/Watch (기본 0건)
+    4. max_impressions: 총 노출 횟수 (기본 100회 미만)
+    5. max_views: 총 조회 횟수 (기본 10회 미만)
     
     Uses metrics JSONB field for flexible filtering:
-    - date_listed > min_days days ago (from metrics or legacy date_listed)
-    - sales <= max_sales (from metrics['sales'] or legacy sold_qty)
-    - views <= max_watch_count (from metrics['views'] or legacy watch_count)
-    - supplier_name matches supplier_filter (if not "All")
-    - platform matches platform_filter (MVP Scope: "eBay" or "Shopify" only)
+    - metrics['sales']['total_sales'] or metrics['sales']
+    - metrics['watches']['total_watches'] or metrics['watches']
+    - metrics['impressions']['total_impressions'] or metrics['impressions']
+    - metrics['views']['total_views'] or metrics['views']
     
     Returns:
         Tuple of (list of zombie listings, breakdown dictionary by platform)
         Example: ([Listing, ...], {"eBay": 150, "Shopify": 23})
     """
-    # Ensure min_days is at least 0
+    # Ensure values are non-negative
     min_days = max(0, min_days)
-    # Ensure max_sales is at least 0
     max_sales = max(0, max_sales)
-    # Ensure max_watch_count is at least 0
-    max_watch_count = max(0, max_watch_count)
+    # Use max_watches if provided, otherwise fall back to max_watch_count (legacy)
+    effective_max_watches = max(0, max_watches if max_watches > 0 else max_watch_count)
+    max_impressions = max(0, max_impressions)
+    max_views = max(0, max_views)
     
     cutoff_date = date.today() - timedelta(days=min_days)
     
@@ -428,30 +438,87 @@ def analyze_zombie_listings(
         )
         query = query.filter(sales_value <= max_sales)
     
-    # Watch count filter: use metrics['views'] (JSONB) with robust casting
-    # ✅ FIX: JSONB 연산자 안전하게 처리 및 타입 검증 추가
-    if max_watch_count is not None and max_watch_count >= 0:
-        # Use CASE to safely handle NULL metrics or missing keys
-        # ✅ FIX: hasattr 제거, 타입 검증 추가 및 안전한 캐스팅
+    # 3. Watch/찜하기 필터: metrics['watches'] or metrics['watches']['total_watches']
+    if effective_max_watches is not None and effective_max_watches >= 0:
+        watches_value = case(
+            # Try nested structure first: metrics['watches']['total_watches']
+            (
+                and_(
+                    Listing.metrics.isnot(None),
+                    Listing.metrics.has_key('watches'),
+                    func.jsonb_typeof(Listing.metrics['watches']) == 'object',
+                    Listing.metrics['watches'].has_key('total_watches')
+                ),
+                cast(Listing.metrics['watches']['total_watches'].astext, Integer)
+            ),
+            # Then try flat structure: metrics['watches']
+            (
+                and_(
+                    Listing.metrics.isnot(None),
+                    Listing.metrics.has_key('watches'),
+                    func.jsonb_typeof(Listing.metrics['watches']).in_(['number', 'string']),
+                    Listing.metrics['watches'].astext.isnot(None)
+                ),
+                cast(Listing.metrics['watches'].astext, Integer)
+            ),
+            # Fallback to legacy watch_count column
+            else_=func.coalesce(Listing.watch_count, 0)
+        )
+        query = query.filter(watches_value <= effective_max_watches)
+    
+    # 4. Impressions/노출 필터: metrics['impressions'] or metrics['impressions']['total_impressions']
+    if max_impressions is not None and max_impressions > 0:
+        impressions_value = case(
+            # Try nested structure first
+            (
+                and_(
+                    Listing.metrics.isnot(None),
+                    Listing.metrics.has_key('impressions'),
+                    func.jsonb_typeof(Listing.metrics['impressions']) == 'object',
+                    Listing.metrics['impressions'].has_key('total_impressions')
+                ),
+                cast(Listing.metrics['impressions']['total_impressions'].astext, Integer)
+            ),
+            # Then try flat structure
+            (
+                and_(
+                    Listing.metrics.isnot(None),
+                    Listing.metrics.has_key('impressions'),
+                    func.jsonb_typeof(Listing.metrics['impressions']).in_(['number', 'string']),
+                    Listing.metrics['impressions'].astext.isnot(None)
+                ),
+                cast(Listing.metrics['impressions'].astext, Integer)
+            ),
+            else_=0
+        )
+        query = query.filter(impressions_value < max_impressions)
+    
+    # 5. Views/조회 필터: metrics['views'] or metrics['views']['total_views']
+    if max_views is not None and max_views > 0:
         views_value = case(
+            # Try nested structure first
             (
                 and_(
                     Listing.metrics.isnot(None),
                     Listing.metrics.has_key('views'),
-                    # ✅ FIX: JSONB 값이 숫자 또는 문자열인지 확인
+                    func.jsonb_typeof(Listing.metrics['views']) == 'object',
+                    Listing.metrics['views'].has_key('total_views')
+                ),
+                cast(Listing.metrics['views']['total_views'].astext, Integer)
+            ),
+            # Then try flat structure
+            (
+                and_(
+                    Listing.metrics.isnot(None),
+                    Listing.metrics.has_key('views'),
                     func.jsonb_typeof(Listing.metrics['views']).in_(['number', 'string']),
-                    # ✅ FIX: NULL 체크 추가
                     Listing.metrics['views'].astext.isnot(None)
                 ),
-                # ✅ FIX: 안전한 타입 변환 (JSONB ->> 텍스트 추출 후 Integer로 변환)
-                cast(
-                    Listing.metrics['views'].astext,
-                    Integer
-                )
+                cast(Listing.metrics['views'].astext, Integer)
             ),
             else_=0
         )
-        query = query.filter(views_value <= max_watch_count)
+        query = query.filter(views_value < max_views)
     
     # Apply platform filter (MVP Scope: Only eBay and Shopify)
     # ✅ FIX: platform 필드가 없으면 marketplace 사용
