@@ -371,23 +371,23 @@ function LandingPage() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.2 }}
-              className="mb-12 p-6 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-amber-500/30 rounded-2xl"
+              className="mb-12 p-6 bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-amber-500/15 border border-amber-500/40 rounded-2xl"
             >
               <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/20">
+                  <div className="w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/30">
                     <span className="text-2xl">💎</span>
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-white mb-1">100% Credit Rollover Guarantee</h3>
                     <p className="text-amber-200/80 text-sm">
-                      Unused credits roll over to next month. Your analysis resources never expire.
+                      <span className="text-amber-300 font-semibold">1 Credit = 1 Listing Scan</span> • Unused credits roll over to next month
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/20 rounded-xl">
+                <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/20 border border-amber-500/30 rounded-xl">
                   <CheckCircle className="w-5 h-5 text-amber-400" />
-                  <span className="text-amber-300 font-semibold text-sm">Reduces CS & Refund Requests</span>
+                  <span className="text-amber-300 font-semibold text-sm">CS & 환불 문의 감소 효과</span>
                 </div>
               </div>
             </motion.div>
@@ -395,50 +395,72 @@ function LandingPage() {
             {/* 3-Column Pricing Cards */}
             <div className="grid md:grid-cols-3 gap-6 mb-12">
               
-              {/* Column 1: STARTER (Pay-Per-Scan) */}
+              {/* Column 1: PPS (Pay-Per-Scan) - Credit Based */}
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.1 }}
-                className="relative bg-zinc-800/50 border border-zinc-700 rounded-2xl p-8 hover:border-zinc-600 transition-all"
+                className="relative bg-gradient-to-b from-amber-500/10 to-zinc-800/80 border border-amber-500/30 rounded-2xl p-8 hover:border-amber-500/50 transition-all"
               >
-                <div className="mb-6">
-                  <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Pay-Per-Scan</span>
-                  <h3 className="text-2xl font-bold text-white mt-2">STARTER</h3>
-                  <p className="text-zinc-400 text-sm mt-1">Perfect for small sellers</p>
-                </div>
-                
-                <div className="mb-6">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-5xl font-black text-white">$19</span>
-                    <span className="text-zinc-400 text-lg">/mo</span>
-                  </div>
-                  <p className="text-zinc-500 text-sm mt-2">or $0.004 per listing scan</p>
+                {/* Credit Badge */}
+                <div className="absolute -top-3 right-4">
+                  <span className="px-3 py-1 bg-amber-500/20 text-amber-400 text-xs font-bold rounded-full border border-amber-500/30">
+                    💰 CREDIT PACK
+                  </span>
                 </div>
 
-                <div className="space-y-4 mb-8">
+                <div className="mb-6 mt-2">
+                  <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Pay-Per-Scan</span>
+                  <h3 className="text-2xl font-bold text-white mt-2">STARTER</h3>
+                  <p className="text-zinc-400 text-sm mt-1">Try before you subscribe</p>
+                </div>
+                
+                <div className="mb-4">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-5xl font-black text-white">$5</span>
+                    <span className="text-zinc-400 text-lg">one-time</span>
+                  </div>
+                </div>
+
+                {/* Credit Value Highlight */}
+                <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-2xl">🎁</span>
+                    <span className="text-amber-300 font-bold text-lg">1,000 Credits 즉시 획득</span>
+                  </div>
+                  <p className="text-amber-200/70 text-sm">
+                    $5 USD 결제 시 <strong className="text-white">1,000 Credits</strong> 즉시 지급
+                  </p>
+                  <div className="mt-2 pt-2 border-t border-amber-500/20">
+                    <p className="text-xs text-zinc-400">
+                      <span className="text-amber-400 font-semibold">1 Credit = 1 Listing Scan</span>에 사용됩니다
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3 mb-8">
                   <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-emerald-500/20 rounded-lg flex items-center justify-center">
-                      <Check className="w-4 h-4 text-emerald-400" />
+                    <div className="w-6 h-6 bg-amber-500/20 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-amber-400" />
                     </div>
-                    <span className="text-zinc-300">Up to <strong className="text-white">5,000</strong> listings</span>
+                    <span className="text-zinc-300">1,000 Listing Scans</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-emerald-500/20 rounded-lg flex items-center justify-center">
-                      <Check className="w-4 h-4 text-emerald-400" />
+                    <div className="w-6 h-6 bg-amber-500/20 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-amber-400" />
                     </div>
                     <span className="text-zinc-300"><strong className="text-white">1</strong> Store connected</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-emerald-500/20 rounded-lg flex items-center justify-center">
-                      <Check className="w-4 h-4 text-emerald-400" />
+                    <div className="w-6 h-6 bg-amber-500/20 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-amber-400" />
                     </div>
                     <span className="text-zinc-300">CSV Export (AutoDS, eBay)</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-emerald-500/20 rounded-lg flex items-center justify-center">
-                      <Check className="w-4 h-4 text-emerald-400" />
+                    <div className="w-6 h-6 bg-amber-500/20 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-amber-400" />
                     </div>
                     <span className="text-zinc-300">5-Filter Zombie Detection</span>
                   </div>
@@ -446,15 +468,15 @@ function LandingPage() {
                     <div className="w-6 h-6 bg-emerald-500/20 rounded-lg flex items-center justify-center">
                       <Check className="w-4 h-4 text-emerald-400" />
                     </div>
-                    <span className="text-zinc-300">Credit Rollover ✨</span>
+                    <span className="text-emerald-300 font-semibold">Credit Rollover ✨ 100%</span>
                   </div>
                 </div>
 
                 <a
                   href="https://optlisting.lemonsqueezy.com/checkout/starter"
-                  className="block w-full py-4 bg-zinc-700 hover:bg-zinc-600 text-white font-bold rounded-xl text-center transition-all"
+                  className="block w-full py-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-bold rounded-xl text-center transition-all shadow-lg shadow-amber-500/20"
                 >
-                  Get Started
+                  Buy Credits →
                 </a>
               </motion.div>
 
@@ -610,39 +632,51 @@ function LandingPage() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.4 }}
-              className="relative p-8 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border border-emerald-500/30 rounded-2xl overflow-hidden"
+              className="relative p-10 bg-gradient-to-r from-emerald-600/20 via-teal-500/20 to-emerald-600/20 border-2 border-emerald-500/50 rounded-3xl overflow-hidden shadow-2xl shadow-emerald-500/10"
             >
               {/* Background Pattern */}
-              <div className="absolute inset-0 opacity-10">
+              <div className="absolute inset-0 opacity-20">
                 <div className="absolute inset-0" style={{
-                  backgroundImage: `radial-gradient(circle at 2px 2px, rgba(52, 211, 153, 0.3) 1px, transparent 0)`,
-                  backgroundSize: '20px 20px'
+                  backgroundImage: `radial-gradient(circle at 2px 2px, rgba(52, 211, 153, 0.4) 1px, transparent 0)`,
+                  backgroundSize: '24px 24px'
                 }} />
               </div>
+              {/* Glow Effect */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[200px] bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
               
               <div className="relative z-10 text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl mb-4 shadow-lg shadow-emerald-500/30">
-                  <span className="text-3xl">🔄</span>
+                <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-3xl mb-6 shadow-xl shadow-emerald-500/40 animate-pulse">
+                  <span className="text-4xl">🔄</span>
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-3">
-                  Your Credits Never Expire
-                </h3>
-                <p className="text-emerald-200/90 text-lg max-w-2xl mx-auto mb-4">
+                
+                {/* Main Korean Text - Maximum Emphasis */}
+                <div className="mb-6 p-6 bg-emerald-500/10 border border-emerald-400/30 rounded-2xl">
+                  <h3 className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-teal-200 to-emerald-300 mb-4 leading-tight">
+                    잔여 크레딧은 100% 다음 달로 이월됩니다
+                  </h3>
+                  <p className="text-xl md:text-2xl text-emerald-100 font-semibold">
+                    사용하지 않은 분석 리소스는 <span className="text-yellow-300 font-black underline decoration-yellow-400 decoration-2">절대로 사라지지 않습니다</span>
+                  </p>
+                </div>
+
+                {/* English Translation */}
+                <p className="text-emerald-200/80 text-base max-w-2xl mx-auto mb-6">
                   <strong className="text-white">Unused credits roll over 100% to the next month.</strong><br/>
                   Your analysis resources are never wasted — they're always there when you need them.
                 </p>
+
                 <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
-                  <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 rounded-lg">
-                    <CheckCircle className="w-4 h-4 text-emerald-400" />
-                    <span className="text-emerald-300">No Use-It-Or-Lose-It Policy</span>
+                  <div className="flex items-center gap-2 px-5 py-3 bg-emerald-500/20 border border-emerald-500/30 rounded-xl">
+                    <CheckCircle className="w-5 h-5 text-emerald-400" />
+                    <span className="text-emerald-300 font-semibold">No Use-It-Or-Lose-It Policy</span>
                   </div>
-                  <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 rounded-lg">
-                    <CheckCircle className="w-4 h-4 text-emerald-400" />
-                    <span className="text-emerald-300">Reduces Refund Requests</span>
+                  <div className="flex items-center gap-2 px-5 py-3 bg-emerald-500/20 border border-emerald-500/30 rounded-xl">
+                    <CheckCircle className="w-5 h-5 text-emerald-400" />
+                    <span className="text-emerald-300 font-semibold">Reduces Refund Requests</span>
                   </div>
-                  <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 rounded-lg">
-                    <CheckCircle className="w-4 h-4 text-emerald-400" />
-                    <span className="text-emerald-300">Customer Trust Guarantee</span>
+                  <div className="flex items-center gap-2 px-5 py-3 bg-emerald-500/20 border border-emerald-500/30 rounded-xl">
+                    <CheckCircle className="w-5 h-5 text-emerald-400" />
+                    <span className="text-emerald-300 font-semibold">Customer Trust Guarantee</span>
                   </div>
                 </div>
               </div>

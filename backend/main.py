@@ -30,7 +30,7 @@ from .credit_service import (
     PlanType,
 )
 
-app = FastAPI(title="OptListing API", version="1.3.4")
+app = FastAPI(title="OptListing API", version="1.3.5")
 
 # eBay Webhook Router 등록
 app.include_router(ebay_webhook_router)
