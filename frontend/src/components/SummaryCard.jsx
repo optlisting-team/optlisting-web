@@ -161,6 +161,7 @@ function SummaryCard({
   onAnalyze = null,
   showFilter = false,
   onToggleFilter = null,
+  filterContent = null, // Filter panel to render after Total card
   // User subscription and credits
   userPlan = 'PRO',
   planStoreLimit = 5,
@@ -300,7 +301,7 @@ function SummaryCard({
           
           {/* Click Hint */}
           <div className="text-xs text-zinc-500 mb-4">
-            {showFilter ? '🔽 Filter panel open below' : '👆 Click to open filter & analyze'}
+            {showFilter ? '✅ Filters open ↓' : '👆 Click to open filters'}
           </div>
           
           {/* Platform Breakdown */}
@@ -328,6 +329,9 @@ function SummaryCard({
           )}
         </div>
       </div>
+
+      {/* Filter Panel Slot - Between Total Card and Secondary Metrics */}
+      {filterContent}
 
       {/* Secondary Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

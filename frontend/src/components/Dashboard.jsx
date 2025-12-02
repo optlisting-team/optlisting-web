@@ -438,34 +438,32 @@ function Dashboard() {
           connectedStore={selectedStore}
           showFilter={showFilter}
           onToggleFilter={handleToggleFilter}
-        />
-
-        {/* Filter Panel - Shows when Total card is clicked */}
-        {showFilter && (
-          <div className="mt-6 bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-fade-in-up">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <span>🔍</span> Analysis Filters
-              </h3>
-              <button 
-                onClick={() => setShowFilter(false)}
-                className="text-zinc-500 hover:text-white transition-colors"
-              >
-                ✕
-              </button>
+          filterContent={showFilter && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-fade-in-up">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <span>🔍</span> Analysis Filters
+                </h3>
+                <button 
+                  onClick={() => setShowFilter(false)}
+                  className="text-zinc-500 hover:text-white transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+              <FilterBar 
+                onApplyFilter={(newFilters) => {
+                  setFilters(newFilters)
+                  fetchZombies(newFilters)
+                  setViewMode('zombies')
+                }}
+                onSync={handleSync}
+                loading={loading}
+                initialFilters={filters}
+              />
             </div>
-            <FilterBar 
-              onApplyFilter={(newFilters) => {
-                setFilters(newFilters)
-                fetchZombies(newFilters)
-                setViewMode('zombies')
-              }}
-              onSync={handleSync}
-              loading={loading}
-              initialFilters={filters}
-            />
-          </div>
-        )}
+          )}
+        />
 
         {/* Initial Statistical View - Show when viewMode === 'total' and filter is not shown */}
         {viewMode === 'total' && !showFilter && (
