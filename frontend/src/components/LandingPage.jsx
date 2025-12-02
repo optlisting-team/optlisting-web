@@ -682,7 +682,7 @@ function LandingPage() {
                       <div className="w-6 h-6 bg-blue-500/30 rounded-lg flex items-center justify-center">
                         <Check className="w-4 h-4 text-blue-400" />
                       </div>
-                      <span className="text-zinc-300">Up to <strong className="text-white">30,000</strong> listings</span>
+                      <span className="text-zinc-300">Up to <strong className="text-white">50,000</strong> listings</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-6 h-6 bg-blue-500/30 rounded-lg flex items-center justify-center">
