@@ -214,6 +214,29 @@ function Sidebar() {
           </div>
         </div>
 
+        {/* RLS Test: User Info Display */}
+        <div className="mb-3 p-3 bg-zinc-900/50 rounded-lg border border-zinc-800/50">
+          <div className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-2">
+            RLS Auth Info
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-zinc-500">user_id:</span>
+              <span className="text-[10px] text-zinc-300 font-mono">default-user</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-zinc-500">email:</span>
+              <span className="text-[10px] text-zinc-300 font-mono truncate max-w-[120px]">user@example.com</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-zinc-500">plan:</span>
+              <span className={`text-[10px] font-bold ${
+                plan === 'PRO' ? 'text-amber-400' : plan === 'BUSINESS' ? 'text-purple-400' : 'text-zinc-300'
+              }`}>{plan}</span>
+            </div>
+          </div>
+        </div>
+
         {/* Plan Badge */}
         <div className={`
           flex items-center justify-between px-4 py-3 rounded-xl

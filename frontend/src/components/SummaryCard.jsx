@@ -128,6 +128,21 @@ function StatCard({
   )
 }
 
+// Calculate estimated fee savings
+function calculateFeeSavings(zombieCount, avgPrice = 25) {
+  // eBay Final Value Fee: ~13.25% average
+  // Listing Fee: $0.35 per listing after free allowance
+  // Estimated monthly holding cost per zombie listing
+  const listingFee = 0.35
+  const avgFinalValueFee = avgPrice * 0.1325
+  const monthlyAdCost = 0.50 // Promoted listings average
+  
+  // Total monthly savings per zombie removed
+  const savingsPerZombie = listingFee + (avgFinalValueFee * 0.1) + monthlyAdCost
+  
+  return zombieCount * savingsPerZombie
+}
+
 // Main Summary Card Component
 function SummaryCard({ 
   totalListings, 
@@ -147,6 +162,9 @@ function SummaryCard({
       onViewModeChange(mode)
     }
   }
+  
+  // Calculate estimated savings
+  const estimatedSavings = calculateFeeSavings(totalZombies)
 
   return (
     <div className="space-y-6 pt-2">
@@ -225,7 +243,7 @@ function SummaryCard({
       </div>
 
       {/* Secondary Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Low Interest Card */}
         <StatCard
           icon="📉"
@@ -265,6 +283,23 @@ function SummaryCard({
           onClick={() => handleCardClick('history')}
           delay={400}
         />
+
+        {/* Fee Savings Card */}
+        <div 
+          className="opt-card p-6 text-center opacity-0 animate-fade-in-up opt-card-success"
+          style={{ animationDelay: '500ms' }}
+        >
+          <div className="text-4xl mb-3">💰</div>
+          <div className="text-3xl font-extrabold text-emerald-500 mb-2 data-value">
+            {loading ? '...' : `$${estimatedSavings.toFixed(2)}`}
+          </div>
+          <div className="text-xs font-bold text-zinc-500 tracking-widest uppercase">
+            Est. Monthly Savings
+          </div>
+          <div className="text-xs text-zinc-600 mt-1">
+            from removing zombies
+          </div>
+        </div>
       </div>
 
       {/* Quick Stats Bar */}
