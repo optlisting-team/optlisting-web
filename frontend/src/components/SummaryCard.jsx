@@ -157,9 +157,16 @@ function SummaryCard({
   viewMode = 'zombies', 
   onViewModeChange,
   connectedStore = null,
+  connectedStoresCount = 1,
   onAnalyze = null,
   showFilter = false,
-  onToggleFilter = null
+  onToggleFilter = null,
+  // User subscription and credits
+  userPlan = 'PRO',
+  planStoreLimit = 3,
+  globalStoreLimit = 10,
+  userCredits = 0,
+  usedCredits = 0
 }) {
   const handleCardClick = (mode) => {
     if (onViewModeChange) {
@@ -169,11 +176,20 @@ function SummaryCard({
   
   // Calculate estimated savings
   const estimatedSavings = calculateFeeSavings(totalZombies)
+  
+  // Plan colors
+  const planColors = {
+    BASIC: 'from-cyan-600/20 to-cyan-600/10 border-cyan-500/30 text-cyan-400',
+    PRO: 'from-blue-600/20 to-blue-600/10 border-blue-500/30 text-blue-400',
+    'POWER SELLER': 'from-purple-600/20 to-purple-600/10 border-purple-500/30 text-purple-400'
+  }
+  const planColor = planColors[userPlan] || planColors.PRO
 
   return (
     <div className="space-y-6 pt-2">
-      {/* Section Title with Connected Store */}
-      <div className="flex items-center justify-between opacity-0 animate-fade-in" style={{ animationDelay: '50ms' }}>
+      {/* Header Status Bar - Subscription, Credits, Store Limits */}
+      <div className="flex flex-wrap items-center justify-between gap-4 opacity-0 animate-fade-in" style={{ animationDelay: '50ms' }}>
+        {/* Left: Title */}
         <div className="flex items-center gap-3">
           <div className="w-1 h-6 bg-gradient-to-b from-white to-zinc-600 rounded-full" />
           <h2 className="text-lg font-semibold text-zinc-300 tracking-wide">
@@ -181,6 +197,42 @@ function SummaryCard({
           </h2>
         </div>
         
+        {/* Right: Status Badges */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Subscription Plan Badge */}
+          <div className={`flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r ${planColor} border rounded-lg`}>
+            <span className="text-sm">👑</span>
+            <span className="text-xs font-bold">{userPlan}</span>
+            <span className="text-xs opacity-70">({connectedStoresCount}/{planStoreLimit} Stores)</span>
+          </div>
+          
+          {/* Global Store Limit Badge */}
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-amber-600/20 to-amber-600/10 border border-amber-500/30 rounded-lg">
+            <span className="text-sm">🏪</span>
+            <span className="text-xs font-bold text-amber-400">Global Limit</span>
+            <span className="text-xs text-amber-300">{globalStoreLimit}</span>
+          </div>
+          
+          {/* Credits Badge */}
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-emerald-600/20 to-emerald-600/10 border border-emerald-500/30 rounded-lg">
+            <span className="text-sm">💰</span>
+            <span className="text-xs font-bold text-emerald-400">{(userCredits - usedCredits).toLocaleString()}</span>
+            <span className="text-xs text-emerald-300/70">Credits</span>
+            {userCredits > 0 && (
+              <span className="text-xs text-emerald-500/50">(Rollover)</span>
+            )}
+          </div>
+          
+          {/* Live Data Badge */}
+          <div className="opt-badge opt-badge-success">
+            <span className="status-dot status-dot-success" />
+            Live
+          </div>
+        </div>
+      </div>
+      
+      {/* Connected Store Row */}
+      <div className="flex items-center justify-between opacity-0 animate-fade-in" style={{ animationDelay: '80ms' }}>
         {/* Connected Store Info */}
         <div className="flex items-center gap-3">
           {connectedStore ? (
@@ -198,10 +250,17 @@ function SummaryCard({
               <span className="text-sm text-zinc-400">No Store Connected</span>
             </div>
           )}
-          <div className="opt-badge opt-badge-success">
-            <span className="status-dot status-dot-success" />
-            Live Data
-          </div>
+        </div>
+        
+        {/* Store License Info */}
+        <div className="text-xs text-zinc-500">
+          {connectedStoresCount < planStoreLimit ? (
+            <span>✨ {planStoreLimit - connectedStoresCount} store slot(s) available in your plan</span>
+          ) : connectedStoresCount < globalStoreLimit ? (
+            <span>💡 Use credits for additional stores (up to {globalStoreLimit})</span>
+          ) : (
+            <span>🔒 Store limit reached</span>
+          )}
         </div>
       </div>
 
