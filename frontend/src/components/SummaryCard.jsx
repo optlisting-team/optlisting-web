@@ -155,7 +155,11 @@ function SummaryCard({
   loading, 
   filters = {}, 
   viewMode = 'zombies', 
-  onViewModeChange 
+  onViewModeChange,
+  connectedStore = null,
+  onAnalyze = null,
+  showFilter = false,
+  onToggleFilter = null
 }) {
   const handleCardClick = (mode) => {
     if (onViewModeChange) {
@@ -168,7 +172,7 @@ function SummaryCard({
 
   return (
     <div className="space-y-6 pt-2">
-      {/* Section Title */}
+      {/* Section Title with Connected Store */}
       <div className="flex items-center justify-between opacity-0 animate-fade-in" style={{ animationDelay: '50ms' }}>
         <div className="flex items-center gap-3">
           <div className="w-1 h-6 bg-gradient-to-b from-white to-zinc-600 rounded-full" />
@@ -176,19 +180,38 @@ function SummaryCard({
             Store Analytics
           </h2>
         </div>
-        <div className="opt-badge opt-badge-success">
-          <span className="status-dot status-dot-success" />
-          Live Data
+        
+        {/* Connected Store Info */}
+        <div className="flex items-center gap-3">
+          {connectedStore ? (
+            <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 border border-blue-500/30 rounded-xl">
+              <span className="text-lg">🏪</span>
+              <div className="flex flex-col">
+                <span className="text-xs text-zinc-400">Connected Store</span>
+                <span className="text-sm font-bold text-white">{connectedStore.name || 'eBay Store'}</span>
+              </div>
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse ml-2" />
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-4 py-2 bg-zinc-800/50 border border-zinc-700 rounded-xl">
+              <span className="text-lg">🔗</span>
+              <span className="text-sm text-zinc-400">No Store Connected</span>
+            </div>
+          )}
+          <div className="opt-badge opt-badge-success">
+            <span className="status-dot status-dot-success" />
+            Live Data
+          </div>
         </div>
       </div>
 
       {/* Primary Metric Card - Total Listings */}
       <div 
-        onClick={() => handleCardClick('all')}
+        onClick={() => onToggleFilter ? onToggleFilter() : handleCardClick('all')}
         className={`
           opt-card p-8 cursor-pointer select-none relative overflow-hidden
           opacity-0 animate-fade-in-up
-          ${viewMode === 'all' ? 'opt-card-active' : ''}
+          ${showFilter ? 'opt-card-active ring-2 ring-blue-500/50' : ''}
         `}
         style={{ animationDelay: '100ms' }}
       >
@@ -214,6 +237,11 @@ function SummaryCard({
           {/* Label */}
           <div className="text-sm font-bold text-zinc-400 tracking-widest uppercase mb-4">
             Total Active Listings
+          </div>
+          
+          {/* Click Hint */}
+          <div className="text-xs text-zinc-500 mb-4">
+            {showFilter ? '🔽 Filter panel open below' : '👆 Click to open filter & analyze'}
           </div>
           
           {/* Platform Breakdown */}

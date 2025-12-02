@@ -28,6 +28,7 @@ function Dashboard() {
   const [viewMode, setViewMode] = useState('total') // 'total', 'all', 'zombies', 'queue', or 'history' - Default to 'total' for initial statistical view
   const [historyLogs, setHistoryLogs] = useState([])
   const [totalDeleted, setTotalDeleted] = useState(0)
+  const [showFilter, setShowFilter] = useState(false) // Filter panel visibility
   const [filters, setFilters] = useState({
     marketplace_filter: 'eBay',  // MVP Scope: Default to eBay (only eBay and Shopify supported)
     analytics_period_days: 7,    // 1. 분석 기준 기간
@@ -208,17 +209,33 @@ function Dashboard() {
   const handleViewModeChange = (mode) => {
     setViewMode(mode)
     setSelectedIds([]) // Reset selection when switching views
+    
+    // Close filter panel when switching to non-zombies view
+    if (mode !== 'zombies' && mode !== 'total') {
+      setShowFilter(false)
+    }
+    
     if (mode === 'total') {
       // Statistical view - no data fetching needed
       return
     } else if (mode === 'all') {
       fetchAllListings()
     } else if (mode === 'zombies') {
+      // Show zombie listings
       fetchZombies()
     } else if (mode === 'history') {
       fetchHistory()
     }
     // 'queue' mode doesn't need to fetch data, it uses existing queue state
+  }
+
+  const handleToggleFilter = () => {
+    setShowFilter(!showFilter)
+  }
+
+  const handleAnalyze = () => {
+    fetchZombies(filters)
+    setViewMode('zombies')
   }
 
   const handleApplyFilter = (newFilters) => {
@@ -407,27 +424,60 @@ function Dashboard() {
       <div className="px-6">
         {/* Summary Card */}
         <SummaryCard 
-                totalListings={totalListings}
-                totalBreakdown={totalBreakdown}
-                platformBreakdown={platformBreakdown}
-                totalZombies={totalZombies}
-                zombieBreakdown={zombieBreakdown}
-                queueCount={queue.length}
-                totalDeleted={totalDeleted}
-                loading={loading}
-                filters={filters}
-                viewMode={viewMode}
-                onViewModeChange={handleViewModeChange}
-              />
+          totalListings={totalListings}
+          totalBreakdown={totalBreakdown}
+          platformBreakdown={platformBreakdown}
+          totalZombies={totalZombies}
+          zombieBreakdown={zombieBreakdown}
+          queueCount={queue.length}
+          totalDeleted={totalDeleted}
+          loading={loading}
+          filters={filters}
+          viewMode={viewMode}
+          onViewModeChange={handleViewModeChange}
+          connectedStore={selectedStore}
+          showFilter={showFilter}
+          onToggleFilter={handleToggleFilter}
+        />
 
-        {/* Initial Statistical View - Show when viewMode === 'total' */}
-        {viewMode === 'total' && (
+        {/* Filter Panel - Shows when Total card is clicked */}
+        {showFilter && (
+          <div className="mt-6 bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-fade-in-up">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <span>🔍</span> Analysis Filters
+              </h3>
+              <button 
+                onClick={() => setShowFilter(false)}
+                className="text-zinc-500 hover:text-white transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            <FilterBar 
+              onApplyFilter={(newFilters) => {
+                setFilters(newFilters)
+                fetchZombies(newFilters)
+                setViewMode('zombies')
+              }}
+              onSync={handleSync}
+              loading={loading}
+              initialFilters={filters}
+            />
+          </div>
+        )}
+
+        {/* Initial Statistical View - Show when viewMode === 'total' and filter is not shown */}
+        {viewMode === 'total' && !showFilter && (
           <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg p-8 mt-8 text-center">
             <p className="text-lg text-zinc-300 dark:text-zinc-300 mb-2">
-              📊 <strong className="text-white">Statistical Overview</strong>
+              📊 <strong className="text-white">Ready to Analyze</strong>
             </p>
-            <p className="text-sm text-zinc-400 dark:text-zinc-400">
-              Click the <strong className="text-red-500">"Low Interest Detected"</strong> card above to start analyzing and cleaning your inventory.
+            <p className="text-sm text-zinc-400 dark:text-zinc-400 mb-4">
+              Click <strong className="text-blue-400">"Total Active Listings"</strong> card above to open filters and analyze your inventory.
+            </p>
+            <p className="text-xs text-zinc-500">
+              Or click <strong className="text-red-400">"Low Interest"</strong> card to see items that need attention.
             </p>
           </div>
         )}
@@ -446,8 +496,8 @@ function Dashboard() {
                   ? 'w-full'
                   : 'flex-1 min-w-0'
             }`}>
-              {/* Filter Bar - Only show for zombies view */}
-              {viewMode === 'zombies' && (
+              {/* Filter Bar - Only show for zombies view when filter panel is not shown above */}
+              {viewMode === 'zombies' && !showFilter && (
                 <FilterBar 
                   onApplyFilter={handleApplyFilter}
                   onSync={handleSync}
