@@ -423,7 +423,7 @@ function LandingPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-amber-400" />
-                      <span className="text-zinc-300">1 Store Connected</span>
+                      <span className="text-zinc-300"><strong className="text-white">Unlimited</strong> Stores</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-emerald-400" />
@@ -476,7 +476,7 @@ function LandingPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-amber-400" />
-                      <span className="text-zinc-300">2 Stores Connected</span>
+                      <span className="text-zinc-300"><strong className="text-white">Unlimited</strong> Stores</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-emerald-400" />
@@ -529,7 +529,7 @@ function LandingPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-orange-400" />
-                      <span className="text-zinc-300">3 Stores Connected</span>
+                      <span className="text-zinc-300"><strong className="text-white">Unlimited</strong> Stores</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-emerald-400" />
@@ -550,8 +550,8 @@ function LandingPage() {
               <div className="mt-6 text-center">
                 <p className="text-zinc-500 text-sm">
                   <span className="text-amber-400">1 Credit = 1 Listing Scan</span> • 
-                  <span className="text-emerald-400 font-semibold"> Credits never expire</span> • 
-                  <span className="text-zinc-400"> CSV Export included</span>
+                  <span className="text-blue-400 font-semibold">Unlimited Stores</span> • 
+                  <span className="text-emerald-400 font-semibold">Never Expires</span>
                 </p>
               </div>
             </motion.div>
