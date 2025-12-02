@@ -387,7 +387,7 @@ function LandingPage() {
                 </div>
                 <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/20 border border-amber-500/30 rounded-xl">
                   <CheckCircle className="w-5 h-5 text-amber-400" />
-                  <span className="text-amber-300 font-semibold text-sm">CS & 환불 문의 감소 효과</span>
+                  <span className="text-amber-300 font-semibold text-sm">Reduces CS & Refund Requests</span>
                 </div>
               </div>
             </motion.div>
@@ -427,14 +427,14 @@ function LandingPage() {
                 <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-2xl">🎁</span>
-                    <span className="text-amber-300 font-bold text-lg">1,000 Credits 즉시 획득</span>
+                    <span className="text-amber-300 font-bold text-lg">Get 1,000 Credits Instantly</span>
                   </div>
                   <p className="text-amber-200/70 text-sm">
-                    $5 USD 결제 시 <strong className="text-white">1,000 Credits</strong> 즉시 지급
+                    Pay $5 USD → Receive <strong className="text-white">1,000 Credits</strong> immediately
                   </p>
                   <div className="mt-2 pt-2 border-t border-amber-500/20">
                     <p className="text-xs text-zinc-400">
-                      <span className="text-amber-400 font-semibold">1 Credit = 1 Listing Scan</span>에 사용됩니다
+                      <span className="text-amber-400 font-semibold">1 Credit = 1 Listing Scan</span>
                     </p>
                   </div>
                 </div>
@@ -649,20 +649,20 @@ function LandingPage() {
                   <span className="text-4xl">🔄</span>
                 </div>
                 
-                {/* Main Korean Text - Maximum Emphasis */}
+                {/* Main Text - Maximum Emphasis */}
                 <div className="mb-6 p-6 bg-emerald-500/10 border border-emerald-400/30 rounded-2xl">
                   <h3 className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-teal-200 to-emerald-300 mb-4 leading-tight">
-                    잔여 크레딧은 100% 다음 달로 이월됩니다
+                    Your Credits Roll Over 100%
                   </h3>
                   <p className="text-xl md:text-2xl text-emerald-100 font-semibold">
-                    사용하지 않은 분석 리소스는 <span className="text-yellow-300 font-black underline decoration-yellow-400 decoration-2">절대로 사라지지 않습니다</span>
+                    Unused analysis resources <span className="text-yellow-300 font-black underline decoration-yellow-400 decoration-2">NEVER expire</span>
                   </p>
                 </div>
 
-                {/* English Translation */}
-                <p className="text-emerald-200/80 text-base max-w-2xl mx-auto mb-6">
-                  <strong className="text-white">Unused credits roll over 100% to the next month.</strong><br/>
-                  Your analysis resources are never wasted — they're always there when you need them.
+                {/* Sub Text */}
+                <p className="text-emerald-200/80 text-lg max-w-2xl mx-auto mb-6">
+                  Every credit you purchase stays in your account until you use it.<br/>
+                  <strong className="text-white">No monthly reset. No wasted money. Guaranteed.</strong>
                 </p>
 
                 <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
