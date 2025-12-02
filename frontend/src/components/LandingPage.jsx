@@ -630,54 +630,123 @@ function LandingPage() {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-white">Subscription Plans</h3>
-                  <p className="text-zinc-400 text-sm">Monthly billing • Cancel anytime • Best value</p>
+                  <p className="text-zinc-400 text-sm">Monthly billing • Cancel anytime • Unlimited scans</p>
                 </div>
               </div>
 
-              {/* Subscription Cards - 2 Column */}
-              <div className="grid md:grid-cols-2 gap-6">
+              {/* Subscription Cards - 3 Column */}
+              <div className="grid md:grid-cols-3 gap-6">
                 
+                {/* BASIC Plan - $19 */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.32 }}
+                  className="relative bg-zinc-800/50 border border-zinc-700 rounded-2xl p-6 hover:border-cyan-500/30 transition-all"
+                >
+                  <div className="mb-5">
+                    <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Starter</span>
+                    <h4 className="text-2xl font-bold text-white mt-2">BASIC</h4>
+                    <p className="text-zinc-400 text-sm mt-1">For small sellers</p>
+                  </div>
+                  
+                  <div className="mb-5">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-5xl font-black text-white">$19</span>
+                      <span className="text-zinc-400 text-lg">/mo</span>
+                    </div>
+                    <p className="text-cyan-400 text-sm mt-2 font-medium">Best for beginners</p>
+                  </div>
+
+                  <div className="space-y-3 mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 bg-cyan-500/20 rounded-lg flex items-center justify-center">
+                        <Check className="w-4 h-4 text-cyan-400" />
+                      </div>
+                      <span className="text-zinc-300">Up to <strong className="text-white">5,000</strong> listings</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 bg-cyan-500/20 rounded-lg flex items-center justify-center">
+                        <Check className="w-4 h-4 text-cyan-400" />
+                      </div>
+                      <span className="text-zinc-300"><strong className="text-white">1</strong> Store connected</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 bg-cyan-500/20 rounded-lg flex items-center justify-center">
+                        <Check className="w-4 h-4 text-cyan-400" />
+                      </div>
+                      <span className="text-zinc-300">CSV Export (AutoDS, eBay)</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 bg-cyan-500/20 rounded-lg flex items-center justify-center">
+                        <Check className="w-4 h-4 text-cyan-400" />
+                      </div>
+                      <span className="text-zinc-300">5-Filter Zombie Detection</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 bg-cyan-500/20 rounded-lg flex items-center justify-center">
+                        <Check className="w-4 h-4 text-cyan-400" />
+                      </div>
+                      <span className="text-zinc-300">Email Support</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+                        <Check className="w-4 h-4 text-emerald-400" />
+                      </div>
+                      <span className="text-emerald-300 font-semibold">Credit Rollover ✨</span>
+                    </div>
+                  </div>
+
+                  <a
+                    href="https://optlisting.lemonsqueezy.com/checkout/basic"
+                    className="block w-full py-3 bg-zinc-700 hover:bg-cyan-600 text-white font-bold rounded-xl text-center transition-all"
+                  >
+                    Get Started
+                  </a>
+                </motion.div>
+
                 {/* PRO Plan (RECOMMENDED) */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.35 }}
-                  className="relative bg-gradient-to-b from-blue-600/20 to-zinc-800/80 border-2 border-blue-500/50 rounded-2xl p-8 shadow-2xl shadow-blue-500/10"
+                  className="relative bg-gradient-to-b from-blue-600/20 to-zinc-800/80 border-2 border-blue-500/50 rounded-2xl p-6 shadow-2xl shadow-blue-500/10 transform md:scale-105"
                 >
                   {/* RECOMMENDED Badge */}
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                    <span className="px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-sm font-bold rounded-full shadow-lg shadow-blue-500/30 uppercase tracking-wider">
+                    <span className="px-4 py-1.5 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-bold rounded-full shadow-lg shadow-blue-500/30 uppercase tracking-wider">
                       ⭐ RECOMMENDED
                     </span>
                   </div>
 
-                  <div className="mt-4 mb-6">
+                  <div className="mt-3 mb-5">
                     <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">Most Popular</span>
-                    <h4 className="text-3xl font-bold text-white mt-2">PRO</h4>
+                    <h4 className="text-2xl font-bold text-white mt-2">PRO</h4>
                     <p className="text-zinc-400 text-sm mt-1">Best value for growing sellers</p>
                   </div>
                   
-                  <div className="mb-6">
+                  <div className="mb-5">
                     <div className="flex items-baseline gap-1">
-                      <span className="text-6xl font-black text-white">$49</span>
+                      <span className="text-5xl font-black text-white">$49</span>
                       <span className="text-zinc-400 text-lg">/mo</span>
                     </div>
                     <p className="text-emerald-400 text-sm mt-2 font-medium">💡 Save 60% vs pay-per-scan</p>
                   </div>
 
-                  <div className="space-y-3 mb-8">
+                  <div className="space-y-3 mb-6">
                     <div className="flex items-center gap-3">
                       <div className="w-6 h-6 bg-blue-500/30 rounded-lg flex items-center justify-center">
                         <Check className="w-4 h-4 text-blue-400" />
                       </div>
-                      <span className="text-zinc-300">Up to <strong className="text-white text-lg">30,000</strong> listings</span>
+                      <span className="text-zinc-300">Up to <strong className="text-white">30,000</strong> listings</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-6 h-6 bg-blue-500/30 rounded-lg flex items-center justify-center">
                         <Check className="w-4 h-4 text-blue-400" />
                       </div>
-                      <span className="text-zinc-300"><strong className="text-white text-lg">3</strong> Stores connected</span>
+                      <span className="text-zinc-300"><strong className="text-white">3</strong> Stores connected</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-6 h-6 bg-blue-500/30 rounded-lg flex items-center justify-center">
@@ -701,15 +770,15 @@ function LandingPage() {
                       <div className="w-6 h-6 bg-emerald-500/30 rounded-lg flex items-center justify-center">
                         <Check className="w-4 h-4 text-emerald-400" />
                       </div>
-                      <span className="text-emerald-300 font-semibold">Credit Rollover ✨ 100%</span>
+                      <span className="text-emerald-300 font-semibold">Credit Rollover ✨</span>
                     </div>
                   </div>
 
                   <a
                     href="https://optlisting.lemonsqueezy.com/checkout/pro"
-                    className="block w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold rounded-xl text-center transition-all shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40"
+                    className="block w-full py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold rounded-xl text-center transition-all shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40"
                   >
-                    Get Started — Best Value
+                    Best Value →
                   </a>
                 </motion.div>
 
@@ -719,41 +788,41 @@ function LandingPage() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.4 }}
-                  className="relative bg-gradient-to-b from-purple-600/15 to-zinc-800/80 border border-purple-500/30 rounded-2xl p-8 hover:border-purple-500/50 transition-all"
+                  className="relative bg-gradient-to-b from-purple-600/15 to-zinc-800/80 border border-purple-500/30 rounded-2xl p-6 hover:border-purple-500/50 transition-all"
                 >
                   {/* Enterprise Badge */}
-                  <div className="absolute -top-3 right-6">
+                  <div className="absolute -top-3 right-4">
                     <span className="px-3 py-1 bg-purple-500/20 text-purple-400 text-xs font-bold rounded-full border border-purple-500/30">
                       🚀 ENTERPRISE
                     </span>
                   </div>
 
-                  <div className="mt-2 mb-6">
+                  <div className="mt-2 mb-5">
                     <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">High Volume</span>
-                    <h4 className="text-3xl font-bold text-white mt-2">POWER SELLER</h4>
+                    <h4 className="text-2xl font-bold text-white mt-2">POWER SELLER</h4>
                     <p className="text-zinc-400 text-sm mt-1">For enterprise-level sellers</p>
                   </div>
                   
-                  <div className="mb-6">
+                  <div className="mb-5">
                     <div className="flex items-baseline gap-1">
-                      <span className="text-6xl font-black text-white">$99</span>
+                      <span className="text-5xl font-black text-white">$99</span>
                       <span className="text-zinc-400 text-lg">/mo</span>
                     </div>
                     <p className="text-emerald-400 text-sm mt-2 font-medium">💡 Save 80% vs pay-per-scan</p>
                   </div>
 
-                  <div className="space-y-3 mb-8">
+                  <div className="space-y-3 mb-6">
                     <div className="flex items-center gap-3">
                       <div className="w-6 h-6 bg-purple-500/20 rounded-lg flex items-center justify-center">
                         <Check className="w-4 h-4 text-purple-400" />
                       </div>
-                      <span className="text-zinc-300">Up to <strong className="text-white text-lg">100,000</strong> listings</span>
+                      <span className="text-zinc-300">Up to <strong className="text-white">100,000</strong> listings</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-6 h-6 bg-purple-500/20 rounded-lg flex items-center justify-center">
                         <Check className="w-4 h-4 text-purple-400" />
                       </div>
-                      <span className="text-zinc-300"><strong className="text-white text-lg">10</strong> Stores connected</span>
+                      <span className="text-zinc-300"><strong className="text-white">10</strong> Stores connected</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-6 h-6 bg-purple-500/20 rounded-lg flex items-center justify-center">
@@ -777,13 +846,13 @@ function LandingPage() {
                       <div className="w-6 h-6 bg-emerald-500/20 rounded-lg flex items-center justify-center">
                         <Check className="w-4 h-4 text-emerald-400" />
                       </div>
-                      <span className="text-emerald-300 font-semibold">Credit Rollover ✨ 100%</span>
+                      <span className="text-emerald-300 font-semibold">Credit Rollover ✨</span>
                     </div>
                   </div>
 
                   <a
                     href="https://optlisting.lemonsqueezy.com/checkout/power-seller"
-                    className="block w-full py-4 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white font-bold rounded-xl text-center transition-all shadow-lg shadow-purple-500/20"
+                    className="block w-full py-3 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white font-bold rounded-xl text-center transition-all shadow-lg shadow-purple-500/20"
                   >
                     Get Started
                   </a>
