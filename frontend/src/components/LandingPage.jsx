@@ -333,9 +333,13 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* Pricing Section - Simplified Table */}
-      <section className="py-24 px-4 bg-zinc-900 dark:bg-zinc-900" id="pricing">
-        <div className="container mx-auto max-w-3xl">
+      {/* Pricing Section - 3-Way Hybrid Pricing */}
+      <section className="py-24 px-4 bg-zinc-900 dark:bg-zinc-900 relative overflow-hidden" id="pricing">
+        {/* Background Gradient */}
+        <div className="absolute inset-0 bg-gradient-to-b from-zinc-900 via-zinc-900 to-black pointer-events-none" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+        
+        <div className="container mx-auto max-w-6xl relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -343,72 +347,319 @@ function LandingPage() {
             transition={{ duration: 0.6 }}
           >
             {/* Header */}
-            <div className="text-center mb-10">
-              <h2 className="text-3xl md:text-4xl font-bold text-white mb-2 flex items-center justify-center gap-3">
-                <span className="text-3xl">💰</span>
-                OptListing 최종 확정 가격 플랜
+            <div className="text-center mb-6">
+              <motion.span 
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-sm font-semibold mb-6"
+              >
+                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                3-Way Hybrid Pricing
+              </motion.span>
+              <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
+                Simple, Transparent Pricing
               </h2>
+              <p className="text-xl text-zinc-400 max-w-2xl mx-auto">
+                Pay only for what you use. No hidden fees. Cancel anytime.
+              </p>
             </div>
 
-            {/* Pricing Table */}
-            <div className="bg-zinc-800/50 rounded-2xl border border-zinc-700 overflow-hidden">
-              {/* Table Header */}
-              <div className="grid grid-cols-4 gap-4 px-6 py-4 border-b border-zinc-700 bg-zinc-800/80">
-                <div className="text-zinc-400 text-sm font-medium">플랜</div>
-                <div className="text-zinc-400 text-sm font-medium">가격 / 월</div>
-                <div className="text-zinc-400 text-sm font-medium">최대 총 리스팅 수</div>
-                <div className="text-zinc-400 text-sm font-medium text-right">최대 스토어 수</div>
-              </div>
-
-              {/* STARTER Row */}
-              <div className="grid grid-cols-4 gap-4 px-6 py-5 border-b border-zinc-700/50 hover:bg-zinc-800/30 transition-colors">
-                <div className="text-white font-bold text-lg">STARTER</div>
-                <div className="text-emerald-400 font-bold text-xl">$19</div>
-                <div className="text-zinc-300">Up to 5,000</div>
-                <div className="text-zinc-300 text-right">1 Store</div>
-              </div>
-
-              {/* PRO Row */}
-              <div className="grid grid-cols-4 gap-4 px-6 py-5 border-b border-zinc-700/50 hover:bg-zinc-800/30 transition-colors">
-                <div className="text-white font-bold text-lg">PRO</div>
-                <div className="text-emerald-400 font-bold text-xl">$49</div>
-                <div className="text-zinc-300">Up to 30,000</div>
-                <div className="text-zinc-300 text-right">3 Stores</div>
-              </div>
-
-              {/* POWER SELLER Row */}
-              <div className="grid grid-cols-4 gap-4 px-6 py-5 hover:bg-zinc-800/30 transition-colors">
-                <div className="text-white font-bold text-lg">POWER SELLER</div>
-                <div className="text-emerald-400 font-bold text-xl">$99</div>
-                <div className="text-zinc-300">Up to 100,000</div>
-                <div className="text-zinc-300 text-right">10 Stores</div>
-              </div>
-            </div>
-
-            {/* Sheets Export Button */}
-            <div className="mt-6">
-              <a 
-                href="/dashboard" 
-                className="flex items-center justify-between w-full px-6 py-4 bg-zinc-800/50 rounded-xl border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-600 transition-all group"
-              >
-                <div className="flex items-center gap-3">
-                  <Table className="w-6 h-6 text-emerald-500" />
-                  <span className="text-white font-medium">Sheets로 내보내기</span>
+            {/* Credit Rollover Banner - TOP */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2 }}
+              className="mb-12 p-6 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-amber-500/30 rounded-2xl"
+            >
+              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/20">
+                    <span className="text-2xl">💎</span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white mb-1">100% Credit Rollover Guarantee</h3>
+                    <p className="text-amber-200/80 text-sm">
+                      Unused credits roll over to next month. Your analysis resources never expire.
+                    </p>
+                  </div>
                 </div>
-                <div className="w-5 h-5 border-2 border-zinc-600 rounded group-hover:border-emerald-500 transition-colors"></div>
-              </a>
+                <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/20 rounded-xl">
+                  <CheckCircle className="w-5 h-5 text-amber-400" />
+                  <span className="text-amber-300 font-semibold text-sm">Reduces CS & Refund Requests</span>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* 3-Column Pricing Cards */}
+            <div className="grid md:grid-cols-3 gap-6 mb-12">
+              
+              {/* Column 1: STARTER (Pay-Per-Scan) */}
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.1 }}
+                className="relative bg-zinc-800/50 border border-zinc-700 rounded-2xl p-8 hover:border-zinc-600 transition-all"
+              >
+                <div className="mb-6">
+                  <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Pay-Per-Scan</span>
+                  <h3 className="text-2xl font-bold text-white mt-2">STARTER</h3>
+                  <p className="text-zinc-400 text-sm mt-1">Perfect for small sellers</p>
+                </div>
+                
+                <div className="mb-6">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-5xl font-black text-white">$19</span>
+                    <span className="text-zinc-400 text-lg">/mo</span>
+                  </div>
+                  <p className="text-zinc-500 text-sm mt-2">or $0.004 per listing scan</p>
+                </div>
+
+                <div className="space-y-4 mb-8">
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <span className="text-zinc-300">Up to <strong className="text-white">5,000</strong> listings</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <span className="text-zinc-300"><strong className="text-white">1</strong> Store connected</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <span className="text-zinc-300">CSV Export (AutoDS, eBay)</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <span className="text-zinc-300">5-Filter Zombie Detection</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <span className="text-zinc-300">Credit Rollover ✨</span>
+                  </div>
+                </div>
+
+                <a
+                  href="https://optlisting.lemonsqueezy.com/checkout/starter"
+                  className="block w-full py-4 bg-zinc-700 hover:bg-zinc-600 text-white font-bold rounded-xl text-center transition-all"
+                >
+                  Get Started
+                </a>
+              </motion.div>
+
+              {/* Column 2: PRO (RECOMMENDED) */}
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.2 }}
+                className="relative bg-gradient-to-b from-blue-600/20 to-zinc-800/80 border-2 border-blue-500/50 rounded-2xl p-8 transform md:scale-105 shadow-2xl shadow-blue-500/10"
+              >
+                {/* RECOMMENDED Badge */}
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                  <span className="px-4 py-1.5 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-bold rounded-full shadow-lg shadow-blue-500/30 uppercase tracking-wider">
+                    ⭐ RECOMMENDED
+                  </span>
+                </div>
+
+                <div className="mb-6 mt-2">
+                  <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">Most Popular</span>
+                  <h3 className="text-2xl font-bold text-white mt-2">PRO</h3>
+                  <p className="text-zinc-400 text-sm mt-1">Best value for growing sellers</p>
+                </div>
+                
+                <div className="mb-6">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-5xl font-black text-white">$49</span>
+                    <span className="text-zinc-400 text-lg">/mo</span>
+                  </div>
+                  <p className="text-emerald-400 text-sm mt-2 font-medium">Save 60% vs pay-per-scan</p>
+                </div>
+
+                <div className="space-y-4 mb-8">
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-blue-500/30 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <span className="text-zinc-300">Up to <strong className="text-white">30,000</strong> listings</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-blue-500/30 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <span className="text-zinc-300"><strong className="text-white">3</strong> Stores connected</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-blue-500/30 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <span className="text-zinc-300">All CSV Formats</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-blue-500/30 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <span className="text-zinc-300">Cross-Platform Health Check</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-blue-500/30 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <span className="text-zinc-300">Priority Support</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-blue-500/30 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <span className="text-zinc-300">Credit Rollover ✨</span>
+                  </div>
+                </div>
+
+                <a
+                  href="https://optlisting.lemonsqueezy.com/checkout/pro"
+                  className="block w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold rounded-xl text-center transition-all shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40"
+                >
+                  Get Started — Best Value
+                </a>
+              </motion.div>
+
+              {/* Column 3: POWER SELLER */}
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.3 }}
+                className="relative bg-zinc-800/50 border border-zinc-700 rounded-2xl p-8 hover:border-zinc-600 transition-all"
+              >
+                <div className="mb-6">
+                  <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">Enterprise</span>
+                  <h3 className="text-2xl font-bold text-white mt-2">POWER SELLER</h3>
+                  <p className="text-zinc-400 text-sm mt-1">For high-volume sellers</p>
+                </div>
+                
+                <div className="mb-6">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-5xl font-black text-white">$99</span>
+                    <span className="text-zinc-400 text-lg">/mo</span>
+                  </div>
+                  <p className="text-emerald-400 text-sm mt-2 font-medium">Save 80% vs pay-per-scan</p>
+                </div>
+
+                <div className="space-y-4 mb-8">
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-purple-400" />
+                    </div>
+                    <span className="text-zinc-300">Up to <strong className="text-white">100,000</strong> listings</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-purple-400" />
+                    </div>
+                    <span className="text-zinc-300"><strong className="text-white">10</strong> Stores connected</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-purple-400" />
+                    </div>
+                    <span className="text-zinc-300">All CSV Formats</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-purple-400" />
+                    </div>
+                    <span className="text-zinc-300">Global Winner Detection</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-purple-400" />
+                    </div>
+                    <span className="text-zinc-300">Dedicated Account Manager</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                      <Check className="w-4 h-4 text-purple-400" />
+                    </div>
+                    <span className="text-zinc-300">Credit Rollover ✨</span>
+                  </div>
+                </div>
+
+                <a
+                  href="https://optlisting.lemonsqueezy.com/checkout/power-seller"
+                  className="block w-full py-4 bg-zinc-700 hover:bg-zinc-600 text-white font-bold rounded-xl text-center transition-all"
+                >
+                  Get Started
+                </a>
+              </motion.div>
             </div>
 
-            {/* CTA Button */}
-            <div className="mt-8 text-center">
-              <a 
-                href="/dashboard" 
-                className="inline-flex items-center gap-2 px-10 py-4 bg-white hover:bg-zinc-200 text-black font-bold rounded-xl transition-all shadow-lg hover:shadow-xl hover:-translate-y-1"
-              >
-                Start 30-Day Free Trial
-                <ArrowRight className="w-5 h-5" />
-              </a>
-              <p className="text-zinc-500 text-sm mt-3">Credit card required. Cancel anytime.</p>
+            {/* Credit Rollover Banner - BOTTOM (Full Width, High Trust) */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.4 }}
+              className="relative p-8 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border border-emerald-500/30 rounded-2xl overflow-hidden"
+            >
+              {/* Background Pattern */}
+              <div className="absolute inset-0 opacity-10">
+                <div className="absolute inset-0" style={{
+                  backgroundImage: `radial-gradient(circle at 2px 2px, rgba(52, 211, 153, 0.3) 1px, transparent 0)`,
+                  backgroundSize: '20px 20px'
+                }} />
+              </div>
+              
+              <div className="relative z-10 text-center">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl mb-4 shadow-lg shadow-emerald-500/30">
+                  <span className="text-3xl">🔄</span>
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-3">
+                  Your Credits Never Expire
+                </h3>
+                <p className="text-emerald-200/90 text-lg max-w-2xl mx-auto mb-4">
+                  <strong className="text-white">Unused credits roll over 100% to the next month.</strong><br/>
+                  Your analysis resources are never wasted — they're always there when you need them.
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
+                  <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 rounded-lg">
+                    <CheckCircle className="w-4 h-4 text-emerald-400" />
+                    <span className="text-emerald-300">No Use-It-Or-Lose-It Policy</span>
+                  </div>
+                  <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 rounded-lg">
+                    <CheckCircle className="w-4 h-4 text-emerald-400" />
+                    <span className="text-emerald-300">Reduces Refund Requests</span>
+                  </div>
+                  <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 rounded-lg">
+                    <CheckCircle className="w-4 h-4 text-emerald-400" />
+                    <span className="text-emerald-300">Customer Trust Guarantee</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* FAQ / Trust Elements */}
+            <div className="mt-12 text-center">
+              <p className="text-zinc-500 text-sm">
+                Questions? <a href="#support" className="text-blue-400 hover:text-blue-300 underline">Contact our support team</a>
+              </p>
+              <div className="flex items-center justify-center gap-6 mt-4 text-zinc-600 text-xs">
+                <span>🔒 Secure Payment via Lemon Squeezy</span>
+                <span>•</span>
+                <span>💳 Cancel Anytime</span>
+                <span>•</span>
+                <span>📧 24/7 Email Support</span>
+              </div>
             </div>
           </motion.div>
         </div>
