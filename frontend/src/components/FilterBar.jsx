@@ -295,17 +295,18 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-white/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="flex-1 flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-red-600 via-orange-500 to-red-600 text-white font-black text-lg rounded-xl hover:from-red-500 hover:via-orange-400 hover:to-red-500 focus:outline-none focus:ring-4 focus:ring-red-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-red-500/30 hover:shadow-red-500/50 hover:scale-[1.02] active:scale-[0.98]"
           >
             {loading ? (
               <>
-                <RotateCw className="w-4 h-4 animate-spin" />
+                <RotateCw className="w-5 h-5 animate-spin" />
                 <span>Analyzing...</span>
               </>
             ) : (
               <>
-                <Filter className="w-4 h-4" />
-                <span>Apply Filter</span>
+                <span className="text-xl">🔬</span>
+                <span>Find Zombie Listings</span>
+                <span className="text-xl">→</span>
               </>
             )}
           </button>
