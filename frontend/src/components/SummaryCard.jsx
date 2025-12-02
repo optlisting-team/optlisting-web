@@ -163,8 +163,8 @@ function SummaryCard({
   onToggleFilter = null,
   // User subscription and credits
   userPlan = 'PRO',
-  planStoreLimit = 3,
-  globalStoreLimit = 10,
+  planStoreLimit = 5,
+  globalStoreLimit = 15,
   userCredits = 0,
   usedCredits = 0
 }) {

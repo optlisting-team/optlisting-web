@@ -183,8 +183,8 @@ function Settings() {
   // Plan info
   const planInfo = {
     BASIC: { stores: 1, price: 19, color: 'cyan' },
-    PRO: { stores: 3, price: 49, color: 'blue' },
-    'POWER SELLER': { stores: 10, price: 99, color: 'purple' }
+    PRO: { stores: 5, price: 49, color: 'blue' },
+    'POWER SELLER': { stores: 15, price: 99, color: 'purple' }
   }
 
   return (

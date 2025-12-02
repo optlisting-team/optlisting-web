@@ -688,7 +688,7 @@ function LandingPage() {
                       <div className="w-6 h-6 bg-blue-500/30 rounded-lg flex items-center justify-center">
                         <Check className="w-4 h-4 text-blue-400" />
                       </div>
-                      <span className="text-zinc-300"><strong className="text-white">3</strong> Stores connected</span>
+                      <span className="text-zinc-300"><strong className="text-white">5</strong> Stores connected</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-6 h-6 bg-blue-500/30 rounded-lg flex items-center justify-center">
@@ -758,13 +758,13 @@ function LandingPage() {
                       <div className="w-6 h-6 bg-purple-500/20 rounded-lg flex items-center justify-center">
                         <Check className="w-4 h-4 text-purple-400" />
                       </div>
-                      <span className="text-zinc-300">Up to <strong className="text-white">100,000</strong> listings</span>
+                      <span className="text-zinc-300">Up to <strong className="text-white">150,000</strong> listings</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-6 h-6 bg-purple-500/20 rounded-lg flex items-center justify-center">
                         <Check className="w-4 h-4 text-purple-400" />
                       </div>
-                      <span className="text-zinc-300"><strong className="text-white">10</strong> Stores connected</span>
+                      <span className="text-zinc-300"><strong className="text-white">15</strong> Stores connected</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-6 h-6 bg-purple-500/20 rounded-lg flex items-center justify-center">
