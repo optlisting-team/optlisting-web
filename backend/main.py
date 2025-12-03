@@ -70,6 +70,12 @@ import re
 # Define the allowed exact origins (for production build)
 # CRITICAL: Include all variations of production URL (with and without trailing slash)
 allowed_origins = [
+    # 🚨 CUSTOM DOMAIN - CRITICAL FOR PRODUCTION
+    "https://optlisting.com",
+    "https://optlisting.com/",
+    "https://www.optlisting.com",
+    "https://www.optlisting.com/",
+    
     # Production Vercel deployment - All variations (CRITICAL for CORS)
     "https://optlisting.vercel.app",
     "https://optlisting.vercel.app/",
