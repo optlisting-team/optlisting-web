@@ -232,37 +232,73 @@ function SummaryCard({
         </div>
       </div>
       
-      {/* Connected Store - Center Prominent Display */}
-      <div className="flex justify-center opacity-0 animate-fade-in" style={{ animationDelay: '80ms' }}>
-        {connectedStore ? (
-          <div className="flex items-center gap-4 px-8 py-4 bg-gradient-to-r from-blue-600/20 via-cyan-600/15 to-blue-600/20 border-2 border-blue-500/40 rounded-2xl shadow-lg shadow-blue-500/10">
+      {/* Your Store - Full Width Card with Dropdown */}
+      <div className="opt-card p-6 opacity-0 animate-fade-in" style={{ animationDelay: '80ms' }}>
+        <div className="flex items-center justify-between">
+          {/* Left: Store Info */}
+          <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
               <span className="text-2xl">🏪</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-xs text-zinc-400 uppercase tracking-wider">Currently Connected</span>
-              <span className="text-xl font-bold text-white">{connectedStore.name || 'eBay Store'}</span>
-              <span className="text-xs text-zinc-500">{connectedStore.email || 'user@ebay.com'}</span>
-            </div>
-            <div className="flex items-center gap-2 ml-4 px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/30 rounded-lg">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-              <span className="text-xs font-semibold text-emerald-400">Connected</span>
+              <span className="text-xs text-zinc-400 uppercase tracking-wider font-medium">Your Store</span>
+              {connectedStore ? (
+                <>
+                  <span className="text-xl font-bold text-white">{connectedStore.name || 'eBay Store'}</span>
+                  <span className="text-xs text-zinc-500">{connectedStore.email || 'user@ebay.com'}</span>
+                </>
+              ) : (
+                <span className="text-lg font-semibold text-zinc-400">No Store Selected</span>
+              )}
             </div>
           </div>
-        ) : (
-          <div className="flex items-center gap-4 px-8 py-4 bg-zinc-800/50 border-2 border-zinc-700 border-dashed rounded-2xl">
-            <div className="w-14 h-14 bg-zinc-800 rounded-xl flex items-center justify-center border border-zinc-700">
-              <span className="text-2xl opacity-50">🔗</span>
+
+          {/* Center: Store Selector Dropdown */}
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <select 
+                className="appearance-none bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 pr-10 text-white font-medium cursor-pointer hover:border-zinc-600 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all min-w-[200px]"
+                defaultValue={connectedStore?.id || ''}
+              >
+                {connectedStore && (
+                  <option value={connectedStore.id}>
+                    {connectedStore.name || 'eBay Store'}
+                  </option>
+                )}
+                <option value="store-2">Amazon Store</option>
+                <option value="store-3">Shopify Store</option>
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <svg className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
             </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold text-zinc-400">No Store Connected</span>
-              <span className="text-xs text-zinc-500">Connect your eBay store to get started</span>
-            </div>
-            <button className="ml-4 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-lg transition-colors">
-              + Connect Store
+
+            {/* Add New Store Button */}
+            <button className="flex items-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition-all hover:scale-105 shadow-lg shadow-blue-500/20">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span>Add Store</span>
             </button>
           </div>
-        )}
+
+          {/* Right: Connection Status */}
+          <div className="flex items-center gap-3">
+            {connectedStore ? (
+              <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-xl">
+                <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
+                <span className="text-sm font-semibold text-emerald-400">Connected</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 px-4 py-2 bg-zinc-700/50 border border-zinc-600 rounded-xl">
+                <div className="w-2.5 h-2.5 bg-zinc-500 rounded-full" />
+                <span className="text-sm font-semibold text-zinc-400">Disconnected</span>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Primary Metric Card - Total Listings */}
