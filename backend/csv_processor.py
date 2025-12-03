@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field, validator
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, func
 
-from models import Listing, SessionLocal
+from .models import Listing, SessionLocal
 
 
 # ============================================================
