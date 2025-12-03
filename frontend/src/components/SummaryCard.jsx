@@ -260,34 +260,41 @@ function SummaryCard({
             </div>
           </div>
 
-          {/* Center: Store Selector Dropdown */}
+          {/* Center: Store Actions */}
           <div className="flex items-center gap-3">
-            <div className="relative">
-              <select 
-                className="appearance-none bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 pr-10 text-white font-medium cursor-pointer hover:border-zinc-600 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all min-w-[200px]"
-                defaultValue={connectedStore?.id || ''}
-              >
-                {connectedStore && (
+            {/* Store Selector - Only show if stores exist */}
+            {connectedStore && (
+              <div className="relative">
+                <select 
+                  className="appearance-none bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 pr-10 text-white font-medium cursor-pointer hover:border-zinc-600 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all min-w-[200px]"
+                  defaultValue={connectedStore?.id || ''}
+                >
                   <option value={connectedStore.id}>
                     {connectedStore.name || 'eBay Store'}
                   </option>
-                )}
-                <option value="store-2">Amazon Store</option>
-                <option value="store-3">Shopify Store</option>
-              </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                <svg className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <svg className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Add New Store Button */}
-            <button className="flex items-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition-all hover:scale-105 shadow-lg shadow-blue-500/20">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            {/* Connect eBay Button - Primary CTA */}
+            <button 
+              onClick={() => {
+                // eBay OAuth 시작 - 원클릭 연결!
+                const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+                const userId = 'default-user' // TODO: 실제 사용자 ID 사용
+                window.location.href = `${apiUrl}/api/ebay/auth/start?user_id=${userId}`
+              }}
+              className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-semibold rounded-xl transition-all hover:scale-105 shadow-lg shadow-blue-500/30"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12.89 3L14.85 3.4L11.11 21L9.15 20.6L12.89 3M19.59 12L16 8.41V5.58L22.42 12L16 18.41V15.58L19.59 12M1.58 12L8 5.58V8.41L4.41 12L8 15.58V18.41L1.58 12Z" />
               </svg>
-              <span>Add Store</span>
+              <span>Connect eBay</span>
             </button>
           </div>
 
