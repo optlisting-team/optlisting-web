@@ -40,32 +40,78 @@ const DUMMY_STORE = {
 
 function Dashboard() {
   const { selectedStore } = useStore()
-  const [zombies, setZombies] = useState(DEMO_MODE ? DUMMY_ZOMBIES : [])
+  const [zombies, setZombies] = useState([])
   const [allListings, setAllListings] = useState([]) // All listings for 'all' view mode
-  const [totalZombies, setTotalZombies] = useState(DEMO_MODE ? DUMMY_ZOMBIES.length : 0)
-  const [totalListings, setTotalListings] = useState(DEMO_MODE ? 1247 : 0)
-  const [totalBreakdown, setTotalBreakdown] = useState(DEMO_MODE ? { Amazon: 523, Walmart: 312, 'Home Depot': 89, AliExpress: 156, Costway: 67, Unknown: 100 } : { Amazon: 0, Walmart: 0, Unknown: 0 })
-  const [platformBreakdown, setPlatformBreakdown] = useState(DEMO_MODE ? { eBay: 1247 } : { eBay: 0, Amazon: 0, Shopify: 0, Walmart: 0 })
-  const [zombieBreakdown, setZombieBreakdown] = useState(DEMO_MODE ? { Amazon: 5, Walmart: 3, 'Home Depot': 1, AliExpress: 1, Costway: 1, Unknown: 1 } : {})
+  const [totalZombies, setTotalZombies] = useState(0)
+  const [totalListings, setTotalListings] = useState(0)
+  const [totalBreakdown, setTotalBreakdown] = useState({ Amazon: 0, Walmart: 0, Unknown: 0 })
+  const [platformBreakdown, setPlatformBreakdown] = useState({ eBay: 0, Amazon: 0, Shopify: 0, Walmart: 0 })
+  const [zombieBreakdown, setZombieBreakdown] = useState({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [selectedIds, setSelectedIds] = useState([])
   const [queue, setQueue] = useState([])
-  const [viewMode, setViewMode] = useState(DEMO_MODE ? 'zombies' : 'total') // 'total', 'all', 'zombies', 'queue', or 'history' - DEMO_MODE starts with zombies view
+  const [viewMode, setViewMode] = useState('total') // 'total', 'all', 'zombies', 'queue', or 'history'
   const [historyLogs, setHistoryLogs] = useState([])
-  const [totalDeleted, setTotalDeleted] = useState(DEMO_MODE ? 23 : 0)
-  const [showFilter, setShowFilter] = useState(DEMO_MODE ? true : false) // Filter panel visibility - DEMO_MODE starts with filter open
+  const [totalDeleted, setTotalDeleted] = useState(0)
+  const [showFilter, setShowFilter] = useState(false) // Filter panel visibility - controlled by Total Listings card click
+  
+  // API Health Check State
+  const [apiConnected, setApiConnected] = useState(false)
+  const [apiError, setApiError] = useState(null)
+  
+  // User Credits & Plan State (from API)
+  const [userCredits, setUserCredits] = useState(0)
+  const [usedCredits, setUsedCredits] = useState(0)
+  const [userPlan, setUserPlan] = useState('FREE')
+  const [connectedStoresCount, setConnectedStoresCount] = useState(1)
+  
   const [filters, setFilters] = useState({
     marketplace_filter: 'eBay',  // MVP Scope: Default to eBay (only eBay and Shopify supported)
-    analytics_period_days: 7,    // 1. 분석 기준 기간
+    analytics_period_days: 7,    // 1. 분석 기준 기간 (기본값: 7일)
     min_days: 7,                 // Legacy compatibility
-    max_sales: 0,                // 2. 기간 내 판매 건수
-    max_watches: 0,              // 3. 찜하기 (Watch)
+    max_sales: 0,                // 2. 기간 내 판매 건수 (기본값: 0건)
+    max_watches: 0,              // 3. 찜하기 (Watch) (기본값: 0건)
     max_watch_count: 0,          // Legacy compatibility
-    max_impressions: 100,        // 4. 총 노출 횟수
-    max_views: 10,               // 5. 총 조회 횟수
+    max_impressions: 100,        // 4. 총 노출 횟수 (기본값: 100회 미만)
+    max_views: 10,               // 5. 총 조회 횟수 (기본값: 10회 미만)
     supplier_filter: 'All'
   })
+  
+  // API Health Check - Check connection on mount
+  const checkApiHealth = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/`, { timeout: 5000 })
+      if (response.status === 200) {
+        setApiConnected(true)
+        setApiError(null)
+        return true
+      }
+    } catch (err) {
+      console.error('API Health Check failed:', err)
+      setApiConnected(false)
+      setApiError('Connection Error')
+      return false
+    }
+    return false
+  }
+  
+  // Fetch user credits and plan info
+  const fetchUserCredits = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/credits`, {
+        params: { user_id: CURRENT_USER_ID }
+      })
+      if (response.data) {
+        setUserCredits(response.data.available_credits || 0)
+        setUsedCredits(response.data.used_credits || 0)
+        setUserPlan(response.data.plan || 'FREE')
+      }
+    } catch (err) {
+      console.error('Failed to fetch credits:', err)
+      // Use default values on error
+    }
+  }
 
   const fetchZombies = async (filterParams = filters) => {
     try {
@@ -388,21 +434,40 @@ function Dashboard() {
     }
   }
 
+  // Initial Load - Check API health and fetch data
+  useEffect(() => {
+    const initializeDashboard = async () => {
+      // Step 1: Check API Health
+      const isHealthy = await checkApiHealth()
+      
+      if (isHealthy) {
+        // Step 2: Fetch user credits
+        await fetchUserCredits()
+        
+        // Step 3: Fetch initial data (all listings stats)
+        await fetchAllListings()
+        
+        // Step 4: Fetch history (non-blocking)
+        fetchHistory().catch(err => {
+          console.error('History fetch error on mount:', err)
+        })
+      }
+    }
+    
+    initializeDashboard()
+    
+    // Set up periodic health check every 30 seconds
+    const healthCheckInterval = setInterval(checkApiHealth, 30000)
+    
+    return () => clearInterval(healthCheckInterval)
+  }, [])
+  
   // Fetch data when store changes
   useEffect(() => {
-    if (selectedStore) {
-      fetchZombies()
+    if (selectedStore && apiConnected) {
       fetchAllListings()
     }
-  }, [selectedStore?.id])
-
-  useEffect(() => {
-    fetchAllListings()
-    // Fetch history separately (non-blocking)
-    fetchHistory().catch(err => {
-      console.error('History fetch error on mount:', err)
-    })
-  }, [])
+  }, [selectedStore?.id, apiConnected])
 
   const handleExport = async (mode, itemsToExport = null) => {
     // Use provided items or default to full queue
@@ -485,9 +550,16 @@ function Dashboard() {
           filters={filters}
           viewMode={viewMode}
           onViewModeChange={handleViewModeChange}
-          connectedStore={DEMO_MODE ? DUMMY_STORE : selectedStore}
+          connectedStore={selectedStore}
+          connectedStoresCount={connectedStoresCount}
           showFilter={showFilter}
           onToggleFilter={handleToggleFilter}
+          // API Health & Credits
+          apiConnected={apiConnected}
+          apiError={apiError}
+          userPlan={userPlan}
+          userCredits={userCredits}
+          usedCredits={usedCredits}
           filterContent={showFilter && (
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-fade-in-up">
               <div className="flex items-center justify-between mb-4">

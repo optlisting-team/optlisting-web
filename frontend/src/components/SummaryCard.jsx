@@ -162,10 +162,13 @@ function SummaryCard({
   showFilter = false,
   onToggleFilter = null,
   filterContent = null, // Filter panel to render after Total card
+  // API Health Status
+  apiConnected = false,
+  apiError = null,
   // User subscription and credits
-  userPlan = 'PRO',
-  planStoreLimit = 5,
-  globalStoreLimit = 15,
+  userPlan = 'FREE',
+  planStoreLimit = 3,
+  globalStoreLimit = 10,
   userCredits = 0,
   usedCredits = 0
 }) {
@@ -219,16 +222,20 @@ function SummaryCard({
             <span className="text-sm">💰</span>
             <span className="text-xs font-bold text-emerald-400">{(userCredits - usedCredits).toLocaleString()}</span>
             <span className="text-xs text-emerald-300/70">Credits</span>
-            {userCredits > 0 && (
-              <span className="text-xs text-emerald-500/50">(Rollover)</span>
-            )}
           </div>
           
-          {/* Live Data Badge */}
-          <div className="opt-badge opt-badge-success">
-            <span className="status-dot status-dot-success" />
-            Live
-          </div>
+          {/* API Health Badge - Dynamic based on connection status */}
+          {apiConnected ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-emerald-600/20 to-emerald-600/10 border border-emerald-500/30 rounded-lg">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+              <span className="text-xs font-bold text-emerald-400">LIVE</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-red-600/20 to-red-600/10 border border-red-500/30 rounded-lg">
+              <div className="w-2 h-2 bg-red-500 rounded-full" />
+              <span className="text-xs font-bold text-red-400">{apiError || 'Connection Error'}</span>
+            </div>
+          )}
         </div>
       </div>
       
