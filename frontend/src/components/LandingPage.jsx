@@ -398,6 +398,7 @@ function LandingPage() {
                   <div>
                     <h3 className="text-xl font-bold text-white">Credit Packs</h3>
                     <p className="text-zinc-400 text-sm">One-time purchase • No commitment • Volume discounts</p>
+                    <p className="text-blue-400 text-xs mt-1">💡 For occasional users who prefer no subscriptions</p>
                   </div>
                 </div>
                 <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
@@ -578,6 +579,7 @@ function LandingPage() {
                 <div>
                   <h3 className="text-xl font-bold text-white">Subscription Plans</h3>
                   <p className="text-zinc-400 text-sm">Monthly billing • Cancel anytime • Unlimited scans</p>
+                  <p className="text-emerald-400 text-xs mt-1">🔄 For power sellers who need continuous listing management</p>
                 </div>
               </div>
 
