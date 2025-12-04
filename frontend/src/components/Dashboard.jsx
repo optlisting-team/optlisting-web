@@ -41,21 +41,22 @@ const DUMMY_STORE = {
 
 function Dashboard() {
   const { selectedStore } = useStore()
-  const [zombies, setZombies] = useState([])
+  // DEMO_MODE 초기 데이터 설정
+  const [zombies, setZombies] = useState(DEMO_MODE ? DUMMY_ZOMBIES : [])
   const [allListings, setAllListings] = useState([]) // All listings for 'all' view mode
-  const [totalZombies, setTotalZombies] = useState(0)
-  const [totalListings, setTotalListings] = useState(0)
-  const [totalBreakdown, setTotalBreakdown] = useState({ Amazon: 0, Walmart: 0, Unknown: 0 })
-  const [platformBreakdown, setPlatformBreakdown] = useState({ eBay: 0, Amazon: 0, Shopify: 0, Walmart: 0 })
-  const [zombieBreakdown, setZombieBreakdown] = useState({})
+  const [totalZombies, setTotalZombies] = useState(DEMO_MODE ? DUMMY_ZOMBIES.length : 0)
+  const [totalListings, setTotalListings] = useState(DEMO_MODE ? 1247 : 0)
+  const [totalBreakdown, setTotalBreakdown] = useState(DEMO_MODE ? { Amazon: 523, Walmart: 312, 'Home Depot': 89, AliExpress: 156, Costway: 67, Unknown: 100 } : { Amazon: 0, Walmart: 0, Unknown: 0 })
+  const [platformBreakdown, setPlatformBreakdown] = useState(DEMO_MODE ? { eBay: 1247 } : { eBay: 0, Amazon: 0, Shopify: 0, Walmart: 0 })
+  const [zombieBreakdown, setZombieBreakdown] = useState(DEMO_MODE ? { Amazon: 5, Walmart: 3, 'Home Depot': 1, AliExpress: 1, Costway: 1, Unknown: 1 } : {})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [selectedIds, setSelectedIds] = useState([])
   const [queue, setQueue] = useState([])
-  const [viewMode, setViewMode] = useState('total') // 'total', 'all', 'zombies', 'queue', or 'history'
+  const [viewMode, setViewMode] = useState(DEMO_MODE ? 'zombies' : 'total') // DEMO_MODE: 바로 좀비 뷰로 시작
   const [historyLogs, setHistoryLogs] = useState([])
-  const [totalDeleted, setTotalDeleted] = useState(0)
-  const [showFilter, setShowFilter] = useState(false) // Filter panel visibility - controlled by Total Listings card click
+  const [totalDeleted, setTotalDeleted] = useState(DEMO_MODE ? 23 : 0)
+  const [showFilter, setShowFilter] = useState(DEMO_MODE ? true : false) // DEMO_MODE: 필터 열린 상태로 시작
   
   // API Health Check State
   const [apiConnected, setApiConnected] = useState(false)
