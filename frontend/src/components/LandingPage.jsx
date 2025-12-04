@@ -361,7 +361,7 @@ function LandingPage() {
                 Simple, Transparent Pricing
               </h2>
               <p className="text-xl text-zinc-400 max-w-2xl mx-auto">
-                Pay only for what you use. No hidden fees. Cancel anytime.
+                90% Less Cleanup Time. Invest in Sourcing, Win the Market.
               </p>
             </div>
 
