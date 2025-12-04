@@ -296,39 +296,36 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
           </div>
         )}
 
-        {/* Filter Summary + Find Button - Inline */}
-        <div className="flex items-center gap-3">
-          <div className="flex-1 p-2 bg-zinc-900/50 rounded-lg border border-zinc-800">
-            <p className="text-xs text-zinc-400">
-              <span className="text-zinc-500">Finding:</span>{' '}
-              <span className="text-white">{maxSales} sales</span>,{' '}
-              <span className="text-white">{maxWatches} watches</span>,{' '}
-              <span className="text-white">&lt;{maxImpressions} imp</span>,{' '}
-              <span className="text-white">&lt;{maxViews} views</span>{' '}
-              <span className="text-zinc-500">in {analysisPeriod}d</span>
-            </p>
-          </div>
+        {/* Filter Summary - Small */}
+        <div className="p-2 bg-zinc-900/50 rounded-lg border border-zinc-800 mb-3">
+          <p className="text-xs text-zinc-400">
+            <span className="text-zinc-500">Finding:</span>{' '}
+            <span className="text-white">{maxSales} sales</span>,{' '}
+            <span className="text-white">{maxWatches} watches</span>,{' '}
+            <span className="text-white">&lt;{maxImpressions} imp</span>,{' '}
+            <span className="text-white">&lt;{maxViews} views</span>{' '}
+            <span className="text-zinc-500">in {analysisPeriod}d</span>
+          </p>
+        </div>
 
-          {/* Find Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-red-600 to-orange-500 text-white text-sm font-bold rounded-lg hover:from-red-500 hover:to-orange-400 disabled:opacity-50 transition-all shadow-lg shadow-red-500/30"
-          >
+        {/* Find Button - Full Width & Prominent */}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-red-600 via-orange-500 to-red-600 text-white text-lg font-black rounded-xl hover:from-red-500 hover:via-orange-400 hover:to-red-500 disabled:opacity-50 transition-all shadow-xl shadow-red-500/40 hover:shadow-red-500/60 hover:scale-[1.01] active:scale-[0.99]"
+        >
           {loading ? (
             <>
-              <RotateCw className="w-4 h-4 animate-spin" />
+              <RotateCw className="w-5 h-5 animate-spin" />
               <span>Analyzing...</span>
             </>
           ) : (
             <>
-              <span>🔬</span>
-              <span>Find Zombies</span>
-              <span>→</span>
+              <span className="text-xl">🔬</span>
+              <span>Find Zombie Listings</span>
+              <span className="text-xl">→</span>
             </>
           )}
-          </button>
-        </div>
       </form>
     </div>
   )
