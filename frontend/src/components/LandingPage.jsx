@@ -594,7 +594,7 @@ function LandingPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <Check className="w-3 h-3 text-blue-400" />
-                        <span className="text-zinc-300">All CSV Formats</span>
+                        <span className="text-zinc-300">CSV Export</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Check className="w-3 h-3 text-emerald-400" />
@@ -650,7 +650,7 @@ function LandingPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <Check className="w-3 h-3 text-purple-400" />
-                        <span className="text-zinc-300">Dedicated Manager</span>
+                        <span className="text-zinc-300">CSV Export</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Check className="w-3 h-3 text-emerald-400" />
