@@ -631,36 +631,36 @@ function Dashboard() {
 
               {/* View Mode Info */}
               {viewMode === 'all' && (
-                <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg p-6 mb-4">
-                  <p className="text-sm text-zinc-400 dark:text-zinc-400">
-                    📋 <strong className="text-gray-900">Viewing All Listings</strong> - Click "Low Interest Detected" card to filter and optimize inventory.
+                <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-zinc-400">
+                    📋 <strong className="text-white">Viewing All Listings</strong> - Click "Low Interest Detected" card to filter and optimize inventory.
                   </p>
                 </div>
               )}
 
             {/* Briefing Text for Low Interest Items View */}
             {viewMode === 'zombies' && (
-              <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg p-6 mb-4">
-                <p className="text-sm text-zinc-400 dark:text-zinc-400">
-                  🔍 <strong className="text-gray-900">Current Filter:</strong> Showing {filters.marketplace_filter === 'All' ? <strong className="text-gray-900">All Platforms</strong> : <strong className="text-gray-900">[{filters.marketplace_filter}]</strong>} listings older than <strong className="text-gray-900">{filters.min_days} days</strong> with <strong className="text-gray-900">{filters.max_sales} sales</strong> and <strong className="text-gray-900">≤ {filters.max_watch_count} views</strong>. These items have low customer interest and may need optimization.
+              <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-4">
+                <p className="text-sm text-zinc-400">
+                  🔍 <strong className="text-white">Current Filter:</strong> Showing <strong className="text-blue-400">{filters.marketplace_filter === 'All' ? 'All Platforms' : `[${filters.marketplace_filter}]`}</strong> listings older than <strong className="text-white">{filters.min_days} days</strong> with <strong className="text-white">{filters.max_sales} sales</strong> and <strong className="text-white">≤ {filters.max_watch_count} views</strong>. These items have low customer interest and may need optimization.
                 </p>
               </div>
             )}
 
             {/* Briefing Text for Queue View */}
             {viewMode === 'queue' && (
-              <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg p-6 mb-4">
-                <p className="text-sm text-zinc-400 dark:text-zinc-400">
-                  ✅ <strong className="text-gray-900">Full-Screen Final Review Mode</strong> - Review all items grouped by source. Each section has its own download button.
+              <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-4">
+                <p className="text-sm text-zinc-400">
+                  ✅ <strong className="text-white">Full-Screen Final Review Mode</strong> - Review all items grouped by source. Each section has its own download button.
                 </p>
               </div>
             )}
 
             {/* Briefing Text for History View */}
             {viewMode === 'history' && (
-              <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg p-6 mb-4">
-                <p className="text-sm text-zinc-400 dark:text-zinc-400">
-                  💀 <strong className="text-gray-900">Deletion History</strong> - View all items that have been exported for deletion. This is your permanent record.
+              <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-4">
+                <p className="text-sm text-zinc-400">
+                  💀 <strong className="text-white">Deletion History</strong> - View all items that have been exported for deletion. This is your permanent record.
                 </p>
               </div>
             )}
