@@ -389,31 +389,26 @@ function LandingPage() {
               transition={{ delay: 0.2 }}
               className="mb-16"
             >
-              {/* Section Header */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
+              {/* Section Header - Centered */}
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center gap-3 mb-2">
                   <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
                     <span className="text-xl">💰</span>
                   </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-white">Credit Packs</h3>
-                    <p className="text-zinc-400 text-sm">One-time purchase • No commitment • Volume discounts</p>
-                    <p className="text-blue-400 text-xs mt-1">💡 For occasional users who prefer no subscriptions</p>
-                  </div>
+                  <h3 className="text-xl font-bold text-white">Credit Packs</h3>
                 </div>
-                <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-                  <span className="text-emerald-400 text-sm font-semibold">💡 Buy more, save more!</span>
-                </div>
+                <p className="text-zinc-400 text-sm">One-time purchase • No commitment • Volume discounts</p>
+                <p className="text-blue-400 text-xs mt-1">💡 For occasional users who prefer no subscriptions</p>
               </div>
 
-              {/* Credit Pack Selector - Dropdown Style */}
-              <div className="max-w-lg mx-auto">
+              {/* Credit Pack Selector - Compact */}
+              <div className="max-w-md mx-auto">
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.25 }}
-                  className="relative bg-gradient-to-b from-amber-500/10 to-zinc-800/80 border-2 border-amber-500/40 rounded-2xl p-8 shadow-xl shadow-amber-500/10"
+                  className="relative bg-gradient-to-b from-amber-500/10 to-zinc-800/80 border-2 border-amber-500/40 rounded-2xl p-6 shadow-xl shadow-amber-500/10"
                 >
                   {/* Selected Pack Badge */}
                   {selectedPack.popular && (
@@ -489,12 +484,12 @@ function LandingPage() {
                   </div>
 
                   {/* Selected Pack Details */}
-                  <div className="p-5 bg-amber-500/10 border border-amber-500/20 rounded-xl mb-6">
-                    <div className="text-center mb-3">
-                      <span className="text-5xl font-black text-white">{selectedPack.credits.toLocaleString()}</span>
-                      <span className="text-2xl text-zinc-400 ml-2">Credits</span>
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl mb-4">
+                    <div className="text-center mb-2">
+                      <span className="text-4xl font-black text-white">{selectedPack.credits.toLocaleString()}</span>
+                      <span className="text-xl text-zinc-400 ml-2">Credits</span>
                     </div>
-                    <div className="flex items-center justify-center gap-4 text-sm">
+                    <div className="flex items-center justify-center gap-3 text-sm">
                       <span className="text-zinc-400">
                         <span className="text-white font-bold">${selectedPack.perScan}</span> per scan
                       </span>
@@ -506,39 +501,38 @@ function LandingPage() {
                     </div>
                   </div>
 
-                  {/* Features */}
-                  <div className="space-y-3 mb-6">
-                    <div className="flex items-center gap-3">
-                      <Check className="w-5 h-5 text-amber-400" />
-                      <span className="text-zinc-300">{selectedPack.credits.toLocaleString()} Listing Scans</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Check className="w-5 h-5 text-amber-400" />
-                      <span className="text-zinc-300">All Connected Stores</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Check className="w-5 h-5 text-emerald-400" />
+                  {/* Features - Compact */}
+                  <div className="flex flex-wrap gap-2 mb-4 justify-center text-xs">
+                    <span className="flex items-center gap-1 px-2 py-1 bg-zinc-800 rounded-lg">
+                      <Check className="w-3 h-3 text-amber-400" />
+                      <span className="text-zinc-300">{selectedPack.credits.toLocaleString()} Scans</span>
+                    </span>
+                    <span className="flex items-center gap-1 px-2 py-1 bg-zinc-800 rounded-lg">
+                      <Check className="w-3 h-3 text-amber-400" />
+                      <span className="text-zinc-300">All Stores</span>
+                    </span>
+                    <span className="flex items-center gap-1 px-2 py-1 bg-emerald-500/20 rounded-lg">
+                      <Check className="w-3 h-3 text-emerald-400" />
                       <span className="text-emerald-300 font-semibold">Never Expires ✨</span>
-                    </div>
+                    </span>
                   </div>
 
                   {/* Purchase Button */}
                   <a
                     href={`https://optlisting.lemonsqueezy.com/checkout/${selectedPack.id}`}
-                    className="block w-full py-4 bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-white font-bold text-lg rounded-xl text-center transition-all shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50"
+                    className="block w-full py-3 bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-white font-bold rounded-xl text-center transition-all shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50"
                   >
-                    Get {selectedPack.credits.toLocaleString()} Credits for ${selectedPack.price} →
+                    Get {selectedPack.credits.toLocaleString()} Credits — ${selectedPack.price}
                   </a>
 
                   {/* Quick Select Buttons */}
-                  <div className="mt-6 pt-5 border-t border-zinc-700/50">
-                    <p className="text-zinc-500 text-xs text-center mb-3">Quick Select</p>
-                    <div className="flex gap-2 justify-center flex-wrap">
+                  <div className="mt-4 pt-3 border-t border-zinc-700/50">
+                    <div className="flex gap-1.5 justify-center flex-wrap">
                       {CREDIT_PACKS.map((pack) => (
                         <button
                           key={pack.id}
                           onClick={() => setSelectedPack(pack)}
-                          className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                             selectedPack.id === pack.id
                               ? 'bg-amber-500 text-black'
                               : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'
@@ -572,19 +566,20 @@ function LandingPage() {
               transition={{ delay: 0.3 }}
             >
               {/* Section Header */}
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                  <span className="text-xl">🏆</span>
-                </div>
-                <div>
+              {/* Section Header - Centered */}
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
+                    <span className="text-xl">🏆</span>
+                  </div>
                   <h3 className="text-xl font-bold text-white">Subscription Plans</h3>
-                  <p className="text-zinc-400 text-sm">Monthly billing • Cancel anytime • Unlimited scans</p>
-                  <p className="text-emerald-400 text-xs mt-1">🔄 For power sellers who need continuous listing management</p>
                 </div>
+                <p className="text-zinc-400 text-sm">Monthly billing • Cancel anytime • Unlimited scans</p>
+                <p className="text-emerald-400 text-xs mt-1">🔄 For power sellers who need continuous listing management</p>
               </div>
 
               {/* Subscription Cards - 3 Column */}
-              <div className="grid md:grid-cols-3 gap-6">
+              <div className="grid md:grid-cols-3 gap-4 max-w-4xl mx-auto">
                 
                 {/* BASIC Plan - $19 */}
                 <motion.div
