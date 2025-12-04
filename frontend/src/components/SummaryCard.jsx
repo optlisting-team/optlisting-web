@@ -239,79 +239,55 @@ function SummaryCard({
         </div>
       </div>
       
-      {/* Your Store - Full Width Card with Dropdown */}
-      <div className="opt-card p-6 opacity-0 animate-fade-in" style={{ animationDelay: '80ms' }}>
-        <div className="flex items-center justify-between">
+      {/* Your Store - Compact */}
+      <div className="opt-card p-3">
+        <div className="flex items-center justify-between gap-4">
           {/* Left: Store Info */}
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
-              <span className="text-2xl">🏪</span>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
+              <span className="text-lg">🏪</span>
             </div>
-            <div className="flex flex-col">
-              <span className="text-xs text-zinc-400 uppercase tracking-wider font-medium">Your Store</span>
-              {connectedStore ? (
-                <>
-                  <span className="text-xl font-bold text-white">{connectedStore.name || 'eBay Store'}</span>
-                  <span className="text-xs text-zinc-500">{connectedStore.email || 'user@ebay.com'}</span>
-                </>
-              ) : (
-                <span className="text-lg font-semibold text-zinc-400">No Store Selected</span>
-              )}
+            <div>
+              <span className="text-xs text-zinc-500">Store</span>
+              <span className="text-sm font-bold text-white ml-2">{connectedStore?.name || 'eBay Store'}</span>
             </div>
           </div>
 
-          {/* Center: Store Actions */}
-          <div className="flex items-center gap-3">
-            {/* Store Selector - Only show if stores exist */}
+          {/* Center: Store Selector + Connect */}
+          <div className="flex items-center gap-2">
             {connectedStore && (
-              <div className="relative">
-                <select 
-                  className="appearance-none bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 pr-10 text-white font-medium cursor-pointer hover:border-zinc-600 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all min-w-[200px]"
-                  defaultValue={connectedStore?.id || ''}
-                >
-                  <option value={connectedStore.id}>
-                    {connectedStore.name || 'eBay Store'}
-                  </option>
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <svg className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
+              <select 
+                className="appearance-none bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 pr-8 text-sm text-white cursor-pointer hover:border-zinc-600 focus:outline-none min-w-[140px]"
+                defaultValue={connectedStore?.id || ''}
+              >
+                <option value={connectedStore.id}>{connectedStore.name || 'eBay Store'}</option>
+              </select>
             )}
-
-            {/* Connect eBay Button - Primary CTA */}
             <button 
               onClick={() => {
-                // eBay OAuth 시작 - 원클릭 연결!
                 const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-                const userId = 'default-user' // TODO: 실제 사용자 ID 사용
+                const userId = 'default-user'
                 window.location.href = `${apiUrl}/api/ebay/auth/start?user_id=${userId}`
               }}
-              className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-semibold rounded-xl transition-all hover:scale-105 shadow-lg shadow-blue-500/30"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white text-sm font-semibold rounded-lg transition-all"
             >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12.89 3L14.85 3.4L11.11 21L9.15 20.6L12.89 3M19.59 12L16 8.41V5.58L22.42 12L16 18.41V15.58L19.59 12M1.58 12L8 5.58V8.41L4.41 12L8 15.58V18.41L1.58 12Z" />
-              </svg>
+              <span>⚡</span>
               <span>Connect eBay</span>
             </button>
           </div>
 
-          {/* Right: Connection Status */}
-          <div className="flex items-center gap-3">
-            {connectedStore ? (
-              <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-xl">
-                <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
-                <span className="text-sm font-semibold text-emerald-400">Connected</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 px-4 py-2 bg-zinc-700/50 border border-zinc-600 rounded-xl">
-                <div className="w-2.5 h-2.5 bg-zinc-500 rounded-full" />
-                <span className="text-sm font-semibold text-zinc-400">Disconnected</span>
-              </div>
-            )}
-          </div>
+          {/* Right: Status */}
+          {connectedStore ? (
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-lg">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+              <span className="text-xs font-semibold text-emerald-400">Connected</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-zinc-700/50 border border-zinc-600 rounded-lg">
+              <div className="w-2 h-2 bg-zinc-500 rounded-full" />
+              <span className="text-xs font-semibold text-zinc-400">Disconnected</span>
+            </div>
+          )}
         </div>
       </div>
 
