@@ -465,9 +465,9 @@ function LandingPage() {
                     </div>
 
                     {/* 1 Credit = 1 Scan Notice */}
-                    <div className="text-center mb-3 py-1.5 px-2 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
-                      <span className="text-xs text-zinc-400">💡 </span>
-                      <span className="text-xs font-semibold text-amber-400">1 Credit = 1 Listing Scan</span>
+                    <div className="text-center mb-3 py-1.5 px-2 bg-zinc-800/50 rounded-lg border border-zinc-700/50 whitespace-nowrap">
+                      <span className="text-xs text-zinc-400">💡</span>
+                      <span className="text-xs font-semibold text-amber-400"> 1 Credit = 1 Scan</span>
                     </div>
 
                     {/* Features */}
