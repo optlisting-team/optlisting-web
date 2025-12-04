@@ -107,19 +107,14 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
     return `${formatDate(startDate)} - ${formatDate(endDate)}`
   }
 
-  // Filter input component
+  // Filter input component - Compact
   const FilterInput = ({ id, label, value, onChange, icon, tooltip, unit, min = 0, step = 1 }) => (
     <div className="relative group">
-      <label htmlFor={id} className="flex items-center gap-2 text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-        <span>{icon}</span>
-        <span>{label}</span>
+      <label htmlFor={id} className="flex items-center gap-1 text-xs font-medium text-zinc-500 mb-1">
+        <span className="text-xs">{icon}</span>
+        <span className="uppercase tracking-wide">{label}</span>
         {tooltip && (
-          <div className="relative">
-            <Info className="w-3 h-3 text-zinc-600 cursor-help" />
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-300 whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-              {tooltip}
-            </div>
-          </div>
+          <Info className="w-3 h-3 text-zinc-600 cursor-help" title={tooltip} />
         )}
       </label>
       <div className="relative">
@@ -130,10 +125,10 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
           step={step}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-lg font-bold data-value focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-zinc-500 transition-all"
+          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white text-sm font-bold focus:outline-none focus:ring-1 focus:ring-white/20 transition-all"
         />
         {unit && (
-          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-zinc-500 font-medium">
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-zinc-600">
             {unit}
           </span>
         )}
@@ -142,16 +137,15 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
   )
 
   return (
-    <div className="opt-card p-4 opacity-0 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+    <div className="opt-card p-3 opacity-0 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
       {/* Header with Action Buttons */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500/20 to-orange-500/20 border border-red-500/30 flex items-center justify-center">
-            <Filter className="w-4 h-4 text-red-400" />
+          <div className="w-6 h-6 rounded-md bg-gradient-to-br from-red-500/20 to-orange-500/20 border border-red-500/30 flex items-center justify-center">
+            <Filter className="w-3 h-3 text-red-400" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-white">Low Interest Filter</h3>
-            <p className="text-xs text-zinc-500">Find zombie listings to clean up</p>
+            <h3 className="text-xs font-bold text-white">Low Interest Filter</h3>
           </div>
         </div>
         
@@ -189,7 +183,7 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
 
       <form onSubmit={handleSubmit}>
         {/* Primary Filters Row - Compact */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
           {/* 1. 분석 기준 기간 */}
           <FilterInput
             id="analysisPeriod"
@@ -302,25 +296,25 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
           </div>
         )}
 
-        {/* Filter Summary - Compact */}
-        <div className="p-3 bg-zinc-900/50 rounded-lg border border-zinc-800 mb-4">
-          <p className="text-xs text-zinc-400">
-            <span className="text-zinc-500">Finding:</span>{' '}
-            <span className="text-white font-medium">{maxSales} sales</span>,{' '}
-            <span className="text-white font-medium">{maxWatches} watches</span>,{' '}
-            <span className="text-white font-medium">&lt;{maxImpressions} imp</span>,{' '}
-            <span className="text-white font-medium">&lt;{maxViews} views</span>{' '}
-            <span className="text-zinc-500">in</span>{' '}
-            <span className="text-white font-medium">{analysisPeriod} days</span>
-          </p>
-        </div>
+        {/* Filter Summary + Find Button - Inline */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 p-2 bg-zinc-900/50 rounded-lg border border-zinc-800">
+            <p className="text-xs text-zinc-400">
+              <span className="text-zinc-500">Finding:</span>{' '}
+              <span className="text-white">{maxSales} sales</span>,{' '}
+              <span className="text-white">{maxWatches} watches</span>,{' '}
+              <span className="text-white">&lt;{maxImpressions} imp</span>,{' '}
+              <span className="text-white">&lt;{maxViews} views</span>{' '}
+              <span className="text-zinc-500">in {analysisPeriod}d</span>
+            </p>
+          </div>
 
-        {/* Find Button - Full Width */}
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-red-600 via-orange-500 to-red-600 text-white font-bold rounded-xl hover:from-red-500 hover:via-orange-400 hover:to-red-500 focus:outline-none focus:ring-4 focus:ring-red-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-red-500/30 hover:shadow-red-500/50"
-        >
+          {/* Find Button */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-red-600 to-orange-500 text-white text-sm font-bold rounded-lg hover:from-red-500 hover:to-orange-400 disabled:opacity-50 transition-all shadow-lg shadow-red-500/30"
+          >
           {loading ? (
             <>
               <RotateCw className="w-4 h-4 animate-spin" />
@@ -329,11 +323,12 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
           ) : (
             <>
               <span>🔬</span>
-              <span>Find Zombie Listings</span>
+              <span>Find Zombies</span>
               <span>→</span>
             </>
           )}
-        </button>
+          </button>
+        </div>
       </form>
     </div>
   )
