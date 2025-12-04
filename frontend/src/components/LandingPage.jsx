@@ -394,7 +394,7 @@ function LandingPage() {
               {/* Credit Pack Cards - 3 Column */}
               <div className="grid md:grid-cols-3 gap-6">
                 
-                {/* 1K Credits Pack */}
+                {/* 300 Credits Pack */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
@@ -403,7 +403,7 @@ function LandingPage() {
                   className="relative bg-zinc-800/50 border border-zinc-700 rounded-2xl p-6 hover:border-amber-500/30 transition-all group"
                 >
                   <div className="mb-4">
-                    <h4 className="text-2xl font-black text-white">1K Credits</h4>
+                    <h4 className="text-2xl font-black text-white">300 Credits</h4>
                     <p className="text-zinc-500 text-sm mt-1">Try it out</p>
                   </div>
 
@@ -412,14 +412,14 @@ function LandingPage() {
                       <span className="text-3xl font-black text-white">$5</span>
                     </div>
                     <p className="text-center text-zinc-400 text-xs">
-                      $0.005 per scan
+                      $0.017 per scan
                     </p>
                   </div>
 
                   <div className="space-y-2 mb-5 text-sm">
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-amber-400" />
-                      <span className="text-zinc-300">1,000 Listing Scans</span>
+                      <span className="text-zinc-300">300 Listing Scans</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-amber-400" />
@@ -432,14 +432,14 @@ function LandingPage() {
                   </div>
 
                   <a
-                    href="https://optlisting.lemonsqueezy.com/checkout/credit-1k"
+                    href="https://optlisting.lemonsqueezy.com/checkout/credit-300"
                     className="block w-full py-3 bg-zinc-700 hover:bg-amber-600 text-white font-bold rounded-xl text-center transition-all group-hover:shadow-lg group-hover:shadow-amber-500/20"
                   >
-                    Get 1K Credits
+                    Get 300 Credits
                   </a>
                 </motion.div>
 
-                {/* 2.5K Credits Pack (Highlighted) */}
+                {/* 800 Credits Pack (Highlighted) */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
@@ -450,29 +450,29 @@ function LandingPage() {
                   {/* Popular Badge */}
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                     <span className="px-4 py-1 bg-gradient-to-r from-amber-600 to-orange-500 text-white text-xs font-bold rounded-full shadow-lg shadow-amber-500/30">
-                      🔥 +25% BONUS
+                      🔥 MOST POPULAR
                     </span>
                   </div>
 
                   <div className="mb-4 mt-2">
-                    <h4 className="text-2xl font-black text-white">2.5K Credits</h4>
+                    <h4 className="text-2xl font-black text-white">800 Credits</h4>
                     <p className="text-amber-400 text-sm mt-1">Most popular</p>
                   </div>
 
                   <div className="p-4 bg-amber-500/20 border border-amber-500/30 rounded-xl mb-4">
                     <div className="flex items-center justify-center gap-2 mb-1">
                       <span className="text-3xl font-black text-white">$10</span>
-                      <span className="text-emerald-400 text-sm font-bold">(Save 20%)</span>
+                      <span className="text-emerald-400 text-sm font-bold">(Save 26%)</span>
                     </div>
                     <p className="text-center text-zinc-400 text-xs">
-                      $0.004 per scan
+                      $0.0125 per scan
                     </p>
                   </div>
 
                   <div className="space-y-2 mb-5 text-sm">
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-amber-400" />
-                      <span className="text-zinc-300">2,500 Listing Scans</span>
+                      <span className="text-zinc-300">800 Listing Scans</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-amber-400" />
@@ -485,14 +485,14 @@ function LandingPage() {
                   </div>
 
                   <a
-                    href="https://optlisting.lemonsqueezy.com/checkout/credit-2.5k"
+                    href="https://optlisting.lemonsqueezy.com/checkout/credit-800"
                     className="block w-full py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-bold rounded-xl text-center transition-all shadow-lg shadow-amber-500/20"
                   >
-                    Get 2.5K Credits →
+                    Get 800 Credits →
                   </a>
                 </motion.div>
 
-                {/* 6K Credits Pack */}
+                {/* 2K Credits Pack */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
@@ -503,29 +503,29 @@ function LandingPage() {
                   {/* Max Value Badge */}
                   <div className="absolute -top-3 right-4">
                     <span className="px-3 py-1 bg-orange-500/20 text-orange-400 text-xs font-bold rounded-full border border-orange-500/30">
-                      💎 +50% BONUS
+                      💎 BEST VALUE
                     </span>
                   </div>
 
                   <div className="mb-4 mt-2">
-                    <h4 className="text-2xl font-black text-white">6K Credits</h4>
+                    <h4 className="text-2xl font-black text-white">2K Credits</h4>
                     <p className="text-orange-400 text-sm mt-1">Best value</p>
                   </div>
 
                   <div className="p-4 bg-orange-500/15 border border-orange-500/25 rounded-xl mb-4">
                     <div className="flex items-center justify-center gap-2 mb-1">
                       <span className="text-3xl font-black text-white">$20</span>
-                      <span className="text-emerald-400 text-sm font-bold">(Save 33%)</span>
+                      <span className="text-emerald-400 text-sm font-bold">(Save 41%)</span>
                     </div>
                     <p className="text-center text-zinc-400 text-xs">
-                      $0.0033 per scan
+                      $0.01 per scan
                     </p>
                   </div>
 
                   <div className="space-y-2 mb-5 text-sm">
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-orange-400" />
-                      <span className="text-zinc-300">6,000 Listing Scans</span>
+                      <span className="text-zinc-300">2,000 Listing Scans</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-orange-400" />
@@ -538,10 +538,10 @@ function LandingPage() {
                   </div>
 
                   <a
-                    href="https://optlisting.lemonsqueezy.com/checkout/credit-6k"
+                    href="https://optlisting.lemonsqueezy.com/checkout/credit-2k"
                     className="block w-full py-3 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white font-bold rounded-xl text-center transition-all shadow-lg shadow-orange-500/20"
                   >
-                    Get 6K Credits →
+                    Get 2K Credits →
                   </a>
                 </motion.div>
               </div>
