@@ -14,6 +14,7 @@ const CURRENT_USER_ID = "default-user" // Temporary user ID for MVP phase
 
 // Demo Mode - Set to true to use dummy data (false for production with real API)
 // 🧪 테스트용: true = 더미 데이터, false = 실제 API
+// Force redeploy: 2024-12-04
 const DEMO_MODE = true
 
 // Dummy data for demo/testing
