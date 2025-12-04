@@ -358,7 +358,7 @@ function LandingPage() {
                 Hybrid Pricing
               </motion.span>
               <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
-                90% Less Cleanup Time
+                1 Hour → 5 Minutes
               </h2>
               <p className="text-xl text-zinc-400 max-w-2xl mx-auto">
                 Master Your Time, Dominate the Market.
