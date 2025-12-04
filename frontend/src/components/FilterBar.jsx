@@ -142,29 +142,54 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
   )
 
   return (
-    <div className="opt-card p-6 opacity-0 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500/20 to-orange-500/20 border border-red-500/30 flex items-center justify-center">
-            <Filter className="w-5 h-5 text-red-400" />
+    <div className="opt-card p-4 opacity-0 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+      {/* Header with Action Buttons */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500/20 to-orange-500/20 border border-red-500/30 flex items-center justify-center">
+            <Filter className="w-4 h-4 text-red-400" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-white">Low Interest Filter</h3>
+            <h3 className="text-sm font-bold text-white">Low Interest Filter</h3>
             <p className="text-xs text-zinc-500">Find zombie listings to clean up</p>
           </div>
         </div>
         
-        {/* Analysis Period Badge */}
-        <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-zinc-800/50 rounded-xl border border-zinc-700/50">
-          <span className="text-xs text-zinc-500">Analysis Period:</span>
-          <span className="text-sm font-bold text-white data-value">{getDateRange()}</span>
+        {/* Right Side: Period Badge + Action Buttons */}
+        <div className="flex items-center gap-2">
+          {/* Analysis Period Badge */}
+          <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
+            <span className="text-xs text-zinc-500">Period:</span>
+            <span className="text-xs font-bold text-white">{getDateRange()}</span>
+          </div>
+          
+          {/* Reset Button */}
+          <button
+            type="button"
+            onClick={handleReset}
+            disabled={loading}
+            className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs font-medium rounded-lg hover:bg-zinc-700 hover:text-white disabled:opacity-50 transition-all"
+          >
+            Reset
+          </button>
+          
+          {/* Sync Button */}
+          <button
+            type="button"
+            onClick={handleSync}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs font-medium rounded-lg hover:bg-zinc-700 hover:text-white disabled:opacity-50 transition-all"
+            title="Sync latest data from eBay"
+          >
+            <RotateCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+            <span>Sync</span>
+          </button>
         </div>
       </div>
 
       <form onSubmit={handleSubmit}>
-        {/* Primary Filters Row */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        {/* Primary Filters Row - Compact */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
           {/* 1. 분석 기준 기간 */}
           <FilterInput
             id="analysisPeriod"
@@ -277,60 +302,38 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
           </div>
         )}
 
-        {/* Filter Summary */}
-        <div className="p-4 bg-zinc-900/50 rounded-xl border border-zinc-800 mb-6">
-          <p className="text-sm text-zinc-400">
-            <span className="text-zinc-500">Finding listings with:</span>{' '}
+        {/* Filter Summary - Compact */}
+        <div className="p-3 bg-zinc-900/50 rounded-lg border border-zinc-800 mb-4">
+          <p className="text-xs text-zinc-400">
+            <span className="text-zinc-500">Finding:</span>{' '}
             <span className="text-white font-medium">{maxSales} sales</span>,{' '}
             <span className="text-white font-medium">{maxWatches} watches</span>,{' '}
-            <span className="text-white font-medium">&lt;{maxImpressions} impressions</span>,{' '}
+            <span className="text-white font-medium">&lt;{maxImpressions} imp</span>,{' '}
             <span className="text-white font-medium">&lt;{maxViews} views</span>{' '}
-            <span className="text-zinc-500">in the last</span>{' '}
+            <span className="text-zinc-500">in</span>{' '}
             <span className="text-white font-medium">{analysisPeriod} days</span>
           </p>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-3">
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex-1 flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-red-600 via-orange-500 to-red-600 text-white font-black text-lg rounded-xl hover:from-red-500 hover:via-orange-400 hover:to-red-500 focus:outline-none focus:ring-4 focus:ring-red-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-red-500/30 hover:shadow-red-500/50 hover:scale-[1.02] active:scale-[0.98]"
-          >
-            {loading ? (
-              <>
-                <RotateCw className="w-5 h-5 animate-spin" />
-                <span>Analyzing...</span>
-              </>
-            ) : (
-              <>
-                <span className="text-xl">🔬</span>
-                <span>Find Zombie Listings</span>
-                <span className="text-xl">→</span>
-              </>
-            )}
-          </button>
-          
-          <button
-            type="button"
-            onClick={handleReset}
-            disabled={loading}
-            className="px-6 py-3 bg-zinc-800 border border-zinc-700 text-zinc-300 font-medium rounded-xl hover:bg-zinc-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-          >
-            Reset
-          </button>
-          
-          <button
-            type="button"
-            onClick={handleSync}
-            disabled={loading}
-            className="flex items-center gap-2 px-6 py-3 bg-zinc-800 border border-zinc-700 text-zinc-300 font-medium rounded-xl hover:bg-zinc-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            title="Sync latest data from eBay"
-          >
-            <RotateCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            <span className="hidden md:inline">Sync</span>
-          </button>
-        </div>
+        {/* Find Button - Full Width */}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-red-600 via-orange-500 to-red-600 text-white font-bold rounded-xl hover:from-red-500 hover:via-orange-400 hover:to-red-500 focus:outline-none focus:ring-4 focus:ring-red-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-red-500/30 hover:shadow-red-500/50"
+        >
+          {loading ? (
+            <>
+              <RotateCw className="w-4 h-4 animate-spin" />
+              <span>Analyzing...</span>
+            </>
+          ) : (
+            <>
+              <span>🔬</span>
+              <span>Find Zombie Listings</span>
+              <span>→</span>
+            </>
+          )}
+        </button>
       </form>
     </div>
   )
