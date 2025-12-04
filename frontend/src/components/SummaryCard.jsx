@@ -385,20 +385,25 @@ function SummaryCard({
 
       {/* Secondary Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Low Interest Card */}
-        <StatCard
-          icon="📉"
-          value={totalZombies}
-          label="Low Interest"
-          sublabel="Needs Attention"
-          breakdown={zombieBreakdown}
-          loading={loading}
-          isActive={viewMode === 'zombies'}
-          isDanger={true}
-          hasPulse={totalZombies > 0}
-          onClick={() => handleCardClick('zombies')}
-          delay={200}
-        />
+        {/* Low Interest Card - First Position */}
+        <div className="opt-card p-6 text-center cursor-pointer select-none opt-card-danger" onClick={() => handleCardClick('zombies')}>
+          {totalZombies > 0 && (
+            <div className="absolute top-3 right-3">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+              </span>
+            </div>
+          )}
+          <div className="text-4xl mb-3">📉</div>
+          <div className={`text-5xl font-extrabold mb-2 tracking-tight ${totalZombies > 0 ? 'text-red-500' : 'text-white'}`}>
+            {loading ? '...' : totalZombies}
+          </div>
+          <div className={`text-xs font-bold tracking-widest uppercase ${totalZombies > 0 ? 'text-red-400' : 'text-zinc-500'}`}>
+            Low Interest
+          </div>
+          <div className="text-xs text-zinc-600 mt-1">Needs Attention</div>
+        </div>
 
         {/* Queue Card */}
         <StatCard
