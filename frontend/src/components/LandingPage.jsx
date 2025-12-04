@@ -392,7 +392,7 @@ function LandingPage() {
               transition={{ delay: 0.2 }}
             >
               {/* 4-Column Pricing Grid */}
-              <div className="grid md:grid-cols-4 gap-4">
+              <div className="grid md:grid-cols-4 gap-4 items-end">
                 
                 {/* Credit Pack Card - Column 1 */}
                 <motion.div
