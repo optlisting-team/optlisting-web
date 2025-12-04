@@ -15,7 +15,7 @@ const CREDIT_PACKS = [
 ]
 
 function LandingPage() {
-  const [selectedPack, setSelectedPack] = useState(CREDIT_PACKS[1]) // Default to $10 Popular
+  const [selectedPack, setSelectedPack] = useState(CREDIT_PACKS[0]) // Default to $5 Starter
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
   const fadeInUp = {
@@ -417,12 +417,10 @@ function LandingPage() {
                       <div className="relative">
                         <button
                           onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                          className="w-full flex items-center justify-between px-3 py-3 bg-zinc-900/80 border border-amber-500/30 rounded-xl text-white font-bold hover:border-amber-500/50 transition-all"
+                          className="w-full flex items-center justify-center gap-2 px-3 py-3 bg-zinc-900/80 border border-amber-500/30 rounded-xl text-white font-bold hover:border-amber-500/50 transition-all"
                         >
-                          <span className="flex items-center gap-2">
-                            <span className="text-lg font-black text-amber-400">${selectedPack.price}</span>
-                            <span className="text-sm text-zinc-300">{selectedPack.credits.toLocaleString()}</span>
-                          </span>
+                          <span className="text-lg font-black text-amber-400">${selectedPack.price}</span>
+                          <span className="text-sm text-zinc-300">{selectedPack.credits.toLocaleString()}</span>
                           <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
                         </button>
 
