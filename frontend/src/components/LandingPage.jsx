@@ -1,9 +1,23 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowRight, TrendingDown, Ban, DollarSign, Check, CheckCircle, Zap, TrendingUp, Clock, Puzzle, Table } from 'lucide-react'
+import { ArrowRight, TrendingDown, Ban, DollarSign, Check, CheckCircle, Zap, TrendingUp, Clock, Puzzle, Table, ChevronDown } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from './ui/card'
 import { Button } from './ui/button'
 
+// Credit Pack Options - Each is a fixed price product for PG approval
+const CREDIT_PACKS = [
+  { id: 'credit-5', price: 5, credits: 300, perScan: 0.017, discount: 0, label: 'Starter' },
+  { id: 'credit-10', price: 10, credits: 800, perScan: 0.0125, discount: 26, label: 'Popular', popular: true },
+  { id: 'credit-15', price: 15, credits: 1200, perScan: 0.0125, discount: 26, label: 'Value' },
+  { id: 'credit-20', price: 20, credits: 2000, perScan: 0.01, discount: 41, label: 'Best', best: true },
+  { id: 'credit-25', price: 25, credits: 2600, perScan: 0.0096, discount: 43, label: 'Pro' },
+  { id: 'credit-50', price: 50, credits: 6000, perScan: 0.0083, discount: 51, label: 'Business' },
+]
+
 function LandingPage() {
+  const [selectedPack, setSelectedPack] = useState(CREDIT_PACKS[1]) // Default to $10 Popular
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+
   const fadeInUp = {
     initial: { opacity: 0, y: 30 },
     animate: { opacity: 1, y: 0 },
@@ -391,158 +405,149 @@ function LandingPage() {
                 </div>
               </div>
 
-              {/* Credit Pack Cards - 3 Column */}
-              <div className="grid md:grid-cols-3 gap-6">
-                
-                {/* 300 Credits Pack */}
+              {/* Credit Pack Selector - Dropdown Style */}
+              <div className="max-w-lg mx-auto">
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.25 }}
-                  className="relative bg-zinc-800/50 border border-zinc-700 rounded-2xl p-6 hover:border-amber-500/30 transition-all group"
+                  className="relative bg-gradient-to-b from-amber-500/10 to-zinc-800/80 border-2 border-amber-500/40 rounded-2xl p-8 shadow-xl shadow-amber-500/10"
                 >
-                  <div className="mb-4">
-                    <h4 className="text-2xl font-black text-white">300 Credits</h4>
-                    <p className="text-zinc-500 text-sm mt-1">Try it out</p>
+                  {/* Selected Pack Badge */}
+                  {selectedPack.popular && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                      <span className="px-4 py-1 bg-gradient-to-r from-amber-600 to-orange-500 text-white text-xs font-bold rounded-full shadow-lg shadow-amber-500/30">
+                        🔥 MOST POPULAR
+                      </span>
+                    </div>
+                  )}
+                  {selectedPack.best && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                      <span className="px-4 py-1 bg-gradient-to-r from-orange-600 to-amber-500 text-white text-xs font-bold rounded-full shadow-lg shadow-orange-500/30">
+                        💎 BEST VALUE
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Dropdown Selector */}
+                  <div className="mb-6 mt-2">
+                    <label className="block text-zinc-400 text-sm mb-2 font-medium">Select Your Credit Pack</label>
+                    <div className="relative">
+                      <button
+                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                        className="w-full flex items-center justify-between px-5 py-4 bg-zinc-900/80 border-2 border-amber-500/30 rounded-xl text-white font-bold text-lg hover:border-amber-500/50 transition-all"
+                      >
+                        <span className="flex items-center gap-3">
+                          <span className="text-2xl font-black text-amber-400">${selectedPack.price}</span>
+                          <span className="text-zinc-400">—</span>
+                          <span>{selectedPack.credits.toLocaleString()} Credits</span>
+                          {selectedPack.discount > 0 && (
+                            <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded-full">
+                              {selectedPack.discount}% OFF
+                            </span>
+                          )}
+                        </span>
+                        <ChevronDown className={`w-5 h-5 text-zinc-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {/* Dropdown Menu */}
+                      {isDropdownOpen && (
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl shadow-black/50 z-50 overflow-hidden">
+                          {CREDIT_PACKS.map((pack) => (
+                            <button
+                              key={pack.id}
+                              onClick={() => {
+                                setSelectedPack(pack)
+                                setIsDropdownOpen(false)
+                              }}
+                              className={`w-full flex items-center justify-between px-5 py-4 hover:bg-amber-500/10 transition-all border-b border-zinc-800 last:border-b-0 ${
+                                selectedPack.id === pack.id ? 'bg-amber-500/15' : ''
+                              }`}
+                            >
+                              <span className="flex items-center gap-3">
+                                <span className="text-xl font-black text-amber-400">${pack.price}</span>
+                                <span className="text-zinc-500">—</span>
+                                <span className="text-white font-medium">{pack.credits.toLocaleString()} Credits</span>
+                              </span>
+                              <span className="flex items-center gap-2">
+                                {pack.discount > 0 && (
+                                  <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded-full">
+                                    {pack.discount}% OFF
+                                  </span>
+                                )}
+                                {pack.popular && <span className="text-amber-400 text-xs">⭐</span>}
+                                {pack.best && <span className="text-orange-400 text-xs">💎</span>}
+                                {selectedPack.id === pack.id && <Check className="w-4 h-4 text-emerald-400" />}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl mb-4">
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                      <span className="text-3xl font-black text-white">$5</span>
+                  {/* Selected Pack Details */}
+                  <div className="p-5 bg-amber-500/10 border border-amber-500/20 rounded-xl mb-6">
+                    <div className="text-center mb-3">
+                      <span className="text-5xl font-black text-white">{selectedPack.credits.toLocaleString()}</span>
+                      <span className="text-2xl text-zinc-400 ml-2">Credits</span>
                     </div>
-                    <p className="text-center text-zinc-400 text-xs">
-                      $0.017 per scan
-                    </p>
+                    <div className="flex items-center justify-center gap-4 text-sm">
+                      <span className="text-zinc-400">
+                        <span className="text-white font-bold">${selectedPack.perScan}</span> per scan
+                      </span>
+                      {selectedPack.discount > 0 && (
+                        <span className="text-emerald-400 font-bold">
+                          Save {selectedPack.discount}%
+                        </span>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="space-y-2 mb-5 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-amber-400" />
-                      <span className="text-zinc-300">300 Listing Scans</span>
+                  {/* Features */}
+                  <div className="space-y-3 mb-6">
+                    <div className="flex items-center gap-3">
+                      <Check className="w-5 h-5 text-amber-400" />
+                      <span className="text-zinc-300">{selectedPack.credits.toLocaleString()} Listing Scans</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-amber-400" />
+                    <div className="flex items-center gap-3">
+                      <Check className="w-5 h-5 text-amber-400" />
                       <span className="text-zinc-300">All Connected Stores</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-emerald-400" />
+                    <div className="flex items-center gap-3">
+                      <Check className="w-5 h-5 text-emerald-400" />
                       <span className="text-emerald-300 font-semibold">Never Expires ✨</span>
                     </div>
                   </div>
 
+                  {/* Purchase Button */}
                   <a
-                    href="https://optlisting.lemonsqueezy.com/checkout/credit-300"
-                    className="block w-full py-3 bg-zinc-700 hover:bg-amber-600 text-white font-bold rounded-xl text-center transition-all group-hover:shadow-lg group-hover:shadow-amber-500/20"
+                    href={`https://optlisting.lemonsqueezy.com/checkout/${selectedPack.id}`}
+                    className="block w-full py-4 bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-white font-bold text-lg rounded-xl text-center transition-all shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50"
                   >
-                    Get 300 Credits
+                    Get {selectedPack.credits.toLocaleString()} Credits for ${selectedPack.price} →
                   </a>
-                </motion.div>
 
-                {/* 800 Credits Pack (Highlighted) */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.3 }}
-                  className="relative bg-gradient-to-b from-amber-500/15 to-zinc-800/80 border-2 border-amber-500/50 rounded-2xl p-6 shadow-xl shadow-amber-500/10"
-                >
-                  {/* Popular Badge */}
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="px-4 py-1 bg-gradient-to-r from-amber-600 to-orange-500 text-white text-xs font-bold rounded-full shadow-lg shadow-amber-500/30">
-                      🔥 MOST POPULAR
-                    </span>
-                  </div>
-
-                  <div className="mb-4 mt-2">
-                    <h4 className="text-2xl font-black text-white">800 Credits</h4>
-                    <p className="text-amber-400 text-sm mt-1">Most popular</p>
-                  </div>
-
-                  <div className="p-4 bg-amber-500/20 border border-amber-500/30 rounded-xl mb-4">
-                    <div className="flex items-center justify-center gap-2 mb-1">
-                      <span className="text-3xl font-black text-white">$10</span>
-                      <span className="text-emerald-400 text-sm font-bold">(Save 26%)</span>
-                    </div>
-                    <p className="text-center text-zinc-400 text-xs">
-                      $0.0125 per scan
-                    </p>
-                  </div>
-
-                  <div className="space-y-2 mb-5 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-amber-400" />
-                      <span className="text-zinc-300">800 Listing Scans</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-amber-400" />
-                      <span className="text-zinc-300">All Connected Stores</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-emerald-400" />
-                      <span className="text-emerald-300 font-semibold">Never Expires ✨</span>
+                  {/* Quick Select Buttons */}
+                  <div className="mt-6 pt-5 border-t border-zinc-700/50">
+                    <p className="text-zinc-500 text-xs text-center mb-3">Quick Select</p>
+                    <div className="flex gap-2 justify-center flex-wrap">
+                      {CREDIT_PACKS.map((pack) => (
+                        <button
+                          key={pack.id}
+                          onClick={() => setSelectedPack(pack)}
+                          className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                            selectedPack.id === pack.id
+                              ? 'bg-amber-500 text-black'
+                              : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'
+                          }`}
+                        >
+                          ${pack.price}
+                        </button>
+                      ))}
                     </div>
                   </div>
-
-                  <a
-                    href="https://optlisting.lemonsqueezy.com/checkout/credit-800"
-                    className="block w-full py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-bold rounded-xl text-center transition-all shadow-lg shadow-amber-500/20"
-                  >
-                    Get 800 Credits →
-                  </a>
-                </motion.div>
-
-                {/* 2K Credits Pack */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.35 }}
-                  className="relative bg-gradient-to-b from-orange-500/10 to-zinc-800/80 border border-orange-500/30 rounded-2xl p-6 hover:border-orange-500/50 transition-all group"
-                >
-                  {/* Max Value Badge */}
-                  <div className="absolute -top-3 right-4">
-                    <span className="px-3 py-1 bg-orange-500/20 text-orange-400 text-xs font-bold rounded-full border border-orange-500/30">
-                      💎 BEST VALUE
-                    </span>
-                  </div>
-
-                  <div className="mb-4 mt-2">
-                    <h4 className="text-2xl font-black text-white">2K Credits</h4>
-                    <p className="text-orange-400 text-sm mt-1">Best value</p>
-                  </div>
-
-                  <div className="p-4 bg-orange-500/15 border border-orange-500/25 rounded-xl mb-4">
-                    <div className="flex items-center justify-center gap-2 mb-1">
-                      <span className="text-3xl font-black text-white">$20</span>
-                      <span className="text-emerald-400 text-sm font-bold">(Save 41%)</span>
-                    </div>
-                    <p className="text-center text-zinc-400 text-xs">
-                      $0.01 per scan
-                    </p>
-                  </div>
-
-                  <div className="space-y-2 mb-5 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-orange-400" />
-                      <span className="text-zinc-300">2,000 Listing Scans</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-orange-400" />
-                      <span className="text-zinc-300">All Connected Stores</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-emerald-400" />
-                      <span className="text-emerald-300 font-semibold">Never Expires ✨</span>
-                    </div>
-                  </div>
-
-                  <a
-                    href="https://optlisting.lemonsqueezy.com/checkout/credit-2k"
-                    className="block w-full py-3 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white font-bold rounded-xl text-center transition-all shadow-lg shadow-orange-500/20"
-                  >
-                    Get 2K Credits →
-                  </a>
                 </motion.div>
               </div>
 
