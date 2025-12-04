@@ -391,27 +391,28 @@ function LandingPage() {
               viewport={{ once: true }}
               transition={{ delay: 0.2 }}
             >
-              {/* 4-Column Pricing Grid */}
-              <div className="grid md:grid-cols-4 gap-4 items-end">
+              {/* 2-Section Pricing Layout */}
+              <div className="grid md:grid-cols-2 gap-6">
                 
-                {/* Credit Pack Card - Column 1 */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.25 }}
-                  className="relative"
-                >
-                  {/* Credit Pack Label */}
-                  <div className="text-center mb-3">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/20 rounded-full">
+                {/* Section 1: Credit Packs */}
+                <div className="border-2 border-dashed border-amber-500/30 rounded-3xl p-6 bg-amber-500/5">
+                  {/* Credit Pack Header */}
+                  <div className="text-center mb-4">
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-500/20 rounded-full">
                       <span className="text-sm">💰</span>
-                      <span className="text-xs font-bold text-amber-400">CREDIT PACKS</span>
+                      <span className="text-sm font-bold text-amber-400">CREDIT PACKS</span>
                     </div>
-                    <p className="text-zinc-500 text-xs mt-1">No subscription needed</p>
+                    <p className="text-zinc-400 text-xs mt-2">No subscription • Pay as you go</p>
                   </div>
 
-                  <div className="bg-gradient-to-b from-amber-500/10 to-zinc-800/80 border-2 border-amber-500/40 rounded-2xl p-5 shadow-xl shadow-amber-500/10 h-full">
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.25 }}
+                    className="max-w-xs mx-auto"
+                  >
+                    <div className="bg-gradient-to-b from-amber-500/10 to-zinc-800/80 border-2 border-amber-500/40 rounded-2xl p-5 shadow-xl shadow-amber-500/10">
                     {/* Dropdown Selector */}
                     <div className="mb-4">
                       <div className="relative">
@@ -480,16 +481,30 @@ function LandingPage() {
                     >
                       Get Credits — ${selectedPack.price}
                     </a>
-                  </div>
-                </motion.div>
+                    </div>
+                  </motion.div>
+                </div>
 
-                {/* BASIC Plan - $19 */}
+                {/* Section 2: Subscriptions */}
+                <div className="border-2 border-dashed border-blue-500/30 rounded-3xl p-6 bg-blue-500/5">
+                  {/* Subscription Header */}
+                  <div className="text-center mb-4">
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-500/20 rounded-full">
+                      <span className="text-sm">🏆</span>
+                      <span className="text-sm font-bold text-blue-400">SUBSCRIPTIONS</span>
+                    </div>
+                    <p className="text-zinc-400 text-xs mt-2">For continuous management</p>
+                  </div>
+
+                  {/* Subscription Cards Grid */}
+                  <div className="grid grid-cols-3 gap-3">
+                    {/* BASIC Plan - $19 */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.32 }}
-                  className="relative pt-9"
+                  className="relative"
                 >
                   <div className="bg-zinc-800/50 border border-zinc-700 rounded-2xl p-5 hover:border-cyan-500/30 transition-all h-full">
                     <div className="mb-3">
@@ -540,15 +555,6 @@ function LandingPage() {
                   transition={{ delay: 0.35 }}
                   className="relative"
                 >
-                  {/* Subscription Label - Centered Above */}
-                  <div className="text-center mb-3">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 rounded-full">
-                      <span className="text-sm">🏆</span>
-                      <span className="text-xs font-bold text-blue-400">SUBSCRIPTIONS</span>
-                    </div>
-                    <p className="text-zinc-500 text-xs mt-1">For continuous management</p>
-                  </div>
-
                   <div className="bg-gradient-to-b from-blue-600/20 to-zinc-800/80 border-2 border-blue-500/50 rounded-2xl p-5 shadow-2xl shadow-blue-500/10 h-full relative">
                     {/* RECOMMENDED Badge */}
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2">
@@ -603,7 +609,7 @@ function LandingPage() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.4 }}
-                  className="relative pt-9"
+                  className="relative"
                 >
                   <div className="bg-gradient-to-b from-purple-600/15 to-zinc-800/80 border border-purple-500/30 rounded-2xl p-5 hover:border-purple-500/50 transition-all h-full relative">
                     {/* Enterprise Badge */}
@@ -652,6 +658,8 @@ function LandingPage() {
                     </a>
                   </div>
                 </motion.div>
+                  </div>
+                </div>
               </div>
             </motion.div>
 
