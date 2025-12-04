@@ -116,6 +116,63 @@ function Dashboard() {
     }
   }
 
+  // 공급처 자동 감지 함수
+  const detectSupplier = (title, sku = '') => {
+    const text = `${title} ${sku}`.toLowerCase()
+    
+    // 패턴 매칭
+    if (text.includes('aliexpress') || text.includes('ali-') || /^ae\d/i.test(sku)) {
+      return 'AliExpress'
+    }
+    if (text.includes('amazon') || text.includes('amz-') || /^b0[a-z0-9]{8}/i.test(sku)) {
+      return 'Amazon'
+    }
+    if (text.includes('walmart') || text.includes('wmt-')) {
+      return 'Walmart'
+    }
+    if (text.includes('home depot') || text.includes('homedepot') || text.includes('hd-')) {
+      return 'Home Depot'
+    }
+    if (text.includes('cj drop') || text.includes('cjdrop') || /^cj\d/i.test(sku)) {
+      return 'CJ Dropshipping'
+    }
+    if (text.includes('costway')) {
+      return 'Costway'
+    }
+    if (text.includes('banggood') || text.includes('bg-')) {
+      return 'Banggood'
+    }
+    
+    return 'Unknown'
+  }
+
+  // 좀비 스코어 계산 함수
+  const calculateZombieScore = (listing, filterParams) => {
+    let score = 0
+    const daysListed = listing.days_listed || 0
+    const sales = listing.quantity_sold || 0
+    const watches = listing.watch_count || 0
+    const views = listing.view_count || 0
+    
+    // 등록 기간이 길수록 점수 증가
+    if (daysListed >= 60) score += 30
+    else if (daysListed >= 30) score += 20
+    else if (daysListed >= 14) score += 10
+    
+    // 판매가 없으면 점수 증가
+    if (sales === 0) score += 30
+    
+    // 찜이 없으면 점수 증가
+    if (watches === 0) score += 20
+    else if (watches <= 2) score += 10
+    
+    // 조회수가 적으면 점수 증가
+    if (views <= 5) score += 20
+    else if (views <= 10) score += 10
+    
+    return Math.min(score, 100)
+  }
+
   const fetchZombies = async (filterParams = filters) => {
     try {
       setLoading(true)
@@ -143,40 +200,132 @@ function Dashboard() {
         return
       }
       
-      // Build params object - ALWAYS include store_id
-      // MVP Scope: Only eBay and Shopify are supported, default to eBay if not specified
-      const marketplace = filterParams.marketplace_filter && filterParams.marketplace_filter !== 'All' 
-        ? filterParams.marketplace_filter 
-        : 'eBay'
-      
-      const params = {
-        user_id: CURRENT_USER_ID,
-        store_id: selectedStore?.id, // Use selected store ID (no fallback to 'all')
-        marketplace: marketplace,
-        // 새 필터 파라미터 (순서대로)
-        analytics_period_days: filterParams.analytics_period_days || filterParams.min_days || 7,
-        min_days: filterParams.analytics_period_days || filterParams.min_days || 7, // Legacy
-        max_sales: filterParams.max_sales || 0,
-        max_watches: filterParams.max_watches || filterParams.max_watch_count || 0,
-        max_watch_count: filterParams.max_watches || filterParams.max_watch_count || 0, // Legacy
-        max_impressions: filterParams.max_impressions || 100,
-        max_views: filterParams.max_views || 10,
-        supplier_filter: filterParams.supplier_filter || filterParams.source_filter
+      // 🚀 Production Mode: Fetch from eBay API
+      try {
+        console.log('📦 Fetching listings from eBay API...')
+        
+        const response = await axios.get(`${API_BASE_URL}/api/ebay/listings/active`, {
+          params: {
+            user_id: CURRENT_USER_ID,
+            page: 1,
+            entries_per_page: 200
+          }
+        })
+        
+        if (!response.data.success) {
+          throw new Error(response.data.error || 'Failed to fetch eBay listings')
+        }
+        
+        const allListingsFromEbay = response.data.listings || []
+        console.log(`✅ Received ${allListingsFromEbay.length} listings from eBay`)
+        
+        // 리스팅 데이터 변환 및 공급처 감지
+        const transformedListings = allListingsFromEbay.map((item, index) => {
+          const supplier = detectSupplier(item.title, item.sku)
+          const zombieScore = calculateZombieScore(item, filterParams)
+          
+          return {
+            id: item.item_id || `ebay-${index}`,
+            item_id: item.item_id || item.ebay_item_id,
+            ebay_item_id: item.ebay_item_id || item.item_id,
+            title: item.title,
+            price: item.price,
+            sku: item.sku,
+            supplier: supplier,
+            supplier_name: supplier,
+            total_sales: item.quantity_sold || 0,
+            quantity_sold: item.quantity_sold || 0,
+            watch_count: item.watch_count || 0,
+            view_count: item.view_count || 0,
+            views: item.view_count || 0,
+            impressions: item.impressions || 0,
+            days_listed: item.days_listed || 0,
+            start_time: item.start_time,
+            picture_url: item.picture_url,
+            is_zombie: false, // 아래에서 필터링으로 결정
+            zombie_score: zombieScore,
+            recommendation: zombieScore >= 70 ? 'DELETE' : zombieScore >= 50 ? 'OPTIMIZE' : 'MONITOR'
+          }
+        })
+        
+        // 전체 리스팅 저장
+        setAllListings(transformedListings)
+        setTotalListings(transformedListings.length)
+        
+        // 공급처별 브레이크다운 계산
+        const supplierBreakdown = {}
+        transformedListings.forEach(item => {
+          supplierBreakdown[item.supplier] = (supplierBreakdown[item.supplier] || 0) + 1
+        })
+        setTotalBreakdown(supplierBreakdown)
+        setPlatformBreakdown({ eBay: transformedListings.length })
+        
+        // 좀비 필터링 적용
+        const minDays = filterParams.analytics_period_days || filterParams.min_days || 7
+        const maxSales = filterParams.max_sales || 0
+        const maxWatches = filterParams.max_watches || filterParams.max_watch_count || 0
+        const maxViews = filterParams.max_views || 10
+        
+        const filteredZombies = transformedListings.filter(item => {
+          // 등록 기간 필터
+          if (item.days_listed < minDays) return false
+          // 판매 필터
+          if (item.total_sales > maxSales) return false
+          // 찜 필터
+          if (item.watch_count > maxWatches) return false
+          // 조회 필터
+          if (item.view_count > maxViews) return false
+          
+          return true
+        }).map(item => ({ ...item, is_zombie: true }))
+        
+        console.log(`🧟 Found ${filteredZombies.length} zombie listings`)
+        
+        // 좀비 공급처별 브레이크다운
+        const zombieSupplierBreakdown = {}
+        filteredZombies.forEach(item => {
+          zombieSupplierBreakdown[item.supplier] = (zombieSupplierBreakdown[item.supplier] || 0) + 1
+        })
+        setZombieBreakdown(zombieSupplierBreakdown)
+        
+        setZombies(filteredZombies)
+        setTotalZombies(filteredZombies.length)
+        setError(null)
+        
+      } catch (ebayErr) {
+        console.error('eBay API Error:', ebayErr)
+        
+        // eBay 연결 안됨 - 사용자에게 연결 안내
+        if (ebayErr.response?.status === 401) {
+          setError('eBay not connected. Please connect your eBay account first.')
+        } else {
+          setError(`Failed to fetch eBay listings: ${ebayErr.message}`)
+        }
+        
+        // Fallback: Try existing analyze endpoint (DB data)
+        try {
+          console.log('⚠️ Falling back to DB data...')
+          const params = {
+            user_id: CURRENT_USER_ID,
+            store_id: selectedStore?.id,
+            marketplace: 'eBay',
+            min_days: filterParams.analytics_period_days || filterParams.min_days || 7,
+            max_sales: filterParams.max_sales || 0,
+            max_watch_count: filterParams.max_watches || filterParams.max_watch_count || 0
+          }
+          
+          const response = await axios.get(`${API_BASE_URL}/api/analyze`, { params })
+          setZombies(response.data.zombies || [])
+          setTotalZombies(response.data.zombie_count || 0)
+          setTotalListings(response.data.total_count || 0)
+          setTotalBreakdown(response.data.total_breakdown || {})
+          setPlatformBreakdown(response.data.platform_breakdown || { eBay: 0 })
+          setZombieBreakdown(response.data.zombie_breakdown || {})
+        } catch (fallbackErr) {
+          console.error('Fallback also failed:', fallbackErr)
+        }
       }
       
-      const response = await axios.get(`${API_BASE_URL}/api/analyze`, { params })
-      setZombies(response.data.zombies)
-      setTotalZombies(response.data.zombie_count)
-      // Update total stats from API response
-      setTotalListings(response.data.total_count || 0)
-      const breakdown = response.data.total_breakdown || { Amazon: 0, Walmart: 0, Unknown: 0 }
-      setTotalBreakdown(breakdown)
-      const platformBreakdown = response.data.platform_breakdown || { eBay: 0, Amazon: 0, Shopify: 0, Walmart: 0 }
-      setPlatformBreakdown(platformBreakdown)
-      // Store-Level Breakdown for Low Interest items
-      const zombieBreakdown = response.data.zombie_breakdown || {}
-      setZombieBreakdown(zombieBreakdown)
-      setError(null)
     } catch (err) {
       setError('Failed to fetch low interest listings')
       console.error(err)
@@ -190,91 +339,99 @@ function Dashboard() {
       setLoading(true)
       setError(null)
       
-      // Fetch listings
-      try {
-        // Build params object - ALWAYS include store_id
-        const listingsParams = {
-          user_id: CURRENT_USER_ID,
-          store_id: selectedStore?.id, // Use selected store ID (no fallback to 'all')
-          skip: 0,
-          limit: 10000 // Get all listings
-        }
-        
-        const listingsResponse = await axios.get(`${API_BASE_URL}/api/listings`, {
-          params: listingsParams
-        })
-        setAllListings(listingsResponse.data.listings || [])
-      } catch (listingsErr) {
-        console.error('Failed to fetch listings:', listingsErr)
-        // Continue even if listings fail, try to get stats
+      // Demo Mode: Use dummy data
+      if (DEMO_MODE) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+        // 더미 데이터에서는 이미 초기화된 값 사용
+        setLoading(false)
+        return
       }
       
-      // Fetch total stats from analyze endpoint (without filters to get all data)
-      // MVP Scope: Fetch stats for both eBay and Shopify separately, then combine
+      // 🚀 Production Mode: Fetch from eBay API
       try {
-        // Fetch eBay stats
-        const ebayStatsResponse = await axios.get(`${API_BASE_URL}/api/analyze`, {
+        console.log('📦 Fetching all listings from eBay API...')
+        
+        const response = await axios.get(`${API_BASE_URL}/api/ebay/listings/active`, {
           params: {
             user_id: CURRENT_USER_ID,
-            min_days: 0, // No filter
-            max_sales: 999999, // No filter
-            max_watch_count: 999999, // No filter
-            supplier_filter: 'All',
-            marketplace: 'eBay'
+            page: 1,
+            entries_per_page: 200
           }
         })
         
-        // Fetch Shopify stats
-        const shopifyStatsResponse = await axios.get(`${API_BASE_URL}/api/analyze`, {
-          params: {
-            user_id: CURRENT_USER_ID,
-            min_days: 0, // No filter
-            max_sales: 999999, // No filter
-            max_watch_count: 999999, // No filter
-            supplier_filter: 'All',
-            marketplace: 'Shopify'
+        if (!response.data.success) {
+          throw new Error(response.data.error || 'Failed to fetch eBay listings')
+        }
+        
+        const allListingsFromEbay = response.data.listings || []
+        console.log(`✅ Received ${allListingsFromEbay.length} total listings from eBay`)
+        
+        // 리스팅 데이터 변환 및 공급처 감지
+        const transformedListings = allListingsFromEbay.map((item, index) => {
+          const supplier = detectSupplier(item.title, item.sku)
+          
+          return {
+            id: item.item_id || `ebay-${index}`,
+            item_id: item.item_id || item.ebay_item_id,
+            ebay_item_id: item.ebay_item_id || item.item_id,
+            title: item.title,
+            price: item.price,
+            sku: item.sku,
+            supplier: supplier,
+            supplier_name: supplier,
+            total_sales: item.quantity_sold || 0,
+            quantity_sold: item.quantity_sold || 0,
+            watch_count: item.watch_count || 0,
+            view_count: item.view_count || 0,
+            views: item.view_count || 0,
+            impressions: item.impressions || 0,
+            days_listed: item.days_listed || 0,
+            start_time: item.start_time,
+            picture_url: item.picture_url
           }
         })
         
-        // Combine stats from both platforms
-        const ebayStats = ebayStatsResponse.data
-        const shopifyStats = shopifyStatsResponse.data
-        const statsResponse = {
-          data: {
-            total_count: (ebayStats.total_count || 0) + (shopifyStats.total_count || 0),
-            total_breakdown: {},
-            platform_breakdown: {
-              eBay: ebayStats.total_count || 0,
-              Shopify: shopifyStats.total_count || 0
+        setAllListings(transformedListings)
+        setTotalListings(transformedListings.length)
+        
+        // 공급처별 브레이크다운 계산
+        const supplierBreakdown = {}
+        transformedListings.forEach(item => {
+          supplierBreakdown[item.supplier] = (supplierBreakdown[item.supplier] || 0) + 1
+        })
+        setTotalBreakdown(supplierBreakdown)
+        setPlatformBreakdown({ eBay: transformedListings.length })
+        
+        setError(null)
+        
+      } catch (ebayErr) {
+        console.error('eBay API Error:', ebayErr)
+        
+        // eBay 연결 안됨
+        if (ebayErr.response?.status === 401) {
+          setError('eBay not connected. Please connect your eBay account first.')
+          setTotalListings(0)
+          setAllListings([])
+        } else {
+          // Fallback: Try existing DB endpoint
+          try {
+            console.log('⚠️ Falling back to DB data...')
+            const listingsParams = {
+              user_id: CURRENT_USER_ID,
+              store_id: selectedStore?.id,
+              skip: 0,
+              limit: 10000
             }
+            
+            const listingsResponse = await axios.get(`${API_BASE_URL}/api/listings`, {
+              params: listingsParams
+            })
+            setAllListings(listingsResponse.data.listings || [])
+            setTotalListings(listingsResponse.data.listings?.length || 0)
+          } catch (fallbackErr) {
+            console.error('Fallback also failed:', fallbackErr)
+            setError('Failed to fetch listings')
           }
-        }
-        
-        // Merge supplier breakdowns
-        const combinedBreakdown = {}
-        if (ebayStats.total_breakdown) {
-          Object.keys(ebayStats.total_breakdown).forEach(key => {
-            combinedBreakdown[key] = (combinedBreakdown[key] || 0) + ebayStats.total_breakdown[key]
-          })
-        }
-        if (shopifyStats.total_breakdown) {
-          Object.keys(shopifyStats.total_breakdown).forEach(key => {
-            combinedBreakdown[key] = (combinedBreakdown[key] || 0) + shopifyStats.total_breakdown[key]
-          })
-        }
-        statsResponse.data.total_breakdown = combinedBreakdown
-        
-        // Update total stats
-        setTotalListings(statsResponse.data.total_count || 0)
-        const breakdown = statsResponse.data.total_breakdown || {}
-        setTotalBreakdown(breakdown)
-        const platformBreakdown = statsResponse.data.platform_breakdown || {}
-        setPlatformBreakdown(platformBreakdown)
-      } catch (statsErr) {
-        console.error('Failed to fetch stats:', statsErr)
-        // If stats fail but listings succeeded, use listings total
-        if (allListings.length > 0) {
-          setTotalListings(allListings.length)
         }
       }
       
