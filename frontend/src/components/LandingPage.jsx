@@ -391,11 +391,11 @@ function LandingPage() {
               viewport={{ once: true }}
               transition={{ delay: 0.2 }}
             >
-              {/* 2-Section Pricing Layout */}
-              <div className="grid md:grid-cols-2 gap-6">
+              {/* 2-Section Pricing Layout - 1:3 ratio */}
+              <div className="grid md:grid-cols-4 gap-6">
                 
-                {/* Section 1: Credit Packs */}
-                <div className="border-2 border-dashed border-amber-500/30 rounded-3xl p-6 bg-amber-500/5">
+                {/* Section 1: Credit Packs - 1 column */}
+                <div className="md:col-span-1 border-2 border-dashed border-amber-500/30 rounded-3xl p-6 bg-amber-500/5">
                   {/* Credit Pack Header */}
                   <div className="text-center mb-4">
                     <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-500/20 rounded-full">
@@ -485,8 +485,8 @@ function LandingPage() {
                   </motion.div>
                 </div>
 
-                {/* Section 2: Subscriptions */}
-                <div className="border-2 border-dashed border-blue-500/30 rounded-3xl p-6 bg-blue-500/5">
+                {/* Section 2: Subscriptions - 3 columns */}
+                <div className="md:col-span-3 border-2 border-dashed border-blue-500/30 rounded-3xl p-6 bg-blue-500/5">
                   {/* Subscription Header */}
                   <div className="text-center mb-4">
                     <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-500/20 rounded-full">
