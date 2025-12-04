@@ -375,7 +375,7 @@ function LandingPage() {
                 1 Hour → 5 Minutes
               </h2>
               <p className="text-xl text-zinc-400 max-w-2xl mx-auto">
-                Master Your Time, Dominate the Market.
+                Invest saved time into sourcing winning products.
               </p>
             </div>
 
