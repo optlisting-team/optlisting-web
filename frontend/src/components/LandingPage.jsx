@@ -193,7 +193,7 @@ function LandingPage() {
               <div className="w-16 h-16 bg-zinc-800 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-6">
                 <DollarSign className="h-8 w-8 text-white dark:text-white" />
               </div>
-              <h3 className="text-2xl font-bold text-white dark:text-white mb-4 font-sans">Cut 80% of Your Cleanup Time</h3>
+              <h3 className="text-2xl font-bold text-white dark:text-white mb-4 font-sans">Cut 90% of Your Cleanup Time</h3>
               <p className="text-zinc-400 dark:text-zinc-400 text-lg leading-relaxed font-sans">
                 Stop deleting listings one by one. Automate the entire process instantly.
               </p>
