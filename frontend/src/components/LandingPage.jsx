@@ -453,17 +453,25 @@ function LandingPage() {
                       </div>
                     </div>
 
-                    {/* Selected Pack Display */}
-                    <div className="text-center mb-4 p-3 bg-amber-500/10 rounded-xl">
-                      <div className="text-3xl font-black text-white">{selectedPack.credits.toLocaleString()}</div>
-                      <div className="text-xs text-zinc-400">Credits</div>
-                      {selectedPack.discount > 0 && (
-                        <div className="text-emerald-400 text-xs font-bold mt-1">Save {selectedPack.discount}%</div>
-                      )}
+                    {/* Selected Pack Display - Compact */}
+                    <div className="text-center mb-3 p-2 bg-amber-500/10 rounded-lg">
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-2xl font-black text-white">{selectedPack.credits.toLocaleString()}</span>
+                        <span className="text-xs text-zinc-400">Credits</span>
+                        {selectedPack.discount > 0 && (
+                          <span className="text-emerald-400 text-xs font-bold">-{selectedPack.discount}%</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 1 Credit = 1 Scan Notice */}
+                    <div className="text-center mb-3 py-1.5 px-2 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
+                      <span className="text-xs text-zinc-400">💡 </span>
+                      <span className="text-xs font-semibold text-amber-400">1 Credit = 1 Listing Scan</span>
                     </div>
 
                     {/* Features */}
-                    <div className="space-y-2 mb-4 text-xs">
+                    <div className="space-y-1.5 mb-3 text-xs">
                       <div className="flex items-center gap-2">
                         <Check className="w-3 h-3 text-amber-400" />
                         <span className="text-zinc-300">All Connected Stores</span>
