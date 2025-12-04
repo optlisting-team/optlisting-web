@@ -361,7 +361,7 @@ function LandingPage() {
                 90% Less Cleanup Time
               </h2>
               <p className="text-xl text-zinc-400 max-w-2xl mx-auto">
-                Invest in Sourcing, Win the Market.
+                Master Your Time, Dominate the Market.
               </p>
             </div>
 
