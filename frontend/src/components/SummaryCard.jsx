@@ -315,68 +315,54 @@ function SummaryCard({
         </div>
       </div>
 
-      {/* Primary Metric Card - Total Listings */}
+      {/* Primary Metric Card - Total Listings (Compact Horizontal) */}
       <div 
         onClick={() => onToggleFilter ? onToggleFilter() : handleCardClick('all')}
         className={`
-          opt-card p-8 cursor-pointer select-none relative overflow-hidden
-          opacity-0 animate-fade-in-up
+          opt-card p-4 cursor-pointer select-none
           ${showFilter ? 'opt-card-active ring-2 ring-blue-500/50' : ''}
         `}
-        style={{ animationDelay: '100ms' }}
       >
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute inset-0" style={{
-            backgroundImage: `radial-gradient(circle at 1px 1px, white 1px, transparent 0)`,
-            backgroundSize: '24px 24px'
-          }} />
-        </div>
-        
-        <div className="relative z-10 text-center">
-          {/* Icon */}
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-zinc-700 to-zinc-900 border border-zinc-600 mb-5 shadow-lg">
-            <span className="text-3xl">📦</span>
+        <div className="flex items-center justify-between gap-4">
+          {/* Left: Icon + Number + Label */}
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-zinc-700 to-zinc-900 border border-zinc-600 flex items-center justify-center">
+              <span className="text-2xl">📦</span>
+            </div>
+            <div>
+              <div className="text-3xl font-black text-white tracking-tight">
+                {loading ? '...' : (totalListings || 0).toLocaleString()}
+              </div>
+              <div className="text-xs font-bold text-zinc-500 uppercase tracking-wider">
+                Total Active Listings
+              </div>
+            </div>
           </div>
-          
-          {/* Value */}
-          <div className="text-7xl font-black text-white mb-3 tracking-tighter">
-            <AnimatedNumber value={totalListings || 0} loading={loading} />
-          </div>
-          
-          {/* Label */}
-          <div className="text-sm font-bold text-zinc-400 tracking-widest uppercase mb-4">
-            Total Active Listings
-          </div>
-          
-          {/* Click Hint */}
-          <div className="text-xs text-zinc-500 mb-4">
-            {showFilter ? '✅ Filters open ↓' : '👆 Click to open filters'}
-          </div>
-          
-          {/* Platform Breakdown */}
+
+          {/* Center: Platform Breakdown */}
           {!loading && totalListings > 0 && (
-            <div className="flex gap-3 justify-center flex-wrap">
+            <div className="flex gap-2">
               {Object.entries(platformBreakdown).map(([platform, count]) => (
                 count > 0 && (
                   <div 
                     key={platform}
-                    className="flex items-center gap-2 px-4 py-2 bg-zinc-800/50 rounded-xl border border-zinc-700/50"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800/50 rounded-lg border border-zinc-700/50"
                   >
-                    <span className="text-lg">
+                    <span className="text-sm">
                       {platform === 'eBay' ? '🏷️' : platform === 'Shopify' ? '🛒' : '📊'}
                     </span>
-                    <span className="text-sm font-semibold text-zinc-300">
-                      {platform}
-                    </span>
-                    <span className="text-sm font-bold text-white data-value">
-                      {count.toLocaleString()}
-                    </span>
+                    <span className="text-xs font-semibold text-zinc-300">{platform}</span>
+                    <span className="text-xs font-bold text-white">{count.toLocaleString()}</span>
                   </div>
                 )
               ))}
             </div>
           )}
+
+          {/* Right: Filter Toggle Hint */}
+          <div className="text-xs text-zinc-500">
+            {showFilter ? '✅ Filters open' : '👆 Click for filters'}
+          </div>
         </div>
       </div>
 
