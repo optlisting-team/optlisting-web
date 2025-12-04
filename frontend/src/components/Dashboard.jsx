@@ -13,7 +13,8 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 const CURRENT_USER_ID = "default-user" // Temporary user ID for MVP phase
 
 // Demo Mode - Set to true to use dummy data (false for production with real API)
-const DEMO_MODE = false
+// 🧪 테스트용: true = 더미 데이터, false = 실제 API
+const DEMO_MODE = true
 
 // Dummy data for demo/testing
 const DUMMY_ZOMBIES = [
