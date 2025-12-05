@@ -691,11 +691,11 @@ function LandingPage() {
                     <div className="space-y-2 mb-4 text-xs">
                       <div className="flex items-center gap-2">
                         <Check className="w-3 h-3 text-blue-400" />
-                        <span className="text-zinc-300">50,000 listings</span>
+                        <span className="text-zinc-300">30,000 listings</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Check className="w-3 h-3 text-blue-400" />
-                        <span className="text-zinc-300">5 Stores</span>
+                        <span className="text-zinc-300">3 Stores</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Check className="w-3 h-3 text-blue-400" />
@@ -747,11 +747,11 @@ function LandingPage() {
                     <div className="space-y-2 mb-4 text-xs">
                       <div className="flex items-center gap-2">
                         <Check className="w-3 h-3 text-purple-400" />
-                        <span className="text-zinc-300">150,000 listings</span>
+                        <span className="text-zinc-300">100,000 listings</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Check className="w-3 h-3 text-purple-400" />
-                        <span className="text-zinc-300">15 Stores</span>
+                        <span className="text-zinc-300">10 Stores</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Check className="w-3 h-3 text-purple-400" />
