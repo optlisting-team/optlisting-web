@@ -978,7 +978,6 @@ function Dashboard() {
                         onSelect={handleSelect}
                         onSelectAll={handleSelectAll}
                         onSourceChange={handleSourceChange}
-                        showZombieColumns={viewMode === 'zombies'}
                       />
                     </div>
                   )
