@@ -943,9 +943,6 @@ function Dashboard() {
                   <span className="text-sm text-zinc-400">
                     📉 <strong className="text-red-400">{zombies.length} Low-Performing SKUs</strong> found
                   </span>
-                  <span className="text-xs text-zinc-600">
-                    ({filters.min_days}d • {filters.max_sales} sales • ≤{filters.max_watch_count} views)
-                  </span>
                 </div>
                 <button
                   onClick={() => {
