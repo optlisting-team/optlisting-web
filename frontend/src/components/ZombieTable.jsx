@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import SourceBadge from './SourceBadge'
 import PlatformBadge from './PlatformBadge'
-import { AlertTriangle, TrendingDown, Trash2, Eye, RefreshCw } from 'lucide-react'
+import { AlertTriangle, TrendingDown, Trash2, Eye, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 
 // Calculate Performance Score based on metrics
 // Lower score = Lower performance (Zombie)
@@ -102,6 +102,8 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [rowsPerPage, setRowsPerPage] = useState(50)
+  const [sortColumn, setSortColumn] = useState(null)
+  const [sortDirection, setSortDirection] = useState('asc') // 'asc' or 'desc'
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A'
@@ -144,17 +146,124 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
 
   // Filter zombies based on search query
   const filteredZombies = useMemo(() => {
-    if (!searchQuery.trim()) return processedZombies
+    let filtered = processedZombies
     
-    const query = searchQuery.toLowerCase()
-    return processedZombies.filter(zombie => {
-      const title = (zombie.title || '').toLowerCase()
-      const sku = (zombie.sku || '').toLowerCase()
-      const itemId = ((zombie.ebay_item_id || zombie.item_id) || '').toLowerCase()
-      
-      return title.includes(query) || sku.includes(query) || itemId.includes(query)
-    })
-  }, [processedZombies, searchQuery])
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(zombie => {
+        const title = (zombie.title || '').toLowerCase()
+        const sku = (zombie.sku || '').toLowerCase()
+        const itemId = ((zombie.ebay_item_id || zombie.item_id) || '').toLowerCase()
+        
+        return title.includes(query) || sku.includes(query) || itemId.includes(query)
+      })
+    }
+    
+    // Apply sorting
+    if (sortColumn) {
+      filtered = [...filtered].sort((a, b) => {
+        let aValue, bValue
+        
+        switch (sortColumn) {
+          case 'platform':
+            aValue = (a.marketplace || a.platform || '').toLowerCase()
+            bValue = (b.marketplace || b.platform || '').toLowerCase()
+            break
+          case 'sku':
+            aValue = (a.sku || '').toLowerCase()
+            bValue = (b.sku || '').toLowerCase()
+            break
+          case 'itemId':
+            aValue = ((a.ebay_item_id || a.item_id) || '').toLowerCase()
+            bValue = ((b.ebay_item_id || b.item_id) || '').toLowerCase()
+            break
+          case 'title':
+            aValue = (a.title || '').toLowerCase()
+            bValue = (b.title || '').toLowerCase()
+            break
+          case 'performanceScore':
+            aValue = a.zombieScore ?? 0
+            bValue = b.zombieScore ?? 0
+            break
+          case 'recommendation':
+            aValue = (a.recommendation?.text || '').toLowerCase()
+            bValue = (b.recommendation?.text || '').toLowerCase()
+            break
+          case 'supplier':
+            aValue = (a.supplier_name || a.supplier || '').toLowerCase()
+            bValue = (b.supplier_name || b.supplier || '').toLowerCase()
+            break
+          case 'price':
+            aValue = parseFloat(a.price || 0)
+            bValue = parseFloat(b.price || 0)
+            break
+          case 'age':
+            aValue = a.days_listed || 0
+            bValue = b.days_listed || 0
+            break
+          case 'sales':
+            aValue = a.total_sales || a.quantity_sold || 0
+            bValue = b.total_sales || b.quantity_sold || 0
+            break
+          case 'watches':
+            aValue = a.watch_count || 0
+            bValue = b.watch_count || 0
+            break
+          case 'impressions':
+            aValue = a.impressions || 0
+            bValue = b.impressions || 0
+            break
+          case 'views':
+            aValue = a.views || a.view_count || 0
+            bValue = b.views || b.view_count || 0
+            break
+          default:
+            return 0
+        }
+        
+        // Handle string comparison
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          if (sortDirection === 'asc') {
+            return aValue.localeCompare(bValue)
+          } else {
+            return bValue.localeCompare(aValue)
+          }
+        }
+        
+        // Handle number comparison
+        if (sortDirection === 'asc') {
+          return aValue - bValue
+        } else {
+          return bValue - aValue
+        }
+      })
+    }
+    
+    return filtered
+  }, [processedZombies, searchQuery, sortColumn, sortDirection])
+  
+  // Handle column sort
+  const handleSort = (column) => {
+    if (sortColumn === column) {
+      // Toggle direction if same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // New column, default to ascending
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
+  
+  // Get sort icon for column
+  const getSortIcon = (column) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="w-3.5 h-3.5 text-zinc-500" />
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="w-3.5 h-3.5 text-zinc-300" />
+      : <ArrowDown className="w-3.5 h-3.5 text-zinc-300" />
+  }
 
   // Calculate pagination
   const totalPages = Math.ceil(filteredZombies.length / rowsPerPage)
@@ -295,44 +404,116 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                     />
                   )}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  Platform
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
+                  onClick={() => handleSort('platform')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Platform</span>
+                    {getSortIcon('platform')}
+                  </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  SKU
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
+                  onClick={() => handleSort('sku')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>SKU</span>
+                    {getSortIcon('sku')}
+                  </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  Item ID
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
+                  onClick={() => handleSort('itemId')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Item ID</span>
+                    {getSortIcon('itemId')}
+                  </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider max-w-xs">
-                  Title
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider max-w-xs cursor-pointer hover:bg-zinc-800/50 transition-colors"
+                  onClick={() => handleSort('title')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Title</span>
+                    {getSortIcon('title')}
+                  </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  <span className="text-red-400">Performance Score</span>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
+                  onClick={() => handleSort('performanceScore')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-red-400">Performance Score</span>
+                    {getSortIcon('performanceScore')}
+                  </div>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
                   {showMoveToZombies ? 'Action' : 'Recommendation'}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  Supplier
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
+                  onClick={() => handleSort('supplier')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Supplier</span>
+                    {getSortIcon('supplier')}
+                  </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  Price
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
+                  onClick={() => handleSort('price')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Price</span>
+                    {getSortIcon('price')}
+                  </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  <span title="Days Listed">Age</span>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
+                  onClick={() => handleSort('age')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span title="Days Listed">Age</span>
+                    {getSortIcon('age')}
+                  </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  <span title="Total Sales">Sales</span>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
+                  onClick={() => handleSort('sales')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span title="Total Sales">Sales</span>
+                    {getSortIcon('sales')}
+                  </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  <span title="Watch Count">Watches</span>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
+                  onClick={() => handleSort('watches')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span title="Watch Count">Watches</span>
+                    {getSortIcon('watches')}
+                  </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  <span title="Search Impressions">Imp</span>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
+                  onClick={() => handleSort('impressions')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span title="Search Impressions">Imp</span>
+                    {getSortIcon('impressions')}
+                  </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  <span title="Page Views">Views</span>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
+                  onClick={() => handleSort('views')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span title="Page Views">Views</span>
+                    {getSortIcon('views')}
+                  </div>
                 </th>
               </tr>
             </thead>
