@@ -65,7 +65,7 @@ function StoreSelector({ connectedStore, apiConnected }) {
 
           {/* Dropdown Menu */}
           {isOpen && (
-            <div className="absolute top-full left-0 mt-1 w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl z-50 overflow-hidden">
+            <div className="absolute top-full left-0 mt-1 w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl z-[9999] overflow-hidden">
               <div className="p-2 border-b border-zinc-800">
                 <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Your Stores</p>
               </div>
