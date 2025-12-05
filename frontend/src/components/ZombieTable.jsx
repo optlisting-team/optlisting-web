@@ -276,13 +276,22 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
             <thead className="bg-zinc-900/50">
               <tr>
                 <th className="px-4 py-3 text-left">
-                  <input
-                    type="checkbox"
-                    checked={allVisibleSelected}
-                    ref={el => el && (el.indeterminate = someVisibleSelected && !allVisibleSelected)}
-                    onChange={(e) => handleSelectAllPage(e.target.checked)}
-                    className="rounded border-zinc-600 text-white focus:ring-white bg-zinc-800"
-                  />
+                  {someVisibleSelected && !allVisibleSelected ? (
+                    <button
+                      onClick={() => handleSelectAllPage(false)}
+                      className="w-4 h-4 rounded border border-zinc-600 bg-blue-500 flex items-center justify-center"
+                      title="Clear selection"
+                    >
+                      <div className="w-2 h-0.5 bg-white rounded"></div>
+                    </button>
+                  ) : (
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={(e) => handleSelectAllPage(e.target.checked)}
+                      className="rounded border-zinc-600 text-white focus:ring-white bg-zinc-800"
+                    />
+                  )}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
                   Platform
