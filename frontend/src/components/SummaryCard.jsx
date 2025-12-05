@@ -9,7 +9,7 @@ const INITIAL_STORES = [
 ]
 
 // Store Selector Component
-function StoreSelector({ connectedStore, apiConnected }) {
+function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
   const [isOpen, setIsOpen] = useState(false)
   const [stores, setStores] = useState(INITIAL_STORES)
   const [selectedStore, setSelectedStore] = useState(stores[0])
@@ -48,6 +48,8 @@ function StoreSelector({ connectedStore, apiConnected }) {
       ))
       setSelectedStore(prev => ({ ...prev, connected: true }))
       setConnecting(false)
+      // Notify parent
+      if (onConnectionChange) onConnectionChange(true)
     }, 1500)
   }
 
@@ -60,6 +62,8 @@ function StoreSelector({ connectedStore, apiConnected }) {
         s.id === selectedStore.id ? { ...s, connected: false } : s
       ))
       setSelectedStore(prev => ({ ...prev, connected: false }))
+      // Notify parent
+      if (onConnectionChange) onConnectionChange(false)
     }
   }
 
@@ -364,7 +368,9 @@ function SummaryCard({
   planStoreLimit = 3,
   globalStoreLimit = 10,
   userCredits = 0,
-  usedCredits = 0
+  usedCredits = 0,
+  // Store connection callback
+  onConnectionChange = null
 }) {
   const handleCardClick = (mode) => {
     if (onViewModeChange) {
@@ -423,6 +429,7 @@ function SummaryCard({
       <StoreSelector 
         connectedStore={connectedStore}
         apiConnected={apiConnected}
+        onConnectionChange={onConnectionChange}
       />
 
       {/* Stats Row - 4 Columns: Flow visualization */}

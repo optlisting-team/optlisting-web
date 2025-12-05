@@ -85,11 +85,14 @@ function Dashboard() {
   const { selectedStore } = useStore()
   const [searchParams] = useSearchParams()
   const viewParam = searchParams.get('view')
-  // DEMO_MODE 초기 데이터 설정
+  // Store connection state
+  const [isStoreConnected, setIsStoreConnected] = useState(false)
+  
+  // DEMO_MODE 초기 데이터 설정 - 스토어 연결 전에는 0
   const [zombies, setZombies] = useState([]) // Start empty, populate after filter
-  const [allListings, setAllListings] = useState(DEMO_MODE ? DUMMY_ALL_LISTINGS : []) // All listings for 'all' view mode
+  const [allListings, setAllListings] = useState([]) // Start empty, populate after store connection
   const [totalZombies, setTotalZombies] = useState(0) // Start at 0, update after filter
-  const [totalListings, setTotalListings] = useState(DEMO_MODE ? DUMMY_ALL_LISTINGS.length : 0)
+  const [totalListings, setTotalListings] = useState(0) // Start at 0, update after store connection
   const [totalBreakdown, setTotalBreakdown] = useState(DEMO_MODE ? { Amazon: 30, Walmart: 20, 'Home Depot': 15, AliExpress: 15, Costway: 10, 'CJ Dropshipping': 5, Banggood: 5 } : { Amazon: 0, Walmart: 0, Unknown: 0 })
   const [platformBreakdown, setPlatformBreakdown] = useState(DEMO_MODE ? { eBay: 100 } : { eBay: 0, Amazon: 0, Shopify: 0, Walmart: 0 })
   const [zombieBreakdown, setZombieBreakdown] = useState(DEMO_MODE ? { Amazon: 5, Walmart: 3, 'Home Depot': 1, AliExpress: 1, Costway: 1, Unknown: 1 } : {})
@@ -385,6 +388,27 @@ function Dashboard() {
       console.error(err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Handle store connection change
+  const handleStoreConnection = (connected) => {
+    setIsStoreConnected(connected)
+    
+    if (connected) {
+      // When connected, load listings (demo data)
+      if (DEMO_MODE) {
+        setAllListings(DUMMY_ALL_LISTINGS)
+        setTotalListings(DUMMY_ALL_LISTINGS.length)
+      } else {
+        fetchAllListings()
+      }
+    } else {
+      // When disconnected, clear listings
+      setAllListings([])
+      setTotalListings(0)
+      setZombies([])
+      setTotalZombies(0)
     }
   }
 
@@ -815,6 +839,8 @@ function Dashboard() {
           userPlan={userPlan}
           userCredits={userCredits}
           usedCredits={usedCredits}
+          // Store connection callback
+          onConnectionChange={handleStoreConnection}
           filterContent={showFilter && (
             <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3 mt-6 animate-fade-in-up">
               <div className="flex items-center gap-3">
