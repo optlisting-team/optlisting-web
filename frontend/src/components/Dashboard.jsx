@@ -1017,22 +1017,22 @@ function Dashboard() {
                       {/* Filter Summary Banner - Only show for zombies view */}
                       {viewMode === 'zombies' && currentData.length > 0 && (
                         <div className="mb-6 p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg">
-                          <p className="text-sm text-zinc-400">
+                          <p className="text-base text-zinc-300">
                             Products filtered by: No sales in the past{' '}
-                            <span className="font-bold text-white">{filters.analytics_period_days || filters.min_days || 7} days</span>
+                            <span className="font-bold text-white text-lg">{filters.analytics_period_days || filters.min_days || 7} days</span>
                             {filters.max_views !== undefined && filters.max_views !== null && (
                               <>
-                                , views ≤ <span className="font-bold text-white">{filters.max_views}</span>
+                                , views ≤ <span className="font-bold text-white text-lg">{filters.max_views}</span>
                               </>
                             )}
                             {filters.max_watches !== undefined && filters.max_watches !== null && (
                               <>
-                                , watches ≤ <span className="font-bold text-white">{filters.max_watches}</span>
+                                , watches ≤ <span className="font-bold text-white text-lg">{filters.max_watches}</span>
                               </>
                             )}
                             {filters.max_impressions !== undefined && filters.max_impressions !== null && (
                               <>
-                                , impressions ≤ <span className="font-bold text-white">{filters.max_impressions}</span>
+                                , impressions ≤ <span className="font-bold text-white text-lg">{filters.max_impressions}</span>
                               </>
                             )}
                             .
