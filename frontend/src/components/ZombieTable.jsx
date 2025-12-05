@@ -104,6 +104,25 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
   const [rowsPerPage, setRowsPerPage] = useState(50)
   const [sortColumn, setSortColumn] = useState(null)
   const [sortDirection, setSortDirection] = useState('asc') // 'asc' or 'desc'
+  const [showScoreTooltip, setShowScoreTooltip] = useState(false)
+  const scoreTooltipRef = useRef(null)
+  
+  // Close tooltip when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (scoreTooltipRef.current && !scoreTooltipRef.current.contains(event.target)) {
+        setShowScoreTooltip(false)
+      }
+    }
+    
+    if (showScoreTooltip) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showScoreTooltip])
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A'
@@ -445,6 +464,46 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                   onClick={() => handleSort('performanceScore')}
                 >
                   <div className="flex items-center gap-1.5">
+                    <div className="relative" ref={scoreTooltipRef}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setShowScoreTooltip(!showScoreTooltip)
+                        }}
+                        className="text-zinc-500 hover:text-zinc-300 transition-colors"
+                      >
+                        <Info className="w-3.5 h-3.5" />
+                      </button>
+                      
+                      {/* Tooltip */}
+                      {showScoreTooltip && (
+                        <div className="absolute left-0 top-full mt-2 w-64 bg-zinc-800 border border-zinc-700 rounded-lg p-3 shadow-xl z-50">
+                          <h4 className="text-xs font-bold text-white mb-2">Performance Score</h4>
+                          <div className="text-xs text-zinc-400 space-y-1.5">
+                            <p className="text-zinc-300 font-medium">Lower score = Lower performance</p>
+                            <div className="space-y-1">
+                              <div className="flex justify-between">
+                                <span>0-20:</span>
+                                <span className="text-red-400">Delete</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>21-40:</span>
+                                <span className="text-orange-400">Recommend Delete</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>41-60:</span>
+                                <span className="text-yellow-400">Optimize</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>61-100:</span>
+                                <span className="text-blue-400">Monitor</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                     <span className="text-red-400">Performance Score</span>
                     {getSortIcon('performanceScore')}
                   </div>
