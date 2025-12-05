@@ -856,9 +856,71 @@ function Dashboard() {
           </div>
         )}
 
+        {/* History View - Full Page */}
+        {viewMode === 'history' && (
+          <div className="mt-6">
+            {/* History Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center">
+                  <span className="text-xl">💀</span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Deletion History</h2>
+                  <p className="text-sm text-zinc-500">All items exported for deletion</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-zinc-500">
+                  Total: <span className="text-white font-bold">{historyLogs.length}</span> items
+                </span>
+                <button
+                  onClick={() => setViewMode('all')}
+                  className="px-3 py-1.5 text-xs font-medium text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-all"
+                >
+                  ← Back to Listings
+                </button>
+              </div>
+            </div>
+
+            {/* History Stats */}
+            <div className="grid grid-cols-4 gap-4 mb-6">
+              <div className="opt-card p-4 text-center">
+                <div className="text-2xl font-black text-white">{historyLogs.length}</div>
+                <div className="text-[10px] text-zinc-500 uppercase">Total Deleted</div>
+              </div>
+              <div className="opt-card p-4 text-center">
+                <div className="text-2xl font-black text-amber-400">
+                  {historyLogs.filter(l => l.supplier === 'Amazon').length}
+                </div>
+                <div className="text-[10px] text-zinc-500 uppercase">Amazon</div>
+              </div>
+              <div className="opt-card p-4 text-center">
+                <div className="text-2xl font-black text-blue-400">
+                  {historyLogs.filter(l => l.supplier === 'Walmart').length}
+                </div>
+                <div className="text-[10px] text-zinc-500 uppercase">Walmart</div>
+              </div>
+              <div className="opt-card p-4 text-center">
+                <div className="text-2xl font-black text-zinc-400">
+                  {historyLogs.filter(l => !['Amazon', 'Walmart'].includes(l.supplier)).length}
+                </div>
+                <div className="text-[10px] text-zinc-500 uppercase">Others</div>
+              </div>
+            </div>
+
+            {/* History Table */}
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+              <div className="p-6">
+                <HistoryTable logs={historyLogs} loading={loading} />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Dynamic Layout: Full Width for 'all', Split View for 'zombies' */}
         {/* Hide table and filters on initial load (viewMode === 'total') */}
-        {viewMode !== 'total' && (
+        {viewMode !== 'total' && viewMode !== 'history' && (
           <div className={`flex gap-8 transition-all duration-300 ${
             viewMode === 'all' ? '' : ''
           }`}>
@@ -918,14 +980,6 @@ function Dashboard() {
               </div>
             )}
 
-            {/* Briefing Text for History View */}
-            {viewMode === 'history' && (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-4 mt-6">
-                <p className="text-sm text-zinc-400">
-                  💀 <strong className="text-white">Deletion History</strong> - View all items that have been exported for deletion. This is your permanent record.
-                </p>
-              </div>
-            )}
 
 
             {/* Table - Shows different data based on viewMode */}
@@ -945,11 +999,7 @@ function Dashboard() {
               />
             ) : (
               <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg overflow-hidden">
-                {viewMode === 'history' ? (
-                  <div className="p-6">
-                    <HistoryTable logs={historyLogs} loading={loading} />
-                  </div>
-                ) : loading ? (
+                {loading ? (
                   <div className="p-8 text-center text-slate-500">
                     Loading {viewMode === 'all' ? 'all' : 'low interest'} listings...
                   </div>
