@@ -191,7 +191,31 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
     <div className="w-full">
       {/* Search, Selection Info, and Action Controls */}
       <div className="flex items-center justify-between gap-4 mb-4">
-        {/* Left: Search */}
+        {/* Left: Add to Queue & Selection Info */}
+        <div className="flex items-center gap-3">
+          {showAddToQueue && (
+            <button
+              onClick={onAddToQueue}
+              disabled={selectedIds.length === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-zinc-800 to-zinc-700 text-white text-sm font-semibold rounded-lg hover:from-zinc-700 hover:to-zinc-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all border border-zinc-600"
+            >
+              <span>Add to Queue</span>
+              <span>➡️</span>
+              {selectedIds.length > 0 && (
+                <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded text-xs font-bold">
+                  {selectedIds.length}
+                </span>
+              )}
+            </button>
+          )}
+          {selectedIds.length > 0 && (
+            <div className="text-sm text-emerald-400 font-medium">
+              ✓ {selectedIds.length} selected
+            </div>
+          )}
+        </div>
+
+        {/* Center: Search */}
         <div className="relative flex-1 max-w-md">
           <input
             type="text"
@@ -210,20 +234,11 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
           )}
         </div>
         
-        {/* Center: Results Info & Selection */}
+        {/* Right: Results Info & Rows per page */}
         <div className="flex items-center gap-4">
           <div className="text-sm text-zinc-500">
             Showing <span className="text-white font-medium data-value">{startIndex + 1}-{Math.min(endIndex, filteredZombies.length)}</span> of <span className="text-white font-medium data-value">{filteredZombies.length}</span>
           </div>
-          {selectedIds.length > 0 && (
-            <div className="text-sm text-emerald-400 font-medium">
-              ✓ {selectedIds.length} selected
-            </div>
-          )}
-        </div>
-        
-        {/* Right: Rows per page & Add to Queue */}
-        <div className="flex items-center gap-3">
           <select
             value={rowsPerPage}
             onChange={(e) => {
@@ -236,22 +251,6 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
             <option value={50}>50 rows</option>
             <option value={100}>100 rows</option>
           </select>
-          
-          {showAddToQueue && (
-            <button
-              onClick={onAddToQueue}
-              disabled={selectedIds.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-zinc-800 to-zinc-700 text-white text-sm font-semibold rounded-lg hover:from-zinc-700 hover:to-zinc-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all border border-zinc-600"
-            >
-              <span>Add to Queue</span>
-              <span>➡️</span>
-              {selectedIds.length > 0 && (
-                <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded text-xs font-bold">
-                  {selectedIds.length}
-                </span>
-              )}
-            </button>
-          )}
         </div>
       </div>
 
