@@ -432,8 +432,8 @@ function SummaryCard({
         onConnectionChange={onConnectionChange}
       />
 
-      {/* Stats Row - 4 Columns: Flow visualization */}
-      <div className="grid grid-cols-4 gap-4">
+      {/* Stats Row - 3 Columns: Flow visualization */}
+      <div className="grid grid-cols-3 gap-4">
         {/* 1. Active Listings - Click to see all listings */}
         <div 
           onClick={() => handleCardClick('all')}
@@ -472,15 +472,6 @@ function SummaryCard({
           <div className={`text-4xl font-black ${queueCount > 0 ? 'text-orange-400' : 'text-white'}`}>{queueCount || 0}</div>
           <div className="text-sm text-zinc-500 uppercase mt-1">CSV Export</div>
             </div>
-
-        {/* 4. Removed - Final destination */}
-        <div 
-          onClick={() => handleCardClick('history')}
-          className={`opt-card p-6 cursor-pointer transition-all text-center hover:bg-zinc-800/50 ${viewMode === 'history' ? 'ring-2 ring-emerald-500/50' : ''}`}
-        >
-          <div className={`text-4xl font-black ${totalDeleted > 0 ? 'text-emerald-400' : 'text-white'}`}>{totalDeleted || 0}</div>
-          <div className="text-sm text-zinc-500 uppercase mt-1">Removed</div>
-              </div>
             </div>
 
       {/* Filter Panel Slot */}
