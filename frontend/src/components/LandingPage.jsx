@@ -210,7 +210,7 @@ function LandingPage() {
                 {/* Dashboard Screenshot */}
                 <div className="relative">
                   <img 
-                    src="/dashboard.png" 
+                    src="/main-screenshot.png" 
                     alt="OptListing Dashboard - Zombie Listing Finder" 
                     className="w-full h-auto"
                     loading="lazy"
