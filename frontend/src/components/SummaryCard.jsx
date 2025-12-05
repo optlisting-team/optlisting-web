@@ -178,9 +178,6 @@ function SummaryCard({
     }
   }
   
-  // Calculate estimated savings
-  const estimatedSavings = calculateFeeSavings(totalZombies)
-  
   // Plan colors
   const planColors = {
     BASIC: 'from-cyan-600/20 to-cyan-600/10 border-cyan-500/30 text-cyan-400',
@@ -256,91 +253,58 @@ function SummaryCard({
         </div>
       </div>
 
-      {/* Primary Metric - Total Listings (Inline with filter toggle) */}
+      {/* Total Listings - 1 Row */}
       <div 
         onClick={() => onToggleFilter ? onToggleFilter() : handleCardClick('all')}
-        className={`
-          opt-card p-3 cursor-pointer select-none transition-all
-          ${showFilter ? 'ring-1 ring-blue-500/50 bg-blue-500/5' : 'hover:bg-zinc-800/50'}
-        `}
+        className={`opt-card p-2 px-4 cursor-pointer transition-all ${showFilter ? 'ring-1 ring-blue-500/50' : 'hover:bg-zinc-800/50'}`}
       >
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-lg">📦</span>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-black text-white">
-                {loading ? '...' : (totalListings || 0).toLocaleString()}
-              </span>
-              <span className="text-xs text-zinc-500 uppercase">Active Listings</span>
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm">📦</span>
+            <span className="text-lg font-black text-white">{loading ? '...' : (totalListings || 0).toLocaleString()}</span>
+            <span className="text-[10px] text-zinc-500 uppercase">Active Listings</span>
             {!loading && Object.entries(platformBreakdown).map(([platform, count]) => (
-              count > 0 && (
-                <span key={platform} className="text-xs px-2 py-0.5 bg-zinc-800 rounded text-zinc-400">
-                  {platform}: {count.toLocaleString()}
-                </span>
-              )
+              count > 0 && <span key={platform} className="text-[10px] px-1.5 py-0.5 bg-zinc-800 rounded text-zinc-400">{platform}: {count.toLocaleString()}</span>
             ))}
           </div>
-          <span className={`text-xs px-2 py-1 rounded ${showFilter ? 'bg-blue-500/20 text-blue-400' : 'bg-zinc-800 text-zinc-500'}`}>
-            {showFilter ? '✓ Filters Open' : '⚡ Open Filters'}
+          <span className={`text-[10px] px-2 py-1 rounded ${showFilter ? 'bg-blue-500/20 text-blue-400' : 'bg-zinc-800 text-zinc-500'}`}>
+            {showFilter ? '✓ Filters' : '⚡ Filters'}
           </span>
         </div>
       </div>
 
-      {/* Filter Panel Slot - Between Total Card and Secondary Metrics */}
+      {/* Filter Panel Slot */}
       {filterContent}
 
-      {/* Quick Action Cards - Compact 3-column */}
-      <div className="grid grid-cols-3 gap-3">
-        {/* Queue Card */}
-        <div 
-          onClick={() => handleCardClick('queue')}
-          className={`opt-card p-3 cursor-pointer text-center transition-all hover:bg-zinc-800/50 ${viewMode === 'queue' ? 'ring-1 ring-blue-500/50' : ''}`}
-        >
-          <div className="flex items-center justify-center gap-2">
-            <span className="text-lg">🗑️</span>
-            <span className="text-xl font-bold text-white">{queueCount || 0}</span>
+      {/* Queue - 1 Row */}
+      <div 
+        onClick={() => handleCardClick('queue')}
+        className={`opt-card p-2 px-4 cursor-pointer transition-all hover:bg-zinc-800/50 ${viewMode === 'queue' ? 'ring-1 ring-blue-500/50' : ''}`}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">🗑️</span>
+            <span className="text-lg font-bold text-white">{queueCount || 0}</span>
+            <span className="text-[10px] text-zinc-500 uppercase">In Queue</span>
           </div>
-          <div className="text-[10px] text-zinc-500 uppercase mt-1">In Queue</div>
-        </div>
-
-        {/* History Card */}
-        <div 
-          onClick={() => handleCardClick('history')}
-          className={`opt-card p-3 cursor-pointer text-center transition-all hover:bg-zinc-800/50 ${viewMode === 'history' ? 'ring-1 ring-blue-500/50' : ''}`}
-        >
-          <div className="flex items-center justify-center gap-2">
-            <span className="text-lg">💀</span>
-            <span className={`text-xl font-bold ${totalDeleted > 0 ? 'text-emerald-400' : 'text-white'}`}>{totalDeleted || 0}</span>
-          </div>
-          <div className="text-[10px] text-zinc-500 uppercase mt-1">Removed</div>
-        </div>
-
-        {/* Savings Card */}
-        <div className="opt-card p-3 text-center">
-          <div className="flex items-center justify-center gap-2">
-            <span className="text-lg">💰</span>
-            <span className="text-xl font-bold text-emerald-400">${estimatedSavings.toFixed(0)}</span>
-          </div>
-          <div className="text-[10px] text-zinc-500 uppercase mt-1">Est. Savings/mo</div>
+          <span className="text-[10px] text-zinc-500">Ready for export</span>
         </div>
       </div>
 
-      {/* Health Indicator - Minimal */}
-      {!loading && totalListings > 0 && (
-        <div className="flex items-center justify-between text-xs text-zinc-500 px-1">
+      {/* History - 1 Row */}
+      <div 
+        onClick={() => handleCardClick('history')}
+        className={`opt-card p-2 px-4 cursor-pointer transition-all hover:bg-zinc-800/50 ${viewMode === 'history' ? 'ring-1 ring-blue-500/50' : ''}`}
+      >
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className={totalZombies === 0 ? 'text-emerald-400' : totalZombies < 10 ? 'text-yellow-400' : 'text-red-400'}>
-              {totalZombies === 0 ? '✅ Excellent' : totalZombies < 10 ? '⚠️ Good' : '🔥 Needs Work'}
-            </span>
-            <span>•</span>
-            <span>Zombie Rate: <strong className="text-white">{((totalZombies / totalListings) * 100).toFixed(1)}%</strong></span>
+            <span className="text-sm">💀</span>
+            <span className={`text-lg font-bold ${totalDeleted > 0 ? 'text-emerald-400' : 'text-white'}`}>{totalDeleted || 0}</span>
+            <span className="text-[10px] text-zinc-500 uppercase">Removed</span>
           </div>
-          {queueCount > 0 && (
-            <span>Queue: <strong className="text-white">{queueCount}/{totalZombies}</strong></span>
-          )}
+          <span className="text-[10px] text-zinc-500">Total cleaned</span>
         </div>
-      )}
+      </div>
     </div>
   )
 }
