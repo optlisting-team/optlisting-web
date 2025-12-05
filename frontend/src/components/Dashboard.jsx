@@ -43,10 +43,15 @@ const generateDummyListings = (count) => {
     const daysListed = Math.floor(Math.random() * 90) + 7
     const zombieScore = isZombie ? Math.floor(Math.random() * 50) + 50 : Math.floor(Math.random() * 40)
     
+    // Generate SKU based on supplier
+    const skuPrefix = supplier === 'Amazon' ? 'B0' : supplier === 'Walmart' ? 'WM' : supplier === 'AliExpress' ? 'AE' : supplier === 'Home Depot' ? 'HD' : 'XX'
+    const sku = `${skuPrefix}${String(Math.floor(Math.random() * 100000000)).padStart(8, '0')}`
+    
     return {
       id: String(i + 1),
       item_id: `eBay-${100000000 + i}`,
       title: `${PRODUCT_TITLES[i % PRODUCT_TITLES.length]} - Model ${String.fromCharCode(65 + (i % 26))}${Math.floor(i / 26) + 1}`,
+      sku,
       price: Math.round((Math.random() * 150 + 10) * 100) / 100,
       supplier,
       supplier_name: supplier,

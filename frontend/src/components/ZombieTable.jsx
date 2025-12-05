@@ -264,6 +264,9 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                   Supplier
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                  SKU
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
                   Price
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
@@ -331,6 +334,9 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                       onSourceChange={onSourceChange}
                       itemId={zombie.id}
                     />
+                  </td>
+                  <td className="px-4 py-4 text-sm font-mono text-zinc-400">
+                    {zombie.sku || '-'}
                   </td>
                   <td className="px-4 py-4 text-sm text-white data-value">
                     {formatPrice(zombie.price)}
