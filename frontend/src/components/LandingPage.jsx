@@ -288,25 +288,58 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* Social Proof / Trust Bar */}
-      <section className="py-12 bg-zinc-900 dark:bg-zinc-900 border-b border-zinc-800 dark:border-zinc-800">
-        <div className="container mx-auto px-4">
+      {/* Supported Marketplaces & Suppliers */}
+      <section className="py-16 px-4 bg-zinc-900 dark:bg-zinc-900 border-b border-zinc-800 dark:border-zinc-800">
+        <div className="container mx-auto max-w-6xl">
           <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="text-center mb-8"
+            className="text-center mb-12"
           >
-            <p className="text-zinc-400 dark:text-zinc-400 font-medium mb-6">Compatible with your favorite tools:</p>
-            <div className="flex flex-wrap justify-center items-center gap-8 md:gap-12 opacity-60 grayscale">
-              <div className="text-2xl font-bold text-zinc-500 dark:text-zinc-500">eBay</div>
-              <div className="text-2xl font-bold text-zinc-500 dark:text-zinc-500">Shopify</div>
-              <div className="text-2xl font-bold text-zinc-500 dark:text-zinc-500">Amazon</div>
-              <div className="text-2xl font-bold text-zinc-500 dark:text-zinc-500">AutoDS</div>
-              <div className="text-2xl font-bold text-zinc-500 dark:text-zinc-500">Yaballe</div>
-              <div className="text-2xl font-bold text-zinc-500 dark:text-zinc-500">CJ Dropshipping</div>
+            <h2 className="text-3xl md:text-4xl font-bold text-white dark:text-white mb-4 font-sans">
+              Supported Platforms
+            </h2>
+          </motion.div>
+
+          {/* Marketplaces */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="mb-12"
+          >
+            <h3 className="text-lg font-semibold text-zinc-300 dark:text-zinc-300 mb-4 text-center">Marketplaces</h3>
+            <div className="flex flex-wrap justify-center items-center gap-6 md:gap-10">
+              <div className="text-xl font-bold text-white dark:text-white">eBay</div>
+              <div className="text-xl font-bold text-white dark:text-white">Shopify</div>
+              <div className="text-xl font-bold text-zinc-500 dark:text-zinc-500 opacity-50">Amazon</div>
+              <div className="text-xl font-bold text-zinc-500 dark:text-zinc-500 opacity-50">Walmart</div>
             </div>
+            <p className="text-xs text-zinc-600 dark:text-zinc-600 text-center mt-2">Amazon & Walmart coming soon</p>
+          </motion.div>
+
+          {/* Suppliers */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            <h3 className="text-lg font-semibold text-zinc-300 dark:text-zinc-300 mb-4 text-center">Suppliers</h3>
+            <div className="flex flex-wrap justify-center items-center gap-6 md:gap-10">
+              <div className="text-xl font-bold text-white dark:text-white">Amazon</div>
+              <div className="text-xl font-bold text-white dark:text-white">Walmart</div>
+              <div className="text-xl font-bold text-white dark:text-white">Home Depot</div>
+              <div className="text-xl font-bold text-white dark:text-white">AliExpress</div>
+              <div className="text-xl font-bold text-white dark:text-white">CJ Dropshipping</div>
+              <div className="text-xl font-bold text-white dark:text-white">Wholesale2B</div>
+              <div className="text-xl font-bold text-white dark:text-white">Costway</div>
+              <div className="text-xl font-bold text-zinc-500 dark:text-zinc-500 opacity-50">Banggood</div>
+            </div>
+            <p className="text-xs text-zinc-600 dark:text-zinc-600 text-center mt-2">Banggood coming soon</p>
           </motion.div>
         </div>
       </section>
