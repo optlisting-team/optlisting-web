@@ -148,7 +148,7 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
           </button>
         </div>
 
-        {/* Find Zombies Button - Large, Below */}
+        {/* Find Low-Interest Items Button - Large, Below */}
         <button
           type="submit"
           disabled={loading}
@@ -158,8 +158,8 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
             <RotateCw className="w-5 h-5 animate-spin" />
           ) : (
             <>
-              <span className="text-xl">🔬</span>
-              <span>Find Zombies</span>
+              <span className="text-xl">🔍</span>
+              <span>Find Low-Interest Items</span>
             </>
           )}
         </button>

@@ -941,7 +941,7 @@ function Dashboard() {
               <div className="mt-6 mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="text-sm text-zinc-400">
-                    🧟 <strong className="text-red-400">{zombies.length} Zombie Listings</strong> found
+                    📉 <strong className="text-red-400">{zombies.length} Low-Interest Items</strong> found
                   </span>
                   <span className="text-xs text-zinc-600">
                     ({filters.min_days}d • {filters.max_sales} sales • ≤{filters.max_watch_count} views)
