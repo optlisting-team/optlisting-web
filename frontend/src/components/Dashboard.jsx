@@ -880,42 +880,61 @@ function Dashboard() {
                   ? 'w-full'
                   : 'flex-1 min-w-0'
             }`}>
-              {/* Filter Bar - Only show for zombies view when filter panel is not shown above */}
-              {viewMode === 'zombies' && !showFilter && (
-                <FilterBar 
-                  onApplyFilter={handleApplyFilter}
-                  onSync={handleSync}
-                  loading={loading}
-                  initialFilters={filters}
-                />
-              )}
-
-              {/* View Mode Info + Action Button */}
+              {/* Active View - With Filter */}
               {viewMode === 'all' && (
-                <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-4 mt-6">
+                <div className="mt-6 space-y-4">
+                  {/* Header */}
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-zinc-400">
-                      📋 <strong className="text-white">Viewing All {allListings.length} Listings</strong>
+                      📋 <strong className="text-white">All {allListings.length} Listings</strong> - Filter to find zombies
                     </p>
-                    <button
-                      onClick={() => {
-                        setShowFilter(true)
+                  </div>
+                  
+                  {/* Inline Filter for Active View */}
+                  <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3">
+                    <FilterBar 
+                      onApplyFilter={(newFilters) => {
+                        setFilters(newFilters)
+                        // Filter allListings locally
+                        const filtered = allListings.filter(item => {
+                          const matchesSales = (item.total_sales || 0) <= newFilters.max_sales
+                          const matchesWatches = (item.watch_count || 0) <= newFilters.max_watches
+                          const matchesViews = (item.views || 0) <= newFilters.max_views
+                          const matchesImpressions = (item.impressions || 0) <= newFilters.max_impressions
+                          return matchesSales && matchesWatches && matchesViews && matchesImpressions
+                        })
+                        // Move filtered items to zombies
+                        setZombies(filtered)
+                        setTotalZombies(filtered.length)
                         setViewMode('zombies')
                       }}
-                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-orange-500 text-white text-sm font-bold rounded-lg hover:from-red-500 hover:to-orange-400 transition-all shadow-lg shadow-red-500/20"
-                    >
-                      <span>🔬</span>
-                      <span>Find Zombies</span>
-                      <span>→</span>
-                    </button>
+                      loading={loading}
+                      initialFilters={filters}
+                    />
                   </div>
                 </div>
               )}
 
-            {/* Compact Filter Summary for Zombies View */}
+            {/* Zombies View - No Filter, just results */}
             {viewMode === 'zombies' && (
-              <div className="text-xs text-zinc-500 mb-2 px-1">
-                📋 {filters.marketplace_filter} • {filters.min_days}d • {filters.max_sales} sales • ≤{filters.max_watch_count} views
+              <div className="mt-6 mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-zinc-400">
+                    🧟 <strong className="text-red-400">{zombies.length} Zombie Listings</strong> found
+                  </span>
+                  <span className="text-xs text-zinc-600">
+                    ({filters.min_days}d • {filters.max_sales} sales • ≤{filters.max_watch_count} views)
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    setViewMode('all')
+                    fetchAllListings()
+                  }}
+                  className="text-xs text-zinc-500 hover:text-white transition-colors"
+                >
+                  ← Back to All Listings
+                </button>
               </div>
             )}
 
