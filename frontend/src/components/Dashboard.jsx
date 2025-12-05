@@ -86,9 +86,9 @@ function Dashboard() {
   const [searchParams] = useSearchParams()
   const viewParam = searchParams.get('view')
   // DEMO_MODE 초기 데이터 설정
-  const [zombies, setZombies] = useState(DEMO_MODE ? DUMMY_ZOMBIES : [])
+  const [zombies, setZombies] = useState([]) // Start empty, populate after filter
   const [allListings, setAllListings] = useState(DEMO_MODE ? DUMMY_ALL_LISTINGS : []) // All listings for 'all' view mode
-  const [totalZombies, setTotalZombies] = useState(DEMO_MODE ? DUMMY_ZOMBIES.length : 0)
+  const [totalZombies, setTotalZombies] = useState(0) // Start at 0, update after filter
   const [totalListings, setTotalListings] = useState(DEMO_MODE ? DUMMY_ALL_LISTINGS.length : 0)
   const [totalBreakdown, setTotalBreakdown] = useState(DEMO_MODE ? { Amazon: 30, Walmart: 20, 'Home Depot': 15, AliExpress: 15, Costway: 10, 'CJ Dropshipping': 5, Banggood: 5 } : { Amazon: 0, Walmart: 0, Unknown: 0 })
   const [platformBreakdown, setPlatformBreakdown] = useState(DEMO_MODE ? { eBay: 100 } : { eBay: 0, Amazon: 0, Shopify: 0, Walmart: 0 })
