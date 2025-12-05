@@ -482,48 +482,81 @@ function LandingPage() {
           >
             <h3 className="text-lg font-semibold text-zinc-300 dark:text-zinc-300 mb-6 text-center">Suppliers</h3>
             <div className="flex flex-wrap justify-center items-center gap-6 md:gap-10">
+              {/* AliExpress - Priority 1 */}
+              <div className="flex flex-col items-center gap-2">
+                <div className="h-12 w-28 bg-white rounded-lg flex items-center justify-center p-2 shadow-lg">
+                  <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/aliexpress.svg" alt="AliExpress" className="h-7 w-auto" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class="text-zinc-900 font-bold text-xs">AliExpress</span>'; }} />
+                </div>
+                <span className="text-xs text-zinc-400 text-center max-w-[100px]">Global largest product range</span>
+              </div>
+              
+              {/* AutoDS - Priority 2 */}
+              <div className="flex flex-col items-center gap-2">
+                <div className="h-12 w-28 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center p-2 shadow-lg">
+                  <span className="text-white font-bold text-xs">AutoDS</span>
+                </div>
+                <span className="text-xs text-zinc-400 text-center max-w-[100px]">All-in-one automation</span>
+              </div>
+              
+              {/* CJ Dropshipping - Priority 3 */}
+              <div className="flex flex-col items-center gap-2">
+                <div className="h-12 w-28 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center p-2 shadow-lg">
+                  <span className="text-white font-bold text-xs">CJ</span>
+                </div>
+                <span className="text-xs text-zinc-400 text-center max-w-[100px]">Integrated service provider</span>
+              </div>
+              
+              {/* Zendrop - Priority 4 */}
+              <div className="flex flex-col items-center gap-2">
+                <div className="h-12 w-28 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center p-2 shadow-lg">
+                  <span className="text-white font-bold text-xs">Zendrop</span>
+                </div>
+                <span className="text-xs text-zinc-400 text-center max-w-[100px]">Fast shipping focus</span>
+              </div>
+              
+              {/* Spocket - Priority 5 */}
+              <div className="flex flex-col items-center gap-2">
+                <div className="h-12 w-28 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center p-2 shadow-lg">
+                  <span className="text-white font-bold text-xs">Spocket</span>
+                </div>
+                <span className="text-xs text-zinc-400 text-center max-w-[100px]">US/EU suppliers</span>
+              </div>
+              
+              {/* Amazon */}
               <div className="flex flex-col items-center gap-2">
                 <div className="h-12 w-28 bg-white rounded-lg flex items-center justify-center p-2 shadow-lg">
                   <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazon.svg" alt="Amazon" className="h-7 w-auto" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class="text-zinc-900 font-bold text-xs">Amazon</span>'; }} />
                 </div>
               </div>
+              
+              {/* Walmart */}
               <div className="flex flex-col items-center gap-2">
                 <div className="h-12 w-28 bg-white rounded-lg flex items-center justify-center p-2 shadow-lg">
                   <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/walmart.svg" alt="Walmart" className="h-7 w-auto" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class="text-zinc-900 font-bold text-xs">Walmart</span>'; }} />
                 </div>
               </div>
+              
+              {/* Home Depot */}
               <div className="flex flex-col items-center gap-2">
                 <div className="h-12 w-28 bg-white rounded-lg flex items-center justify-center p-2 shadow-lg">
                   <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/homedepot.svg" alt="Home Depot" className="h-7 w-auto" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class="text-zinc-900 font-bold text-xs">Home Depot</span>'; }} />
                 </div>
               </div>
-              <div className="flex flex-col items-center gap-2">
-                <div className="h-12 w-28 bg-white rounded-lg flex items-center justify-center p-2 shadow-lg">
-                  <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/aliexpress.svg" alt="AliExpress" className="h-7 w-auto" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class="text-zinc-900 font-bold text-xs">AliExpress</span>'; }} />
-                </div>
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <div className="h-12 w-28 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center p-2 shadow-lg">
-                  <span className="text-white font-bold text-xs">CJ</span>
-                </div>
-              </div>
+              
+              {/* Wholesale2B */}
               <div className="flex flex-col items-center gap-2">
                 <div className="h-12 w-28 bg-zinc-800 border border-zinc-700 rounded-lg flex items-center justify-center p-2 shadow-lg">
                   <span className="text-white font-bold text-xs">W2B</span>
                 </div>
               </div>
+              
+              {/* Costway */}
               <div className="flex flex-col items-center gap-2">
                 <div className="h-12 w-28 bg-zinc-800 border border-zinc-700 rounded-lg flex items-center justify-center p-2 shadow-lg">
                   <span className="text-white font-bold text-xs">Costway</span>
                 </div>
               </div>
-              <div className="flex flex-col items-center gap-2 opacity-50">
-                <div className="h-12 w-28 bg-zinc-700 rounded-lg flex items-center justify-center p-2 shadow-lg">
-                  <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/banggood.svg" alt="Banggood" className="h-7 w-auto" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class="text-zinc-300 font-bold text-xs">Banggood</span>'; }} />
-                </div>
-              </div>
             </div>
-            <p className="text-xs text-zinc-600 dark:text-zinc-600 text-center mt-4">Banggood coming soon</p>
           </motion.div>
         </div>
       </section>
