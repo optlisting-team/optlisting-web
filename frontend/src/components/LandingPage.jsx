@@ -8,12 +8,12 @@ import { Button } from './ui/button'
 
 // Credit Pack Options - Each is a fixed price product for PG approval
 const CREDIT_PACKS = [
-  { id: 'credit-5', price: 5, credits: 300, perScan: 0.017, discount: 0, label: 'Starter' },
-  { id: 'credit-10', price: 10, credits: 800, perScan: 0.0125, discount: 26, label: 'Popular', popular: true },
-  { id: 'credit-15', price: 15, credits: 1200, perScan: 0.0125, discount: 26, label: 'Value' },
-  { id: 'credit-20', price: 20, credits: 2000, perScan: 0.01, discount: 41, label: 'Best', best: true },
-  { id: 'credit-25', price: 25, credits: 2600, perScan: 0.0096, discount: 43, label: 'Pro' },
-  { id: 'credit-50', price: 50, credits: 6000, perScan: 0.0083, discount: 51, label: 'Business' },
+  { id: 'credit-5', price: 5, credits: 500, perScan: 0.01, discount: 0, label: 'Starter' },
+  { id: 'credit-10', price: 10, credits: 1100, perScan: 0.0091, discount: 10, label: 'Popular', popular: true },
+  { id: 'credit-15', price: 15, credits: 1700, perScan: 0.0088, discount: 13, label: 'Value' },
+  { id: 'credit-20', price: 20, credits: 2300, perScan: 0.0087, discount: 15, label: 'Best', best: true },
+  { id: 'credit-25', price: 25, credits: 2900, perScan: 0.0086, discount: 16, label: 'Pro' },
+  { id: 'credit-50', price: 50, credits: 6000, perScan: 0.0083, discount: 17, label: 'Business' },
 ]
 
 function LandingPage() {
