@@ -768,7 +768,7 @@ function Dashboard() {
           userCredits={userCredits}
           usedCredits={usedCredits}
           filterContent={showFilter && (
-            <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3 animate-fade-in-up">
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3 mt-6 animate-fade-in-up">
               <div className="flex items-center gap-3">
                 <span className="text-xs text-zinc-500">🔍 Filter:</span>
                 <div className="flex-1">
@@ -835,7 +835,7 @@ function Dashboard() {
 
               {/* View Mode Info + Action Button */}
               {viewMode === 'all' && (
-                <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-4">
+                <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-4 mt-6">
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-zinc-400">
                       📋 <strong className="text-white">Viewing All {allListings.length} Listings</strong>
