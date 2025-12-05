@@ -109,9 +109,9 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
 
   // Filter input component - Wider Layout
   const FilterInput = ({ id, label, value, onChange, icon, unit, min = 0, step = 1 }) => (
-    <div className="flex items-center gap-2 bg-zinc-900/50 rounded-lg px-3 py-2 border border-zinc-800 flex-1">
-      <span className="text-sm">{icon}</span>
-      <span className="text-xs text-zinc-500 uppercase font-medium">{label}</span>
+    <div className="flex items-center gap-2 bg-zinc-900/50 rounded-lg px-3 py-2 border border-zinc-800 flex-1 min-w-0">
+      <span className="text-sm flex-shrink-0">{icon}</span>
+      <span className="text-xs text-zinc-500 uppercase font-medium whitespace-nowrap flex-shrink-0">{label}</span>
       <input
         type="number"
         id={id}
@@ -119,9 +119,9 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
         step={step}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="flex-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-white text-sm font-bold text-center focus:outline-none focus:border-zinc-600"
+        className="flex-1 min-w-0 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-white text-sm font-bold text-center focus:outline-none focus:border-zinc-600"
       />
-      {unit && <span className="text-xs text-zinc-600">{unit}</span>}
+      {unit && <span className="text-xs text-zinc-600 flex-shrink-0">{unit}</span>}
     </div>
   )
 
@@ -129,7 +129,7 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
     <div className="opt-card p-4 opacity-0 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
       <form onSubmit={handleSubmit}>
         {/* Filters Row - Wide Layout */}
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
           {/* Filters - Spread out */}
           <FilterInput id="analysisPeriod" label="Days" value={analysisPeriod} onChange={setAnalysisPeriod} icon="📅" unit="d" min={1} />
           <FilterInput id="maxSales" label="Sales" value={maxSales} onChange={setMaxSales} icon="💰" />
@@ -142,7 +142,7 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
             type="button"
             onClick={handleReset}
             disabled={loading}
-            className="ml-auto px-3 py-1.5 text-xs text-zinc-400 hover:text-white transition-all"
+            className="flex-shrink-0 px-3 py-1.5 text-xs text-zinc-400 hover:text-white transition-all whitespace-nowrap"
           >
             Reset
           </button>
