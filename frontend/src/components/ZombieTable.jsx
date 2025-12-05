@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import SourceBadge from './SourceBadge'
 import PlatformBadge from './PlatformBadge'
-import { AlertTriangle, TrendingDown, Trash2, Eye, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { AlertTriangle, TrendingDown, Trash2, Eye, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Info } from 'lucide-react'
 
 // Calculate Performance Score based on metrics
 // Lower score = Lower performance (Zombie)
