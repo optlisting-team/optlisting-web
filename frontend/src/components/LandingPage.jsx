@@ -160,7 +160,7 @@ function LandingPage() {
               <span className="text-white dark:text-white">Cleaner.</span>
             </h1>
             <h2 className="text-xl md:text-2xl text-zinc-400 dark:text-zinc-400 font-normal mb-10 max-w-3xl mx-auto leading-relaxed font-sans">
-              Instantly generate a CSV of dead listings—so you can delete them fast and clean.
+              Instantly generate a CSV of Low-Interest Items
             </h2>
             <div className="flex flex-col items-center mt-8">
               <motion.a
