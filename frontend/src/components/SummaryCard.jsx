@@ -433,22 +433,22 @@ function SummaryCard({
       />
 
       {/* Stats Row - 4 Columns: Flow visualization */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-4 gap-4">
         {/* 1. Active Listings - Click to see all listings */}
         <div 
           onClick={() => handleCardClick('all')}
-          className={`opt-card p-3 cursor-pointer transition-all text-center relative hover:bg-zinc-800/50 ${viewMode === 'all' ? 'ring-1 ring-blue-500/50' : ''}`}
+          className={`opt-card p-6 cursor-pointer transition-all text-center relative hover:bg-zinc-800/50 ${viewMode === 'all' ? 'ring-2 ring-blue-500/50' : ''}`}
         >
-          <div className="text-2xl font-black text-white">{loading ? '...' : (totalListings || 0).toLocaleString()}</div>
-          <div className="text-[10px] text-zinc-500 uppercase">Active</div>
+          <div className="text-4xl font-black text-white">{loading ? '...' : (totalListings || 0).toLocaleString()}</div>
+          <div className="text-sm text-zinc-500 uppercase mt-1">Active</div>
           {onSync && (
             <button
               onClick={(e) => { e.stopPropagation(); onSync(); }}
               disabled={loading}
-              className="absolute top-1 right-1 p-1 text-zinc-500 hover:text-white transition-all"
+              className="absolute top-2 right-2 p-1.5 text-zinc-500 hover:text-white transition-all"
               title="Sync from eBay"
             >
-              <svg className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </button>
@@ -458,28 +458,28 @@ function SummaryCard({
         {/* 2. Zombies - Click to open filter and find zombies */}
         <div 
           onClick={() => { if (onToggleFilter) onToggleFilter(); handleCardClick('zombies'); }}
-          className={`opt-card p-3 cursor-pointer transition-all text-center hover:bg-zinc-800/50 ${viewMode === 'zombies' || showFilter ? 'ring-1 ring-red-500/50' : ''} ${totalZombies > 0 ? 'border-red-500/30' : ''}`}
+          className={`opt-card p-6 cursor-pointer transition-all text-center hover:bg-zinc-800/50 ${viewMode === 'zombies' || showFilter ? 'ring-2 ring-red-500/50' : ''} ${totalZombies > 0 ? 'border-red-500/30' : ''}`}
         >
-          <div className={`text-2xl font-black ${totalZombies > 0 ? 'text-red-400' : 'text-white'}`}>{totalZombies || 0}</div>
-          <div className={`text-[10px] uppercase ${totalZombies > 0 ? 'text-red-400' : 'text-zinc-500'}`}>Zombies</div>
+          <div className={`text-4xl font-black ${totalZombies > 0 ? 'text-red-400' : 'text-white'}`}>{totalZombies || 0}</div>
+          <div className={`text-sm uppercase mt-1 ${totalZombies > 0 ? 'text-red-400' : 'text-zinc-500'}`}>Zombies</div>
         </div>
 
         {/* 3. CSV Export - Selected for export */}
         <div 
           onClick={() => handleCardClick('queue')}
-          className={`opt-card p-3 cursor-pointer transition-all text-center hover:bg-zinc-800/50 ${viewMode === 'queue' ? 'ring-1 ring-orange-500/50' : ''}`}
+          className={`opt-card p-6 cursor-pointer transition-all text-center hover:bg-zinc-800/50 ${viewMode === 'queue' ? 'ring-2 ring-orange-500/50' : ''}`}
         >
-          <div className={`text-2xl font-black ${queueCount > 0 ? 'text-orange-400' : 'text-white'}`}>{queueCount || 0}</div>
-          <div className="text-[10px] text-zinc-500 uppercase">CSV Export</div>
+          <div className={`text-4xl font-black ${queueCount > 0 ? 'text-orange-400' : 'text-white'}`}>{queueCount || 0}</div>
+          <div className="text-sm text-zinc-500 uppercase mt-1">CSV Export</div>
         </div>
 
         {/* 4. Removed - Final destination */}
         <div 
           onClick={() => handleCardClick('history')}
-          className={`opt-card p-3 cursor-pointer transition-all text-center hover:bg-zinc-800/50 ${viewMode === 'history' ? 'ring-1 ring-emerald-500/50' : ''}`}
+          className={`opt-card p-6 cursor-pointer transition-all text-center hover:bg-zinc-800/50 ${viewMode === 'history' ? 'ring-2 ring-emerald-500/50' : ''}`}
         >
-          <div className={`text-2xl font-black ${totalDeleted > 0 ? 'text-emerald-400' : 'text-white'}`}>{totalDeleted || 0}</div>
-          <div className="text-[10px] text-zinc-500 uppercase">Removed</div>
+          <div className={`text-4xl font-black ${totalDeleted > 0 ? 'text-emerald-400' : 'text-white'}`}>{totalDeleted || 0}</div>
+          <div className="text-sm text-zinc-500 uppercase mt-1">Removed</div>
         </div>
       </div>
 

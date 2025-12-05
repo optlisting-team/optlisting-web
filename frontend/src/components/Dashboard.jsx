@@ -113,7 +113,7 @@ function Dashboard() {
     { id: '9', title: 'Laptop Stand Adjustable', sku: 'AE77889900', supplier: 'AliExpress', price: 22.99, deleted_at: '2024-12-01T10:20:00Z', reason: 'No watches' },
     { id: '10', title: 'Mouse Pad Large Gaming', sku: 'BG44556677', supplier: 'Banggood', price: 14.99, deleted_at: '2024-12-01T08:55:00Z', reason: 'Zero sales in 30 days' },
   ] : [])
-  const [totalDeleted, setTotalDeleted] = useState(DEMO_MODE ? 10 : 0)
+  const [totalDeleted, setTotalDeleted] = useState(0) // Start at 0, updates from history
   const [showFilter, setShowFilter] = useState(false) // 기본: 필터 접힘
   
   // API Health Check State
