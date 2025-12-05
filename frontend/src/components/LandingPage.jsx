@@ -487,7 +487,7 @@ function LandingPage() {
                 1 Hour → 5 Minutes
               </h2>
               <p className="text-xl text-zinc-400 max-w-2xl mx-auto">
-                Invest saved time into sourcing winning products.
+                Time is money for sellers. Dramatically reduce your product cleanup time.
               </p>
             </div>
 
