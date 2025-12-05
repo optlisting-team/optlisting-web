@@ -227,33 +227,6 @@ function SummaryCard({
         </div>
       </div>
       
-      {/* 🔥 ZOMBIE ALERT BANNER - Shows when zombies detected */}
-      {!loading && totalZombies > 0 && (
-        <div 
-          onClick={() => handleCardClick('zombies')}
-          className="cursor-pointer bg-gradient-to-r from-red-900/40 via-orange-900/30 to-red-900/40 border-2 border-red-500/50 rounded-xl p-4 animate-pulse-glow"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-red-500/20 rounded-xl flex items-center justify-center border border-red-500/30">
-                <span className="text-3xl">⚠️</span>
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl font-black text-red-400">{totalZombies}</span>
-                  <span className="text-lg font-bold text-white">Zombie Listings Found!</span>
-                </div>
-                <div className="text-sm text-zinc-400">
-                  Estimated monthly loss: <span className="text-red-400 font-bold">${estimatedSavings.toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
-            <button className="px-6 py-3 bg-red-500 hover:bg-red-400 text-white font-bold rounded-xl transition-all hover:scale-105 shadow-lg shadow-red-500/30">
-              Clean Up Now →
-            </button>
-          </div>
-        </div>
-      )}
       
       {/* Your Store - Ultra Compact */}
       <div className="opt-card p-2 px-4">
