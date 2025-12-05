@@ -1,5 +1,5 @@
 import React from 'react'
-import SupplierBadge from './SupplierBadge'
+import SourceBadge from './SourceBadge'
 
 function HistoryTable({ logs, loading }) {
   const formatDateTime = (dateString) => {
@@ -87,7 +87,7 @@ function HistoryTable({ logs, loading }) {
                     {log.title}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <SupplierBadge supplier={log.supplier || "Unknown"} />
+                    <SourceBadge source={log.supplier || "Unknown"} />
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-white data-value">
                     {formatPrice(log.price)}
