@@ -450,20 +450,24 @@ function LandingPage() {
             <h3 className="text-lg font-semibold text-zinc-300 dark:text-zinc-300 mb-6 text-center">Marketplaces</h3>
             <div className="flex flex-wrap justify-center items-center gap-8 md:gap-12">
               <div className="flex flex-col items-center gap-2">
-                <img src="https://logo.clearbit.com/ebay.com" alt="eBay" className="h-12 w-auto object-contain filter brightness-0 invert" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
-                <span className="text-sm text-white font-medium" style={{display: 'none'}}>eBay</span>
+                <div className="h-14 w-32 bg-white rounded-lg flex items-center justify-center p-2 shadow-lg">
+                  <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/ebay.svg" alt="eBay" className="h-8 w-auto" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class="text-zinc-900 font-bold text-sm">eBay</span>'; }} />
+                </div>
               </div>
               <div className="flex flex-col items-center gap-2">
-                <img src="https://logo.clearbit.com/shopify.com" alt="Shopify" className="h-12 w-auto object-contain filter brightness-0 invert" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
-                <span className="text-sm text-white font-medium" style={{display: 'none'}}>Shopify</span>
+                <div className="h-14 w-32 bg-white rounded-lg flex items-center justify-center p-2 shadow-lg">
+                  <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/shopify.svg" alt="Shopify" className="h-8 w-auto" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class="text-zinc-900 font-bold text-sm">Shopify</span>'; }} />
+                </div>
               </div>
               <div className="flex flex-col items-center gap-2 opacity-50">
-                <img src="https://logo.clearbit.com/amazon.com" alt="Amazon" className="h-12 w-auto object-contain filter brightness-0 invert" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
-                <span className="text-sm text-zinc-500 font-medium" style={{display: 'none'}}>Amazon</span>
+                <div className="h-14 w-32 bg-zinc-700 rounded-lg flex items-center justify-center p-2 shadow-lg">
+                  <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazon.svg" alt="Amazon" className="h-8 w-auto" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class="text-zinc-300 font-bold text-sm">Amazon</span>'; }} />
+                </div>
               </div>
               <div className="flex flex-col items-center gap-2 opacity-50">
-                <img src="https://logo.clearbit.com/walmart.com" alt="Walmart" className="h-12 w-auto object-contain filter brightness-0 invert" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
-                <span className="text-sm text-zinc-500 font-medium" style={{display: 'none'}}>Walmart</span>
+                <div className="h-14 w-32 bg-zinc-700 rounded-lg flex items-center justify-center p-2 shadow-lg">
+                  <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/walmart.svg" alt="Walmart" className="h-8 w-auto" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class="text-zinc-300 font-bold text-sm">Walmart</span>'; }} />
+                </div>
               </div>
             </div>
             <p className="text-xs text-zinc-600 dark:text-zinc-600 text-center mt-4">Amazon & Walmart coming soon</p>
@@ -477,42 +481,46 @@ function LandingPage() {
             transition={{ duration: 0.6, delay: 0.2 }}
           >
             <h3 className="text-lg font-semibold text-zinc-300 dark:text-zinc-300 mb-6 text-center">Suppliers</h3>
-            <div className="flex flex-wrap justify-center items-center gap-8 md:gap-12">
+            <div className="flex flex-wrap justify-center items-center gap-6 md:gap-10">
               <div className="flex flex-col items-center gap-2">
-                <img src="https://logo.clearbit.com/amazon.com" alt="Amazon" className="h-10 w-auto object-contain filter brightness-0 invert" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
-                <span className="text-sm text-white font-medium" style={{display: 'none'}}>Amazon</span>
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <img src="https://logo.clearbit.com/walmart.com" alt="Walmart" className="h-10 w-auto object-contain filter brightness-0 invert" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
-                <span className="text-sm text-white font-medium" style={{display: 'none'}}>Walmart</span>
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <img src="https://logo.clearbit.com/homedepot.com" alt="Home Depot" className="h-10 w-auto object-contain filter brightness-0 invert" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
-                <span className="text-sm text-white font-medium" style={{display: 'none'}}>Home Depot</span>
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <img src="https://logo.clearbit.com/aliexpress.com" alt="AliExpress" className="h-10 w-auto object-contain filter brightness-0 invert" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
-                <span className="text-sm text-white font-medium" style={{display: 'none'}}>AliExpress</span>
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <img src="https://logo.clearbit.com/cjdropshipping.com" alt="CJ Dropshipping" className="h-10 w-auto object-contain filter brightness-0 invert" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
-                <span className="text-sm text-white font-medium" style={{display: 'none'}}>CJ Dropshipping</span>
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <div className="h-10 w-24 bg-zinc-700 rounded flex items-center justify-center">
-                  <span className="text-xs text-white font-bold">W2B</span>
+                <div className="h-12 w-28 bg-white rounded-lg flex items-center justify-center p-2 shadow-lg">
+                  <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/amazon.svg" alt="Amazon" className="h-7 w-auto" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class="text-zinc-900 font-bold text-xs">Amazon</span>'; }} />
                 </div>
-                <span className="text-sm text-white font-medium">Wholesale2B</span>
               </div>
               <div className="flex flex-col items-center gap-2">
-                <div className="h-10 w-24 bg-zinc-700 rounded flex items-center justify-center">
-                  <span className="text-xs text-white font-bold">CW</span>
+                <div className="h-12 w-28 bg-white rounded-lg flex items-center justify-center p-2 shadow-lg">
+                  <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/walmart.svg" alt="Walmart" className="h-7 w-auto" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class="text-zinc-900 font-bold text-xs">Walmart</span>'; }} />
                 </div>
-                <span className="text-sm text-white font-medium">Costway</span>
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                <div className="h-12 w-28 bg-white rounded-lg flex items-center justify-center p-2 shadow-lg">
+                  <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/homedepot.svg" alt="Home Depot" className="h-7 w-auto" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class="text-zinc-900 font-bold text-xs">Home Depot</span>'; }} />
+                </div>
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                <div className="h-12 w-28 bg-white rounded-lg flex items-center justify-center p-2 shadow-lg">
+                  <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/aliexpress.svg" alt="AliExpress" className="h-7 w-auto" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class="text-zinc-900 font-bold text-xs">AliExpress</span>'; }} />
+                </div>
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                <div className="h-12 w-28 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center p-2 shadow-lg">
+                  <span className="text-white font-bold text-xs">CJ</span>
+                </div>
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                <div className="h-12 w-28 bg-zinc-800 border border-zinc-700 rounded-lg flex items-center justify-center p-2 shadow-lg">
+                  <span className="text-white font-bold text-xs">W2B</span>
+                </div>
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                <div className="h-12 w-28 bg-zinc-800 border border-zinc-700 rounded-lg flex items-center justify-center p-2 shadow-lg">
+                  <span className="text-white font-bold text-xs">Costway</span>
+                </div>
               </div>
               <div className="flex flex-col items-center gap-2 opacity-50">
-                <img src="https://logo.clearbit.com/banggood.com" alt="Banggood" className="h-10 w-auto object-contain filter brightness-0 invert" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
-                <span className="text-sm text-zinc-500 font-medium" style={{display: 'none'}}>Banggood</span>
+                <div className="h-12 w-28 bg-zinc-700 rounded-lg flex items-center justify-center p-2 shadow-lg">
+                  <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/banggood.svg" alt="Banggood" className="h-7 w-auto" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class="text-zinc-300 font-bold text-xs">Banggood</span>'; }} />
+                </div>
               </div>
             </div>
             <p className="text-xs text-zinc-600 dark:text-zinc-600 text-center mt-4">Banggood coming soon</p>
