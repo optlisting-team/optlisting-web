@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, TrendingDown, Ban, DollarSign, Check, CheckCircle, Zap, TrendingUp, Clock, Puzzle, Table, ChevronDown, User, LayoutDashboard, Settings, LogOut, BarChart3, Target, Users, Star } from 'lucide-react'
+import { ArrowRight, TrendingDown, Ban, DollarSign, Check, CheckCircle, Zap, TrendingUp, Clock, Puzzle, Table, ChevronDown, User, LayoutDashboard, Settings, LogOut, BarChart3, Target, Users, Star, RefreshCw, Filter, Download } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from './ui/card'
 import { Button } from './ui/button'
@@ -457,69 +457,6 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-24 px-4 bg-black dark:bg-black" id="features-benefits">
-        <div className="container mx-auto max-w-6xl">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-20"
-          >
-            <h2 className="text-4xl md:text-5xl font-bold text-white dark:text-white mb-4 font-sans">
-              Features
-            </h2>
-          </motion.div>
-
-          <motion.div
-            variants={staggerContainer}
-            initial="initial"
-            whileInView="animate"
-            viewport={{ once: true }}
-            className="grid md:grid-cols-3 gap-10"
-          >
-            <motion.div
-              variants={fadeInUp}
-              className="bg-zinc-900 dark:bg-zinc-900 p-10 rounded-2xl border border-zinc-800 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all"
-            >
-              <div className="w-16 h-16 bg-zinc-800 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-6">
-                <TrendingUp className="h-8 w-8 text-white dark:text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-white dark:text-white mb-4 font-sans">Boost Your Store Performance</h3>
-              <p className="text-zinc-400 dark:text-zinc-400 text-lg leading-relaxed font-sans">
-                Removing dead inventory improves search visibility across all major marketplaces.
-              </p>
-            </motion.div>
-
-            <motion.div
-              variants={fadeInUp}
-              className="bg-zinc-900 dark:bg-zinc-900 p-10 rounded-2xl border border-zinc-800 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all"
-            >
-              <div className="w-16 h-16 bg-zinc-800 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-6">
-                <Clock className="h-8 w-8 text-white dark:text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-white dark:text-white mb-4 font-sans">CSV-Ready Cleanup</h3>
-              <p className="text-zinc-400 dark:text-zinc-400 text-lg leading-relaxed font-sans">
-                Stay fully in control. We generate a clean, deletion-ready CSV for safe bulk removal.
-              </p>
-            </motion.div>
-
-            <motion.div
-              variants={fadeInUp}
-              className="bg-zinc-900 dark:bg-zinc-900 p-10 rounded-2xl border border-zinc-800 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all"
-            >
-              <div className="w-16 h-16 bg-zinc-800 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-6">
-                <Puzzle className="h-8 w-8 text-white dark:text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-white dark:text-white mb-4 font-sans">Seamless Across Markets & Suppliers</h3>
-              <p className="text-zinc-400 dark:text-zinc-400 text-lg leading-relaxed font-sans">
-                Built to fit any seller workflow. Supports multiple marketplaces and suppliers, with more added regularly.
-              </p>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
 
       {/* Testimonials Section */}
       <section className="py-24 px-4 bg-zinc-900 dark:bg-zinc-900">
