@@ -162,28 +162,16 @@ function LandingPage() {
             <h2 className="text-xl md:text-2xl text-zinc-400 dark:text-zinc-400 font-normal mb-10 max-w-3xl mx-auto leading-relaxed font-sans">
               Instantly generate a CSV of Low-Interest Items
             </h2>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8">
+            <div className="flex flex-col items-center mt-8">
               <motion.a
                 href="/signup"
                 whileHover={{ scale: 1.05, y: -4 }}
                 whileTap={{ scale: 0.95 }}
                 className="px-12 py-5 bg-white dark:bg-white hover:bg-zinc-200 dark:hover:bg-zinc-200 text-black dark:text-black font-semibold text-lg rounded-xl shadow-lg transition-all hover:-translate-y-1 flex items-center gap-2 font-sans"
               >
-                Start Your 30-Day Free Trial
+                Sign Up
                 <ArrowRight className="h-5 w-5" />
               </motion.a>
-              <motion.a
-                href="#features"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="px-8 py-5 bg-zinc-800 hover:bg-zinc-700 text-white dark:text-white font-semibold text-lg rounded-xl border border-zinc-700 transition-all flex items-center gap-2 font-sans"
-              >
-                See How It Works
-              </motion.a>
-              {/* Microcopy */}
-              <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-2 text-center font-sans w-full sm:w-auto">
-                No credit card required • Cancel anytime
-              </p>
             </div>
           </motion.div>
 
