@@ -71,10 +71,10 @@ function StoreSelector({ connectedStore, apiConnected }) {
   }
 
   return (
-    <div className="opt-card p-2 px-4" ref={dropdownRef}>
+    <div className="opt-card p-2 px-4 relative z-50" ref={dropdownRef}>
       <div className="flex items-center justify-between gap-3">
         {/* Store Dropdown */}
-        <div className="relative flex-1">
+        <div className="relative flex-1" style={{ zIndex: 9999 }}>
           <button
             onClick={() => setIsOpen(!isOpen)}
             className="flex items-center gap-2 w-full text-left hover:bg-zinc-800/50 rounded-lg px-2 py-1 transition-all"
@@ -94,7 +94,7 @@ function StoreSelector({ connectedStore, apiConnected }) {
 
           {/* Dropdown Menu */}
           {isOpen && (
-            <div className="absolute top-full left-0 mt-1 w-72 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl z-[9999] overflow-hidden">
+            <div className="absolute top-full left-0 mt-1 w-72 bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl overflow-hidden" style={{ zIndex: 99999 }}>
               <div className="p-2 border-b border-zinc-800">
                 <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Your Stores</p>
               </div>
