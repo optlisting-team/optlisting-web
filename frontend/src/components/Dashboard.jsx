@@ -597,11 +597,12 @@ function Dashboard() {
     setAllListings(allListings.filter(item => !idsToMove.includes(item.id)))
     setTotalListings(totalListings - markedItems.length)
     
-    setSelectedIds([])
+    // Only clear selection if bulk action (not single item click)
+    if (!itemIds) {
+      setSelectedIds([])
+    }
     
-    // Navigate to zombies view
-    setViewMode('zombies')
-    setShowFilter(true)
+    // Stay on Active page - don't navigate
   }
 
   const handleRemoveFromQueueBulk = () => {
