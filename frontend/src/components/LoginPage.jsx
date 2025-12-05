@@ -2,15 +2,12 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { motion } from 'framer-motion'
-import { Zap, Mail, Lock, Eye, EyeOff, AlertCircle, Loader2, ArrowLeft } from 'lucide-react'
+import { Zap, AlertCircle, Loader2, ArrowLeft } from 'lucide-react'
 
 function LoginPage() {
   const navigate = useNavigate()
-  const { signInWithGoogle, signInWithEmail, isAuthenticated, loading: authLoading } = useAuth()
+  const { signInWithGoogle, isAuthenticated, loading: authLoading } = useAuth()
   
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -29,24 +26,6 @@ function LoginPage() {
     
     if (error) {
       setError(error.message || 'Google 로그인에 실패했습니다.')
-    }
-    setLoading(false)
-  }
-
-  const handleEmailLogin = async (e) => {
-    e.preventDefault()
-    setError('')
-    
-    if (!email || !password) {
-      setError('이메일과 비밀번호를 입력해주세요.')
-      return
-    }
-    
-    setLoading(true)
-    const { error } = await signInWithEmail(email, password)
-    
-    if (error) {
-      setError(error.message || '로그인에 실패했습니다.')
     }
     setLoading(false)
   }
@@ -119,7 +98,7 @@ function LoginPage() {
           <button
             onClick={handleGoogleLogin}
             disabled={loading}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-white hover:bg-gray-100 text-gray-800 font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-6 shadow-lg"
+            className="w-full flex items-center justify-center gap-3 px-4 py-4 bg-white hover:bg-gray-100 text-gray-800 font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
           >
             {loading ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -148,86 +127,10 @@ function LoginPage() {
             )}
           </button>
 
-          {/* Divider */}
-          <div className="flex items-center gap-4 mb-6">
-            <div className="flex-1 h-px bg-zinc-700" />
-            <span className="text-xs text-zinc-500 uppercase tracking-wider">or</span>
-            <div className="flex-1 h-px bg-zinc-700" />
-          </div>
-
-          {/* Email Login Form */}
-          <form onSubmit={handleEmailLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-2">
-                Email
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="w-full pl-11 pr-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-11 pr-11 py-3 bg-zinc-800/50 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
-                >
-                  {showPassword ? (
-                    <EyeOff className="w-5 h-5" />
-                  ) : (
-                    <Eye className="w-5 h-5" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/25"
-            >
-              {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin mx-auto" />
-              ) : (
-                'Sign In'
-              )}
-            </button>
-          </form>
-
-          {/* Footer Links */}
-          <div className="mt-6 text-center space-y-2">
-            <Link
-              to="/signup"
-              className="block text-sm text-zinc-400 hover:text-white transition-colors"
-            >
-              Don't have an account? <span className="text-blue-400">Sign up</span>
-            </Link>
-            <Link
-              to="/forgot-password"
-              className="block text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
-            >
-              Forgot your password?
-            </Link>
-          </div>
+          {/* Info Text */}
+          <p className="mt-6 text-center text-xs text-zinc-500">
+            By signing in, you agree to our Terms of Service and Privacy Policy
+          </p>
         </div>
 
         {/* Trust Badge */}
@@ -242,4 +145,3 @@ function LoginPage() {
 }
 
 export default LoginPage
-
