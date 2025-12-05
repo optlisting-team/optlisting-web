@@ -217,13 +217,13 @@ function LandingPage() {
                   />
                   
                   {/* Privacy Blur Overlays - Top Header (User name, email) */}
-                  <div className="absolute top-[2%] right-[8%] w-[200px] h-[40px] bg-black/60 backdrop-blur-md rounded-lg border border-zinc-700/50"></div>
+                  <div className="absolute top-[2%] right-[8%] w-[120px] h-[24px] bg-black/60 backdrop-blur-md rounded border border-zinc-700/50"></div>
                   
                   {/* Privacy Blur Overlays - Sidebar Bottom (User info) */}
-                  <div className="absolute bottom-[8%] left-[2%] w-[180px] h-[60px] bg-black/60 backdrop-blur-md rounded-lg border border-zinc-700/50"></div>
+                  <div className="absolute bottom-[8%] left-[2%] w-[140px] h-[40px] bg-black/60 backdrop-blur-md rounded border border-zinc-700/50"></div>
                   
                   {/* Privacy Blur Overlays - Plan Banner */}
-                  <div className="absolute top-[6%] right-[15%] w-[250px] h-[30px] bg-black/60 backdrop-blur-md rounded-lg border border-zinc-700/50"></div>
+                  <div className="absolute top-[6%] right-[15%] w-[150px] h-[20px] bg-black/60 backdrop-blur-md rounded border border-zinc-700/50"></div>
                 </div>
               </div>
             </div>
