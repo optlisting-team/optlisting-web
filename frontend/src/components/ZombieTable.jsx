@@ -96,7 +96,7 @@ function RecommendationBadge({ recommendation }) {
   )
 }
 
-function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChange }) {
+function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChange, showZombieColumns = true }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [rowsPerPage, setRowsPerPage] = useState(50)
@@ -254,12 +254,16 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider max-w-xs">
                   Title
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  <span className="text-red-400">Zombie Score</span>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  Recommendation
-                </th>
+                {showZombieColumns && (
+                  <>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                      <span className="text-red-400">Zombie Score</span>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                      Recommendation
+                    </th>
+                  </>
+                )}
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
                   Supplier
                 </th>
@@ -321,12 +325,16 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-4">
-                    <ZombieScoreBadge score={zombie.zombieScore} />
-                  </td>
-                  <td className="px-4 py-4">
-                    <RecommendationBadge recommendation={zombie.recommendation} />
-                  </td>
+                  {showZombieColumns && (
+                    <>
+                      <td className="px-4 py-4">
+                        <ZombieScoreBadge score={zombie.zombieScore} />
+                      </td>
+                      <td className="px-4 py-4">
+                        <RecommendationBadge recommendation={zombie.recommendation} />
+                      </td>
+                    </>
+                  )}
                   <td className="px-4 py-4">
                     <SourceBadge 
                       source={zombie.supplier_name || zombie.supplier || "Unknown"} 
