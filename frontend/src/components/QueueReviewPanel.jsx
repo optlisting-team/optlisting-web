@@ -41,37 +41,43 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
     }
 
     try {
-      // Log deletion first
-      try {
-        await axios.post(`${API_BASE_URL}/api/log-deletion`, {
-          items: items
-        })
-      } catch (logErr) {
-        console.error('Failed to log deletion:', logErr)
-      }
+      // Generate CSV content directly in frontend (works with demo data)
+      const csvHeaders = ['Item ID', 'SKU', 'Title', 'Supplier', 'Price', 'Platform', 'Action']
+      const csvRows = items.map(item => [
+        item.ebay_item_id || item.item_id || '',
+        item.sku || '',
+        `"${(item.title || '').replace(/"/g, '""')}"`, // Escape quotes in title
+        item.supplier_name || item.supplier || 'Unknown',
+        item.price || 0,
+        item.marketplace || 'eBay',
+        'DELETE'
+      ])
 
-      // Export CSV
-      const response = await axios.post(
-        `${API_BASE_URL}/api/export-queue`,
-        {
-          items: items,
-          export_mode: 'autods'
-        },
-        {
-          responseType: 'blob'
-        }
-      )
+      const csvContent = [
+        csvHeaders.join(','),
+        ...csvRows.map(row => row.join(','))
+      ].join('\n')
 
-      // Create download link
-      const url = window.URL.createObjectURL(new Blob([response.data]))
+      // Create and download CSV file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
       
-      const sourceLower = source.toLowerCase()
-      link.setAttribute('download', `${sourceLower}_delete.csv`)
+      const sourceLower = source.toLowerCase().replace(/\s+/g, '_')
+      const timestamp = new Date().toISOString().split('T')[0]
+      link.setAttribute('download', `optlisting_${sourceLower}_delete_${timestamp}.csv`)
       document.body.appendChild(link)
       link.click()
       link.remove()
+      window.URL.revokeObjectURL(url)
+
+      // Try to log deletion to API (optional, won't block if fails)
+      try {
+        await axios.post(`${API_BASE_URL}/api/log-deletion`, { items: items })
+      } catch (logErr) {
+        console.log('API log skipped (demo mode)')
+      }
 
       // Notify parent to remove exported items and update history
       if (onExportComplete) {
@@ -82,8 +88,11 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
       if (onHistoryUpdate) {
         onHistoryUpdate()
       }
+
+      // Success feedback
+      alert(`✅ ${items.length} items exported to ${sourceLower}_delete_${timestamp}.csv`)
     } catch (err) {
-      alert(`Failed to export ${source} CSV`)
+      alert(`Failed to export ${source} CSV: ${err.message}`)
       console.error(err)
     }
   }
