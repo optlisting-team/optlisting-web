@@ -342,7 +342,8 @@ function Dashboard() {
       // Demo Mode: Use dummy data
       if (DEMO_MODE) {
         await new Promise(resolve => setTimeout(resolve, 500))
-        // 더미 데이터에서는 이미 초기화된 값 사용
+        // 더미 데이터로 전체 리스팅 설정
+        setAllListings(DUMMY_ZOMBIES) // 데모에서는 좀비 데이터를 전체 리스팅으로 사용
         setLoading(false)
         return
       }
