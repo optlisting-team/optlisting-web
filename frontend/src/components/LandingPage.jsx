@@ -179,7 +179,7 @@ function LandingPage() {
             </div>
           </motion.div>
 
-          {/* Dashboard Screenshot Placeholder - 3D Effect */}
+          {/* Dashboard Screenshot - 3D Effect */}
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
@@ -190,18 +190,37 @@ function LandingPage() {
             <div 
               className="relative transform-gpu" 
               style={{ 
-                transform: 'perspective(1000px) rotateX(12deg) scale(0.95)',
+                transform: 'perspective(1000px) rotateX(8deg) scale(0.98)',
                 transformStyle: 'preserve-3d'
               }}
             >
-              <div className="bg-gradient-to-br from-zinc-900 to-zinc-800 dark:from-zinc-900 dark:to-zinc-800 rounded-xl p-10 border-8 border-zinc-800 dark:border-zinc-800 shadow-2xl">
-                <div className="bg-zinc-900 dark:bg-zinc-900 rounded-xl p-16 border border-zinc-800 dark:border-zinc-800 min-h-[450px] flex items-center justify-center shadow-inner">
-                  <div className="text-center">
-                    <div className="text-7xl mb-6">📊</div>
-                    <p className="text-zinc-400 dark:text-zinc-400 text-xl font-semibold">Dashboard Screenshot</p>
-                    <p className="text-zinc-500 dark:text-zinc-500 text-sm mt-3">(Image will be added here)</p>
+              {/* Glow effect behind the image */}
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-cyan-500/20 rounded-2xl blur-3xl -z-10 scale-105"></div>
+              
+              {/* Browser Frame */}
+              <div className="bg-zinc-900 rounded-2xl border border-zinc-700/50 shadow-2xl shadow-black/50 overflow-hidden">
+                {/* Browser Top Bar */}
+                <div className="bg-zinc-800/80 px-4 py-3 flex items-center gap-3 border-b border-zinc-700/50">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
+                    <div className="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+                    <div className="w-3 h-3 rounded-full bg-green-500/80"></div>
+                  </div>
+                  <div className="flex-1 flex justify-center">
+                    <div className="bg-zinc-900/80 rounded-lg px-4 py-1.5 text-xs text-zinc-400 flex items-center gap-2">
+                      <span className="text-green-400">🔒</span>
+                      <span>optlisting.com/dashboard</span>
+                    </div>
                   </div>
                 </div>
+                
+                {/* Dashboard Screenshot */}
+                <img 
+                  src="/dashboard.png" 
+                  alt="OptListing Dashboard - Zombie Listing Finder" 
+                  className="w-full h-auto"
+                  loading="lazy"
+                />
               </div>
             </div>
           </motion.div>
