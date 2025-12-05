@@ -247,15 +247,19 @@ function Sidebar() {
         </div>
 
         {/* Plan Badge */}
-        <div className={`
-          flex items-center justify-between px-4 py-3 rounded-xl
-          ${plan === 'PRO' 
-            ? 'bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20' 
-            : plan === 'BUSINESS'
-              ? 'bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20'
-              : 'bg-zinc-800/50 border border-zinc-700/50'
-          }
-        `}>
+        <Link
+          to="/#pricing"
+          className={`
+            flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer
+            transition-all hover:scale-[1.02] hover:shadow-lg
+            ${plan === 'PRO' 
+              ? 'bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 hover:border-amber-500/40' 
+              : plan === 'BUSINESS'
+                ? 'bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 hover:border-purple-500/40'
+                : 'bg-zinc-800/50 border border-zinc-700/50 hover:border-zinc-600/50'
+            }
+          `}
+        >
           <div className="flex items-center gap-2">
             <span className={`text-lg ${
               plan === 'PRO' ? '👑' : plan === 'BUSINESS' ? '🚀' : '📦'
@@ -275,12 +279,8 @@ function Sidebar() {
               </div>
             </div>
           </div>
-          {plan === 'FREE' && (
-            <button className="text-xs font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 px-3 py-1.5 rounded-lg hover:shadow-lg hover:shadow-amber-500/20 transition-shadow">
-              Upgrade
-            </button>
-          )}
-        </div>
+          <ChevronRight className="w-4 h-4 text-zinc-500" />
+        </Link>
       </div>
     </div>
   )
