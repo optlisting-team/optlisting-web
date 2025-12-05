@@ -179,26 +179,19 @@ function LandingPage() {
             </div>
           </motion.div>
 
-          {/* Dashboard Screenshot - 3D Effect */}
+          {/* Dashboard Screenshot */}
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, delay: 0.3 }}
             className="mt-20"
-            style={{ perspective: '1000px' }}
           >
-            <div 
-              className="relative transform-gpu" 
-              style={{ 
-                transform: 'perspective(1000px) rotateX(8deg) scale(0.98)',
-                transformStyle: 'preserve-3d'
-              }}
-            >
+            <div className="relative">
               {/* Glow effect behind the image */}
               <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-cyan-500/20 rounded-2xl blur-3xl -z-10 scale-105"></div>
               
               {/* Browser Frame */}
-              <div className="bg-zinc-900 rounded-2xl border border-zinc-700/50 shadow-2xl shadow-black/50 overflow-hidden">
+              <div className="bg-zinc-900 rounded-2xl border border-zinc-700/50 shadow-2xl shadow-black/50 overflow-hidden relative">
                 {/* Browser Top Bar */}
                 <div className="bg-zinc-800/80 px-4 py-3 flex items-center gap-3 border-b border-zinc-700/50">
                   <div className="flex items-center gap-2">
@@ -215,12 +208,23 @@ function LandingPage() {
                 </div>
                 
                 {/* Dashboard Screenshot */}
-                <img 
-                  src="/dashboard.png" 
-                  alt="OptListing Dashboard - Zombie Listing Finder" 
-                  className="w-full h-auto"
-                  loading="lazy"
-                />
+                <div className="relative">
+                  <img 
+                    src="/dashboard.png" 
+                    alt="OptListing Dashboard - Zombie Listing Finder" 
+                    className="w-full h-auto"
+                    loading="lazy"
+                  />
+                  
+                  {/* Privacy Blur Overlays - Top Header (User name, email) */}
+                  <div className="absolute top-[2%] right-[8%] w-[200px] h-[40px] bg-black/60 backdrop-blur-md rounded-lg border border-zinc-700/50"></div>
+                  
+                  {/* Privacy Blur Overlays - Sidebar Bottom (User info) */}
+                  <div className="absolute bottom-[8%] left-[2%] w-[180px] h-[60px] bg-black/60 backdrop-blur-md rounded-lg border border-zinc-700/50"></div>
+                  
+                  {/* Privacy Blur Overlays - Plan Banner */}
+                  <div className="absolute top-[6%] right-[15%] w-[250px] h-[30px] bg-black/60 backdrop-blur-md rounded-lg border border-zinc-700/50"></div>
+                </div>
               </div>
             </div>
           </motion.div>
