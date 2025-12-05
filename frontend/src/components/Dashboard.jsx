@@ -878,51 +878,6 @@ function Dashboard() {
               </div>
             )}
 
-            {/* Bulk Action Bar - Show for zombies view only (queue uses QueueReviewPanel) */}
-            {viewMode === 'zombies' && zombies.length > 0 && (
-              <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg p-6 mb-4">
-                <div className="flex items-center justify-between gap-4">
-                  {/* Left Side: Select All */}
-                  <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={
-                          viewMode === 'queue' 
-                            ? selectedIds.length === queue.length && queue.length > 0
-                            : selectedIds.length === zombies.length && zombies.length > 0
-                        }
-                        onChange={(e) => handleSelectAll(e.target.checked)}
-                        className="w-4 h-4 rounded border-zinc-700 dark:border-zinc-700 text-white dark:text-white focus:ring-white dark:focus:ring-white bg-zinc-800 dark:bg-zinc-800"
-                      />
-                      <span className="text-sm font-medium text-zinc-300 dark:text-zinc-300">
-                        Select All ({viewMode === 'queue' ? queue.length : zombies.length} items)
-                      </span>
-                    </label>
-                    {selectedIds.length > 0 && (
-                      <span className="text-sm text-zinc-400 dark:text-zinc-400">
-                        {selectedIds.length} item{selectedIds.length !== 1 ? 's' : ''} selected
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Right Side: Action Button */}
-                  <Button
-                    onClick={handleAddToQueue}
-                    disabled={selectedIds.length === 0}
-                    className="bg-black hover:bg-gray-900 text-white font-semibold"
-                  >
-                    <span>Add Selected to Queue</span>
-                    <span className="text-lg">➡️</span>
-                    {selectedIds.length > 0 && (
-                      <span className="ml-1 px-2 py-0.5 bg-gray-700 rounded text-xs font-bold">
-                        {selectedIds.length}
-                      </span>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            )}
 
             {/* Table - Shows different data based on viewMode */}
             {viewMode === 'queue' ? (
@@ -978,6 +933,8 @@ function Dashboard() {
                         onSelect={handleSelect}
                         onSelectAll={handleSelectAll}
                         onSourceChange={handleSourceChange}
+                        onAddToQueue={viewMode === 'zombies' ? handleAddToQueue : null}
+                        showAddToQueue={viewMode === 'zombies'}
                       />
                     </div>
                   )
