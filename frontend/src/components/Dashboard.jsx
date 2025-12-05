@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import { useStore } from '../contexts/StoreContext'
 import SummaryCard from './SummaryCard'
@@ -81,6 +82,8 @@ const DUMMY_STORE = {
 
 function Dashboard() {
   const { selectedStore } = useStore()
+  const [searchParams] = useSearchParams()
+  const viewParam = searchParams.get('view')
   // DEMO_MODE 초기 데이터 설정
   const [zombies, setZombies] = useState(DEMO_MODE ? DUMMY_ZOMBIES : [])
   const [allListings, setAllListings] = useState(DEMO_MODE ? DUMMY_ALL_LISTINGS : []) // All listings for 'all' view mode
@@ -699,6 +702,14 @@ function Dashboard() {
       fetchAllListings()
     }
   }, [selectedStore?.id, apiConnected])
+
+  // Handle URL query param for view mode
+  useEffect(() => {
+    if (viewParam === 'history') {
+      setViewMode('history')
+      fetchHistory()
+    }
+  }, [viewParam])
 
   const handleExport = async (mode, itemsToExport = null) => {
     // Use provided items or default to full queue

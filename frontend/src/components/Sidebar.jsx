@@ -46,13 +46,16 @@ function Sidebar() {
   }, [])
 
   const isActive = (path) => {
-    return location.pathname === path
+    if (path.includes('?')) {
+      const [basePath, query] = path.split('?')
+      return location.pathname === basePath && location.search === `?${query}`
+    }
+    return location.pathname === path && !location.search
   }
 
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, badge: null },
-    { path: '/listings', label: 'Listings', icon: List, badge: null },
-    { path: '/history', label: 'History', icon: History, badge: null }
+    { path: '/dashboard?view=history', label: 'History', icon: History, badge: null }
   ]
 
   return (
