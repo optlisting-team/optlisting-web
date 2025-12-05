@@ -75,25 +75,25 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
   }
 
   return (
-    <div className="opt-card p-2 px-4 relative z-50" ref={dropdownRef}>
-      <div className="flex items-center justify-between gap-3">
+    <div className="opt-card p-4 px-6 relative z-50" ref={dropdownRef}>
+      <div className="flex items-center justify-between gap-4">
         {/* Store Dropdown */}
         <div className="relative flex-1" style={{ zIndex: 9999 }}>
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="flex items-center gap-2 w-full text-left hover:bg-zinc-800/50 rounded-lg px-2 py-1 transition-all"
+            className="flex items-center gap-3 w-full text-left hover:bg-zinc-800/50 rounded-lg px-3 py-2 transition-all"
           >
-            <span className="text-sm">{getPlatformIcon(selectedStore?.platform)}</span>
-            <span className="text-xs font-bold text-white">{selectedStore?.name || 'Select Store'}</span>
+            <span className="text-xl">{getPlatformIcon(selectedStore?.platform)}</span>
+            <span className="text-base font-bold text-white">{selectedStore?.name || 'Select Store'}</span>
             {selectedStore?.connected ? (
-              <span className="flex items-center gap-1 text-[10px] text-emerald-400">
-                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+              <span className="flex items-center gap-1.5 text-xs text-emerald-400">
+                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
                 Connected
               </span>
             ) : (
-              <span className="text-[10px] text-zinc-500">Not connected</span>
+              <span className="text-xs text-zinc-500">Not connected</span>
             )}
-            <ChevronDown className={`w-3 h-3 text-zinc-500 ml-auto transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-4 h-4 text-zinc-500 ml-auto transition-transform ${isOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {/* Dropdown Menu */}
@@ -153,14 +153,14 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
 
         {/* API Status Indicator */}
         {selectedStore?.connected ? (
-          <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
-            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-[10px] font-bold text-emerald-400">LIVE</span>
+          <div className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+            <span className="text-xs font-bold text-emerald-400">LIVE</span>
           </div>
         ) : (
-          <div className="flex items-center gap-1.5 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded-md">
-            <div className="w-1.5 h-1.5 bg-zinc-500 rounded-full" />
-            <span className="text-[10px] font-bold text-zinc-500">OFFLINE</span>
+          <div className="flex items-center gap-2 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg">
+            <div className="w-2 h-2 bg-zinc-500 rounded-full" />
+            <span className="text-xs font-bold text-zinc-500">OFFLINE</span>
           </div>
         )}
 
@@ -168,25 +168,25 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
         {selectedStore?.connected ? (
           <button 
             onClick={handleDisconnect}
-            className="text-[10px] px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 font-semibold rounded border border-red-600/30 transition-all flex items-center gap-1"
+            className="text-sm px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 font-semibold rounded-lg border border-red-600/30 transition-all flex items-center gap-2"
           >
-            <Unplug className="w-3 h-3" />
+            <Unplug className="w-4 h-4" />
             Disconnect
           </button>
         ) : (
           <button 
             onClick={handleConnect}
             disabled={connecting}
-            className="text-[10px] px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded transition-all flex items-center gap-1 disabled:opacity-50"
+            className="text-sm px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-all flex items-center gap-2 disabled:opacity-50"
           >
             {connecting ? (
               <>
-                <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 Connecting...
               </>
             ) : (
               <>
-                <Plus className="w-3 h-3" />
+                <Plus className="w-4 h-4" />
                 Connect
               </>
             )}
