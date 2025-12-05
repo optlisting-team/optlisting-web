@@ -9,12 +9,12 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 // Credit Pack Options
 const CREDIT_PACKS = [
-  { id: 'credit-5', price: 5, credits: 500, perScan: 0.01, discount: 0, label: 'Starter' },
-  { id: 'credit-10', price: 10, credits: 1100, perScan: 0.0091, discount: 10, label: 'Popular', popular: true },
-  { id: 'credit-15', price: 15, credits: 1700, perScan: 0.0088, discount: 13, label: 'Value' },
-  { id: 'credit-20', price: 20, credits: 2800, perScan: 0.0071, discount: 29, label: 'Best', best: true },
-  { id: 'credit-25', price: 25, credits: 3600, perScan: 0.0069, discount: 31, label: 'Pro' },
-  { id: 'credit-50', price: 50, credits: 8000, perScan: 0.0063, discount: 37, label: 'Business' },
+  { id: 'credit-5', price: 5, credits: 1000, perScan: 0.005, discount: 0, label: 'Starter' },
+  { id: 'credit-10', price: 10, credits: 2200, perScan: 0.0045, discount: 10, label: 'Popular', popular: true },
+  { id: 'credit-15', price: 15, credits: 3400, perScan: 0.0044, discount: 13, label: 'Value' },
+  { id: 'credit-20', price: 20, credits: 5600, perScan: 0.0036, discount: 29, label: 'Best', best: true },
+  { id: 'credit-25', price: 25, credits: 7200, perScan: 0.0035, discount: 31, label: 'Pro' },
+  { id: 'credit-50', price: 50, credits: 16000, perScan: 0.0031, discount: 37, label: 'Business' },
 ]
 
 function Sidebar() {
