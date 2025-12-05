@@ -107,11 +107,11 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
     return `${formatDate(startDate)} - ${formatDate(endDate)}`
   }
 
-  // Filter input component - Ultra Compact
+  // Filter input component - Wider Layout
   const FilterInput = ({ id, label, value, onChange, icon, unit, min = 0, step = 1 }) => (
-    <div className="flex items-center gap-2 bg-zinc-900/50 rounded px-2 py-1.5 border border-zinc-800">
-      <span className="text-[10px]">{icon}</span>
-      <span className="text-[10px] text-zinc-500 uppercase">{label}</span>
+    <div className="flex items-center gap-2 bg-zinc-900/50 rounded-lg px-3 py-2 border border-zinc-800 flex-1">
+      <span className="text-sm">{icon}</span>
+      <span className="text-xs text-zinc-500 uppercase font-medium">{label}</span>
       <input
         type="number"
         id={id}
@@ -119,18 +119,18 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
         step={step}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-12 px-1 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-white text-xs font-bold text-center focus:outline-none"
+        className="flex-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-white text-sm font-bold text-center focus:outline-none focus:border-zinc-600"
       />
-      {unit && <span className="text-[10px] text-zinc-600">{unit}</span>}
+      {unit && <span className="text-xs text-zinc-600">{unit}</span>}
     </div>
   )
 
   return (
-    <div className="opt-card p-2 opacity-0 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+    <div className="opt-card p-4 opacity-0 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
       <form onSubmit={handleSubmit}>
-        {/* Single Row Layout */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Filters - Inline */}
+        {/* Filters Row - Wide Layout */}
+        <div className="flex items-center gap-3 mb-4">
+          {/* Filters - Spread out */}
           <FilterInput id="analysisPeriod" label="Days" value={analysisPeriod} onChange={setAnalysisPeriod} icon="📅" unit="d" min={1} />
           <FilterInput id="maxSales" label="Sales" value={maxSales} onChange={setMaxSales} icon="💰" />
           <FilterInput id="maxWatches" label="Watch" value={maxWatches} onChange={setMaxWatches} icon="❤️" />
@@ -142,27 +142,27 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
             type="button"
             onClick={handleReset}
             disabled={loading}
-            className="px-2 py-1.5 text-[10px] text-zinc-400 hover:text-white transition-all"
+            className="ml-auto px-3 py-1.5 text-xs text-zinc-400 hover:text-white transition-all"
           >
             Reset
           </button>
-
-          {/* Find Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="ml-auto flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-orange-500 text-white text-xs font-bold rounded-lg hover:from-red-500 hover:to-orange-400 disabled:opacity-50 transition-all shadow-lg shadow-red-500/30"
-          >
-            {loading ? (
-              <RotateCw className="w-3 h-3 animate-spin" />
-            ) : (
-              <>
-                <span>🔬</span>
-                <span>Find Zombies</span>
-              </>
-            )}
-          </button>
         </div>
+
+        {/* Find Zombies Button - Large, Below */}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-red-600 to-orange-500 text-white text-base font-bold rounded-xl hover:from-red-500 hover:to-orange-400 disabled:opacity-50 transition-all shadow-lg shadow-red-500/30"
+        >
+          {loading ? (
+            <RotateCw className="w-5 h-5 animate-spin" />
+          ) : (
+            <>
+              <span className="text-xl">🔬</span>
+              <span>Find Zombies</span>
+            </>
+          )}
+        </button>
       </form>
     </div>
   )
