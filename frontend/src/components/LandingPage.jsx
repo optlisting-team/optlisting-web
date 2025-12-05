@@ -529,31 +529,10 @@ function LandingPage() {
                 </div>
               </div>
               
-              {/* Walmart */}
-              <div className="flex flex-col items-center gap-2">
-                <div className="h-12 w-28 bg-white rounded-lg flex items-center justify-center p-2 shadow-lg">
-                  <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/walmart.svg" alt="Walmart" className="h-7 w-auto" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class="text-zinc-900 font-bold text-xs">Walmart</span>'; }} />
-                </div>
-              </div>
-              
-              {/* Home Depot */}
-              <div className="flex flex-col items-center gap-2">
-                <div className="h-12 w-28 bg-white rounded-lg flex items-center justify-center p-2 shadow-lg">
-                  <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/homedepot.svg" alt="Home Depot" className="h-7 w-auto" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class="text-zinc-900 font-bold text-xs">Home Depot</span>'; }} />
-                </div>
-              </div>
-              
               {/* Wholesale2B */}
               <div className="flex flex-col items-center gap-2">
                 <div className="h-12 w-28 bg-zinc-800 border border-zinc-700 rounded-lg flex items-center justify-center p-2 shadow-lg">
                   <span className="text-white font-bold text-xs">W2B</span>
-                </div>
-              </div>
-              
-              {/* Costway */}
-              <div className="flex flex-col items-center gap-2">
-                <div className="h-12 w-28 bg-zinc-800 border border-zinc-700 rounded-lg flex items-center justify-center p-2 shadow-lg">
-                  <span className="text-white font-bold text-xs">Costway</span>
                 </div>
               </div>
             </div>
