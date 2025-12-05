@@ -574,6 +574,10 @@ function Dashboard() {
     setZombies(zombies.filter(z => !selectedIds.includes(z.id)))
     setSelectedIds([])
     setTotalZombies(totalZombies - selectedItems.length)
+    
+    // 바로 Queue 뷰로 이동
+    setViewMode('queue')
+    setShowFilter(false)
   }
 
   const handleRemoveFromQueueBulk = () => {
@@ -943,8 +947,8 @@ function Dashboard() {
             )}
             </div>
 
-            {/* Right Column (Fixed Width) - Delete Queue - Show only when queue has items */}
-            {viewMode === 'zombies' && queue.length > 0 && (
+            {/* Right Column - Removed: Queue panel now accessed via Queue card */}
+            {false && viewMode === 'zombies' && queue.length > 0 && (
               <div className="w-80 flex-shrink-0 transition-all duration-300">
                 <div className="sticky top-4">
                   <DeleteQueue
