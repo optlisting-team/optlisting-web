@@ -318,10 +318,19 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                   Price
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  Age
+                  <span title="Days Listed">Age</span>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  Watches
+                  <span title="Total Sales">Sales</span>
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                  <span title="Watch Count">Watches</span>
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                  <span title="Search Impressions">Imp</span>
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                  <span title="Page Views">Views</span>
                 </th>
               </tr>
             </thead>
@@ -400,10 +409,19 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                     {formatPrice(zombie.price)}
                   </td>
                   <td className="px-4 py-4 text-sm text-zinc-400">
-                    {formatDate(zombie.date_listed)}
+                    {zombie.days_listed || 'N/A'}d
+                  </td>
+                  <td className="px-4 py-4 text-sm text-zinc-400 data-value">
+                    {zombie.total_sales || 0}
                   </td>
                   <td className="px-4 py-4 text-sm text-zinc-400 data-value">
                     {zombie.watch_count || 0}
+                  </td>
+                  <td className="px-4 py-4 text-sm text-zinc-400 data-value">
+                    {zombie.impressions || 0}
+                  </td>
+                  <td className="px-4 py-4 text-sm text-zinc-400 data-value">
+                    {zombie.views || 0}
                   </td>
                 </tr>
               ))}
