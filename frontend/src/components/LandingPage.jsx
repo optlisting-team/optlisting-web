@@ -640,10 +640,6 @@ function LandingPage() {
                         <Check className="w-3 h-3 text-cyan-400" />
                         <span className="text-zinc-300">CSV Export</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Check className="w-3 h-3 text-emerald-400" />
-                        <span className="text-emerald-300">Rollover ✨</span>
-                      </div>
                     </div>
 
                     <a
