@@ -580,6 +580,30 @@ function Dashboard() {
     setShowFilter(false)
   }
 
+  const handleMoveToZombies = (itemIds = null) => {
+    // Move items from all listings to zombies (manual zombie flagging)
+    const idsToMove = itemIds ? (Array.isArray(itemIds) ? itemIds : [itemIds]) : selectedIds
+    if (idsToMove.length === 0) return
+    
+    const itemsToMove = allListings.filter(item => idsToMove.includes(item.id))
+    // Mark as zombie
+    const markedItems = itemsToMove.map(item => ({ ...item, is_zombie: true, zombie_score: 100 }))
+    
+    // Add to zombies list
+    setZombies([...zombies, ...markedItems])
+    setTotalZombies(totalZombies + markedItems.length)
+    
+    // Remove from all listings
+    setAllListings(allListings.filter(item => !idsToMove.includes(item.id)))
+    setTotalListings(totalListings - markedItems.length)
+    
+    setSelectedIds([])
+    
+    // Navigate to zombies view
+    setViewMode('zombies')
+    setShowFilter(true)
+  }
+
   const handleRemoveFromQueueBulk = () => {
     // Remove selected items from queue (restore to candidates)
     if (viewMode !== 'queue') return
@@ -937,6 +961,8 @@ function Dashboard() {
                         onSourceChange={handleSourceChange}
                         onAddToQueue={viewMode === 'zombies' ? handleAddToQueue : null}
                         showAddToQueue={viewMode === 'zombies'}
+                        onMoveToZombies={viewMode === 'all' ? handleMoveToZombies : null}
+                        showMoveToZombies={viewMode === 'all'}
                       />
                     </div>
                   )

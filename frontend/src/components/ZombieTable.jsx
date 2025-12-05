@@ -96,7 +96,7 @@ function RecommendationBadge({ recommendation }) {
   )
 }
 
-function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChange, onAddToQueue, showAddToQueue = false }) {
+function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChange, onAddToQueue, showAddToQueue = false, onMoveToZombies, showMoveToZombies = false }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [rowsPerPage, setRowsPerPage] = useState(50)
@@ -191,7 +191,7 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
     <div className="w-full">
       {/* Search, Selection Info, and Action Controls */}
       <div className="flex items-center justify-between gap-4 mb-4">
-        {/* Left: Add to Queue & Selection Info */}
+        {/* Left: Action Buttons & Selection Info */}
         <div className="flex items-center gap-3">
           {showAddToQueue && (
             <button
@@ -203,6 +203,21 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
               <span>➡️</span>
               {selectedIds.length > 0 && (
                 <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded text-xs font-bold">
+                  {selectedIds.length}
+                </span>
+              )}
+            </button>
+          )}
+          {showMoveToZombies && (
+            <button
+              onClick={() => onMoveToZombies()}
+              disabled={selectedIds.length === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-orange-500 text-white text-sm font-semibold rounded-lg hover:from-red-500 hover:to-orange-400 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md"
+            >
+              <span>🧟</span>
+              <span>Move to Zombies</span>
+              {selectedIds.length > 0 && (
+                <span className="px-1.5 py-0.5 bg-white/20 rounded text-xs font-bold">
                   {selectedIds.length}
                 </span>
               )}
@@ -285,7 +300,7 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                   <span className="text-red-400">Zombie Score</span>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  Recommendation
+                  {showMoveToZombies ? 'Action' : 'Recommendation'}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
                   Supplier
@@ -352,7 +367,17 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                     <ZombieScoreBadge score={zombie.zombieScore} />
                   </td>
                   <td className="px-4 py-4">
-                    <RecommendationBadge recommendation={zombie.recommendation} />
+                    {showMoveToZombies ? (
+                      <button
+                        onClick={() => onMoveToZombies(zombie.id)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-semibold hover:bg-red-500/30 transition-all"
+                      >
+                        <span>🧟</span>
+                        <span>To Zombie</span>
+                      </button>
+                    ) : (
+                      <RecommendationBadge recommendation={zombie.recommendation} />
+                    )}
                   </td>
                   <td className="px-4 py-4">
                     <SourceBadge 
