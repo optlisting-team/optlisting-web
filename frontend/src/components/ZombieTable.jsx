@@ -199,7 +199,7 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
               disabled={selectedIds.length === 0}
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-zinc-800 to-zinc-700 text-white text-sm font-semibold rounded-lg hover:from-zinc-700 hover:to-zinc-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all border border-zinc-600"
             >
-              <span>Add to Queue</span>
+              <span>Add to CSV</span>
               <span>➡️</span>
               {selectedIds.length > 0 && (
                 <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded text-xs font-bold">

@@ -286,13 +286,13 @@ function SummaryCard({
           <div className={`text-[10px] uppercase ${totalZombies > 0 ? 'text-red-400' : 'text-zinc-500'}`}>Zombies</div>
         </div>
 
-        {/* 3. In Queue - Selected for deletion */}
+        {/* 3. CSV Export - Selected for export */}
         <div 
           onClick={() => handleCardClick('queue')}
           className={`opt-card p-3 cursor-pointer transition-all text-center hover:bg-zinc-800/50 ${viewMode === 'queue' ? 'ring-1 ring-orange-500/50' : ''}`}
         >
           <div className={`text-2xl font-black ${queueCount > 0 ? 'text-orange-400' : 'text-white'}`}>{queueCount || 0}</div>
-          <div className="text-[10px] text-zinc-500 uppercase">Queue</div>
+          <div className="text-[10px] text-zinc-500 uppercase">CSV Export</div>
         </div>
 
         {/* 4. Removed - Final destination */}
