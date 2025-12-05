@@ -794,22 +794,22 @@ function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-4 bg-slate-900 text-white">
+      <footer className="py-12 px-4 bg-black dark:bg-black border-t border-zinc-800">
         <div className="container mx-auto max-w-6xl">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-4 md:mb-0">
               <div className="flex items-center space-x-3 mb-2">
-                <div className="p-2 bg-blue-600 rounded-lg">
+                <div className="p-2 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg shadow-lg shadow-blue-500/20">
                   <Zap className="h-5 w-5 text-white" />
                 </div>
-                <span className="text-xl font-bold">OptListing</span>
+                <span className="text-xl font-bold text-white dark:text-white">OptListing</span>
               </div>
-              <p className="text-gray-400 text-sm">© 2026 OptListing. All rights reserved.</p>
+              <p className="text-zinc-400 dark:text-zinc-400 text-sm">© 2026 OptListing. All rights reserved.</p>
             </div>
             <div className="flex gap-6">
-              <a href="#support" className="text-gray-400 hover:text-white transition-colors">Support</a>
-              <Link to="/terms" className="text-gray-400 hover:text-white transition-colors">Terms</Link>
-              <Link to="/privacy" className="text-gray-400 hover:text-white transition-colors">Privacy</Link>
+              <a href="#support" className="text-zinc-400 dark:text-zinc-400 hover:text-white dark:hover:text-white transition-colors">Support</a>
+              <Link to="/terms" className="text-zinc-400 dark:text-zinc-400 hover:text-white dark:hover:text-white transition-colors">Terms</Link>
+              <Link to="/privacy" className="text-zinc-400 dark:text-zinc-400 hover:text-white dark:hover:text-white transition-colors">Privacy</Link>
             </div>
           </div>
         </div>
