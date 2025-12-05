@@ -306,7 +306,7 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                   Title
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  <span className="text-red-400">Interest Score</span>
+                  <span className="text-red-400">Performance Score</span>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
                   {showMoveToZombies ? 'Action' : 'Recommendation'}
