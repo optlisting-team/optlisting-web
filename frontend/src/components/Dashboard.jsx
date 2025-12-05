@@ -362,19 +362,19 @@ function Dashboard() {
         // Fallback: Try existing analyze endpoint (DB data)
         try {
           console.log('⚠️ Falling back to DB data...')
-          const params = {
-            user_id: CURRENT_USER_ID,
+      const params = {
+        user_id: CURRENT_USER_ID,
             store_id: selectedStore?.id,
             marketplace: 'eBay',
             min_days: filterParams.analytics_period_days || filterParams.min_days || 7,
-            max_sales: filterParams.max_sales || 0,
+        max_sales: filterParams.max_sales || 0,
             max_watch_count: filterParams.max_watches || filterParams.max_watch_count || 0
-          }
-          
-          const response = await axios.get(`${API_BASE_URL}/api/analyze`, { params })
+      }
+      
+      const response = await axios.get(`${API_BASE_URL}/api/analyze`, { params })
           setZombies(response.data.zombies || [])
           setTotalZombies(response.data.zombie_count || 0)
-          setTotalListings(response.data.total_count || 0)
+      setTotalListings(response.data.total_count || 0)
           setTotalBreakdown(response.data.total_breakdown || {})
           setPlatformBreakdown(response.data.platform_breakdown || { eBay: 0 })
           setZombieBreakdown(response.data.zombie_breakdown || {})
@@ -715,9 +715,9 @@ function Dashboard() {
         await fetchUserCredits()
         
         // Step 3: Fetch history only (listings require store connection)
-        fetchHistory().catch(err => {
-          console.error('History fetch error on mount:', err)
-        })
+    fetchHistory().catch(err => {
+      console.error('History fetch error on mount:', err)
+    })
         
         // Note: fetchAllListings() is called when store is connected via handleStoreConnection
       }
@@ -841,16 +841,16 @@ function Dashboard() {
               <div className="flex items-center gap-3">
                 <span className="text-xs text-zinc-500">🔍 Filter:</span>
                 <div className="flex-1">
-                  <FilterBar 
-                    onApplyFilter={(newFilters) => {
-                      setFilters(newFilters)
-                      fetchZombies(newFilters)
-                      setViewMode('zombies')
-                    }}
-                    onSync={handleSync}
-                    loading={loading}
-                    initialFilters={filters}
-                  />
+              <FilterBar 
+                onApplyFilter={(newFilters) => {
+                  setFilters(newFilters)
+                  fetchZombies(newFilters)
+                  setViewMode('zombies')
+                }}
+                onSync={handleSync}
+                loading={loading}
+                initialFilters={filters}
+              />
                 </div>
                 <button 
                   onClick={() => setShowFilter(false)}
@@ -913,7 +913,7 @@ function Dashboard() {
                   
                   {/* Inline Filter for Active View */}
                   <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3">
-                    <FilterBar 
+                <FilterBar 
                       onApplyFilter={(newFilters) => {
                         setFilters(newFilters)
                         // Filter allListings locally
@@ -929,9 +929,9 @@ function Dashboard() {
                         setTotalZombies(filtered.length)
                         setViewMode('zombies')
                       }}
-                      loading={loading}
-                      initialFilters={filters}
-                    />
+                  loading={loading}
+                  initialFilters={filters}
+                />
                   </div>
                 </div>
               )}

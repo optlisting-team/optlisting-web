@@ -393,8 +393,8 @@ function SummaryCard({
         {/* Left: Title */}
         <h2 className="text-sm font-semibold text-zinc-400 tracking-wide flex items-center gap-2">
           <span className="w-1 h-4 bg-gradient-to-b from-blue-500 to-cyan-500 rounded-full" />
-          Store Analytics
-        </h2>
+            Store Analytics
+          </h2>
         
         {/* Right: Compact Badges */}
         <div className="flex items-center gap-2">
@@ -414,8 +414,8 @@ function SummaryCard({
             <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
               <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
               <span className="text-[10px] font-bold text-emerald-400">LIVE</span>
-            </div>
-          ) : (
+          </div>
+        ) : (
             <div className="flex items-center gap-1.5 px-2 py-1 bg-red-500/10 border border-red-500/20 rounded-md">
               <div className="w-1.5 h-1.5 bg-red-500 rounded-full" />
               <span className="text-[10px] font-bold text-red-400">{apiError || 'Offline'}</span>
@@ -423,7 +423,7 @@ function SummaryCard({
           )}
         </div>
       </div>
-      
+
       
       {/* Your Store - With Dropdown */}
       <StoreSelector 
@@ -462,7 +462,7 @@ function SummaryCard({
         >
           <div className={`text-4xl font-black ${totalZombies > 0 ? 'text-red-400' : 'text-white'}`}>{totalZombies || 0}</div>
           <div className={`text-sm uppercase mt-1 ${totalZombies > 0 ? 'text-red-400' : 'text-zinc-500'}`}>Zombies</div>
-        </div>
+      </div>
 
         {/* 3. CSV Export - Selected for export */}
         <div 
@@ -471,7 +471,7 @@ function SummaryCard({
         >
           <div className={`text-4xl font-black ${queueCount > 0 ? 'text-orange-400' : 'text-white'}`}>{queueCount || 0}</div>
           <div className="text-sm text-zinc-500 uppercase mt-1">CSV Export</div>
-        </div>
+            </div>
 
         {/* 4. Removed - Final destination */}
         <div 
@@ -480,8 +480,8 @@ function SummaryCard({
         >
           <div className={`text-4xl font-black ${totalDeleted > 0 ? 'text-emerald-400' : 'text-white'}`}>{totalDeleted || 0}</div>
           <div className="text-sm text-zinc-500 uppercase mt-1">Removed</div>
-        </div>
-      </div>
+              </div>
+            </div>
 
       {/* Filter Panel Slot */}
       {filterContent}

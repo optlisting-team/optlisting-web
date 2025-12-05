@@ -804,8 +804,8 @@ function LandingPage() {
             </div>
             <div className="flex gap-6">
               <a href="#support" className="text-gray-400 hover:text-white transition-colors">Support</a>
-              <a href="#terms" className="text-gray-400 hover:text-white transition-colors">Terms</a>
-              <a href="#privacy" className="text-gray-400 hover:text-white transition-colors">Privacy</a>
+              <Link to="/terms" className="text-gray-400 hover:text-white transition-colors">Terms</Link>
+              <Link to="/privacy" className="text-gray-400 hover:text-white transition-colors">Privacy</Link>
             </div>
           </div>
         </div>
