@@ -1,15 +1,24 @@
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import StoreSwitcher from './StoreSwitcher'
-import { LayoutDashboard, List, History, User, Zap, CreditCard, Settings, ChevronRight } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
+import { LayoutDashboard, List, History, User, Zap, CreditCard, Settings, ChevronRight, LogOut } from 'lucide-react'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 function Sidebar() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { user, signOut, isAuthenticated } = useAuth()
   const [credits, setCredits] = useState(null)
   const [plan, setPlan] = useState('FREE')
   const [apiStatus, setApiStatus] = useState('checking')
+
+  // 로그아웃 핸들러
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/login')
+  }
 
   // Fetch credits on mount
   useEffect(() => {
@@ -203,38 +212,35 @@ function Sidebar() {
         {/* User Info */}
         <div className="flex items-center gap-3 mb-3 px-1">
           <div className="relative">
-            <div className="w-10 h-10 bg-gradient-to-br from-zinc-700 to-zinc-800 rounded-xl flex items-center justify-center border border-zinc-600">
-              <User className="w-5 h-5 text-zinc-400" />
-            </div>
+            {user?.user_metadata?.avatar_url ? (
+              <img 
+                src={user.user_metadata.avatar_url} 
+                alt="Profile" 
+                className="w-10 h-10 rounded-xl object-cover border border-zinc-600"
+              />
+            ) : (
+              <div className="w-10 h-10 bg-gradient-to-br from-zinc-700 to-zinc-800 rounded-xl flex items-center justify-center border border-zinc-600">
+                <User className="w-5 h-5 text-zinc-400" />
+              </div>
+            )}
             <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-zinc-950" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-white truncate">CEO</p>
-            <p className="text-xs text-zinc-500 truncate">user@example.com</p>
+            <p className="text-sm font-semibold text-white truncate">
+              {user?.user_metadata?.full_name || user?.user_metadata?.name || 'User'}
+            </p>
+            <p className="text-xs text-zinc-500 truncate">
+              {user?.email || 'Not signed in'}
+            </p>
           </div>
-        </div>
-
-        {/* RLS Test: User Info Display */}
-        <div className="mb-3 p-3 bg-zinc-900/50 rounded-lg border border-zinc-800/50">
-          <div className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-2">
-            RLS Auth Info
-          </div>
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-zinc-500">user_id:</span>
-              <span className="text-[10px] text-zinc-300 font-mono">default-user</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-zinc-500">email:</span>
-              <span className="text-[10px] text-zinc-300 font-mono truncate max-w-[120px]">user@example.com</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-zinc-500">plan:</span>
-              <span className={`text-[10px] font-bold ${
-                plan === 'PRO' ? 'text-amber-400' : plan === 'BUSINESS' ? 'text-purple-400' : 'text-zinc-300'
-              }`}>{plan}</span>
-            </div>
-          </div>
+          {/* Logout Button */}
+          <button
+            onClick={handleSignOut}
+            className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+            title="Sign Out"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Plan Badge */}

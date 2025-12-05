@@ -626,3 +626,349 @@ async def ebay_oauth_config():
         "frontend_url": FRONTEND_URL,
         "scopes": EBAY_SCOPES
     }
+
+
+# =====================================================
+# eBay Listings API - 리스팅 가져오기
+# =====================================================
+
+# eBay API Base URLs
+EBAY_API_ENDPOINTS = {
+    "SANDBOX": {
+        "sell_inventory": "https://api.sandbox.ebay.com/sell/inventory/v1",
+        "sell_analytics": "https://api.sandbox.ebay.com/sell/analytics/v1",
+        "trading": "https://api.sandbox.ebay.com/ws/api.dll"
+    },
+    "PRODUCTION": {
+        "sell_inventory": "https://api.ebay.com/sell/inventory/v1",
+        "sell_analytics": "https://api.ebay.com/sell/analytics/v1",
+        "trading": "https://api.ebay.com/ws/api.dll"
+    }
+}
+
+
+def get_user_access_token(user_id: str) -> Optional[str]:
+    """
+    DB에서 사용자의 eBay access token 가져오기
+    토큰이 만료됐으면 refresh token으로 갱신
+    """
+    try:
+        from .models import get_db, Profile
+        
+        db = next(get_db())
+        profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+        
+        if not profile or not profile.ebay_access_token:
+            return None
+        
+        # 토큰 만료 확인
+        if profile.ebay_token_expires_at and profile.ebay_token_expires_at < datetime.utcnow():
+            # 토큰 갱신 필요
+            if profile.ebay_refresh_token:
+                new_token = refresh_access_token(profile.ebay_refresh_token)
+                if new_token:
+                    # DB 업데이트
+                    profile.ebay_access_token = new_token["access_token"]
+                    profile.ebay_token_expires_at = datetime.utcnow() + timedelta(seconds=new_token.get("expires_in", 7200))
+                    profile.ebay_token_updated_at = datetime.utcnow()
+                    db.commit()
+                    return new_token["access_token"]
+            return None
+        
+        return profile.ebay_access_token
+        
+    except Exception as e:
+        logger.error(f"Error getting access token: {e}")
+        return None
+
+
+def refresh_access_token(refresh_token: str) -> Optional[Dict]:
+    """
+    Refresh token으로 새 access token 발급
+    """
+    try:
+        env = EBAY_ENVIRONMENT if EBAY_ENVIRONMENT in EBAY_AUTH_ENDPOINTS else "PRODUCTION"
+        token_url = EBAY_AUTH_ENDPOINTS[env]["token"]
+        
+        credentials = f"{EBAY_CLIENT_ID}:{EBAY_CLIENT_SECRET}"
+        encoded_credentials = base64.b64encode(credentials.encode()).decode()
+        
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Authorization": f"Basic {encoded_credentials}"
+        }
+        
+        data = {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "scope": " ".join(EBAY_SCOPES)
+        }
+        
+        response = requests.post(token_url, headers=headers, data=data, timeout=30)
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.error(f"Token refresh failed: {response.status_code} - {response.text}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Token refresh error: {e}")
+        return None
+
+
+@router.get("/listings")
+async def get_ebay_listings(
+    user_id: str = Query(..., description="User ID"),
+    limit: int = Query(100, description="Number of listings to fetch", ge=1, le=500),
+    offset: int = Query(0, description="Offset for pagination", ge=0)
+):
+    """
+    📦 eBay Active Listings 가져오기
+    
+    사용자의 eBay 스토어에서 활성 리스팅 목록을 가져옵니다.
+    - 제목, 가격, SKU, 수량
+    - 등록일, 조회수, 관심목록 수
+    """
+    logger.info("=" * 60)
+    logger.info(f"📦 Fetching eBay listings for user: {user_id}")
+    
+    # Access Token 가져오기
+    access_token = get_user_access_token(user_id)
+    
+    if not access_token:
+        logger.error("❌ No valid access token found")
+        raise HTTPException(
+            status_code=401,
+            detail="eBay not connected or token expired. Please reconnect your eBay account."
+        )
+    
+    try:
+        # eBay Sell Inventory API 호출
+        env = EBAY_ENVIRONMENT if EBAY_ENVIRONMENT in EBAY_API_ENDPOINTS else "PRODUCTION"
+        inventory_url = f"{EBAY_API_ENDPOINTS[env]['sell_inventory']}/inventory_item"
+        
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        
+        params = {
+            "limit": limit,
+            "offset": offset
+        }
+        
+        logger.info(f"   Calling: {inventory_url}")
+        response = requests.get(inventory_url, headers=headers, params=params, timeout=30)
+        
+        if response.status_code == 401:
+            logger.error("❌ Access token invalid or expired")
+            raise HTTPException(status_code=401, detail="eBay token expired. Please reconnect.")
+        
+        if response.status_code != 200:
+            logger.error(f"❌ eBay API error: {response.status_code} - {response.text}")
+            raise HTTPException(status_code=response.status_code, detail=f"eBay API error: {response.text}")
+        
+        data = response.json()
+        
+        # 리스팅 데이터 변환
+        listings = []
+        inventory_items = data.get("inventoryItems", [])
+        
+        for item in inventory_items:
+            sku = item.get("sku", "")
+            product = item.get("product", {})
+            availability = item.get("availability", {})
+            
+            listing = {
+                "sku": sku,
+                "title": product.get("title", ""),
+                "description": product.get("description", ""),
+                "brand": product.get("brand", ""),
+                "condition": item.get("condition", ""),
+                "quantity": availability.get("shipToLocationAvailability", {}).get("quantity", 0),
+                "images": product.get("imageUrls", []),
+                "aspects": product.get("aspects", {}),
+            }
+            listings.append(listing)
+        
+        logger.info(f"✅ Retrieved {len(listings)} listings")
+        logger.info("=" * 60)
+        
+        return {
+            "success": True,
+            "total": data.get("total", len(listings)),
+            "offset": offset,
+            "limit": limit,
+            "listings": listings
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error fetching listings: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/listings/active")
+async def get_active_listings_trading_api(
+    user_id: str = Query(..., description="User ID"),
+    page: int = Query(1, description="Page number", ge=1),
+    entries_per_page: int = Query(100, description="Entries per page", ge=1, le=200)
+):
+    """
+    📦 eBay Active Listings (Trading API 방식)
+    
+    GetMyeBaySelling API를 사용하여 더 상세한 판매 데이터를 가져옵니다.
+    - 조회수 (ViewCount)
+    - 관심목록 수 (WatchCount)
+    - 판매 수량 (QuantitySold)
+    - 노출 횟수 (ImpressionCount)
+    """
+    logger.info("=" * 60)
+    logger.info(f"📦 Fetching active listings (Trading API) for user: {user_id}")
+    
+    access_token = get_user_access_token(user_id)
+    
+    if not access_token:
+        raise HTTPException(status_code=401, detail="eBay not connected. Please connect your eBay account.")
+    
+    try:
+        env = EBAY_ENVIRONMENT if EBAY_ENVIRONMENT in EBAY_API_ENDPOINTS else "PRODUCTION"
+        trading_url = EBAY_API_ENDPOINTS[env]["trading"]
+        
+        # GetMyeBaySelling XML Request
+        xml_request = f"""<?xml version="1.0" encoding="utf-8"?>
+<GetMyeBaySellingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+    <RequesterCredentials>
+        <eBayAuthToken>{access_token}</eBayAuthToken>
+    </RequesterCredentials>
+    <ActiveList>
+        <Include>true</Include>
+        <Pagination>
+            <EntriesPerPage>{entries_per_page}</EntriesPerPage>
+            <PageNumber>{page}</PageNumber>
+        </Pagination>
+    </ActiveList>
+    <DetailLevel>ReturnAll</DetailLevel>
+</GetMyeBaySellingRequest>"""
+        
+        headers = {
+            "X-EBAY-API-SITEID": "0",  # US site
+            "X-EBAY-API-COMPATIBILITY-LEVEL": "1225",
+            "X-EBAY-API-CALL-NAME": "GetMyeBaySelling",
+            "X-EBAY-API-IAF-TOKEN": access_token,
+            "Content-Type": "text/xml"
+        }
+        
+        logger.info(f"   Calling Trading API: {trading_url}")
+        response = requests.post(trading_url, headers=headers, data=xml_request, timeout=60)
+        
+        if response.status_code != 200:
+            logger.error(f"❌ Trading API error: {response.status_code}")
+            raise HTTPException(status_code=response.status_code, detail="eBay Trading API error")
+        
+        # XML 파싱
+        import xml.etree.ElementTree as ET
+        root = ET.fromstring(response.text)
+        
+        # Namespace 처리
+        ns = {"ebay": "urn:ebay:apis:eBLBaseComponents"}
+        
+        # 에러 체크
+        ack = root.find(".//ebay:Ack", ns)
+        if ack is not None and ack.text != "Success":
+            errors = root.findall(".//ebay:Errors/ebay:ShortMessage", ns)
+            error_msg = errors[0].text if errors else "Unknown error"
+            logger.error(f"❌ eBay API Error: {error_msg}")
+            raise HTTPException(status_code=400, detail=f"eBay Error: {error_msg}")
+        
+        # 리스팅 파싱
+        listings = []
+        active_list = root.find(".//ebay:ActiveList", ns)
+        
+        if active_list is not None:
+            items = active_list.findall(".//ebay:Item", ns)
+            
+            for item in items:
+                # 기본 정보
+                item_id = item.findtext("ebay:ItemID", "", ns)
+                title = item.findtext("ebay:Title", "", ns)
+                
+                # 가격
+                current_price = item.find("ebay:SellingStatus/ebay:CurrentPrice", ns)
+                price = float(current_price.text) if current_price is not None and current_price.text else 0
+                
+                # 수량
+                quantity = int(item.findtext("ebay:QuantityAvailable", "0", ns))
+                quantity_sold = int(item.findtext("ebay:SellingStatus/ebay:QuantitySold", "0", ns))
+                
+                # 통계
+                watch_count = int(item.findtext("ebay:WatchCount", "0", ns))
+                hit_count = int(item.findtext("ebay:HitCount", "0", ns))  # 조회수
+                
+                # 날짜
+                start_time = item.findtext("ebay:ListingDetails/ebay:StartTime", "", ns)
+                end_time = item.findtext("ebay:ListingDetails/ebay:EndTime", "", ns)
+                
+                # SKU
+                sku = item.findtext("ebay:SKU", "", ns)
+                
+                # 이미지
+                picture_url = item.findtext("ebay:PictureDetails/ebay:PictureURL", "", ns)
+                
+                listing = {
+                    "item_id": item_id,
+                    "ebay_item_id": item_id,
+                    "title": title,
+                    "price": price,
+                    "quantity_available": quantity,
+                    "quantity_sold": quantity_sold,
+                    "watch_count": watch_count,
+                    "view_count": hit_count,
+                    "impressions": 0,  # Trading API에서는 제공 안 됨, Analytics API 필요
+                    "sku": sku,
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "picture_url": picture_url,
+                    "days_listed": 0  # 계산 필요
+                }
+                
+                # days_listed 계산
+                if start_time:
+                    try:
+                        from dateutil import parser
+                        start_date = parser.parse(start_time)
+                        listing["days_listed"] = (datetime.utcnow() - start_date.replace(tzinfo=None)).days
+                    except:
+                        pass
+                
+                listings.append(listing)
+        
+        # 페이지네이션 정보
+        pagination = active_list.find("ebay:PaginationResult", ns) if active_list is not None else None
+        total_entries = int(pagination.findtext("ebay:TotalNumberOfEntries", "0", ns)) if pagination is not None else len(listings)
+        total_pages = int(pagination.findtext("ebay:TotalNumberOfPages", "1", ns)) if pagination is not None else 1
+        
+        logger.info(f"✅ Retrieved {len(listings)} active listings (Page {page}/{total_pages})")
+        logger.info("=" * 60)
+        
+        return {
+            "success": True,
+            "total": total_entries,
+            "page": page,
+            "total_pages": total_pages,
+            "entries_per_page": entries_per_page,
+            "listings": listings
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))

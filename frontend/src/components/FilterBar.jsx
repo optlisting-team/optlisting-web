@@ -326,6 +326,7 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
               <span className="text-xl">→</span>
             </>
           )}
+        </button>
       </form>
     </div>
   )
