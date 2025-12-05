@@ -579,7 +579,7 @@ function LandingPage() {
                     <div className="space-y-1.5 mb-3 text-xs">
                       <div className="flex items-center gap-2">
                         <Check className="w-3 h-3 text-amber-400" />
-                        <span className="text-zinc-300">All Connected Stores</span>
+                        <span className="text-zinc-300">All Stores (We Support)</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Check className="w-3 h-3 text-emerald-400" />
