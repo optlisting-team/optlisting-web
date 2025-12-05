@@ -224,22 +224,19 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* Statistics Section - Key Metrics */}
-      <section className="py-20 px-4 bg-zinc-900 dark:bg-zinc-900 border-y border-zinc-800 dark:border-zinc-800">
+      {/* Features Section */}
+      <section className="py-24 px-4 bg-black dark:bg-black" id="features">
         <div className="container mx-auto max-w-6xl">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="text-center mb-12"
+            className="text-center mb-20"
           >
-            <h2 className="text-3xl md:text-4xl font-bold text-white dark:text-white mb-4 font-sans">
-              Trusted by eBay Sellers Worldwide
+            <h2 className="text-4xl md:text-5xl font-bold text-white dark:text-white mb-4 font-sans">
+              Features
             </h2>
-            <p className="text-lg text-zinc-400 dark:text-zinc-400 max-w-2xl mx-auto font-sans">
-              Real results from real sellers
-            </p>
           </motion.div>
 
           <motion.div
@@ -247,54 +244,45 @@ function LandingPage() {
             initial="initial"
             whileInView="animate"
             viewport={{ once: true }}
-            className="grid md:grid-cols-4 gap-6"
+            className="grid md:grid-cols-3 gap-10"
           >
             <motion.div
               variants={fadeInUp}
-              className="bg-zinc-800/50 dark:bg-zinc-800/50 p-6 rounded-2xl border border-zinc-700 dark:border-zinc-700 text-center"
+              className="bg-zinc-900 dark:bg-zinc-900 p-10 rounded-2xl border border-zinc-800 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all"
             >
-              <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Clock className="h-6 w-6 text-blue-400" />
+              <div className="w-16 h-16 bg-zinc-800 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-6">
+                <RefreshCw className="h-8 w-8 text-white dark:text-white" />
               </div>
-              <div className="text-4xl font-bold text-white dark:text-white mb-2 font-sans">Under 5 min</div>
-              <div className="text-sm text-zinc-400 dark:text-zinc-400 font-sans">Average Detection Time</div>
-              <div className="text-xs text-zinc-500 dark:text-zinc-500 mt-1 font-sans">vs. hours manually</div>
+              <h3 className="text-2xl font-bold text-white dark:text-white mb-4 font-sans">Market Listings Auto-Sync</h3>
+              <p className="text-zinc-400 dark:text-zinc-400 text-lg leading-relaxed font-sans">
+                Automatically fetch and sync your marketplace listings in real-time.
+              </p>
             </motion.div>
 
             <motion.div
               variants={fadeInUp}
-              className="bg-zinc-800/50 dark:bg-zinc-800/50 p-6 rounded-2xl border border-zinc-700 dark:border-zinc-700 text-center"
+              className="bg-zinc-900 dark:bg-zinc-900 p-10 rounded-2xl border border-zinc-800 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all"
             >
-              <div className="w-12 h-12 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Target className="h-6 w-6 text-emerald-400" />
+              <div className="w-16 h-16 bg-zinc-800 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-6">
+                <Filter className="h-8 w-8 text-white dark:text-white" />
               </div>
-              <div className="text-4xl font-bold text-white dark:text-white mb-2 font-sans">95%+</div>
-              <div className="text-sm text-zinc-400 dark:text-zinc-400 font-sans">Detection Accuracy</div>
-              <div className="text-xs text-zinc-500 dark:text-zinc-500 mt-1 font-sans">Based on sales data</div>
+              <h3 className="text-2xl font-bold text-white dark:text-white mb-4 font-sans">Real-Time Low-Performance Filtering</h3>
+              <p className="text-zinc-400 dark:text-zinc-400 text-lg leading-relaxed font-sans">
+                Instantly identify underperforming products based on sales, views, and engagement metrics.
+              </p>
             </motion.div>
 
             <motion.div
               variants={fadeInUp}
-              className="bg-zinc-800/50 dark:bg-zinc-800/50 p-6 rounded-2xl border border-zinc-700 dark:border-zinc-700 text-center"
+              className="bg-zinc-900 dark:bg-zinc-900 p-10 rounded-2xl border border-zinc-800 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all"
             >
-              <div className="w-12 h-12 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <BarChart3 className="h-6 w-6 text-purple-400" />
+              <div className="w-16 h-16 bg-zinc-800 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-6">
+                <Download className="h-8 w-8 text-white dark:text-white" />
               </div>
-              <div className="text-4xl font-bold text-white dark:text-white mb-2 font-sans">2K+</div>
-              <div className="text-sm text-zinc-400 dark:text-zinc-400 font-sans">Listings Analyzed</div>
-              <div className="text-xs text-zinc-500 dark:text-zinc-500 mt-1 font-sans">This month</div>
-            </motion.div>
-
-            <motion.div
-              variants={fadeInUp}
-              className="bg-zinc-800/50 dark:bg-zinc-800/50 p-6 rounded-2xl border border-zinc-700 dark:border-zinc-700 text-center"
-            >
-              <div className="w-12 h-12 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Users className="h-6 w-6 text-amber-400" />
-              </div>
-              <div className="text-4xl font-bold text-white dark:text-white mb-2 font-sans">100+</div>
-              <div className="text-sm text-zinc-400 dark:text-zinc-400 font-sans">Active Sellers</div>
-              <div className="text-xs text-zinc-500 dark:text-zinc-500 mt-1 font-sans">Growing daily</div>
+              <h3 className="text-2xl font-bold text-white dark:text-white mb-4 font-sans">Supplier-Specific CSV Export</h3>
+              <p className="text-zinc-400 dark:text-zinc-400 text-lg leading-relaxed font-sans">
+                Export official CSV files organized by supplier for easy bulk deletion.
+              </p>
             </motion.div>
           </motion.div>
         </div>
