@@ -18,20 +18,54 @@ const CURRENT_USER_ID = "default-user" // Temporary user ID for MVP phase
 const DEMO_MODE = true
 
 // Dummy data for demo/testing
-const DUMMY_ZOMBIES = [
-  { id: '1', item_id: 'eBay-123456789', title: 'Wireless Bluetooth Headphones Premium Quality', price: 29.99, supplier: 'Amazon', supplier_name: 'Amazon', total_sales: 0, watch_count: 0, impressions: 45, views: 3, days_listed: 45, is_zombie: true, zombie_score: 85, recommendation: 'DELETE', global_winner: false, active_elsewhere: false },
-  { id: '2', item_id: 'eBay-234567890', title: 'LED Desk Lamp with USB Charging Port', price: 34.99, supplier: 'Walmart', supplier_name: 'Walmart', total_sales: 0, watch_count: 1, impressions: 67, views: 5, days_listed: 32, is_zombie: true, zombie_score: 72, recommendation: 'DELETE', global_winner: false, active_elsewhere: true },
-  { id: '3', item_id: 'eBay-345678901', title: 'Portable Phone Charger 10000mAh Power Bank', price: 19.99, supplier: 'Amazon', supplier_name: 'Amazon', total_sales: 0, watch_count: 0, impressions: 23, views: 1, days_listed: 60, is_zombie: true, zombie_score: 92, recommendation: 'DELETE', global_winner: false, active_elsewhere: false },
-  { id: '4', item_id: 'eBay-456789012', title: 'Kitchen Knife Set Stainless Steel 6-Piece', price: 45.99, supplier: 'Home Depot', supplier_name: 'Home Depot', total_sales: 0, watch_count: 2, impressions: 89, views: 8, days_listed: 21, is_zombie: true, zombie_score: 58, recommendation: 'OPTIMIZE', global_winner: true, active_elsewhere: false },
-  { id: '5', item_id: 'eBay-567890123', title: 'Yoga Mat Non-Slip Exercise Fitness Mat', price: 24.99, supplier: 'Amazon', supplier_name: 'Amazon', total_sales: 0, watch_count: 0, impressions: 34, views: 2, days_listed: 55, is_zombie: true, zombie_score: 88, recommendation: 'DELETE', global_winner: false, active_elsewhere: false },
-  { id: '6', item_id: 'eBay-678901234', title: 'Wireless Mouse Ergonomic Design 2.4GHz', price: 15.99, supplier: 'Walmart', supplier_name: 'Walmart', total_sales: 0, watch_count: 1, impressions: 56, views: 4, days_listed: 38, is_zombie: true, zombie_score: 68, recommendation: 'DELETE', global_winner: false, active_elsewhere: false },
-  { id: '7', item_id: 'eBay-789012345', title: 'Smart Watch Fitness Tracker with Heart Rate', price: 49.99, supplier: 'AliExpress', supplier_name: 'AliExpress', total_sales: 0, watch_count: 3, impressions: 112, views: 12, days_listed: 14, is_zombie: true, zombie_score: 45, recommendation: 'MONITOR', global_winner: false, active_elsewhere: true },
-  { id: '8', item_id: 'eBay-890123456', title: 'Camping Tent 4-Person Waterproof Easy Setup', price: 89.99, supplier: 'Amazon', supplier_name: 'Amazon', total_sales: 0, watch_count: 0, impressions: 28, views: 2, days_listed: 67, is_zombie: true, zombie_score: 95, recommendation: 'DELETE', global_winner: false, active_elsewhere: false },
-  { id: '9', item_id: 'eBay-901234567', title: 'Coffee Maker 12-Cup Programmable Drip', price: 39.99, supplier: 'Walmart', supplier_name: 'Walmart', total_sales: 0, watch_count: 1, impressions: 78, views: 6, days_listed: 28, is_zombie: true, zombie_score: 62, recommendation: 'OPTIMIZE', global_winner: false, active_elsewhere: false },
-  { id: '10', item_id: 'eBay-012345678', title: 'Bluetooth Speaker Portable Waterproof', price: 27.99, supplier: 'Amazon', supplier_name: 'Amazon', total_sales: 0, watch_count: 0, impressions: 41, views: 3, days_listed: 42, is_zombie: true, zombie_score: 82, recommendation: 'DELETE', global_winner: false, active_elsewhere: false },
-  { id: '11', item_id: 'eBay-111222333', title: 'Electric Toothbrush Sonic Rechargeable', price: 32.99, supplier: 'Amazon', supplier_name: 'Amazon', total_sales: 0, watch_count: 2, impressions: 95, views: 9, days_listed: 19, is_zombie: true, zombie_score: 52, recommendation: 'OPTIMIZE', global_winner: true, active_elsewhere: false },
-  { id: '12', item_id: 'eBay-222333444', title: 'Air Fryer 5.8QT Digital Touch Screen', price: 79.99, supplier: 'Costway', supplier_name: 'Costway', total_sales: 0, watch_count: 4, impressions: 134, views: 15, days_listed: 12, is_zombie: true, zombie_score: 38, recommendation: 'MONITOR', global_winner: false, active_elsewhere: true },
+// Generate 100 dummy listings
+const PRODUCT_TITLES = [
+  'Wireless Bluetooth Headphones', 'LED Desk Lamp', 'Phone Charger Power Bank', 'Kitchen Knife Set',
+  'Yoga Mat Non-Slip', 'Wireless Mouse Ergonomic', 'Smart Watch Fitness', 'Camping Tent Waterproof',
+  'Coffee Maker Programmable', 'Bluetooth Speaker', 'Electric Toothbrush', 'Air Fryer Digital',
+  'Gaming Keyboard RGB', 'Laptop Stand Adjustable', 'Webcam HD 1080p', 'USB Hub 7-Port',
+  'Portable Monitor 15.6', 'Wireless Earbuds TWS', 'Smart Plug WiFi', 'LED Strip Lights',
+  'Car Phone Mount', 'Dash Cam 4K', 'Tire Inflator Portable', 'Jump Starter Battery',
+  'Vacuum Cleaner Cordless', 'Robot Vacuum Smart', 'Steam Mop Floor Cleaner', 'Air Purifier HEPA',
+  'Humidifier Ultrasonic', 'Space Heater Ceramic', 'Electric Blanket Heated', 'Weighted Blanket 15lb',
+  'Memory Foam Pillow', 'Mattress Topper Gel', 'Bed Sheets Egyptian', 'Blackout Curtains',
+  'Smart Light Bulb', 'Security Camera WiFi', 'Video Doorbell HD', 'Smart Lock Keyless'
 ]
+const SUPPLIERS = ['Amazon', 'Walmart', 'Home Depot', 'AliExpress', 'Costway', 'CJ Dropshipping', 'Banggood']
+
+const generateDummyListings = (count) => {
+  return Array.from({ length: count }, (_, i) => {
+    const isZombie = Math.random() > 0.7 // 30% are zombies
+    const supplier = SUPPLIERS[Math.floor(Math.random() * SUPPLIERS.length)]
+    const sales = isZombie ? 0 : Math.floor(Math.random() * 50)
+    const watches = isZombie ? Math.floor(Math.random() * 3) : Math.floor(Math.random() * 20)
+    const views = isZombie ? Math.floor(Math.random() * 10) : Math.floor(Math.random() * 500)
+    const daysListed = Math.floor(Math.random() * 90) + 7
+    const zombieScore = isZombie ? Math.floor(Math.random() * 50) + 50 : Math.floor(Math.random() * 40)
+    
+    return {
+      id: String(i + 1),
+      item_id: `eBay-${100000000 + i}`,
+      title: `${PRODUCT_TITLES[i % PRODUCT_TITLES.length]} - Model ${String.fromCharCode(65 + (i % 26))}${Math.floor(i / 26) + 1}`,
+      price: Math.round((Math.random() * 150 + 10) * 100) / 100,
+      supplier,
+      supplier_name: supplier,
+      total_sales: sales,
+      watch_count: watches,
+      impressions: Math.floor(Math.random() * 200),
+      views,
+      days_listed: daysListed,
+      is_zombie: isZombie,
+      zombie_score: zombieScore,
+      recommendation: zombieScore >= 70 ? 'DELETE' : zombieScore >= 50 ? 'OPTIMIZE' : 'MONITOR',
+      global_winner: Math.random() > 0.9,
+      active_elsewhere: Math.random() > 0.8
+    }
+  })
+}
+
+const DUMMY_ALL_LISTINGS = generateDummyListings(100)
+const DUMMY_ZOMBIES = DUMMY_ALL_LISTINGS.filter(item => item.is_zombie)
 
 const DUMMY_STORE = {
   id: 'store-1',
@@ -44,11 +78,11 @@ function Dashboard() {
   const { selectedStore } = useStore()
   // DEMO_MODE 초기 데이터 설정
   const [zombies, setZombies] = useState(DEMO_MODE ? DUMMY_ZOMBIES : [])
-  const [allListings, setAllListings] = useState([]) // All listings for 'all' view mode
+  const [allListings, setAllListings] = useState(DEMO_MODE ? DUMMY_ALL_LISTINGS : []) // All listings for 'all' view mode
   const [totalZombies, setTotalZombies] = useState(DEMO_MODE ? DUMMY_ZOMBIES.length : 0)
-  const [totalListings, setTotalListings] = useState(DEMO_MODE ? 1247 : 0)
-  const [totalBreakdown, setTotalBreakdown] = useState(DEMO_MODE ? { Amazon: 523, Walmart: 312, 'Home Depot': 89, AliExpress: 156, Costway: 67, Unknown: 100 } : { Amazon: 0, Walmart: 0, Unknown: 0 })
-  const [platformBreakdown, setPlatformBreakdown] = useState(DEMO_MODE ? { eBay: 1247 } : { eBay: 0, Amazon: 0, Shopify: 0, Walmart: 0 })
+  const [totalListings, setTotalListings] = useState(DEMO_MODE ? DUMMY_ALL_LISTINGS.length : 0)
+  const [totalBreakdown, setTotalBreakdown] = useState(DEMO_MODE ? { Amazon: 30, Walmart: 20, 'Home Depot': 15, AliExpress: 15, Costway: 10, 'CJ Dropshipping': 5, Banggood: 5 } : { Amazon: 0, Walmart: 0, Unknown: 0 })
+  const [platformBreakdown, setPlatformBreakdown] = useState(DEMO_MODE ? { eBay: 100 } : { eBay: 0, Amazon: 0, Shopify: 0, Walmart: 0 })
   const [zombieBreakdown, setZombieBreakdown] = useState(DEMO_MODE ? { Amazon: 5, Walmart: 3, 'Home Depot': 1, AliExpress: 1, Costway: 1, Unknown: 1 } : {})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -342,8 +376,9 @@ function Dashboard() {
       // Demo Mode: Use dummy data
       if (DEMO_MODE) {
         await new Promise(resolve => setTimeout(resolve, 500))
-        // 더미 데이터로 전체 리스팅 설정
-        setAllListings(DUMMY_ZOMBIES) // 데모에서는 좀비 데이터를 전체 리스팅으로 사용
+        // 더미 데이터로 전체 리스팅 설정 (100개)
+        setAllListings(DUMMY_ALL_LISTINGS)
+        setTotalListings(DUMMY_ALL_LISTINGS.length)
         setLoading(false)
         return
       }
