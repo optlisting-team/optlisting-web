@@ -205,7 +205,10 @@ function Sidebar() {
 
       {/* Credits Card */}
       <div className="px-3 py-3 border-t border-zinc-800/50">
-        <div className="opt-card p-4 bg-gradient-to-br from-zinc-900 to-zinc-950">
+        <button
+          onClick={() => setShowCreditModal(true)}
+          className="w-full opt-card p-4 bg-gradient-to-br from-zinc-900 to-zinc-950 hover:from-zinc-800 hover:to-zinc-900 transition-all cursor-pointer text-left"
+        >
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
               <Zap className="w-5 h-5 text-white" />
@@ -222,7 +225,7 @@ function Sidebar() {
           <div className="mb-3">
             <div className="flex justify-between text-[10px] text-zinc-500 mb-1">
               <span>Used this month</span>
-              <span className="data-value">{credits !== null ? `${Math.max(0, 1000 - credits)} / 1000` : '...'}</span>
+              <span className="data-value">{credits !== null ? `${Math.max(0, 1000 - credits)} / 1000` : '...'}`}</span>
             </div>
             <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
               <div 
@@ -233,14 +236,11 @@ function Sidebar() {
           </div>
 
           {/* Buy More Button */}
-          <button 
-            onClick={() => setShowCreditModal(true)}
-            className="w-full py-2 text-xs font-bold text-amber-400 hover:text-amber-300 border border-amber-500/30 hover:border-amber-500/50 rounded-lg transition-colors flex items-center justify-center gap-2"
-          >
+          <div className="w-full py-2 text-xs font-bold text-amber-400 border border-amber-500/30 rounded-lg flex items-center justify-center gap-2">
             <CreditCard className="w-4 h-4" />
             Buy More Credits
-          </button>
-        </div>
+          </div>
+        </button>
       </div>
 
       {/* User Profile & Plan */}
