@@ -273,6 +273,9 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                   Platform
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                  SKU
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
                   Item ID
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider max-w-xs">
@@ -286,9 +289,6 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
                   Supplier
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  SKU
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
                   Price
@@ -325,6 +325,9 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                       </div>
                     </div>
                   </td>
+                  <td className="px-4 py-4 text-sm font-mono text-zinc-400">
+                    {zombie.sku || '-'}
+                  </td>
                   <td className="px-4 py-4 text-sm font-mono text-zinc-300">
                     {zombie.ebay_item_id || zombie.item_id || 'N/A'}
                   </td>
@@ -358,9 +361,6 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                       onSourceChange={onSourceChange}
                       itemId={zombie.id}
                     />
-                  </td>
-                  <td className="px-4 py-4 text-sm font-mono text-zinc-400">
-                    {zombie.sku || '-'}
                   </td>
                   <td className="px-4 py-4 text-sm text-white data-value">
                     {formatPrice(zombie.price)}
