@@ -453,16 +453,16 @@ function SummaryCard({
               </svg>
             </button>
           )}
-        </div>
+      </div>
 
-        {/* 2. Zombies - Click to open filter and find zombies */}
+        {/* 2. Zombies - Click to view low-performing SKUs */}
         <div 
-          onClick={() => { if (onToggleFilter) onToggleFilter(); handleCardClick('zombies'); }}
-          className={`opt-card p-6 cursor-pointer transition-all text-center hover:bg-zinc-800/50 ${viewMode === 'zombies' || showFilter ? 'ring-2 ring-red-500/50' : ''} ${totalZombies > 0 ? 'border-red-500/30' : ''}`}
+          onClick={() => handleCardClick('zombies')}
+          className={`opt-card p-6 cursor-pointer transition-all text-center hover:bg-zinc-800/50 ${viewMode === 'zombies' ? 'ring-2 ring-red-500/50' : ''} ${totalZombies > 0 ? 'border-red-500/30' : ''}`}
         >
           <div className={`text-4xl font-black ${totalZombies > 0 ? 'text-red-400' : 'text-white'}`}>{totalZombies || 0}</div>
           <div className={`text-sm uppercase mt-1 ${totalZombies > 0 ? 'text-red-400' : 'text-zinc-500'}`}>Low-Performing</div>
-      </div>
+            </div>
 
         {/* 3. CSV Export - Selected for export */}
         <div 
@@ -471,7 +471,7 @@ function SummaryCard({
         >
           <div className={`text-4xl font-black ${queueCount > 0 ? 'text-orange-400' : 'text-white'}`}>{queueCount || 0}</div>
           <div className="text-sm text-zinc-500 uppercase mt-1">CSV Export</div>
-            </div>
+              </div>
             </div>
 
       {/* Filter Panel Slot */}
