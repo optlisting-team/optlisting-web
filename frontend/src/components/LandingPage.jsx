@@ -256,9 +256,9 @@ function LandingPage() {
               <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Clock className="h-6 w-6 text-blue-400" />
               </div>
-              <div className="text-4xl font-bold text-white dark:text-white mb-2 font-sans">5 min</div>
+              <div className="text-4xl font-bold text-white dark:text-white mb-2 font-sans">Under 5 min</div>
               <div className="text-sm text-zinc-400 dark:text-zinc-400 font-sans">Average Detection Time</div>
-              <div className="text-xs text-zinc-500 dark:text-zinc-500 mt-1 font-sans">vs. 1 hour manually</div>
+              <div className="text-xs text-zinc-500 dark:text-zinc-500 mt-1 font-sans">vs. hours manually</div>
             </motion.div>
 
             <motion.div
@@ -268,7 +268,7 @@ function LandingPage() {
               <div className="w-12 h-12 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Target className="h-6 w-6 text-emerald-400" />
               </div>
-              <div className="text-4xl font-bold text-white dark:text-white mb-2 font-sans">98%</div>
+              <div className="text-4xl font-bold text-white dark:text-white mb-2 font-sans">95%+</div>
               <div className="text-sm text-zinc-400 dark:text-zinc-400 font-sans">Detection Accuracy</div>
               <div className="text-xs text-zinc-500 dark:text-zinc-500 mt-1 font-sans">Based on sales data</div>
             </motion.div>
@@ -280,7 +280,7 @@ function LandingPage() {
               <div className="w-12 h-12 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <BarChart3 className="h-6 w-6 text-purple-400" />
               </div>
-              <div className="text-4xl font-bold text-white dark:text-white mb-2 font-sans">50K+</div>
+              <div className="text-4xl font-bold text-white dark:text-white mb-2 font-sans">2K+</div>
               <div className="text-sm text-zinc-400 dark:text-zinc-400 font-sans">Listings Analyzed</div>
               <div className="text-xs text-zinc-500 dark:text-zinc-500 mt-1 font-sans">This month</div>
             </motion.div>
@@ -292,7 +292,7 @@ function LandingPage() {
               <div className="w-12 h-12 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Users className="h-6 w-6 text-amber-400" />
               </div>
-              <div className="text-4xl font-bold text-white dark:text-white mb-2 font-sans">1,200+</div>
+              <div className="text-4xl font-bold text-white dark:text-white mb-2 font-sans">100+</div>
               <div className="text-sm text-zinc-400 dark:text-zinc-400 font-sans">Active Sellers</div>
               <div className="text-xs text-zinc-500 dark:text-zinc-500 mt-1 font-sans">Growing daily</div>
             </motion.div>
