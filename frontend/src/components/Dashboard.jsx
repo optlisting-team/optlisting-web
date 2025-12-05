@@ -768,28 +768,28 @@ function Dashboard() {
           userCredits={userCredits}
           usedCredits={usedCredits}
           filterContent={showFilter && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-fade-in-up">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <span>🔍</span> Analysis Filters
-                </h3>
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3 animate-fade-in-up">
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-zinc-500">🔍 Filter:</span>
+                <div className="flex-1">
+                  <FilterBar 
+                    onApplyFilter={(newFilters) => {
+                      setFilters(newFilters)
+                      fetchZombies(newFilters)
+                      setViewMode('zombies')
+                    }}
+                    onSync={handleSync}
+                    loading={loading}
+                    initialFilters={filters}
+                  />
+                </div>
                 <button 
                   onClick={() => setShowFilter(false)}
-                  className="text-zinc-500 hover:text-white transition-colors"
+                  className="text-zinc-500 hover:text-white transition-colors text-sm"
                 >
                   ✕
                 </button>
               </div>
-              <FilterBar 
-                onApplyFilter={(newFilters) => {
-                  setFilters(newFilters)
-                  fetchZombies(newFilters)
-                  setViewMode('zombies')
-                }}
-                onSync={handleSync}
-                loading={loading}
-                initialFilters={filters}
-              />
             </div>
           )}
         />
@@ -855,12 +855,10 @@ function Dashboard() {
                 </div>
               )}
 
-            {/* Briefing Text for Low Interest Items View */}
+            {/* Compact Filter Summary for Zombies View */}
             {viewMode === 'zombies' && (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-4">
-                <p className="text-sm text-zinc-400">
-                  🔍 <strong className="text-white">Current Filter:</strong> Showing <strong className="text-blue-400">{filters.marketplace_filter === 'All' ? 'All Platforms' : `[${filters.marketplace_filter}]`}</strong> listings older than <strong className="text-white">{filters.min_days} days</strong> with <strong className="text-white">{filters.max_sales} sales</strong> and <strong className="text-white">≤ {filters.max_watch_count} views</strong>. These items have low customer interest and may need optimization.
-                </p>
+              <div className="text-xs text-zinc-500 mb-2 px-1">
+                📋 {filters.marketplace_filter} • {filters.min_days}d • {filters.max_sales} sales • ≤{filters.max_watch_count} views
               </div>
             )}
 
