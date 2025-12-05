@@ -3,30 +3,32 @@ import SourceBadge from './SourceBadge'
 import PlatformBadge from './PlatformBadge'
 import { AlertTriangle, TrendingDown, Trash2, Eye, RefreshCw } from 'lucide-react'
 
-// Calculate zombie score based on metrics
+// Calculate Performance Score based on metrics
+// Lower score = Lower performance (Zombie)
+// Higher score = Higher performance (Good)
 function calculateZombieScore(listing) {
-  let score = 0
+  let score = 100 // Start with perfect score
   
-  // Age factor (max 30 points)
+  // Age factor (subtract up to 30 points for old listings)
   const dateListed = listing.date_listed || listing.metrics?.date_listed
   if (dateListed) {
     const ageInDays = Math.floor((new Date() - new Date(dateListed)) / (1000 * 60 * 60 * 24))
-    score += Math.min(30, Math.floor(ageInDays / 3))
+    score -= Math.min(30, Math.floor(ageInDays / 3))
   } else {
-    score += 15 // Default if no date
+    score -= 15 // Default penalty if no date
   }
   
-  // Sales factor (max 30 points - inverted, 0 sales = 30 points)
+  // Sales factor (subtract up to 30 points for low sales)
   const sales = listing.sold_qty || listing.metrics?.sales?.total_sales || listing.metrics?.sales || 0
-  score += Math.max(0, 30 - (sales * 10))
+  score -= Math.max(0, 30 - (sales * 10))
   
-  // Watch/Interest factor (max 20 points - inverted)
+  // Watch/Interest factor (subtract up to 20 points for low watches)
   const watches = listing.watch_count || listing.metrics?.watches?.total_watches || listing.metrics?.watches || 0
-  score += Math.max(0, 20 - (watches * 4))
+  score -= Math.max(0, 20 - (watches * 4))
   
-  // Views factor (max 20 points - inverted)
+  // Views factor (subtract up to 20 points for low views)
   const views = listing.metrics?.views?.total_views || listing.metrics?.views || 0
-  score += Math.max(0, 20 - Math.floor(views / 5))
+  score -= Math.max(0, 20 - Math.floor(views / 5))
   
   return Math.min(100, Math.max(0, score))
 }
@@ -41,12 +43,12 @@ function getRecommendation(listing, score) {
     return { action: 'REVIEW', color: 'orange', icon: AlertTriangle, text: 'Review - Active Elsewhere' }
   }
   
-  // Score-based recommendations
-  if (score >= 80) {
+  // Score-based recommendations (Lower score = Lower performance)
+  if (score <= 20) {
     return { action: 'DELETE', color: 'red', icon: Trash2, text: 'Delete Immediately' }
-  } else if (score >= 60) {
+  } else if (score <= 40) {
     return { action: 'DELETE', color: 'red', icon: Trash2, text: 'Recommend Delete' }
-  } else if (score >= 40) {
+  } else if (score <= 60) {
     return { action: 'OPTIMIZE', color: 'yellow', icon: RefreshCw, text: 'Optimize Listing' }
   } else {
     return { action: 'MONITOR', color: 'blue', icon: TrendingDown, text: 'Monitor' }
@@ -56,9 +58,9 @@ function getRecommendation(listing, score) {
 // Zombie Score Badge Component
 function ZombieScoreBadge({ score }) {
   const getScoreColor = (score) => {
-    if (score >= 80) return 'bg-red-500/20 text-red-400 border-red-500/30'
-    if (score >= 60) return 'bg-orange-500/20 text-orange-400 border-orange-500/30'
-    if (score >= 40) return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+    if (score <= 20) return 'bg-red-500/20 text-red-400 border-red-500/30'
+    if (score <= 40) return 'bg-orange-500/20 text-orange-400 border-orange-500/30'
+    if (score <= 60) return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
     return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
   }
   
@@ -67,9 +69,9 @@ function ZombieScoreBadge({ score }) {
       <div className="relative w-8 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
         <div 
           className={`absolute left-0 top-0 h-full rounded-full transition-all ${
-            score >= 80 ? 'bg-red-500' : score >= 60 ? 'bg-orange-500' : score >= 40 ? 'bg-yellow-500' : 'bg-blue-500'
+            score <= 20 ? 'bg-red-500' : score <= 40 ? 'bg-orange-500' : score <= 60 ? 'bg-yellow-500' : 'bg-blue-500'
           }`}
-          style={{ width: `${score}%` }}
+          style={{ width: `${100 - score}%` }}
         />
       </div>
       <span className="text-xs font-bold data-value">{score}</span>

@@ -173,24 +173,24 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
                   <div className="space-y-1.5">
                     <div className="flex justify-between">
                       <span>• Listing Age:</span>
-                      <span className="text-zinc-500">Up to 30 points</span>
+                      <span className="text-zinc-500">Subtract up to 30 points</span>
                     </div>
                     <div className="flex justify-between">
                       <span>• Sales Volume:</span>
-                      <span className="text-zinc-500">Up to 30 points</span>
+                      <span className="text-zinc-500">Subtract up to 30 points</span>
                     </div>
                     <div className="flex justify-between">
                       <span>• Watch Count:</span>
-                      <span className="text-zinc-500">Up to 20 points</span>
+                      <span className="text-zinc-500">Subtract up to 20 points</span>
                     </div>
                     <div className="flex justify-between">
                       <span>• View Count:</span>
-                      <span className="text-zinc-500">Up to 20 points</span>
+                      <span className="text-zinc-500">Subtract up to 20 points</span>
                     </div>
                   </div>
                   <div className="mt-3 pt-2 border-t border-zinc-700">
-                    <p className="text-zinc-300 font-medium mb-1">Higher score = Lower performance</p>
-                    <p className="text-zinc-500 text-[10px]">80+: Delete | 60-79: Recommend Delete | 40-59: Optimize | 0-39: Monitor</p>
+                    <p className="text-zinc-300 font-medium mb-1">Lower score = Lower performance (Zombie)</p>
+                    <p className="text-zinc-500 text-[10px]">0-20: Delete | 21-40: Recommend Delete | 41-60: Optimize | 61-100: Monitor</p>
                   </div>
                 </div>
               </div>

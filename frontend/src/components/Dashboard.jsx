@@ -43,7 +43,7 @@ const generateDummyListings = (count) => {
     const watches = isZombie ? Math.floor(Math.random() * 3) : Math.floor(Math.random() * 20)
     const views = isZombie ? Math.floor(Math.random() * 10) : Math.floor(Math.random() * 500)
     const daysListed = Math.floor(Math.random() * 90) + 7
-    const zombieScore = isZombie ? Math.floor(Math.random() * 50) + 50 : Math.floor(Math.random() * 40)
+    const zombieScore = isZombie ? Math.floor(Math.random() * 40) : Math.floor(Math.random() * 40) + 60
     
     // Generate SKU based on supplier
     const skuPrefix = supplier === 'Amazon' ? 'B0' : supplier === 'Walmart' ? 'WM' : supplier === 'AliExpress' ? 'AE' : supplier === 'Home Depot' ? 'HD' : 'XX'
@@ -64,7 +64,7 @@ const generateDummyListings = (count) => {
       days_listed: daysListed,
       is_zombie: isZombie,
       zombie_score: zombieScore,
-      recommendation: zombieScore >= 70 ? 'DELETE' : zombieScore >= 50 ? 'OPTIMIZE' : 'MONITOR',
+      recommendation: zombieScore <= 20 ? 'DELETE' : zombieScore <= 40 ? 'DELETE' : zombieScore <= 60 ? 'OPTIMIZE' : 'MONITOR',
       global_winner: Math.random() > 0.9,
       active_elsewhere: Math.random() > 0.8
     }
@@ -203,31 +203,31 @@ function Dashboard() {
     return 'Unknown'
   }
 
-  // 좀비 스코어 계산 함수
+  // Performance Score 계산 함수 (낮을수록 성능 낮음)
   const calculateZombieScore = (listing, filterParams) => {
-    let score = 0
+    let score = 100 // Start with perfect score
     const daysListed = listing.days_listed || 0
     const sales = listing.quantity_sold || 0
     const watches = listing.watch_count || 0
     const views = listing.view_count || 0
     
-    // 등록 기간이 길수록 점수 증가
-    if (daysListed >= 60) score += 30
-    else if (daysListed >= 30) score += 20
-    else if (daysListed >= 14) score += 10
+    // 등록 기간이 길수록 점수 감소
+    if (daysListed >= 60) score -= 30
+    else if (daysListed >= 30) score -= 20
+    else if (daysListed >= 14) score -= 10
     
-    // 판매가 없으면 점수 증가
-    if (sales === 0) score += 30
+    // 판매가 없으면 점수 감소
+    if (sales === 0) score -= 30
     
-    // 찜이 없으면 점수 증가
-    if (watches === 0) score += 20
-    else if (watches <= 2) score += 10
+    // 찜이 없으면 점수 감소
+    if (watches === 0) score -= 20
+    else if (watches <= 2) score -= 10
     
-    // 조회수가 적으면 점수 증가
-    if (views <= 5) score += 20
-    else if (views <= 10) score += 10
+    // 조회수가 적으면 점수 감소
+    if (views <= 5) score -= 20
+    else if (views <= 10) score -= 10
     
-    return Math.min(score, 100)
+    return Math.max(0, Math.min(score, 100))
   }
 
   const fetchZombies = async (filterParams = filters) => {
@@ -301,7 +301,7 @@ function Dashboard() {
             picture_url: item.picture_url,
             is_zombie: false, // 아래에서 필터링으로 결정
             zombie_score: zombieScore,
-            recommendation: zombieScore >= 70 ? 'DELETE' : zombieScore >= 50 ? 'OPTIMIZE' : 'MONITOR'
+            recommendation: zombieScore <= 20 ? 'DELETE' : zombieScore <= 40 ? 'DELETE' : zombieScore <= 60 ? 'OPTIMIZE' : 'MONITOR'
           }
         })
         
@@ -626,7 +626,7 @@ function Dashboard() {
     
     const itemsToMove = allListings.filter(item => idsToMove.includes(item.id))
     // Mark as zombie
-    const markedItems = itemsToMove.map(item => ({ ...item, is_zombie: true, zombie_score: 100 }))
+    const markedItems = itemsToMove.map(item => ({ ...item, is_zombie: true, zombie_score: 0 }))
     
     // Add to zombies list
     setZombies([...zombies, ...markedItems])
