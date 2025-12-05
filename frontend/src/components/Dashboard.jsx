@@ -714,13 +714,12 @@ function Dashboard() {
         // Step 2: Fetch user credits
         await fetchUserCredits()
         
-        // Step 3: Fetch initial data (all listings stats)
-        await fetchAllListings()
-        
-        // Step 4: Fetch history (non-blocking)
+        // Step 3: Fetch history only (listings require store connection)
         fetchHistory().catch(err => {
           console.error('History fetch error on mount:', err)
         })
+        
+        // Note: fetchAllListings() is called when store is connected via handleStoreConnection
       }
     }
     
@@ -732,12 +731,8 @@ function Dashboard() {
     return () => clearInterval(healthCheckInterval)
   }, [])
   
-  // Fetch data when store changes
-  useEffect(() => {
-    if (selectedStore && apiConnected) {
-      fetchAllListings()
-    }
-  }, [selectedStore?.id, apiConnected])
+  // Fetch data when store is connected (handled by handleStoreConnection callback)
+  // This useEffect is removed - connection is managed via onConnectionChange prop
 
   // Handle URL query param for view mode
   useEffect(() => {
