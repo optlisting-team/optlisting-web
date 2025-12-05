@@ -379,7 +379,7 @@ function LandingPage() {
       </section>
 
       {/* How It Works Section */}
-      <section className="py-24 px-4 bg-zinc-900 dark:bg-zinc-900" id="features">
+      <section className="py-24 px-4 bg-zinc-900 dark:bg-zinc-900" id="how-it-works">
         <div className="container mx-auto max-w-6xl">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
