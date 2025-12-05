@@ -102,7 +102,7 @@ function SourceBadge({ source, editable = false, onSourceChange = null, itemId =
         className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getBadgeColor(
           currentSource
         )} hover:opacity-80 transition-opacity cursor-pointer`}
-        title={currentSource === 'Unverified' ? '⚠️ Source needs verification - Click to identify' : 'Click to change source'}
+        title={currentSource === 'Unverified' ? '⚠️ Supplier needs verification - Click to identify' : 'Click to change supplier'}
       >
         {currentSource === 'Unverified' && <span className="text-xs">⚠️</span>}
         <span>{currentSource === 'Unverified' ? 'Unverified' : currentSource}</span>
@@ -112,7 +112,7 @@ function SourceBadge({ source, editable = false, onSourceChange = null, itemId =
       {isOpen && (
         <div className="absolute z-50 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 py-1 max-h-60 overflow-auto">
           <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase border-b border-gray-100">
-            Change Source to...
+            Change Supplier to...
           </div>
           {AVAILABLE_SOURCES.map((src) => (
             <button
