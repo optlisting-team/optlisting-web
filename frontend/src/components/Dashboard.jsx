@@ -712,6 +712,7 @@ function Dashboard() {
           onViewModeChange={handleViewModeChange}
           connectedStore={selectedStore}
           connectedStoresCount={connectedStoresCount}
+          onSync={handleSync}
           showFilter={showFilter}
           onToggleFilter={handleToggleFilter}
           // API Health & Credits

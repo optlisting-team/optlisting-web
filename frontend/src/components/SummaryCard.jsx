@@ -159,6 +159,7 @@ function SummaryCard({
   connectedStore = null,
   connectedStoresCount = 1,
   onAnalyze = null,
+  onSync = null, // Sync callback
   showFilter = false,
   onToggleFilter = null,
   filterContent = null, // Filter panel to render after Total card
@@ -257,11 +258,28 @@ function SummaryCard({
       <div className="grid grid-cols-3 gap-2">
         {/* Active Listings */}
         <div 
-          onClick={() => onToggleFilter ? onToggleFilter() : handleCardClick('all')}
-          className={`opt-card p-3 cursor-pointer transition-all text-center ${showFilter ? 'ring-1 ring-blue-500/50' : 'hover:bg-zinc-800/50'}`}
+          className={`opt-card p-3 transition-all text-center relative ${showFilter ? 'ring-1 ring-blue-500/50' : 'hover:bg-zinc-800/50'}`}
         >
-          <div className="text-2xl font-black text-white">{loading ? '...' : (totalListings || 0).toLocaleString()}</div>
-          <div className="text-[10px] text-zinc-500 uppercase">Active Listings</div>
+          <div 
+            onClick={() => onToggleFilter ? onToggleFilter() : handleCardClick('all')}
+            className="cursor-pointer"
+          >
+            <div className="text-2xl font-black text-white">{loading ? '...' : (totalListings || 0).toLocaleString()}</div>
+            <div className="text-[10px] text-zinc-500 uppercase">Active Listings</div>
+          </div>
+          {/* Sync Button */}
+          {onSync && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onSync(); }}
+              disabled={loading}
+              className="absolute top-1 right-1 p-1 text-zinc-500 hover:text-white transition-all"
+              title="Sync from eBay"
+            >
+              <svg className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* In Queue */}

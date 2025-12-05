@@ -137,7 +137,7 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
           <FilterInput id="maxImpressions" label="Imp" value={maxImpressions} onChange={setMaxImpressions} icon="👁️" />
           <FilterInput id="maxViews" label="Views" value={maxViews} onChange={setMaxViews} icon="📊" />
           
-          {/* Action Buttons */}
+          {/* Reset Button */}
           <button
             type="button"
             onClick={handleReset}
@@ -146,17 +146,8 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
           >
             Reset
           </button>
-          
-          <button
-            type="button"
-            onClick={handleSync}
-            disabled={loading}
-            className="flex items-center gap-1 px-2 py-1.5 text-[10px] text-zinc-400 hover:text-white transition-all"
-          >
-            <RotateCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
-          </button>
 
-          {/* Find Button - Compact but prominent */}
+          {/* Find Button */}
           <button
             type="submit"
             disabled={loading}
