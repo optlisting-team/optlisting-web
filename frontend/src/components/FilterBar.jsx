@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Filter, RotateCw, ChevronDown, Info } from 'lucide-react'
+import { RotateCw } from 'lucide-react'
 
 /**
  * OptListing 최종 좀비 분석 필터
@@ -107,226 +107,71 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
     return `${formatDate(startDate)} - ${formatDate(endDate)}`
   }
 
-  // Filter input component - Compact
-  const FilterInput = ({ id, label, value, onChange, icon, tooltip, unit, min = 0, step = 1 }) => (
-    <div className="relative group">
-      <label htmlFor={id} className="flex items-center gap-1 text-xs font-medium text-zinc-500 mb-1">
-        <span className="text-xs">{icon}</span>
-        <span className="uppercase tracking-wide">{label}</span>
-        {tooltip && (
-          <Info className="w-3 h-3 text-zinc-600 cursor-help" title={tooltip} />
-        )}
-      </label>
-      <div className="relative">
-        <input
-          type="number"
-          id={id}
-          min={min}
-          step={step}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white text-sm font-bold focus:outline-none focus:ring-1 focus:ring-white/20 transition-all"
-        />
-        {unit && (
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-zinc-600">
-            {unit}
-          </span>
-        )}
-      </div>
+  // Filter input component - Ultra Compact
+  const FilterInput = ({ id, label, value, onChange, icon, unit, min = 0, step = 1 }) => (
+    <div className="flex items-center gap-2 bg-zinc-900/50 rounded px-2 py-1.5 border border-zinc-800">
+      <span className="text-[10px]">{icon}</span>
+      <span className="text-[10px] text-zinc-500 uppercase">{label}</span>
+      <input
+        type="number"
+        id={id}
+        min={min}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-12 px-1 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-white text-xs font-bold text-center focus:outline-none"
+      />
+      {unit && <span className="text-[10px] text-zinc-600">{unit}</span>}
     </div>
   )
 
   return (
-    <div className="opt-card p-3 opacity-0 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
-      {/* Header with Action Buttons */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md bg-gradient-to-br from-red-500/20 to-orange-500/20 border border-red-500/30 flex items-center justify-center">
-            <Filter className="w-3 h-3 text-red-400" />
-          </div>
-          <div>
-            <h3 className="text-xs font-bold text-white">Low Interest Filter</h3>
-          </div>
-        </div>
-        
-        {/* Right Side: Period Badge + Action Buttons */}
-        <div className="flex items-center gap-2">
-          {/* Analysis Period Badge */}
-          <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
-            <span className="text-xs text-zinc-500">Period:</span>
-            <span className="text-xs font-bold text-white">{getDateRange()}</span>
-          </div>
+    <div className="opt-card p-2 opacity-0 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+      <form onSubmit={handleSubmit}>
+        {/* Single Row Layout */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Filters - Inline */}
+          <FilterInput id="analysisPeriod" label="Days" value={analysisPeriod} onChange={setAnalysisPeriod} icon="📅" unit="d" min={1} />
+          <FilterInput id="maxSales" label="Sales" value={maxSales} onChange={setMaxSales} icon="💰" />
+          <FilterInput id="maxWatches" label="Watch" value={maxWatches} onChange={setMaxWatches} icon="❤️" />
+          <FilterInput id="maxImpressions" label="Imp" value={maxImpressions} onChange={setMaxImpressions} icon="👁️" />
+          <FilterInput id="maxViews" label="Views" value={maxViews} onChange={setMaxViews} icon="📊" />
           
-          {/* Reset Button */}
+          {/* Action Buttons */}
           <button
             type="button"
             onClick={handleReset}
             disabled={loading}
-            className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs font-medium rounded-lg hover:bg-zinc-700 hover:text-white disabled:opacity-50 transition-all"
+            className="px-2 py-1.5 text-[10px] text-zinc-400 hover:text-white transition-all"
           >
             Reset
           </button>
           
-          {/* Sync Button */}
           <button
             type="button"
             onClick={handleSync}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs font-medium rounded-lg hover:bg-zinc-700 hover:text-white disabled:opacity-50 transition-all"
-            title="Sync latest data from eBay"
+            className="flex items-center gap-1 px-2 py-1.5 text-[10px] text-zinc-400 hover:text-white transition-all"
           >
             <RotateCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
-            <span>Sync</span>
+          </button>
+
+          {/* Find Button - Compact but prominent */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="ml-auto flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-orange-500 text-white text-xs font-bold rounded-lg hover:from-red-500 hover:to-orange-400 disabled:opacity-50 transition-all shadow-lg shadow-red-500/30"
+          >
+            {loading ? (
+              <RotateCw className="w-3 h-3 animate-spin" />
+            ) : (
+              <>
+                <span>🔬</span>
+                <span>Find Zombies</span>
+              </>
+            )}
           </button>
         </div>
-      </div>
-
-      <form onSubmit={handleSubmit}>
-        {/* Primary Filters Row - Compact */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
-          {/* 1. 분석 기준 기간 */}
-          <FilterInput
-            id="analysisPeriod"
-            label="Period"
-            value={analysisPeriod}
-            onChange={setAnalysisPeriod}
-            icon="📅"
-            tooltip="Analysis window in days"
-            unit="days"
-            min={1}
-          />
-          
-          {/* 2. 기간 내 판매 건수 */}
-          <FilterInput
-            id="maxSales"
-            label="Max Sales"
-            value={maxSales}
-            onChange={setMaxSales}
-            icon="💰"
-            tooltip="Maximum sales in period (0 = no sales)"
-            unit="qty"
-          />
-          
-          {/* 3. 찜하기 */}
-          <FilterInput
-            id="maxWatches"
-            label="Max Watches"
-            value={maxWatches}
-            onChange={setMaxWatches}
-            icon="❤️"
-            tooltip="Maximum watch/save count"
-            unit="qty"
-          />
-          
-          {/* 4. 총 노출 횟수 */}
-          <FilterInput
-            id="maxImpressions"
-            label="Max Impressions"
-            value={maxImpressions}
-            onChange={setMaxImpressions}
-            icon="👁️"
-            tooltip="Maximum search impressions"
-            unit="views"
-          />
-          
-          {/* 5. 총 조회 횟수 */}
-          <FilterInput
-            id="maxViews"
-            label="Max Views"
-            value={maxViews}
-            onChange={setMaxViews}
-            icon="📊"
-            tooltip="Maximum page views"
-            unit="views"
-          />
-        </div>
-
-        {/* Advanced Filters Toggle */}
-        <button
-          type="button"
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          className="flex items-center gap-2 text-xs text-zinc-500 hover:text-zinc-300 mb-4 transition-colors"
-        >
-          <ChevronDown className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
-          <span>Advanced Filters</span>
-        </button>
-
-        {/* Advanced Filters */}
-        {showAdvanced && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-zinc-900/50 rounded-xl border border-zinc-800">
-            {/* Platform Filter */}
-            <div>
-              <label htmlFor="marketplaceFilter" className="flex items-center gap-2 text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-                <span>🏪</span>
-                <span>Platform</span>
-              </label>
-              <select
-                id="marketplaceFilter"
-                value={marketplaceFilter}
-                onChange={(e) => setMarketplaceFilter(e.target.value)}
-                className="w-full px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-xl text-white font-medium focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-zinc-500 transition-all cursor-pointer"
-              >
-                <option value="eBay">eBay</option>
-                <option value="Shopify">Shopify</option>
-              </select>
-            </div>
-
-            {/* Source Filter */}
-            <div>
-              <label htmlFor="sourceFilter" className="flex items-center gap-2 text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-                <span>📦</span>
-                <span>Supplier</span>
-              </label>
-              <select
-                id="sourceFilter"
-                value={sourceFilter}
-                onChange={(e) => setSourceFilter(e.target.value)}
-                className="w-full px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-xl text-white font-medium focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-zinc-500 transition-all cursor-pointer"
-              >
-                <option value="All">All Sources</option>
-                <option value="Amazon">Amazon</option>
-                <option value="Walmart">Walmart</option>
-                <option value="Home Depot">Home Depot</option>
-                <option value="AliExpress">AliExpress</option>
-                <option value="CJ Dropshipping">CJ Dropshipping</option>
-                <option value="Wholesale2B">Wholesale2B</option>
-                <option value="Costway">Costway</option>
-              </select>
-            </div>
-          </div>
-        )}
-
-        {/* Filter Summary - Small */}
-        <div className="p-2 bg-zinc-900/50 rounded-lg border border-zinc-800 mb-3">
-          <p className="text-xs text-zinc-400">
-            <span className="text-zinc-500">Finding:</span>{' '}
-            <span className="text-white">{maxSales} sales</span>,{' '}
-            <span className="text-white">{maxWatches} watches</span>,{' '}
-            <span className="text-white">&lt;{maxImpressions} imp</span>,{' '}
-            <span className="text-white">&lt;{maxViews} views</span>{' '}
-            <span className="text-zinc-500">in {analysisPeriod}d</span>
-          </p>
-        </div>
-
-        {/* Find Button - Full Width & Prominent */}
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-red-600 via-orange-500 to-red-600 text-white text-lg font-black rounded-xl hover:from-red-500 hover:via-orange-400 hover:to-red-500 disabled:opacity-50 transition-all shadow-xl shadow-red-500/40 hover:shadow-red-500/60 hover:scale-[1.01] active:scale-[0.99]"
-        >
-          {loading ? (
-            <>
-              <RotateCw className="w-5 h-5 animate-spin" />
-              <span>Analyzing...</span>
-            </>
-          ) : (
-            <>
-              <span className="text-xl">🔬</span>
-              <span>Find Zombie Listings</span>
-              <span className="text-xl">→</span>
-            </>
-          )}
-        </button>
       </form>
     </div>
   )
