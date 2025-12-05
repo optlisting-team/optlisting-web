@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import StoreSwitcher from './StoreSwitcher'
 import { useAuth } from '../contexts/AuthContext'
 import { LayoutDashboard, List, History, User, Zap, CreditCard, Settings, ChevronRight, LogOut, X, Check } from 'lucide-react'
@@ -317,7 +318,7 @@ function Sidebar() {
       </div>
 
       {/* Plan Modal */}
-      {showPlanModal && (
+      {showPlanModal && createPortal(
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" style={{ zIndex: 9999 }}>
           <div 
             ref={planModalRef}
@@ -462,11 +463,12 @@ function Sidebar() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Credit Pack Modal */}
-      {showCreditModal && (
+      {showCreditModal && createPortal(
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" style={{ zIndex: 9999 }}>
           <div 
             ref={creditModalRef}
@@ -572,7 +574,8 @@ function Sidebar() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
