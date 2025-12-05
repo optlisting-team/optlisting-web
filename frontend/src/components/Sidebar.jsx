@@ -39,17 +39,27 @@ function Sidebar() {
 
   // Close modals when clicking outside
   useEffect(() => {
+    if (!showCreditModal && !showPlanModal) return
+    
     const handleClickOutside = (event) => {
-      if (planModalRef.current && !planModalRef.current.contains(event.target)) {
+      if (planModalRef.current && showPlanModal && !planModalRef.current.contains(event.target)) {
         setShowPlanModal(false)
       }
-      if (creditModalRef.current && !creditModalRef.current.contains(event.target)) {
+      if (creditModalRef.current && showCreditModal && !creditModalRef.current.contains(event.target)) {
         setShowCreditModal(false)
       }
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+    
+    // Add slight delay to prevent immediate closing when opening
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside)
+    }, 100)
+    
+    return () => {
+      clearTimeout(timeoutId)
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showCreditModal, showPlanModal])
 
   // Fetch credits on mount
   useEffect(() => {
@@ -206,10 +216,7 @@ function Sidebar() {
 
       {/* Credits Card */}
       <div className="px-3 py-3 border-t border-zinc-800/50">
-        <button
-          onClick={() => setShowCreditModal(true)}
-          className="w-full opt-card p-4 bg-gradient-to-br from-zinc-900 to-zinc-950 hover:from-zinc-800 hover:to-zinc-900 transition-all cursor-pointer text-left"
-        >
+        <div className="w-full opt-card p-4 bg-gradient-to-br from-zinc-900 to-zinc-950 hover:from-zinc-800 hover:to-zinc-900 transition-all text-left">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
               <Zap className="w-5 h-5 text-white" />
@@ -237,8 +244,9 @@ function Sidebar() {
           </div>
 
           {/* Buy More Button */}
-          <div 
+          <button
             onClick={(e) => {
+              e.preventDefault()
               e.stopPropagation()
               setShowCreditModal(true)
             }}
@@ -246,8 +254,8 @@ function Sidebar() {
           >
             <CreditCard className="w-4 h-4" />
             Buy More Credits
-          </div>
-        </button>
+          </button>
+        </div>
       </div>
 
       {/* User Profile & Plan */}
