@@ -461,7 +461,7 @@ function SummaryCard({
           className={`opt-card p-6 cursor-pointer transition-all text-center hover:bg-zinc-800/50 ${viewMode === 'zombies' || showFilter ? 'ring-2 ring-red-500/50' : ''} ${totalZombies > 0 ? 'border-red-500/30' : ''}`}
         >
           <div className={`text-4xl font-black ${totalZombies > 0 ? 'text-red-400' : 'text-white'}`}>{totalZombies || 0}</div>
-          <div className={`text-sm uppercase mt-1 ${totalZombies > 0 ? 'text-red-400' : 'text-zinc-500'}`}>Low Interest</div>
+          <div className={`text-sm uppercase mt-1 ${totalZombies > 0 ? 'text-red-400' : 'text-zinc-500'}`}>Low-Performing</div>
       </div>
 
         {/* 3. CSV Export - Selected for export */}

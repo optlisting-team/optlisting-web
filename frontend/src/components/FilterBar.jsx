@@ -159,7 +159,7 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
           ) : (
             <>
               <span className="text-xl">🔍</span>
-              <span>Find Low-Interest Items</span>
+              <span>Find Low-Performing SKUs</span>
             </>
           )}
         </button>

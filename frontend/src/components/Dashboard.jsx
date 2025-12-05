@@ -941,7 +941,7 @@ function Dashboard() {
               <div className="mt-6 mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="text-sm text-zinc-400">
-                    📉 <strong className="text-red-400">{zombies.length} Low-Interest Items</strong> found
+                    📉 <strong className="text-red-400">{zombies.length} Low-Performing SKUs</strong> found
                   </span>
                   <span className="text-xs text-zinc-600">
                     ({filters.min_days}d • {filters.max_sales} sales • ≤{filters.max_watch_count} views)
@@ -1018,7 +1018,7 @@ function Dashboard() {
                       {viewMode === 'zombies' && currentData.length > 0 && (
                         <div className="mb-6 p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg">
                           <p className="text-base text-zinc-300">
-                            Products filtered by: No sales in the past{' '}
+                            Low-Performing SKUs filtered by: No sales in the past{' '}
                             <span className="font-bold text-white text-lg">{filters.analytics_period_days || filters.min_days || 7} days</span>
                             {filters.max_views !== undefined && filters.max_views !== null && (
                               <>

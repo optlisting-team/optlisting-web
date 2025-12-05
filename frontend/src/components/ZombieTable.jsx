@@ -215,7 +215,7 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-orange-500 text-white text-sm font-semibold rounded-lg hover:from-red-500 hover:to-orange-400 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md"
             >
               <span>📉</span>
-              <span>Mark as Low-Interest</span>
+              <span>Mark as Low-Performing</span>
               {selectedIds.length > 0 && (
                 <span className="px-1.5 py-0.5 bg-white/20 rounded text-xs font-bold">
                   {selectedIds.length}
