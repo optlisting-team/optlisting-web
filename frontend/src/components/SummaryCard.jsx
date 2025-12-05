@@ -190,296 +190,182 @@ function SummaryCard({
   const planColor = planColors[userPlan] || planColors.PRO
 
   return (
-    <div className="space-y-6 pt-2">
-      {/* Header Status Bar - Subscription, Credits, Store Limits */}
-      <div className="flex flex-wrap items-center justify-between gap-4 opacity-0 animate-fade-in" style={{ animationDelay: '50ms' }}>
+    <div className="space-y-4 pt-2">
+      {/* Compact Status Bar */}
+      <div className="flex items-center justify-between gap-3 opacity-0 animate-fade-in" style={{ animationDelay: '50ms' }}>
         {/* Left: Title */}
-        <div className="flex items-center gap-3">
-          <div className="w-1 h-6 bg-gradient-to-b from-white to-zinc-600 rounded-full" />
-          <h2 className="text-lg font-semibold text-zinc-300 tracking-wide">
-            Store Analytics
-          </h2>
-        </div>
+        <h2 className="text-sm font-semibold text-zinc-400 tracking-wide flex items-center gap-2">
+          <span className="w-1 h-4 bg-gradient-to-b from-blue-500 to-cyan-500 rounded-full" />
+          Store Analytics
+        </h2>
         
-        {/* Right: Status Badges */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Subscription Plan Badge */}
-          <div className={`flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r ${planColor} border rounded-lg`}>
-            <span className="text-sm">👑</span>
-            <span className="text-xs font-bold">{userPlan}</span>
-            <span className="text-xs opacity-70">({connectedStoresCount}/{planStoreLimit} Stores)</span>
+        {/* Right: Compact Badges */}
+        <div className="flex items-center gap-2">
+          <div className={`flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r ${planColor} border rounded-md text-[10px]`}>
+            <span>👑</span>
+            <span className="font-bold">{userPlan}</span>
+            <span className="opacity-70">({connectedStoresCount}/{planStoreLimit} Stores)</span>
           </div>
           
-          {/* Global Store Limit Badge */}
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-amber-600/20 to-amber-600/10 border border-amber-500/30 rounded-lg">
-            <span className="text-sm">🏪</span>
-            <span className="text-xs font-bold text-amber-400">Global Limit</span>
-            <span className="text-xs text-amber-300">{globalStoreLimit}</span>
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
+            <span className="text-[10px]">💰</span>
+            <span className="text-[10px] font-bold text-emerald-400">{(userCredits - usedCredits).toLocaleString()}</span>
+            <span className="text-[10px] text-emerald-300/70">Credits</span>
           </div>
           
-          {/* Credits Badge */}
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-emerald-600/20 to-emerald-600/10 border border-emerald-500/30 rounded-lg">
-            <span className="text-sm">💰</span>
-            <span className="text-xs font-bold text-emerald-400">{(userCredits - usedCredits).toLocaleString()}</span>
-            <span className="text-xs text-emerald-300/70">Credits</span>
-          </div>
-          
-          {/* API Health Badge - Dynamic based on connection status */}
           {apiConnected ? (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-emerald-600/20 to-emerald-600/10 border border-emerald-500/30 rounded-lg">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-              <span className="text-xs font-bold text-emerald-400">LIVE</span>
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
+              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+              <span className="text-[10px] font-bold text-emerald-400">LIVE</span>
             </div>
           ) : (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-red-600/20 to-red-600/10 border border-red-500/30 rounded-lg">
-              <div className="w-2 h-2 bg-red-500 rounded-full" />
-              <span className="text-xs font-bold text-red-400">{apiError || 'Connection Error'}</span>
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-red-500/10 border border-red-500/20 rounded-md">
+              <div className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+              <span className="text-[10px] font-bold text-red-400">{apiError || 'Offline'}</span>
             </div>
           )}
         </div>
       </div>
       
-      {/* Your Store - Compact */}
-      <div className="opt-card p-3">
-        <div className="flex items-center justify-between gap-4">
-          {/* Left: Store Info */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
-              <span className="text-lg">🏪</span>
+      {/* 🔥 ZOMBIE ALERT BANNER - Shows when zombies detected */}
+      {!loading && totalZombies > 0 && (
+        <div 
+          onClick={() => handleCardClick('zombies')}
+          className="cursor-pointer bg-gradient-to-r from-red-900/40 via-orange-900/30 to-red-900/40 border-2 border-red-500/50 rounded-xl p-4 animate-pulse-glow"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-red-500/20 rounded-xl flex items-center justify-center border border-red-500/30">
+                <span className="text-3xl">⚠️</span>
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl font-black text-red-400">{totalZombies}</span>
+                  <span className="text-lg font-bold text-white">Zombie Listings Found!</span>
+                </div>
+                <div className="text-sm text-zinc-400">
+                  Estimated monthly loss: <span className="text-red-400 font-bold">${estimatedSavings.toFixed(2)}</span>
+                </div>
+              </div>
             </div>
-            <div>
-              <span className="text-xs text-zinc-500">Store</span>
-              <span className="text-sm font-bold text-white ml-2">{connectedStore?.name || 'eBay Store'}</span>
-            </div>
-          </div>
-
-          {/* Center: Store Selector + Connect */}
-          <div className="flex items-center gap-2">
-            {connectedStore && (
-              <select 
-                className="appearance-none bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 pr-8 text-sm text-white cursor-pointer hover:border-zinc-600 focus:outline-none min-w-[140px]"
-                defaultValue={connectedStore?.id || ''}
-              >
-                <option value={connectedStore.id}>{connectedStore.name || 'eBay Store'}</option>
-              </select>
-            )}
-            <button 
-              onClick={() => {
-                const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-                const userId = 'default-user'
-                window.location.href = `${apiUrl}/api/ebay/auth/start?user_id=${userId}`
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white text-sm font-semibold rounded-lg transition-all"
-            >
-              <span>⚡</span>
-              <span>Connect eBay</span>
+            <button className="px-6 py-3 bg-red-500 hover:bg-red-400 text-white font-bold rounded-xl transition-all hover:scale-105 shadow-lg shadow-red-500/30">
+              Clean Up Now →
             </button>
           </div>
-
-          {/* Right: Status */}
-          {connectedStore ? (
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-lg">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-              <span className="text-xs font-semibold text-emerald-400">Connected</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-zinc-700/50 border border-zinc-600 rounded-lg">
-              <div className="w-2 h-2 bg-zinc-500 rounded-full" />
-              <span className="text-xs font-semibold text-zinc-400">Disconnected</span>
-            </div>
-          )}
+        </div>
+      )}
+      
+      {/* Your Store - Ultra Compact */}
+      <div className="opt-card p-2 px-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">🏪</span>
+            <span className="text-xs font-bold text-white">{connectedStore?.name || 'eBay Store'}</span>
+            {connectedStore ? (
+              <span className="flex items-center gap-1 text-[10px] text-emerald-400">
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                Connected
+              </span>
+            ) : (
+              <span className="text-[10px] text-zinc-500">Not connected</span>
+            )}
+          </div>
+          <button 
+            onClick={() => {
+              const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+              const userId = 'default-user'
+              window.location.href = `${apiUrl}/api/ebay/auth/start?user_id=${userId}`
+            }}
+            className="text-[10px] px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded transition-all"
+          >
+            + Connect
+          </button>
         </div>
       </div>
 
-      {/* Primary Metric Card - Total Listings (Compact Horizontal) */}
+      {/* Primary Metric - Total Listings (Inline with filter toggle) */}
       <div 
         onClick={() => onToggleFilter ? onToggleFilter() : handleCardClick('all')}
         className={`
-          opt-card p-4 cursor-pointer select-none
-          ${showFilter ? 'opt-card-active ring-2 ring-blue-500/50' : ''}
+          opt-card p-3 cursor-pointer select-none transition-all
+          ${showFilter ? 'ring-1 ring-blue-500/50 bg-blue-500/5' : 'hover:bg-zinc-800/50'}
         `}
       >
-        <div className="flex items-center justify-between gap-4">
-          {/* Left: Icon + Number + Label */}
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-zinc-700 to-zinc-900 border border-zinc-600 flex items-center justify-center">
-              <span className="text-2xl">📦</span>
-            </div>
-            <div>
-              <div className="text-3xl font-black text-white tracking-tight">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-lg">📦</span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-black text-white">
                 {loading ? '...' : (totalListings || 0).toLocaleString()}
-              </div>
-              <div className="text-xs font-bold text-zinc-500 uppercase tracking-wider">
-                Total Active Listings
-              </div>
+              </span>
+              <span className="text-xs text-zinc-500 uppercase">Active Listings</span>
             </div>
+            {!loading && Object.entries(platformBreakdown).map(([platform, count]) => (
+              count > 0 && (
+                <span key={platform} className="text-xs px-2 py-0.5 bg-zinc-800 rounded text-zinc-400">
+                  {platform}: {count.toLocaleString()}
+                </span>
+              )
+            ))}
           </div>
-
-          {/* Center: Platform Breakdown */}
-          {!loading && totalListings > 0 && (
-            <div className="flex gap-2">
-              {Object.entries(platformBreakdown).map(([platform, count]) => (
-                count > 0 && (
-                  <div 
-                    key={platform}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800/50 rounded-lg border border-zinc-700/50"
-                  >
-                    <span className="text-sm">
-                      {platform === 'eBay' ? '🏷️' : platform === 'Shopify' ? '🛒' : '📊'}
-                    </span>
-                    <span className="text-xs font-semibold text-zinc-300">{platform}</span>
-                    <span className="text-xs font-bold text-white">{count.toLocaleString()}</span>
-                  </div>
-                )
-              ))}
-            </div>
-          )}
-
-          {/* Right: Filter Toggle Hint */}
-          <div className="text-xs text-zinc-500">
-            {showFilter ? '✅ Filters open' : '👆 Click for filters'}
-          </div>
+          <span className={`text-xs px-2 py-1 rounded ${showFilter ? 'bg-blue-500/20 text-blue-400' : 'bg-zinc-800 text-zinc-500'}`}>
+            {showFilter ? '✓ Filters Open' : '⚡ Open Filters'}
+          </span>
         </div>
       </div>
 
       {/* Filter Panel Slot - Between Total Card and Secondary Metrics */}
       {filterContent}
 
-      {/* Secondary Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Low Interest Card - First Position */}
-        <div className="opt-card p-6 text-center cursor-pointer select-none opt-card-danger" onClick={() => handleCardClick('zombies')}>
-          {totalZombies > 0 && (
-            <div className="absolute top-3 right-3">
-              <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-              </span>
-            </div>
-          )}
-          <div className="text-4xl mb-3">📉</div>
-          <div className={`text-5xl font-extrabold mb-2 tracking-tight ${totalZombies > 0 ? 'text-red-500' : 'text-white'}`}>
-            {loading ? '...' : totalZombies}
+      {/* Quick Action Cards - Compact 3-column */}
+      <div className="grid grid-cols-3 gap-3">
+        {/* Queue Card */}
+        <div 
+          onClick={() => handleCardClick('queue')}
+          className={`opt-card p-3 cursor-pointer text-center transition-all hover:bg-zinc-800/50 ${viewMode === 'queue' ? 'ring-1 ring-blue-500/50' : ''}`}
+        >
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-lg">🗑️</span>
+            <span className="text-xl font-bold text-white">{queueCount || 0}</span>
           </div>
-          <div className={`text-xs font-bold tracking-widest uppercase ${totalZombies > 0 ? 'text-red-400' : 'text-zinc-500'}`}>
-            Low Interest
-          </div>
-          <div className="text-xs text-zinc-600 mt-1">Needs Attention</div>
+          <div className="text-[10px] text-zinc-500 uppercase mt-1">In Queue</div>
         </div>
 
-        {/* Queue Card */}
-        <StatCard
-          icon="🗑️"
-          value={queueCount || 0}
-          label="In Queue"
-          sublabel="Ready for Export"
-          loading={false}
-          isActive={viewMode === 'queue'}
-          onClick={() => handleCardClick('queue')}
-          delay={300}
-        />
-
         {/* History Card */}
-        <StatCard
-          icon="💀"
-          value={totalDeleted || 0}
-          label="Removed"
-          sublabel="Total Cleaned"
-          loading={loading}
-          isActive={viewMode === 'history'}
-          isSuccess={totalDeleted > 0}
-          onClick={() => handleCardClick('history')}
-          delay={400}
-        />
-
-        {/* Fee Savings Card */}
         <div 
-          className="opt-card p-6 text-center opacity-0 animate-fade-in-up opt-card-success"
-          style={{ animationDelay: '500ms' }}
+          onClick={() => handleCardClick('history')}
+          className={`opt-card p-3 cursor-pointer text-center transition-all hover:bg-zinc-800/50 ${viewMode === 'history' ? 'ring-1 ring-blue-500/50' : ''}`}
         >
-          <div className="text-4xl mb-3">💰</div>
-          <div className="text-3xl font-extrabold text-emerald-500 mb-2 data-value">
-            {loading ? '...' : `$${estimatedSavings.toFixed(2)}`}
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-lg">💀</span>
+            <span className={`text-xl font-bold ${totalDeleted > 0 ? 'text-emerald-400' : 'text-white'}`}>{totalDeleted || 0}</span>
           </div>
-          <div className="text-xs font-bold text-zinc-500 tracking-widest uppercase">
-            Est. Monthly Savings
+          <div className="text-[10px] text-zinc-500 uppercase mt-1">Removed</div>
+        </div>
+
+        {/* Savings Card */}
+        <div className="opt-card p-3 text-center">
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-lg">💰</span>
+            <span className="text-xl font-bold text-emerald-400">${estimatedSavings.toFixed(0)}</span>
           </div>
-          <div className="text-xs text-zinc-600 mt-1">
-            from removing zombies
-          </div>
+          <div className="text-[10px] text-zinc-500 uppercase mt-1">Est. Savings/mo</div>
         </div>
       </div>
 
-      {/* Quick Stats Bar */}
+      {/* Health Indicator - Minimal */}
       {!loading && totalListings > 0 && (
-        <div 
-          className="opt-card p-4 opacity-0 animate-fade-in-up"
-          style={{ animationDelay: '500ms' }}
-        >
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            {/* Health Score */}
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                totalZombies === 0 
-                  ? 'bg-emerald-500/20 border border-emerald-500/30' 
-                  : totalZombies < 10 
-                    ? 'bg-yellow-500/20 border border-yellow-500/30'
-                    : 'bg-red-500/20 border border-red-500/30'
-              }`}>
-                <span className="text-xl">
-                  {totalZombies === 0 ? '✅' : totalZombies < 10 ? '⚠️' : '🔥'}
-                </span>
-              </div>
-              <div>
-                <div className="text-xs text-zinc-500 uppercase tracking-wider">Health</div>
-                <div className={`text-sm font-bold ${
-                  totalZombies === 0 
-                    ? 'text-emerald-500' 
-                    : totalZombies < 10 
-                      ? 'text-yellow-500'
-                      : 'text-red-500'
-                }`}>
-                  {totalZombies === 0 
-                    ? 'Excellent' 
-                    : totalZombies < 10 
-                      ? 'Good'
-                      : 'Needs Work'}
-                </div>
-              </div>
-            </div>
-
-            {/* Conversion Rate */}
-            <div className="flex items-center gap-3">
-              <div className="text-xs text-zinc-500 uppercase tracking-wider">
-                Low Interest Rate
-              </div>
-              <div className="text-lg font-bold text-white data-value">
-                {totalListings > 0 
-                  ? ((totalZombies / totalListings) * 100).toFixed(1) 
-                  : 0}%
-              </div>
-            </div>
-
-            {/* Queue Progress */}
-            {queueCount > 0 && (
-              <div className="flex items-center gap-3">
-                <div className="text-xs text-zinc-500 uppercase tracking-wider">
-                  Queue Progress
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-24 h-2 bg-zinc-800 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min((queueCount / Math.max(totalZombies, 1)) * 100, 100)}%` }}
-                    />
-                  </div>
-                  <span className="text-sm font-bold text-white data-value">
-                    {queueCount}/{totalZombies}
-                  </span>
-                </div>
-              </div>
-            )}
+        <div className="flex items-center justify-between text-xs text-zinc-500 px-1">
+          <div className="flex items-center gap-2">
+            <span className={totalZombies === 0 ? 'text-emerald-400' : totalZombies < 10 ? 'text-yellow-400' : 'text-red-400'}>
+              {totalZombies === 0 ? '✅ Excellent' : totalZombies < 10 ? '⚠️ Good' : '🔥 Needs Work'}
+            </span>
+            <span>•</span>
+            <span>Zombie Rate: <strong className="text-white">{((totalZombies / totalListings) * 100).toFixed(1)}%</strong></span>
           </div>
+          {queueCount > 0 && (
+            <span>Queue: <strong className="text-white">{queueCount}/{totalZombies}</strong></span>
+          )}
         </div>
       )}
     </div>

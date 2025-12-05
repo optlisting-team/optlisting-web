@@ -54,10 +54,10 @@ function Dashboard() {
   const [error, setError] = useState(null)
   const [selectedIds, setSelectedIds] = useState([])
   const [queue, setQueue] = useState([])
-  const [viewMode, setViewMode] = useState(DEMO_MODE ? 'zombies' : 'total') // DEMO_MODE: 바로 좀비 뷰로 시작
+  const [viewMode, setViewMode] = useState('total') // 항상 통계 뷰로 시작 (좀비 배너가 강조됨)
   const [historyLogs, setHistoryLogs] = useState([])
   const [totalDeleted, setTotalDeleted] = useState(DEMO_MODE ? 23 : 0)
-  const [showFilter, setShowFilter] = useState(DEMO_MODE ? true : false) // DEMO_MODE: 필터 열린 상태로 시작
+  const [showFilter, setShowFilter] = useState(false) // 기본: 필터 접힘
   
   // API Health Check State
   const [apiConnected, setApiConnected] = useState(false)
