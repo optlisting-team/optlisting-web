@@ -68,6 +68,9 @@ function LandingPage() {
           <div className="flex items-center space-x-6">
             <a href="#features" className="text-zinc-300 dark:text-zinc-300 hover:text-white dark:hover:text-white font-medium transition-colors">Features</a>
             <a href="#pricing" className="text-zinc-300 dark:text-zinc-300 hover:text-white dark:hover:text-white font-medium transition-colors">Pricing</a>
+            {isAuthenticated && (
+              <Link to="/dashboard" className="text-zinc-300 dark:text-zinc-300 hover:text-white dark:hover:text-white font-medium transition-colors">Dashboard</Link>
+            )}
             {isAuthenticated ? (
               <div className="relative" ref={profileRef}>
                 <button 
@@ -100,14 +103,6 @@ function LandingPage() {
 
                     {/* Menu Items */}
                     <div className="py-1">
-                      <Link
-                        to="/dashboard"
-                        onClick={() => setIsProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
-                      >
-                        <LayoutDashboard className="w-4 h-4" />
-                        Dashboard
-                      </Link>
                       <Link
                         to="/settings"
                         onClick={() => setIsProfileOpen(false)}
