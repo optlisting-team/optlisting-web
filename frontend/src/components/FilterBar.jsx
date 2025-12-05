@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { RotateCw } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { RotateCw, Info } from 'lucide-react'
 
 /**
  * OptListing 최종 좀비 분석 필터
@@ -28,6 +28,27 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
   
   // Advanced mode toggle
   const [showAdvanced, setShowAdvanced] = useState(false)
+  
+  // Performance Score tooltip
+  const [showScoreTooltip, setShowScoreTooltip] = useState(false)
+  const tooltipRef = useRef(null)
+  
+  // Close tooltip when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (tooltipRef.current && !tooltipRef.current.contains(event.target)) {
+        setShowScoreTooltip(false)
+      }
+    }
+    
+    if (showScoreTooltip) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showScoreTooltip])
 
   // Update state when initialFilters change
   useEffect(() => {
@@ -128,6 +149,55 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
   return (
     <div className="opt-card p-4 opacity-0 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
       <form onSubmit={handleSubmit}>
+        {/* Header with Performance Score Info */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-zinc-400 font-medium">Filter Settings</span>
+          </div>
+          <div className="relative" ref={tooltipRef}>
+            <button
+              type="button"
+              onClick={() => setShowScoreTooltip(!showScoreTooltip)}
+              className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
+              <Info className="w-4 h-4" />
+              <span>Performance Score</span>
+            </button>
+            
+            {/* Tooltip */}
+            {showScoreTooltip && (
+              <div className="absolute right-0 top-full mt-2 w-72 bg-zinc-800 border border-zinc-700 rounded-lg p-4 shadow-xl z-50">
+                <h4 className="text-sm font-bold text-white mb-2">Performance Score Calculation</h4>
+                <div className="text-xs text-zinc-400 space-y-2">
+                  <p className="text-zinc-300 font-medium mb-2">Score is calculated from 4 factors (0-100 points):</p>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between">
+                      <span>• Listing Age:</span>
+                      <span className="text-zinc-500">Up to 30 points</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>• Sales Volume:</span>
+                      <span className="text-zinc-500">Up to 30 points</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>• Watch Count:</span>
+                      <span className="text-zinc-500">Up to 20 points</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>• View Count:</span>
+                      <span className="text-zinc-500">Up to 20 points</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-2 border-t border-zinc-700">
+                    <p className="text-zinc-300 font-medium mb-1">Higher score = Lower performance</p>
+                    <p className="text-zinc-500 text-[10px]">80+: Delete | 60-79: Recommend Delete | 40-59: Optimize | 0-39: Monitor</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        
         {/* Filters Row - Wide Layout */}
         <div className="flex items-center gap-3 mb-4 flex-wrap">
           {/* Filters - Spread out */}
