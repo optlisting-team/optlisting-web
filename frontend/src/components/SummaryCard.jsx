@@ -253,58 +253,38 @@ function SummaryCard({
         </div>
       </div>
 
-      {/* Total Listings - 1 Row */}
-      <div 
-        onClick={() => onToggleFilter ? onToggleFilter() : handleCardClick('all')}
-        className={`opt-card p-2 px-4 cursor-pointer transition-all ${showFilter ? 'ring-1 ring-blue-500/50' : 'hover:bg-zinc-800/50'}`}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-sm">📦</span>
-            <span className="text-lg font-black text-white">{loading ? '...' : (totalListings || 0).toLocaleString()}</span>
-            <span className="text-[10px] text-zinc-500 uppercase">Active Listings</span>
-            {!loading && Object.entries(platformBreakdown).map(([platform, count]) => (
-              count > 0 && <span key={platform} className="text-[10px] px-1.5 py-0.5 bg-zinc-800 rounded text-zinc-400">{platform}: {count.toLocaleString()}</span>
-            ))}
-          </div>
-          <span className={`text-[10px] px-2 py-1 rounded ${showFilter ? 'bg-blue-500/20 text-blue-400' : 'bg-zinc-800 text-zinc-500'}`}>
-            {showFilter ? '✓ Filters' : '⚡ Filters'}
-          </span>
+      {/* Stats Row - 3 Columns */}
+      <div className="grid grid-cols-3 gap-2">
+        {/* Active Listings */}
+        <div 
+          onClick={() => onToggleFilter ? onToggleFilter() : handleCardClick('all')}
+          className={`opt-card p-3 cursor-pointer transition-all text-center ${showFilter ? 'ring-1 ring-blue-500/50' : 'hover:bg-zinc-800/50'}`}
+        >
+          <div className="text-2xl font-black text-white">{loading ? '...' : (totalListings || 0).toLocaleString()}</div>
+          <div className="text-[10px] text-zinc-500 uppercase">Active Listings</div>
+        </div>
+
+        {/* In Queue */}
+        <div 
+          onClick={() => handleCardClick('queue')}
+          className={`opt-card p-3 cursor-pointer transition-all text-center hover:bg-zinc-800/50 ${viewMode === 'queue' ? 'ring-1 ring-blue-500/50' : ''}`}
+        >
+          <div className="text-2xl font-black text-white">{queueCount || 0}</div>
+          <div className="text-[10px] text-zinc-500 uppercase">In Queue</div>
+        </div>
+
+        {/* Removed */}
+        <div 
+          onClick={() => handleCardClick('history')}
+          className={`opt-card p-3 cursor-pointer transition-all text-center hover:bg-zinc-800/50 ${viewMode === 'history' ? 'ring-1 ring-blue-500/50' : ''}`}
+        >
+          <div className={`text-2xl font-black ${totalDeleted > 0 ? 'text-emerald-400' : 'text-white'}`}>{totalDeleted || 0}</div>
+          <div className="text-[10px] text-zinc-500 uppercase">Removed</div>
         </div>
       </div>
 
       {/* Filter Panel Slot */}
       {filterContent}
-
-      {/* Queue - 1 Row */}
-      <div 
-        onClick={() => handleCardClick('queue')}
-        className={`opt-card p-2 px-4 cursor-pointer transition-all hover:bg-zinc-800/50 ${viewMode === 'queue' ? 'ring-1 ring-blue-500/50' : ''}`}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-sm">🗑️</span>
-            <span className="text-lg font-bold text-white">{queueCount || 0}</span>
-            <span className="text-[10px] text-zinc-500 uppercase">In Queue</span>
-          </div>
-          <span className="text-[10px] text-zinc-500">Ready for export</span>
-        </div>
-      </div>
-
-      {/* History - 1 Row */}
-      <div 
-        onClick={() => handleCardClick('history')}
-        className={`opt-card p-2 px-4 cursor-pointer transition-all hover:bg-zinc-800/50 ${viewMode === 'history' ? 'ring-1 ring-blue-500/50' : ''}`}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-sm">💀</span>
-            <span className={`text-lg font-bold ${totalDeleted > 0 ? 'text-emerald-400' : 'text-white'}`}>{totalDeleted || 0}</span>
-            <span className="text-[10px] text-zinc-500 uppercase">Removed</span>
-          </div>
-          <span className="text-[10px] text-zinc-500">Total cleaned</span>
-        </div>
-      </div>
     </div>
   )
 }
