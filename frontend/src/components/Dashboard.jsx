@@ -900,7 +900,7 @@ function Dashboard() {
 
             {/* Briefing Text for Queue View */}
             {viewMode === 'queue' && (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-4">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-4 mt-6">
                 <p className="text-sm text-zinc-400">
                   ✅ <strong className="text-white">Full-Screen Final Review Mode</strong> - Review all items grouped by source. Each section has its own download button.
                 </p>
@@ -909,7 +909,7 @@ function Dashboard() {
 
             {/* Briefing Text for History View */}
             {viewMode === 'history' && (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-4">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-4 mt-6">
                 <p className="text-sm text-zinc-400">
                   💀 <strong className="text-white">Deletion History</strong> - View all items that have been exported for deletion. This is your permanent record.
                 </p>
