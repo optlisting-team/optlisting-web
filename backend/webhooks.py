@@ -26,6 +26,24 @@ PLAN_LIMITS = {
     "default": 100  # 기본값
 }
 
+# 크레딧 팩 정의 (가격 → 크레딧 매핑)
+# Lemon Squeezy의 variant_id 또는 product_name으로 매칭
+CREDIT_PACKS = {
+    # 가격 기준 매핑 (단위: cents)
+    500: 300,      # $5 → 300 크레딧
+    1000: 800,     # $10 → 800 크레딧
+    1500: 1200,    # $15 → 1,200 크레딧
+    2000: 2000,    # $20 → 2,000 크레딧
+    2500: 2600,    # $25 → 2,600 크레딧
+    5000: 6000,    # $50 → 6,000 크레딧
+}
+
+# Variant ID 기준 매핑 (Lemon Squeezy 설정 후 업데이트 필요)
+VARIANT_CREDITS = {
+    # "variant_id": credits
+    # 예: "12345": 300,
+}
+
 
 def verify_webhook_signature(payload: bytes, signature: str) -> bool:
     """
@@ -272,6 +290,95 @@ def handle_subscription_cancelled(db: Session, event_data: Dict) -> bool:
         return False
 
 
+def handle_order_created(db: Session, event_data: Dict) -> bool:
+    """
+    order_created 이벤트 처리 (크레딧 팩 구매)
+    
+    Args:
+        db: 데이터베이스 세션
+        event_data: 웹훅 이벤트 데이터
+    
+    Returns:
+        처리 성공 여부
+    """
+    try:
+        order = event_data.get('data', {}).get('attributes', {})
+        order_id = event_data.get('data', {}).get('id')
+        
+        # user_id 추출 (custom_data에서)
+        custom_data = order.get('custom_data', {}) or {}
+        
+        # custom_data가 문자열이면 JSON 파싱 시도
+        if isinstance(custom_data, str):
+            try:
+                import json
+                custom_data = json.loads(custom_data)
+            except:
+                custom_data = {}
+        
+        user_id = custom_data.get('user_id')
+        
+        if not user_id:
+            # first_order_item에서 추출 시도
+            first_order_item = order.get('first_order_item', {}) or {}
+            user_id = first_order_item.get('custom_data', {}).get('user_id') if isinstance(first_order_item.get('custom_data'), dict) else None
+        
+        if not user_id:
+            logger.error(f"order_created: user_id를 찾을 수 없습니다. order_id={order_id}")
+            return False
+        
+        # 결제 금액에서 크레딧 수 계산 (cents → credits)
+        total_cents = order.get('total', 0)  # 총 결제 금액 (cents)
+        
+        # Variant ID로 먼저 확인
+        first_order_item = order.get('first_order_item', {}) or {}
+        variant_id = str(first_order_item.get('variant_id', ''))
+        
+        credits_to_add = 0
+        
+        # 1. Variant ID 매핑 확인
+        if variant_id and variant_id in VARIANT_CREDITS:
+            credits_to_add = VARIANT_CREDITS[variant_id]
+        # 2. 가격 기반 매핑 확인
+        elif total_cents in CREDIT_PACKS:
+            credits_to_add = CREDIT_PACKS[total_cents]
+        # 3. 근사값으로 매핑 (오차 범위 ±50 cents)
+        else:
+            for price_cents, credits in CREDIT_PACKS.items():
+                if abs(total_cents - price_cents) <= 50:
+                    credits_to_add = credits
+                    break
+        
+        if credits_to_add <= 0:
+            logger.warning(f"order_created: 알 수 없는 크레딧 팩. order_id={order_id}, total={total_cents}")
+            # 안전을 위해 기본값 설정 (최소 팩)
+            credits_to_add = 300
+        
+        # 프로필 조회 또는 생성
+        profile = get_or_create_profile(db, user_id)
+        
+        # 크레딧 추가
+        profile.purchased_credits = (profile.purchased_credits or 0) + credits_to_add
+        
+        # LS 고객 ID 저장 (없는 경우)
+        customer_id = order.get('customer_id')
+        if customer_id and not profile.ls_customer_id:
+            profile.ls_customer_id = str(customer_id)
+        
+        db.commit()
+        
+        logger.info(f"크레딧 팩 구매 완료: user_id={user_id}, credits={credits_to_add}, order_id={order_id}")
+        return True
+        
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"order_created 처리 중 DB 오류: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"order_created 처리 중 예상치 못한 오류: {e}")
+        return False
+
+
 def process_webhook_event(db: Session, event_data: Dict) -> bool:
     """
     웹훅 이벤트 처리 라우터
@@ -294,6 +401,8 @@ def process_webhook_event(db: Session, event_data: Dict) -> bool:
             return handle_subscription_updated(db, event_data)
         elif event_name == 'subscription_cancelled':
             return handle_subscription_cancelled(db, event_data)
+        elif event_name == 'order_created':
+            return handle_order_created(db, event_data)
         else:
             logger.warning(f"처리되지 않은 이벤트: {event_name}")
             return True  # 알 수 없는 이벤트는 성공으로 처리 (200 OK 반환)
