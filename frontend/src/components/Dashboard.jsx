@@ -829,12 +829,25 @@ function Dashboard() {
                 />
               )}
 
-              {/* View Mode Info */}
+              {/* View Mode Info + Action Button */}
               {viewMode === 'all' && (
                 <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-4">
-                  <p className="text-sm text-zinc-400">
-                    📋 <strong className="text-white">Viewing All Listings</strong> - Click "Low Interest Detected" card to filter and optimize inventory.
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-zinc-400">
+                      📋 <strong className="text-white">Viewing All {allListings.length} Listings</strong>
+                    </p>
+                    <button
+                      onClick={() => {
+                        setShowFilter(true)
+                        setViewMode('zombies')
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-orange-500 text-white text-sm font-bold rounded-lg hover:from-red-500 hover:to-orange-400 transition-all shadow-lg shadow-red-500/20"
+                    >
+                      <span>🔬</span>
+                      <span>Find Zombies</span>
+                      <span>→</span>
+                    </button>
+                  </div>
                 </div>
               )}
 
