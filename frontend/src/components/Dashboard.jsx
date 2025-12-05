@@ -466,8 +466,8 @@ function Dashboard() {
     setViewMode(mode)
     setSelectedIds([]) // Reset selection when switching views
     
-    // Close filter panel when switching to non-zombies view
-    if (mode !== 'zombies' && mode !== 'total') {
+    // Close filter when switching to non-zombie views
+    if (mode === 'all' || mode === 'queue' || mode === 'history') {
       setShowFilter(false)
     }
     
@@ -475,9 +475,10 @@ function Dashboard() {
       // Statistical view - no data fetching needed
       return
     } else if (mode === 'all') {
+      // Show ALL listings (no filtering)
       fetchAllListings()
     } else if (mode === 'zombies') {
-      // Show zombie listings
+      // Show zombie listings (filter stays open for adjustment)
       fetchZombies()
     } else if (mode === 'history') {
       fetchHistory()

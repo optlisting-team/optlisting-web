@@ -256,17 +256,13 @@ function SummaryCard({
 
       {/* Stats Row - 4 Columns: Flow visualization */}
       <div className="grid grid-cols-4 gap-2">
-        {/* 1. Active Listings - Starting point */}
+        {/* 1. Active Listings - Click to see all listings */}
         <div 
-          className={`opt-card p-3 transition-all text-center relative ${showFilter ? 'ring-1 ring-blue-500/50' : 'hover:bg-zinc-800/50'}`}
+          onClick={() => handleCardClick('all')}
+          className={`opt-card p-3 cursor-pointer transition-all text-center relative hover:bg-zinc-800/50 ${viewMode === 'all' ? 'ring-1 ring-blue-500/50' : ''}`}
         >
-          <div 
-            onClick={() => onToggleFilter ? onToggleFilter() : handleCardClick('all')}
-            className="cursor-pointer"
-          >
-            <div className="text-2xl font-black text-white">{loading ? '...' : (totalListings || 0).toLocaleString()}</div>
-            <div className="text-[10px] text-zinc-500 uppercase">Active</div>
-          </div>
+          <div className="text-2xl font-black text-white">{loading ? '...' : (totalListings || 0).toLocaleString()}</div>
+          <div className="text-[10px] text-zinc-500 uppercase">Active</div>
           {onSync && (
             <button
               onClick={(e) => { e.stopPropagation(); onSync(); }}
@@ -281,10 +277,10 @@ function SummaryCard({
           )}
         </div>
 
-        {/* 2. Zombies - Found after filtering */}
+        {/* 2. Zombies - Click to open filter and find zombies */}
         <div 
-          onClick={() => handleCardClick('zombies')}
-          className={`opt-card p-3 cursor-pointer transition-all text-center hover:bg-zinc-800/50 ${viewMode === 'zombies' ? 'ring-1 ring-red-500/50' : ''} ${totalZombies > 0 ? 'border-red-500/30' : ''}`}
+          onClick={() => { if (onToggleFilter) onToggleFilter(); handleCardClick('zombies'); }}
+          className={`opt-card p-3 cursor-pointer transition-all text-center hover:bg-zinc-800/50 ${viewMode === 'zombies' || showFilter ? 'ring-1 ring-red-500/50' : ''} ${totalZombies > 0 ? 'border-red-500/30' : ''}`}
         >
           <div className={`text-2xl font-black ${totalZombies > 0 ? 'text-red-400' : 'text-white'}`}>{totalZombies || 0}</div>
           <div className={`text-[10px] uppercase ${totalZombies > 0 ? 'text-red-400' : 'text-zinc-500'}`}>Zombies</div>
