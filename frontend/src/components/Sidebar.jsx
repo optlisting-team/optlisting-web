@@ -237,7 +237,13 @@ function Sidebar() {
           </div>
 
           {/* Buy More Button */}
-          <div className="w-full py-2 text-xs font-bold text-amber-400 border border-amber-500/30 rounded-lg flex items-center justify-center gap-2">
+          <div 
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowCreditModal(true)
+            }}
+            className="w-full py-2 text-xs font-bold text-amber-400 border border-amber-500/30 rounded-lg flex items-center justify-center gap-2 cursor-pointer hover:border-amber-500/50 hover:text-amber-300 transition-colors"
+          >
             <CreditCard className="w-4 h-4" />
             Buy More Credits
           </div>
