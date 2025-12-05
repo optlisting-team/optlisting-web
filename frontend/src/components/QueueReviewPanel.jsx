@@ -1,11 +1,12 @@
-import React from 'react'
+import React, { useState } from 'react'
 import SourceBadge from './SourceBadge'
 import PlatformBadge from './PlatformBadge'
 import axios from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
-function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, onSourceChange }) {
+function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, onSourceChange, onMarkDownloaded }) {
+  const [downloadedGroups, setDownloadedGroups] = useState(new Set())
   // Group items by supplier
   const groupedBySource = queue.reduce((acc, item) => {
     // Safely extract supplier name, handling null, undefined, empty string, and "undefined" string
@@ -79,18 +80,13 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
         console.log('API log skipped (demo mode)')
       }
 
-      // Notify parent to remove exported items and update history
-      if (onExportComplete) {
-        onExportComplete(items.map(item => item.id))
-      }
+      // Mark this group as downloaded (don't remove)
+      setDownloadedGroups(prev => new Set([...prev, source]))
       
       // Update history count
       if (onHistoryUpdate) {
         onHistoryUpdate()
       }
-
-      // Success feedback
-      alert(`✅ ${items.length} items exported to ${sourceLower}_delete_${timestamp}.csv`)
     } catch (err) {
       alert(`Failed to export ${source} CSV: ${err.message}`)
       console.error(err)
@@ -126,17 +122,29 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
       {Object.entries(groupedBySource).map(([source, items]) => {
+        const isDownloaded = downloadedGroups.has(source)
         return (
           <div
             key={source}
-            className="bg-white rounded-lg border border-gray-300 overflow-hidden flex flex-col"
+            className={`rounded-lg border overflow-hidden flex flex-col transition-all ${
+              isDownloaded 
+                ? 'bg-zinc-800 border-zinc-700 opacity-60' 
+                : 'bg-white border-gray-300'
+            }`}
           >
             {/* Header */}
-            <div className={`${colors.headerBg} ${colors.headerText} px-6 py-4 flex-shrink-0 border-b border-gray-300`}>
+            <div className={`${isDownloaded ? 'bg-zinc-900 text-zinc-400' : `${colors.headerBg} ${colors.headerText}`} px-6 py-4 flex-shrink-0 border-b ${isDownloaded ? 'border-zinc-700' : 'border-gray-300'}`}>
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold">
-                  {source.toUpperCase()} - {items.length} Item{items.length !== 1 ? 's' : ''}
-                </h2>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-xl font-bold">
+                    {source.toUpperCase()} - {items.length} Item{items.length !== 1 ? 's' : ''}
+                  </h2>
+                  {isDownloaded && (
+                    <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded-full">
+                      ✓ Downloaded
+                    </span>
+                  )}
+                </div>
                 <SourceBadge source={source} />
               </div>
             </div>
@@ -232,6 +240,20 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                   >
                     <span>🔒</span>
                     <span>Download Disabled - Verify Suppliers First</span>
+                  </button>
+                </div>
+              ) : isDownloaded ? (
+                <div className="space-y-2">
+                  <div className="w-full bg-emerald-600/20 text-emerald-400 font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 border border-emerald-600/30">
+                    <span>✅</span>
+                    <span>Downloaded - {items.length} items exported</span>
+                  </div>
+                  <button
+                    onClick={() => handleSourceExport(source, items)}
+                    className="w-full bg-zinc-700 hover:bg-zinc-600 text-zinc-300 font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+                  >
+                    <span>🔄</span>
+                    <span>Download Again</span>
                   </button>
                 </div>
               ) : (
