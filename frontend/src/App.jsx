@@ -23,33 +23,33 @@ function App() {
       <StoreProvider>
         <AccountProvider>
           <Router>
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
-            <Route path="/terms" element={<TermsOfService />} />
-            <Route path="/privacy" element={<PrivacyPolicy />} />
-            
-            {/* Protected Routes */}
-            <Route 
-              path="/dashboard" 
-              element={
-                <ProtectedRoute>
-                  <DashboardPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/settings" 
-              element={
-                <ProtectedRoute>
-                  <SettingsPage />
-                </ProtectedRoute>
-              } 
-            />
-          </Routes>
-        </Router>
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/signup" element={<SignupPage />} />
+              <Route path="/terms" element={<TermsOfService />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
+              
+              {/* Protected Routes */}
+              <Route 
+                path="/dashboard" 
+                element={
+                  <ProtectedRoute>
+                    <DashboardPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/settings" 
+                element={
+                  <ProtectedRoute>
+                    <SettingsPage />
+                  </ProtectedRoute>
+                } 
+              />
+            </Routes>
+          </Router>
         </AccountProvider>
       </StoreProvider>
     </AuthProvider>
