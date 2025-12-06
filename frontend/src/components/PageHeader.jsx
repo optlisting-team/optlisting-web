@@ -1,11 +1,13 @@
 import { useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { Bell, Search, RefreshCw, User, ChevronDown } from 'lucide-react'
+import { Bell, Search, RefreshCw, User, ChevronDown, Zap, CreditCard, ChevronRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useAccount } from '../contexts/AccountContext'
 
 function PageHeader() {
   const location = useLocation()
   const { user, isAuthenticated, signOut } = useAuth()
+  const { credits, plan, setShowPlanModal, setShowCreditModal } = useAccount()
   const [currentTime, setCurrentTime] = useState(new Date())
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [showAuthMenu, setShowAuthMenu] = useState(false)
@@ -148,6 +150,55 @@ function PageHeader() {
                 3
               </span>
             </button>
+
+            {/* Credits */}
+            {isAuthenticated && (
+              <button
+                onClick={() => setShowCreditModal(true)}
+                className="flex items-center gap-2 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-800 hover:border-amber-500/30 transition-all"
+              >
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                  <Zap className="w-4 h-4 text-white" />
+                </div>
+                <div className="text-left hidden md:block">
+                  <div className="text-xs text-zinc-500 text-[10px] uppercase tracking-wider">Credits</div>
+                  <div className="text-sm font-bold text-white">
+                    {credits !== null ? credits.toLocaleString() : '...'}
+                  </div>
+                </div>
+              </button>
+            )}
+
+            {/* Plan */}
+            {isAuthenticated && (
+              <button
+                onClick={() => setShowPlanModal(true)}
+                className={`flex items-center gap-2 px-3 py-2 border rounded-xl hover:scale-[1.02] transition-all hidden md:flex ${
+                  plan === 'PRO' 
+                    ? 'bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/20 hover:border-amber-500/40' 
+                    : plan === 'BUSINESS'
+                      ? 'bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/20 hover:border-purple-500/40'
+                      : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'
+                }`}
+              >
+                <span className="text-lg">
+                  {plan === 'PRO' ? '👑' : plan === 'BUSINESS' ? '🚀' : '📦'}
+                </span>
+                <div className="text-left">
+                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Plan</div>
+                  <div className={`text-sm font-bold ${
+                    plan === 'PRO' 
+                      ? 'text-amber-400' 
+                      : plan === 'BUSINESS'
+                        ? 'text-purple-400'
+                        : 'text-zinc-300'
+                  }`}>
+                    {plan}
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-zinc-500" />
+              </button>
+            )}
 
             {/* User Menu */}
             {isAuthenticated && (

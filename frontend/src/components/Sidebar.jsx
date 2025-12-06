@@ -3,9 +3,8 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import StoreSwitcher from './StoreSwitcher'
 import { useAuth } from '../contexts/AuthContext'
-import { LayoutDashboard, List, History, User, Zap, CreditCard, Settings, ChevronRight, LogOut, X, Check, ChevronDown } from 'lucide-react'
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+import { useAccount } from '../contexts/AccountContext'
+import { LayoutDashboard, List, History, Settings, X, Check, ChevronDown } from 'lucide-react'
 
 // Credit Pack Options
 const CREDIT_PACKS = [
@@ -19,23 +18,11 @@ const CREDIT_PACKS = [
 
 function Sidebar() {
   const location = useLocation()
-  const navigate = useNavigate()
-  const { user, signOut, isAuthenticated } = useAuth()
-  const [credits, setCredits] = useState(null)
-  const [plan, setPlan] = useState('FREE')
-  const [apiStatus, setApiStatus] = useState('checking')
-  const [showPlanModal, setShowPlanModal] = useState(false)
-  const [showCreditModal, setShowCreditModal] = useState(false)
+  const { showPlanModal, setShowPlanModal, showCreditModal, setShowCreditModal } = useAccount()
   const [selectedPack, setSelectedPack] = useState(CREDIT_PACKS[0])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const planModalRef = useRef(null)
   const creditModalRef = useRef(null)
-
-  // 로그아웃 핸들러
-  const handleSignOut = async () => {
-    await signOut()
-    navigate('/login')
-  }
 
   // Close modals when clicking outside
   useEffect(() => {
@@ -61,31 +48,6 @@ function Sidebar() {
       document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [showCreditModal, showPlanModal])
-
-  // Fetch credits on mount
-  useEffect(() => {
-    const fetchCredits = async () => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/credits?user_id=default-user`)
-        if (response.ok) {
-          const data = await response.json()
-          setCredits(data.available_credits)
-          setPlan(data.current_plan || 'FREE')
-          setApiStatus('connected')
-        } else {
-          setApiStatus('error')
-        }
-      } catch (err) {
-        console.error('Failed to fetch credits:', err)
-        setApiStatus('error')
-      }
-    }
-    
-    fetchCredits()
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchCredits, 30000)
-    return () => clearInterval(interval)
-  }, [])
 
   const isActive = (path) => {
     if (path.includes('?')) {
@@ -131,32 +93,9 @@ function Sidebar() {
         </div>
 
         {/* API Status */}
-        <div className={`
-          flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium
-          transition-all duration-300
-          ${apiStatus === 'connected' 
-            ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' 
-            : apiStatus === 'error'
-              ? 'bg-red-500/10 border border-red-500/20 text-red-400'
-              : 'bg-zinc-800/50 border border-zinc-700/50 text-zinc-400'
-          }
-        `}>
-          <span className={`
-            status-dot
-            ${apiStatus === 'connected' 
-              ? 'status-dot-success' 
-              : apiStatus === 'error'
-                ? 'status-dot-danger'
-                : 'bg-zinc-500'
-            }
-          `} />
-          <span>
-            {apiStatus === 'connected' 
-              ? 'API Connected' 
-              : apiStatus === 'error'
-                ? 'Connection Error'
-                : 'Checking...'}
-          </span>
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 transition-all duration-300">
+          <span className="status-dot status-dot-success" />
+          <span>API Connected</span>
         </div>
       </div>
 
@@ -215,122 +154,6 @@ function Sidebar() {
         </Link>
       </nav>
 
-      {/* Credits Card */}
-      <div className="px-3 py-3 border-t border-zinc-800/50">
-        <div className="w-full opt-card p-4 bg-gradient-to-br from-zinc-900 to-zinc-950 hover:from-zinc-800 hover:to-zinc-900 transition-all text-left">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
-              <Zap className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1">
-              <div className="text-xs text-zinc-500 uppercase tracking-wider">Credits</div>
-              <div className="text-2xl font-bold text-white data-value">
-                {credits !== null ? credits.toLocaleString() : '...'}
-              </div>
-            </div>
-          </div>
-          
-          {/* Credit Bar */}
-          <div className="mb-3">
-            <div className="flex justify-between text-[10px] text-zinc-500 mb-1">
-              <span>Used this month</span>
-              <span className="data-value">{credits !== null ? `${Math.max(0, 1000 - credits)} / 1000` : '...'}`}</span>
-            </div>
-            <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full transition-all duration-500"
-                style={{ width: credits !== null ? `${Math.min(((1000 - credits) / 1000) * 100, 100)}%` : '0%' }}
-              />
-            </div>
-          </div>
-
-          {/* Buy More Button */}
-          <button
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              setShowCreditModal(true)
-            }}
-            className="w-full py-2 text-xs font-bold text-amber-400 border border-amber-500/30 rounded-lg flex items-center justify-center gap-2 cursor-pointer hover:border-amber-500/50 hover:text-amber-300 transition-colors"
-          >
-            <CreditCard className="w-4 h-4" />
-            Buy More Credits
-          </button>
-        </div>
-      </div>
-
-      {/* User Profile & Plan */}
-      <div className="px-3 py-3 border-t border-zinc-800/50">
-        {/* User Info */}
-        <div className="flex items-center gap-3 mb-3 px-1">
-          <div className="relative">
-            {user?.user_metadata?.avatar_url ? (
-              <img 
-                src={user.user_metadata.avatar_url} 
-                alt="Profile" 
-                className="w-10 h-10 rounded-xl object-cover border border-zinc-600"
-              />
-            ) : (
-              <div className="w-10 h-10 bg-gradient-to-br from-zinc-700 to-zinc-800 rounded-xl flex items-center justify-center border border-zinc-600">
-                <User className="w-5 h-5 text-zinc-400" />
-              </div>
-            )}
-            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-zinc-950" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-white truncate">
-              {user?.user_metadata?.full_name || user?.user_metadata?.name || 'User'}
-            </p>
-            <p className="text-xs text-zinc-500 truncate">
-              {user?.email || 'Not signed in'}
-            </p>
-          </div>
-          {/* Logout Button */}
-          <button
-            onClick={handleSignOut}
-            className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-            title="Sign Out"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Plan Badge */}
-        <button
-          onClick={() => setShowPlanModal(true)}
-          className={`
-            w-full flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer
-            transition-all hover:scale-[1.02] hover:shadow-lg
-            ${plan === 'PRO' 
-              ? 'bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 hover:border-amber-500/40' 
-              : plan === 'BUSINESS'
-                ? 'bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 hover:border-purple-500/40'
-                : 'bg-zinc-800/50 border border-zinc-700/50 hover:border-zinc-600/50'
-            }
-          `}
-        >
-          <div className="flex items-center gap-2">
-            <span className={`text-lg ${
-              plan === 'PRO' ? '👑' : plan === 'BUSINESS' ? '🚀' : '📦'
-            }`}>
-              {plan === 'PRO' ? '👑' : plan === 'BUSINESS' ? '🚀' : '📦'}
-            </span>
-            <div>
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Current Plan</div>
-              <div className={`text-sm font-bold ${
-                plan === 'PRO' 
-                  ? 'text-amber-400' 
-                  : plan === 'BUSINESS'
-                    ? 'text-purple-400'
-                    : 'text-zinc-300'
-              }`}>
-                {plan}
-              </div>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-zinc-500" />
-        </button>
-      </div>
 
       {/* Plan Modal */}
       {showPlanModal && createPortal(
