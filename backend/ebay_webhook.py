@@ -260,10 +260,103 @@ async def ebay_deletion_notification(request: Request):
         logger.info(f"   Type: {notification_type}")
         logger.info(f"   eBay User ID: {ebay_user_id}")
         
-        # TODO: 실제 사용자 데이터 삭제 로직 구현
-        # - profiles 테이블에서 ebay_user_id로 검색
-        # - 관련 listings 삭제
-        # - deletion_logs 기록
+        # 실제 사용자 데이터 삭제 로직 구현
+        from .models import get_db, Profile, Listing, DeletionLog
+        
+        db = next(get_db())
+        try:
+            # 1. profiles 테이블에서 ebay_user_id로 검색
+            profile = db.query(Profile).filter(Profile.ebay_user_id == ebay_user_id).first()
+            
+            if not profile:
+                logger.warning(f"⚠️ Profile not found for eBay User ID: {ebay_user_id}")
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "status": "success",
+                        "message": "Deletion notification received (no profile found)"
+                    }
+                )
+            
+            user_id = profile.user_id
+            logger.info(f"   Found profile: user_id={user_id}")
+            
+            # 2. 해당 사용자의 모든 listings 조회
+            user_listings = db.query(Listing).filter(Listing.user_id == user_id).all()
+            listing_count = len(user_listings)
+            
+            logger.info(f"   Found {listing_count} listings for user {user_id}")
+            
+            if listing_count > 0:
+                # 3. deletion_logs 기록 (삭제 전에 스냅샷 저장)
+                deletion_logs = []
+                for listing in user_listings:
+                    # Extract supplier_name
+                    supplier = listing.supplier_name or listing.supplier or listing.source or "Unknown"
+                    
+                    # Extract platform/marketplace
+                    platform = listing.platform or listing.marketplace or "eBay"
+                    
+                    # Create snapshot JSONB with full listing data
+                    snapshot_data = {
+                        "supplier_name": supplier,
+                        "supplier_id": listing.supplier_id,
+                        "platform": platform,
+                        "title": listing.title,
+                        "price": listing.price,
+                        "sold_qty": listing.sold_qty,
+                        "watch_count": listing.watch_count,
+                        "ebay_item_id": listing.ebay_item_id,
+                        "sku": listing.sku,
+                        "date_listed": listing.date_listed.isoformat() if listing.date_listed else None,
+                        "metrics": listing.metrics if listing.metrics else {},
+                        "analysis_meta": listing.analysis_meta if listing.analysis_meta else {},
+                        "deletion_reason": "eBay Account Deletion",
+                        "ebay_user_id": ebay_user_id
+                    }
+                    
+                    log_entry = DeletionLog(
+                        item_id=listing.ebay_item_id or listing.item_id or str(listing.id),
+                        title=listing.title,
+                        platform=platform,
+                        source=supplier  # Use source field (supplier_name)
+                    )
+                    deletion_logs.append(log_entry)
+                
+                # Bulk insert deletion logs
+                db.bulk_save_objects(deletion_logs)
+                logger.info(f"   Created {len(deletion_logs)} deletion log entries")
+                
+                # 4. 관련 listings 삭제
+                for listing in user_listings:
+                    db.delete(listing)
+                logger.info(f"   Deleted {listing_count} listings")
+                
+                # 5. Profile도 삭제 (선택사항 - 또는 비활성화만 할 수도 있음)
+                # 여기서는 삭제하지 않고, 필요시 나중에 정리할 수 있도록 남겨둠
+                # db.delete(profile)
+                
+                db.commit()
+                logger.info(f"✅ Successfully deleted {listing_count} listings and created deletion logs")
+            else:
+                logger.info(f"   No listings found for user {user_id}")
+                db.commit()
+            
+        except Exception as e:
+            db.rollback()
+            logger.error(f"❌ Error processing deletion: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            # 에러가 발생해도 eBay에 성공 응답을 보내야 함 (재시도 방지)
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "status": "error",
+                    "message": f"Deletion notification received but processing failed: {str(e)}"
+                }
+            )
+        finally:
+            db.close()
         
         logger.info(f"✅ Deletion notification acknowledged")
         logger.info("=" * 60)
@@ -272,7 +365,8 @@ async def ebay_deletion_notification(request: Request):
             status_code=200,
             content={
                 "status": "success",
-                "message": "Deletion notification received"
+                "message": "Deletion notification received and processed",
+                "deleted_listings": listing_count if 'listing_count' in locals() else 0
             }
         )
         
