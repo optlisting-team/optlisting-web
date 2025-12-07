@@ -93,57 +93,66 @@ function ProductJourneySection({ zombies = [] }) {
           const hasAutomationTool = automationTool !== null
           
           return (
-            <div key={supplier.name} className="flex items-center gap-3">
-              {/* Supplier - Multiple can be shown */}
-              <div className="relative flex-1">
-                <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">YOUR SUPPLIER {suppliers.length > 1 ? `#${index + 1}` : ''}</div>
-                <div className="w-full flex items-center justify-between px-3 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-lg">
-                  <div className="flex items-center gap-2 flex-1">
-                    <span className="text-sm font-semibold text-white">{supplier.name}</span>
-                    <span className="text-[10px] text-zinc-500 bg-zinc-900/50 px-1.5 py-0.5 rounded">
-                      {supplier.count} items ({supplier.percentage}%)
+            <div key={supplier.name} className="flex items-center gap-2">
+              {/* Supplier - Smaller size */}
+              <div className="relative flex-shrink-0" style={{ minWidth: '140px' }}>
+                <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">YOUR SUPPLIER {suppliers.length > 1 ? `#${index + 1}` : ''}</div>
+                <div className="w-full flex items-center justify-between px-2 py-1.5 bg-zinc-800/50 border border-zinc-700 rounded-lg">
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    <span className="text-xs font-semibold text-white truncate">{supplier.name}</span>
+                    <span className="text-[9px] text-zinc-500 bg-zinc-900/50 px-1 py-0.5 rounded flex-shrink-0">
+                      {supplier.count} ({supplier.percentage}%)
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Arrow - Colored for better visibility */}
-              <ArrowRight className="w-5 h-5 text-blue-400 mt-6 flex-shrink-0" />
+              {/* Arrow - Longer line */}
+              <div className="flex items-center flex-1 min-w-[40px] max-w-[60px]">
+                <div className="w-full h-0.5 bg-blue-400"></div>
+                <ArrowRight className="w-4 h-4 text-blue-400 flex-shrink-0" />
+              </div>
 
-              {/* Automation Tool Selection - Inferred or Direct Upload */}
+              {/* Automation Tool Selection - Smaller size */}
               {hasAutomationTool ? (
                 <>
-                  <div className="relative flex-1">
-                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">YOUR AUTOMATION TOOL</div>
-                    <div className="w-full flex items-center justify-between px-3 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-lg">
-                      <span className="text-sm font-semibold text-white">{automationTool}</span>
+                  <div className="relative flex-shrink-0" style={{ minWidth: '120px' }}>
+                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">YOUR AUTOMATION TOOL</div>
+                    <div className="w-full flex items-center justify-between px-2 py-1.5 bg-zinc-800/50 border border-zinc-700 rounded-lg">
+                      <span className="text-xs font-semibold text-white truncate">{automationTool}</span>
                     </div>
                   </div>
-                  {/* Arrow - Colored for better visibility */}
-                  <ArrowRight className="w-5 h-5 text-blue-400 mt-6 flex-shrink-0" />
+                  {/* Arrow - Longer line */}
+                  <div className="flex items-center flex-1 min-w-[40px] max-w-[60px]">
+                    <div className="w-full h-0.5 bg-blue-400"></div>
+                    <ArrowRight className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                  </div>
                 </>
               ) : (
                 <>
-                  <div className="relative flex-1">
-                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">UPLOAD METHOD</div>
-                    <div className="w-full flex items-center justify-between px-3 py-2.5 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                      <span className="text-sm font-semibold text-blue-400">Direct Upload</span>
+                  <div className="relative flex-shrink-0" style={{ minWidth: '120px' }}>
+                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">UPLOAD METHOD</div>
+                    <div className="w-full flex items-center justify-between px-2 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                      <span className="text-xs font-semibold text-blue-400 truncate">Direct Upload</span>
                     </div>
                   </div>
-                  {/* Arrow - Colored for better visibility */}
-                  <ArrowRight className="w-5 h-5 text-blue-400 mt-6 flex-shrink-0" />
+                  {/* Arrow - Longer line */}
+                  <div className="flex items-center flex-1 min-w-[40px] max-w-[60px]">
+                    <div className="w-full h-0.5 bg-blue-400"></div>
+                    <ArrowRight className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                  </div>
                 </>
               )}
 
-              {/* eBay Store Status - No green color to avoid confusion */}
-              <div className="flex-1">
-                <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">EBAY STORE</div>
-                <div className="flex items-center gap-2 px-3 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-lg">
-                  <div className="w-8 h-8 bg-zinc-700 rounded-lg flex items-center justify-center">
-                    <span className="text-xs font-bold text-white">ebay</span>
+              {/* eBay Store Status - Smaller size */}
+              <div className="flex-shrink-0" style={{ minWidth: '120px' }}>
+                <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">EBAY STORE</div>
+                <div className="flex items-center gap-1.5 px-2 py-1.5 bg-zinc-800/50 border border-zinc-700 rounded-lg">
+                  <div className="w-6 h-6 bg-zinc-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-[10px] font-bold text-white">ebay</span>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-white">eBay Store</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-white truncate">eBay Store</p>
                   </div>
                 </div>
               </div>
