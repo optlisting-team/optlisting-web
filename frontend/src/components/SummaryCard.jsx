@@ -10,11 +10,10 @@ const INITIAL_STORES = [
 
 // Product Journey Section Component
 function ProductJourneySection({ zombies = [] }) {
-
-  // Analyze zombies to find most common supplier
-  const analyzeSupplier = () => {
+  // Analyze all suppliers with counts and percentages
+  const analyzeSuppliers = () => {
     if (!zombies || zombies.length === 0) {
-      return 'Unknown'
+      return []
     }
 
     // Count suppliers
@@ -24,22 +23,28 @@ function ProductJourneySection({ zombies = [] }) {
       supplierCount[supplier] = (supplierCount[supplier] || 0) + 1
     })
 
-    // Find most common supplier
-    const sortedSuppliers = Object.entries(supplierCount)
-      .sort((a, b) => b[1] - a[1])
+    // Convert to array with percentage
+    const total = zombies.length
+    const suppliers = Object.entries(supplierCount)
+      .map(([name, count]) => ({
+        name,
+        count,
+        percentage: Math.round((count / total) * 100)
+      }))
+      .sort((a, b) => b.count - a.count) // Sort by count descending
     
-    return sortedSuppliers.length > 0 ? sortedSuppliers[0][0] : 'Unknown'
+    return suppliers
   }
 
   // Infer automation tool based on supplier patterns
-  const inferAutomationTool = (supplier) => {
+  const inferAutomationTool = () => {
     // Common patterns: AutoDS is most popular, but we can infer from supplier
     // For now, default to AutoDS as it's the most common
     return 'AutoDS'
   }
 
-  const detectedSupplier = analyzeSupplier()
-  const detectedTool = inferAutomationTool(detectedSupplier)
+  const suppliers = analyzeSuppliers()
+  const detectedTool = inferAutomationTool()
 
   if (suppliers.length === 0) {
     return null
