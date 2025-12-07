@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import StoreSwitcher from './StoreSwitcher'
 import { useAuth } from '../contexts/AuthContext'
 import { useAccount } from '../contexts/AccountContext'
-import { LayoutDashboard, List, History, Settings, X, Check, ChevronDown } from 'lucide-react'
+import { LayoutDashboard, List, History, Settings, X, Check, ChevronDown, ChevronRight } from 'lucide-react'
 
 // Credit Pack Options
 const CREDIT_PACKS = [
