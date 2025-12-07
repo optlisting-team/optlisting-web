@@ -141,7 +141,7 @@ function Dashboard() {
   // API Health Check - Check connection on mount
   const checkApiHealth = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/`, { timeout: 5000 })
+      const response = await axios.get(`${API_BASE_URL}/api/health`, { timeout: 10000 })
       if (response.status === 200) {
         setApiConnected(true)
         setApiError(null)
