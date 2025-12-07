@@ -395,21 +395,6 @@ function SummaryCard({
           <span className="w-1 h-4 bg-gradient-to-b from-blue-500 to-cyan-500 rounded-full" />
             Store Analytics
           </h2>
-        
-        {/* Right: API Status Only */}
-        <div className="flex items-center gap-2">
-          {apiConnected ? (
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
-              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-              <span className="text-[10px] font-bold text-emerald-400">LIVE</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-red-500/10 border border-red-500/20 rounded-md">
-              <div className="w-1.5 h-1.5 bg-red-500 rounded-full" />
-              <span className="text-[10px] font-bold text-red-400">{apiError || 'Offline'}</span>
-            </div>
-          )}
-        </div>
       </div>
 
       
