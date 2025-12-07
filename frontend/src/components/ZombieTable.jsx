@@ -594,26 +594,7 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                       className="w-5 h-5 rounded border-zinc-600 text-white focus:ring-white bg-zinc-800 cursor-pointer"
                     />
                   </td>
-                  {/* Filter order: Days (Age) → Sales → Watches → Impressions → Views */}
-                  <td className="px-2 py-4 text-sm text-zinc-400 text-center">
-                    {zombie.days_listed || 'N/A'}d
-                  </td>
-                  <td className="px-2 py-4 text-sm text-zinc-400 data-value text-center">
-                    {zombie.total_sales || 0}
-                  </td>
-                  <td className="px-2 py-4 text-sm text-zinc-400 data-value text-center">
-                    {zombie.watch_count || 0}
-                  </td>
-                  <td className="px-2 py-4 text-sm text-zinc-400 data-value text-center">
-                    {zombie.impressions || 0}
-                  </td>
-                  <td className="px-2 py-4 text-sm text-zinc-400 data-value text-center">
-                    {zombie.views || 0}
-                  </td>
-                  <td className="px-2 py-4">
-                    <ZombieScoreBadge score={zombie.zombieScore} />
-                  </td>
-                  {/* Remaining columns */}
+                  {/* Column order: Platform → SKU → Item ID → Title → Score → Filter order (Age → Sales → Watch → Imp → Views) → Recommendation → Supplier → Price */}
                   <td className="px-2 py-4">
                     <div className="relative group inline-block">
                       <PlatformBadge marketplace={zombie.marketplace || 'eBay'} />
@@ -652,6 +633,25 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                         </span>
                       )}
                     </div>
+                  </td>
+                  <td className="px-2 py-4">
+                    <ZombieScoreBadge score={zombie.zombieScore} />
+                  </td>
+                  {/* Filter order: Days (Age) → Sales → Watches → Impressions → Views */}
+                  <td className="px-2 py-4 text-sm text-zinc-400 text-center">
+                    {zombie.days_listed || 'N/A'}d
+                  </td>
+                  <td className="px-2 py-4 text-sm text-zinc-400 data-value text-center">
+                    {zombie.total_sales || 0}
+                  </td>
+                  <td className="px-2 py-4 text-sm text-zinc-400 data-value text-center">
+                    {zombie.watch_count || 0}
+                  </td>
+                  <td className="px-2 py-4 text-sm text-zinc-400 data-value text-center">
+                    {zombie.impressions || 0}
+                  </td>
+                  <td className="px-2 py-4 text-sm text-zinc-400 data-value text-center">
+                    {zombie.views || 0}
                   </td>
                   <td className="px-2 py-4">
                     {showMoveToZombies ? (
