@@ -772,7 +772,8 @@ function Dashboard() {
         `${API_BASE_URL}/api/export-queue`,
         {
           items: items,
-          export_mode: mode
+          export_mode: mode,
+          target_tool: mode // Use mode as target_tool for backward compatibility
         },
         {
           responseType: 'blob'
@@ -792,16 +793,71 @@ function Dashboard() {
         ebay: `${source}_delete_ebay.csv`
       }
       
-      link.setAttribute('download', filenameMap[mode])
+      link.setAttribute('download', filenameMap[mode] || `${source}_delete.csv`)
       document.body.appendChild(link)
       link.click()
       link.remove()
 
-      // Step 3: Remove exported items from queue
-      const exportedIds = items.map(item => item.id)
-      setQueue(queue.filter(item => !exportedIds.includes(item.id)))
+      // Step 3: Remove exported items from queue if they were in queue
+      if (itemsToExport === null) {
+        const exportedIds = items.map(item => item.id)
+        setQueue(queue.filter(item => !exportedIds.includes(item.id)))
+      }
     } catch (err) {
       alert('Failed to export CSV')
+      console.error(err)
+    }
+  }
+
+  // Handle supplier-specific export from Product Journey section
+  const handleSupplierExport = async (items, targetTool, supplierName) => {
+    if (!items || items.length === 0) {
+      alert(`No items to export for ${supplierName}`)
+      return
+    }
+
+    try {
+      // Step 1: Log deletion to history BEFORE exporting
+      try {
+        await axios.post(`${API_BASE_URL}/api/log-deletion`, {
+          items: items
+        })
+        // Refresh total deleted count
+        const historyResponse = await axios.get(`${API_BASE_URL}/api/history`, {
+          params: { skip: 0, limit: 1 }
+        })
+        setTotalDeleted(historyResponse.data.total_count || 0)
+      } catch (logErr) {
+        console.error('Failed to log deletion:', logErr)
+        // Continue with export even if logging fails
+      }
+
+      // Step 2: Export CSV with supplier-specific target tool
+      const response = await axios.post(
+        `${API_BASE_URL}/api/export-queue`,
+        {
+          items: items,
+          target_tool: targetTool,
+          export_mode: targetTool // For backward compatibility
+        },
+        {
+          responseType: 'blob'
+        }
+      )
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      
+      // Filename based on supplier and tool
+      const supplierSlug = supplierName.toLowerCase().replace(/\s+/g, '_')
+      link.setAttribute('download', `${supplierSlug}_${targetTool}_delete.csv`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+    } catch (err) {
+      alert(`Failed to export CSV for ${supplierName}`)
       console.error(err)
     }
   }
@@ -838,6 +894,8 @@ function Dashboard() {
           usedCredits={usedCredits}
           // Store connection callback
           onConnectionChange={handleStoreConnection}
+          // Supplier export callback
+          onSupplierExport={handleSupplierExport}
           filterContent={showFilter && (
             <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3 mt-6 animate-fade-in-up">
               <div className="flex items-center gap-3">

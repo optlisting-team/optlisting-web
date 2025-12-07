@@ -9,27 +9,48 @@ const INITIAL_STORES = [
 ]
 
 // Product Journey Section Component
-function ProductJourneySection({ zombies = [] }) {
-  // Analyze all suppliers with counts and percentages
+function ProductJourneySection({ zombies = [], onSupplierExport }) {
+  // Analyze all suppliers with counts, percentages, and automation tool info
   const analyzeSuppliers = () => {
     if (!zombies || zombies.length === 0) {
       return []
     }
 
-    // Count suppliers
-    const supplierCount = {}
+    // Group by supplier and detect automation tool usage
+    const supplierData = {}
     zombies.forEach(zombie => {
       const supplier = zombie.supplier_name || zombie.supplier || 'Unknown'
-      supplierCount[supplier] = (supplierCount[supplier] || 0) + 1
+      
+      if (!supplierData[supplier]) {
+        supplierData[supplier] = {
+          name: supplier,
+          count: 0,
+          hasAutomationTool: false,
+          automationTool: null,
+          directUpload: false,
+          items: [] // Store items for this supplier
+        }
+      }
+      
+      supplierData[supplier].count += 1
+      supplierData[supplier].items.push(zombie)
+      
+      // Detect automation tool for this supplier
+      const tool = inferAutomationTool(supplier)
+      if (tool) {
+        supplierData[supplier].hasAutomationTool = true
+        supplierData[supplier].automationTool = tool
+      } else {
+        supplierData[supplier].directUpload = true
+      }
     })
 
     // Convert to array with percentage
     const total = zombies.length
-    const suppliers = Object.entries(supplierCount)
-      .map(([name, count]) => ({
-        name,
-        count,
-        percentage: Math.round((count / total) * 100)
+    const suppliers = Object.values(supplierData)
+      .map(supplier => ({
+        ...supplier,
+        percentage: Math.round((supplier.count / total) * 100)
       }))
       .sort((a, b) => b.count - a.count) // Sort by count descending
     
@@ -76,6 +97,15 @@ function ProductJourneySection({ zombies = [] }) {
 
   const suppliers = analyzeSuppliers()
 
+  // Handle export for a specific supplier
+  const handleSupplierExport = (supplier) => {
+    if (onSupplierExport && supplier.items) {
+      // Determine target tool based on automation tool or direct upload
+      const targetTool = supplier.directUpload ? 'ebay' : (supplier.automationTool?.toLowerCase() || 'autods')
+      onSupplierExport(supplier.items, targetTool, supplier.name)
+    }
+  }
+
   if (suppliers.length === 0) {
     return null
   }
@@ -86,79 +116,43 @@ function ProductJourneySection({ zombies = [] }) {
         <p className="text-xs text-zinc-500 uppercase tracking-wider font-bold">YOUR PRODUCT JOURNEY</p>
       </div>
       
-      {/* Multiple Suppliers Display */}
-      <div className="space-y-3">
-        {suppliers.map((supplier, index) => {
-          const automationTool = inferAutomationTool(supplier.name)
-          const hasAutomationTool = automationTool !== null
-          
-          return (
-            <div key={supplier.name} className="flex items-center gap-2">
-              {/* Supplier - Smaller size */}
-              <div className="relative flex-shrink-0" style={{ minWidth: '140px' }}>
-                <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">YOUR SUPPLIER {suppliers.length > 1 ? `#${index + 1}` : ''}</div>
-                <div className="w-full flex items-center justify-between px-2 py-1.5 bg-zinc-800/50 border border-zinc-700 rounded-lg">
-                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                    <span className="text-xs font-semibold text-white truncate">{supplier.name}</span>
-                    <span className="text-[9px] text-zinc-500 bg-zinc-900/50 px-1 py-0.5 rounded flex-shrink-0">
-                      {supplier.count} ({supplier.percentage}%)
-                    </span>
-                  </div>
+      {/* Suppliers Display - Simplified: Only show supplier with automation tool info */}
+      <div className="space-y-2">
+        {suppliers.map((supplier, index) => (
+          <div key={supplier.name} className="flex items-center gap-3">
+            {/* Supplier - This is our data target */}
+            <div className="relative flex-1">
+              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">SUPPLIER {suppliers.length > 1 ? `#${index + 1}` : ''}</div>
+              <div className="w-full flex items-center justify-between px-3 py-2 bg-zinc-800/50 border border-zinc-700 rounded-lg">
+                <div className="flex items-center gap-2 flex-1">
+                  <span className="text-sm font-semibold text-white">{supplier.name}</span>
+                  <span className="text-[10px] text-zinc-500 bg-zinc-900/50 px-1.5 py-0.5 rounded">
+                    {supplier.count} items ({supplier.percentage}%)
+                  </span>
                 </div>
-              </div>
-
-              {/* Arrow - Longer line */}
-              <div className="flex items-center flex-1 min-w-[40px] max-w-[60px]">
-                <div className="w-full h-0.5 bg-blue-400"></div>
-                <ArrowRight className="w-4 h-4 text-blue-400 flex-shrink-0" />
-              </div>
-
-              {/* Automation Tool Selection - Smaller size */}
-              {hasAutomationTool ? (
-                <>
-                  <div className="relative flex-shrink-0" style={{ minWidth: '120px' }}>
-                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">YOUR AUTOMATION TOOL</div>
-                    <div className="w-full flex items-center justify-between px-2 py-1.5 bg-zinc-800/50 border border-zinc-700 rounded-lg">
-                      <span className="text-xs font-semibold text-white truncate">{automationTool}</span>
-                    </div>
-                  </div>
-                  {/* Arrow - Longer line */}
-                  <div className="flex items-center flex-1 min-w-[40px] max-w-[60px]">
-                    <div className="w-full h-0.5 bg-blue-400"></div>
-                    <ArrowRight className="w-4 h-4 text-blue-400 flex-shrink-0" />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="relative flex-shrink-0" style={{ minWidth: '120px' }}>
-                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">UPLOAD METHOD</div>
-                    <div className="w-full flex items-center justify-between px-2 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                      <span className="text-xs font-semibold text-blue-400 truncate">Direct Upload</span>
-                    </div>
-                  </div>
-                  {/* Arrow - Longer line */}
-                  <div className="flex items-center flex-1 min-w-[40px] max-w-[60px]">
-                    <div className="w-full h-0.5 bg-blue-400"></div>
-                    <ArrowRight className="w-4 h-4 text-blue-400 flex-shrink-0" />
-                  </div>
-                </>
-              )}
-
-              {/* eBay Store Status - Smaller size */}
-              <div className="flex-shrink-0" style={{ minWidth: '120px' }}>
-                <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">EBAY STORE</div>
-                <div className="flex items-center gap-1.5 px-2 py-1.5 bg-zinc-800/50 border border-zinc-700 rounded-lg">
-                  <div className="w-6 h-6 bg-zinc-700 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <span className="text-[10px] font-bold text-white">ebay</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-white truncate">eBay Store</p>
-                  </div>
+                {/* Show automation tool or direct upload indicator */}
+                <div className="flex items-center gap-2">
+                  {supplier.hasAutomationTool ? (
+                    <span className="text-[10px] text-zinc-400 bg-zinc-900/50 px-2 py-1 rounded border border-zinc-700">
+                      via {supplier.automationTool}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-blue-400 bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">
+                      Direct Upload
+                    </span>
+                  )}
+                  {/* Export button for this supplier */}
+                  <button
+                    onClick={() => handleSupplierExport(supplier)}
+                    className="text-[10px] px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded transition-colors"
+                  >
+                    Export CSV
+                  </button>
                 </div>
               </div>
             </div>
-          )
-        })}
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -601,7 +595,7 @@ function SummaryCard({
               💡 This shows the distribution path of products you're about to delete
             </p>
           </div>
-          <ProductJourneySection zombies={zombies} />
+          <ProductJourneySection zombies={zombies} onSupplierExport={onSupplierExport} />
         </>
       )}
 
