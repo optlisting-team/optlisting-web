@@ -491,9 +491,6 @@ function SummaryCard({
         onConnectionChange={onConnectionChange}
       />
 
-      {/* Product Journey Section - Auto-detected from Low-Performing items */}
-      <ProductJourneySection zombies={zombies} />
-
       {/* Stats Row - 3 Columns: Flow visualization */}
       <div className="grid grid-cols-3 gap-4">
         {/* 1. Active Listings - Click to see all listings */}
@@ -533,8 +530,11 @@ function SummaryCard({
         >
           <div className={`text-4xl font-black ${queueCount > 0 ? 'text-orange-400' : 'text-white'}`}>{queueCount || 0}</div>
           <div className="text-sm text-zinc-500 uppercase mt-1">CSV Export</div>
-              </div>
             </div>
+          </div>
+
+      {/* Product Journey Section - Auto-detected from Low-Performing items */}
+      <ProductJourneySection zombies={zombies} />
 
       {/* Filter Panel Slot */}
       {filterContent}
