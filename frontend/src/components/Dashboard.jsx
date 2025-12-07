@@ -832,6 +832,8 @@ function Dashboard() {
           apiConnected={apiConnected}
           apiError={apiError}
           userPlan={userPlan}
+          // Low-Performing items for Product Journey analysis
+          zombies={zombies}
           userCredits={userCredits}
           usedCredits={usedCredits}
           // Store connection callback

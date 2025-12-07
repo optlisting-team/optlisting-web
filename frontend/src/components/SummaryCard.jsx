@@ -9,46 +9,37 @@ const INITIAL_STORES = [
 ]
 
 // Product Journey Section Component
-function ProductJourneySection() {
-  const [selectedSupplier, setSelectedSupplier] = useState('AliExpress')
-  const [selectedTool, setSelectedTool] = useState('AutoDS')
-  const [isSupplierOpen, setIsSupplierOpen] = useState(false)
-  const [isToolOpen, setIsToolOpen] = useState(false)
-  const supplierRef = useRef(null)
-  const toolRef = useRef(null)
+function ProductJourneySection({ zombies = [] }) {
 
-  const suppliers = [
-    'AliExpress',
-    'Amazon',
-    'CJ Dropshipping',
-    'Wholesale2B',
-    'Spocket',
-    'Zendrop',
-    'Other'
-  ]
-
-  const automationTools = [
-    'AutoDS',
-    'Wholesale2B',
-    'Yaballe',
-    'Shopify Matrixify',
-    'eBay File Exchange',
-    'Other'
-  ]
-
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (supplierRef.current && !supplierRef.current.contains(event.target)) {
-        setIsSupplierOpen(false)
-      }
-      if (toolRef.current && !toolRef.current.contains(event.target)) {
-        setIsToolOpen(false)
-      }
+  // Analyze zombies to find most common supplier
+  const analyzeSupplier = () => {
+    if (!zombies || zombies.length === 0) {
+      return 'Unknown'
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+
+    // Count suppliers
+    const supplierCount = {}
+    zombies.forEach(zombie => {
+      const supplier = zombie.supplier_name || zombie.supplier || 'Unknown'
+      supplierCount[supplier] = (supplierCount[supplier] || 0) + 1
+    })
+
+    // Find most common supplier
+    const sortedSuppliers = Object.entries(supplierCount)
+      .sort((a, b) => b[1] - a[1])
+    
+    return sortedSuppliers.length > 0 ? sortedSuppliers[0][0] : 'Unknown'
+  }
+
+  // Infer automation tool based on supplier patterns
+  const inferAutomationTool = (supplier) => {
+    // Common patterns: AutoDS is most popular, but we can infer from supplier
+    // For now, default to AutoDS as it's the most common
+    return 'AutoDS'
+  }
+
+  const detectedSupplier = analyzeSupplier()
+  const detectedTool = inferAutomationTool(detectedSupplier)
 
   return (
     <div className="opt-card p-5">
@@ -57,16 +48,22 @@ function ProductJourneySection() {
       </div>
       
       <div className="flex items-center gap-3">
-        {/* Supplier Selection */}
+        {/* Supplier Selection - Auto-detected */}
         <div className="relative flex-1" ref={supplierRef}>
           <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">YOUR SUPPLIER</div>
-          <button
-            onClick={() => setIsSupplierOpen(!isSupplierOpen)}
-            className="w-full flex items-center justify-between px-3 py-2.5 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700 rounded-lg transition-all"
-          >
-            <span className="text-sm font-semibold text-white">{selectedSupplier}</span>
-            <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${isSupplierOpen ? 'rotate-180' : ''}`} />
-          </button>
+          <div className="w-full flex items-center justify-between px-3 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-lg">
+            <div className="flex items-center gap-2 flex-1">
+              <span className="text-sm font-semibold text-white">{detectedSupplier}</span>
+              {zombies.length > 0 && (
+                <span className="text-[10px] text-zinc-500 bg-zinc-900/50 px-1.5 py-0.5 rounded">
+                  {zombies.filter(z => (z.supplier_name || z.supplier) === detectedSupplier).length} items
+                </span>
+              )}
+            </div>
+            {zombies.length === 0 && (
+              <span className="text-[10px] text-zinc-600 italic">No data</span>
+            )}
+          </div>
 
           {isSupplierOpen && (
             <>
@@ -100,16 +97,15 @@ function ProductJourneySection() {
         {/* Arrow */}
         <ArrowRight className="w-5 h-5 text-zinc-600 mt-6 flex-shrink-0" />
 
-        {/* Automation Tool Selection */}
+        {/* Automation Tool Selection - Inferred */}
         <div className="relative flex-1" ref={toolRef}>
           <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">YOUR AUTOMATION TOOL</div>
-          <button
-            onClick={() => setIsToolOpen(!isToolOpen)}
-            className="w-full flex items-center justify-between px-3 py-2.5 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700 rounded-lg transition-all"
-          >
-            <span className="text-sm font-semibold text-white">{selectedTool}</span>
-            <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${isToolOpen ? 'rotate-180' : ''}`} />
-          </button>
+          <div className="w-full flex items-center justify-between px-3 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-lg">
+            <span className="text-sm font-semibold text-white">{detectedTool}</span>
+            {zombies.length === 0 && (
+              <span className="text-[10px] text-zinc-600 italic">No data</span>
+            )}
+          </div>
 
           {isToolOpen && (
             <>
@@ -524,7 +520,9 @@ function SummaryCard({
   userCredits = 0,
   usedCredits = 0,
   // Store connection callback
-  onConnectionChange = null
+  onConnectionChange = null,
+  // Low-Performing items data for Product Journey analysis
+  zombies = []
 }) {
   const handleCardClick = (mode) => {
     if (onViewModeChange) {
@@ -549,8 +547,8 @@ function SummaryCard({
         onConnectionChange={onConnectionChange}
       />
 
-      {/* Product Journey Section */}
-      <ProductJourneySection />
+      {/* Product Journey Section - Auto-detected from Low-Performing items */}
+      <ProductJourneySection zombies={zombies} />
 
       {/* Stats Row - 3 Columns: Flow visualization */}
       <div className="grid grid-cols-3 gap-4">
