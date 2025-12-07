@@ -425,13 +425,32 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                     <span>✅</span>
                     <span>Downloaded - {items.length} items exported</span>
                   </div>
-                  <button
-                    onClick={() => handleSourceExport(supplier, items)}
-                    className="w-full bg-zinc-700 hover:bg-zinc-600 text-zinc-300 font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
-                  >
-                    <span>🔄</span>
-                    <span>Download Again</span>
-                  </button>
+                  {hasBothTypes ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => handleShopifyExport(supplier, items)}
+                        className="bg-zinc-700 hover:bg-zinc-600 text-zinc-300 font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+                      >
+                        <span>🔄</span>
+                        <span>Shopify</span>
+                      </button>
+                      <button
+                        onClick={() => handleSupplierExport(supplier, items)}
+                        className="bg-zinc-700 hover:bg-zinc-600 text-zinc-300 font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+                      >
+                        <span>🔄</span>
+                        <span>Supplier</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleSourceExport(supplier, items)}
+                      className="w-full bg-zinc-700 hover:bg-zinc-600 text-zinc-300 font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+                    >
+                      <span>🔄</span>
+                      <span>Download Again</span>
+                    </button>
+                  )}
                 </div>
               ) : hasBothTypes ? (
                 <div className="space-y-2">
