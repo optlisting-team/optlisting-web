@@ -423,50 +423,41 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                     />
                   )}
                 </th>
-                {/* Filter order: Days (Age) → Sales → Watches → Impressions → Views */}
-                <th 
-                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-16"
-                  onClick={() => handleSort('age')}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span title="Days Listed">Age</span>
-                    {getSortIcon('age')}
-                  </div>
-                </th>
-                <th 
-                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-16"
-                  onClick={() => handleSort('sales')}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span title="Total Sales">Sales</span>
-                    {getSortIcon('sales')}
-                  </div>
-                </th>
+                {/* Column order: Platform → SKU → Item ID → Title → Score → Filter order (Age → Sales → Watch → Imp → Views) → Recommendation → Supplier → Price */}
                 <th 
                   className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-20"
-                  onClick={() => handleSort('watches')}
+                  onClick={() => handleSort('platform')}
                 >
                   <div className="flex items-center gap-1.5">
-                    <span title="Watch Count">Watch</span>
-                    {getSortIcon('watches')}
+                    <span>Platform</span>
+                    {getSortIcon('platform')}
                   </div>
                 </th>
                 <th 
-                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-16"
-                  onClick={() => handleSort('impressions')}
+                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-24"
+                  onClick={() => handleSort('sku')}
                 >
                   <div className="flex items-center gap-1.5">
-                    <span title="Search Impressions">Imp</span>
-                    {getSortIcon('impressions')}
+                    <span>SKU</span>
+                    {getSortIcon('sku')}
                   </div>
                 </th>
                 <th 
-                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-16"
-                  onClick={() => handleSort('views')}
+                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-28"
+                  onClick={() => handleSort('itemId')}
                 >
                   <div className="flex items-center gap-1.5">
-                    <span title="Page Views">Views</span>
-                    {getSortIcon('views')}
+                    <span>Item ID</span>
+                    {getSortIcon('itemId')}
+                  </div>
+                </th>
+                <th 
+                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors min-w-[200px]"
+                  onClick={() => handleSort('title')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Title</span>
+                    {getSortIcon('title')}
                   </div>
                 </th>
                 <th 
@@ -518,41 +509,50 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                     {getSortIcon('performanceScore')}
                   </div>
                 </th>
-                {/* Remaining columns */}
+                {/* Filter order: Days (Age) → Sales → Watches → Impressions → Views */}
+                <th 
+                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-16"
+                  onClick={() => handleSort('age')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span title="Days Listed">Age</span>
+                    {getSortIcon('age')}
+                  </div>
+                </th>
+                <th 
+                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-16"
+                  onClick={() => handleSort('sales')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span title="Total Sales">Sales</span>
+                    {getSortIcon('sales')}
+                  </div>
+                </th>
                 <th 
                   className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-20"
-                  onClick={() => handleSort('platform')}
+                  onClick={() => handleSort('watches')}
                 >
                   <div className="flex items-center gap-1.5">
-                    <span>Platform</span>
-                    {getSortIcon('platform')}
+                    <span title="Watch Count">Watch</span>
+                    {getSortIcon('watches')}
                   </div>
                 </th>
                 <th 
-                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-24"
-                  onClick={() => handleSort('sku')}
+                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-16"
+                  onClick={() => handleSort('impressions')}
                 >
                   <div className="flex items-center gap-1.5">
-                    <span>SKU</span>
-                    {getSortIcon('sku')}
+                    <span title="Search Impressions">Imp</span>
+                    {getSortIcon('impressions')}
                   </div>
                 </th>
                 <th 
-                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-28"
-                  onClick={() => handleSort('itemId')}
+                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-16"
+                  onClick={() => handleSort('views')}
                 >
                   <div className="flex items-center gap-1.5">
-                    <span>Item ID</span>
-                    {getSortIcon('itemId')}
-                  </div>
-                </th>
-                <th 
-                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors min-w-[200px]"
-                  onClick={() => handleSort('title')}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span>Title</span>
-                    {getSortIcon('title')}
+                    <span title="Page Views">Views</span>
+                    {getSortIcon('views')}
                   </div>
                 </th>
                 <th className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider w-28">
