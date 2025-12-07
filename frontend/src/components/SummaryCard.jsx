@@ -96,6 +96,7 @@ function ProductJourneySection({ zombies = [], onSupplierExport }) {
   }
 
   const suppliers = analyzeSuppliers()
+  const [showAll, setShowAll] = useState(false)
 
   // Handle export for a specific supplier
   const handleSupplierExport = (supplier) => {
@@ -116,6 +117,9 @@ function ProductJourneySection({ zombies = [], onSupplierExport }) {
     return null
   }
 
+  const displayedSuppliers = showAll ? suppliers : suppliers.slice(0, 2)
+  const hasMore = suppliers.length > 2
+
   return (
     <div className="opt-card p-5">
       <div className="mb-3">
@@ -124,7 +128,7 @@ function ProductJourneySection({ zombies = [], onSupplierExport }) {
       
       {/* Suppliers Display - Supplier → eBay Store */}
       <div className="space-y-2">
-        {suppliers.map((supplier, index) => (
+        {displayedSuppliers.map((supplier, index) => (
           <div key={supplier.name} className="flex items-center gap-2">
             {/* Supplier - This is our data target */}
             <div className="relative flex-shrink-0" style={{ minWidth: '140px' }}>
@@ -139,14 +143,14 @@ function ProductJourneySection({ zombies = [], onSupplierExport }) {
               </div>
             </div>
 
-            {/* Arrow */}
-            <div className="flex items-center flex-1 min-w-[40px] max-w-[60px]">
+            {/* Arrow - Flexible space */}
+            <div className="flex items-center flex-1 min-w-[40px]">
               <div className="w-full h-0.5 bg-blue-400"></div>
               <ArrowRight className="w-4 h-4 text-blue-400 flex-shrink-0" />
             </div>
 
-            {/* eBay Store - Right side */}
-            <div className="flex-shrink-0" style={{ minWidth: '120px' }}>
+            {/* eBay Store - Right side, aligned to the right */}
+            <div className="flex-shrink-0 ml-auto" style={{ minWidth: '120px' }}>
               <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">EBAY STORE</div>
               <div className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800/50 border border-zinc-700 rounded-lg">
                 <div className="w-6 h-6 bg-zinc-700 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -159,6 +163,30 @@ function ProductJourneySection({ zombies = [], onSupplierExport }) {
             </div>
           </div>
         ))}
+        
+        {/* More button */}
+        {hasMore && !showAll && (
+          <div className="flex justify-center pt-2">
+            <button
+              onClick={() => setShowAll(true)}
+              className="text-xs px-3 py-1.5 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white rounded-lg transition-colors"
+            >
+              +{suppliers.length - 2} More Suppliers
+            </button>
+          </div>
+        )}
+        
+        {/* Show less button */}
+        {hasMore && showAll && (
+          <div className="flex justify-center pt-2">
+            <button
+              onClick={() => setShowAll(false)}
+              className="text-xs px-3 py-1.5 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white rounded-lg transition-colors"
+            >
+              Show Less
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
