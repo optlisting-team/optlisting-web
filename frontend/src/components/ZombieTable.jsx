@@ -653,20 +653,28 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                     {zombie.views || 0}
                   </td>
                   <td className="px-2 py-4">
-                    <div 
-                      className="group relative"
-                      title={zombie.supplier_name || zombie.supplier || "Unknown"}
-                    >
-                      <SourceBadge 
-                        source={zombie.supplier_name || zombie.supplier || "Unknown"} 
-                        editable={!!onSourceChange}
-                        onSourceChange={onSourceChange}
-                        itemId={zombie.id}
-                      />
-                      {/* Tooltip */}
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                        {zombie.supplier_name || zombie.supplier || "Unknown"}
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="group relative"
+                        title={zombie.supplier_name || zombie.supplier || "Unknown"}
+                      >
+                        <SourceBadge 
+                          source={zombie.supplier_name || zombie.supplier || "Unknown"} 
+                          editable={!!onSourceChange}
+                          onSourceChange={onSourceChange}
+                          itemId={zombie.id}
+                        />
+                        {/* Tooltip */}
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                          {zombie.supplier_name || zombie.supplier || "Unknown"}
+                        </div>
                       </div>
+                      {/* Show "via Shopify" badge if product goes through Shopify */}
+                      {(zombie.management_hub === 'Shopify' || zombie.marketplace === 'Shopify') && (
+                        <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded text-[10px] font-medium">
+                          via Shopify
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-2 py-4 text-xs text-white data-value">

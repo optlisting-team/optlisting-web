@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import SourceBadge from './SourceBadge'
 import PlatformBadge from './PlatformBadge'
 import axios from 'axios'
@@ -7,6 +8,8 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, onSourceChange, onMarkDownloaded }) {
   const [downloadedGroups, setDownloadedGroups] = useState(new Set())
+  const [showShopifyModal, setShowShopifyModal] = useState(false)
+  const [pendingExport, setPendingExport] = useState(null) // { source, items, shopifyItems, supplierItems }
   // Group items by supplier
   const groupedBySource = queue.reduce((acc, item) => {
     // Safely extract supplier name, handling null, undefined, empty string, and "undefined" string
@@ -35,61 +38,173 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
     })
   }
 
+  // Check if items go through Shopify
+  const hasShopifyItems = (items) => {
+    return items.some(item => 
+      item.management_hub === 'Shopify' || 
+      item.marketplace === 'Shopify' ||
+      (item.raw_data && typeof item.raw_data === 'object' && item.raw_data.management_hub === 'Shopify')
+    )
+  }
+
+  // Separate items by Shopify vs Source Supplier
+  const separateByShopify = (items) => {
+    const shopifyItems = items.filter(item => 
+      item.management_hub === 'Shopify' || 
+      item.marketplace === 'Shopify' ||
+      (item.raw_data && typeof item.raw_data === 'object' && item.raw_data.management_hub === 'Shopify')
+    )
+    const supplierItems = items.filter(item => 
+      !(item.management_hub === 'Shopify' || 
+        item.marketplace === 'Shopify' ||
+        (item.raw_data && typeof item.raw_data === 'object' && item.raw_data.management_hub === 'Shopify'))
+    )
+    return { shopifyItems, supplierItems }
+  }
+
   const handleSourceExport = async (source, items) => {
     if (items.length === 0) {
       alert(`No ${source} items in queue to export.`)
       return
     }
 
+    // Check if any items go through Shopify
+    if (hasShopifyItems(items)) {
+      const { shopifyItems, supplierItems } = separateByShopify(items)
+      // Show modal to choose export option
+      setPendingExport({ source, items, shopifyItems, supplierItems })
+      setShowShopifyModal(true)
+      return
+    }
+
+    // No Shopify items, proceed with normal export
+    await performExport(source, items, 'supplier')
+  }
+
+  const performExport = async (source, items, exportType) => {
     try {
-      // Generate CSV content directly in frontend (works with demo data)
-      const csvHeaders = ['Item ID', 'SKU', 'Title', 'Supplier', 'Price', 'Platform', 'Action']
-      const csvRows = items.map(item => [
-        item.ebay_item_id || item.item_id || '',
-        item.sku || '',
-        `"${(item.title || '').replace(/"/g, '""')}"`, // Escape quotes in title
-        item.supplier_name || item.supplier || 'Unknown',
-        item.price || 0,
-        item.marketplace || 'eBay',
-        'DELETE'
-      ])
-
-      const csvContent = [
-        csvHeaders.join(','),
-        ...csvRows.map(row => row.join(','))
-      ].join('\n')
-
-      // Create and download CSV file
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
+      // Determine target tool based on export type
+      let targetTool = 'autods' // Default
       
-      const sourceLower = source.toLowerCase().replace(/\s+/g, '_')
-      const timestamp = new Date().toISOString().split('T')[0]
-      link.setAttribute('download', `optlisting_${sourceLower}_delete_${timestamp}.csv`)
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(url)
+      if (exportType === 'shopify') {
+        // Use Shopify CSV format
+        targetTool = 'shopify_matrixify' // or 'shopify_tagging' based on preference
+      } else {
+        // Use supplier-specific format (determine from supplier name)
+        const supplier = items[0]?.supplier_name || items[0]?.supplier || 'Unknown'
+        const supplierLower = supplier.toLowerCase()
+        
+        if (supplierLower.includes('wholesale2b') || supplierLower === 'wholesale2b') {
+          targetTool = 'wholesale2b'
+        } else if (supplierLower.includes('autods') || supplierLower === 'autods') {
+          targetTool = 'autods'
+        } else {
+          targetTool = 'autods' // Default fallback
+        }
+      }
 
-      // Try to log deletion to API (optional, won't block if fails)
+      // Use API export for proper CSV format
+      try {
+        const response = await axios.post(
+          `${API_BASE_URL}/api/export-queue`,
+          {
+            items: items,
+            target_tool: targetTool,
+            export_mode: targetTool
+          },
+          {
+            responseType: 'blob'
+          }
+        )
+
+        // Create and download CSV file
+        const url = window.URL.createObjectURL(new Blob([response.data]))
+        const link = document.createElement('a')
+        link.href = url
+        
+        const sourceLower = source.toLowerCase().replace(/\s+/g, '_')
+        const exportTypeLabel = exportType === 'shopify' ? 'shopify' : 'supplier'
+        const timestamp = new Date().toISOString().split('T')[0]
+        link.setAttribute('download', `optlisting_${sourceLower}_${exportTypeLabel}_delete_${timestamp}.csv`)
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        window.URL.revokeObjectURL(url)
+      } catch (apiErr) {
+        // Fallback to frontend CSV generation if API fails
+        console.warn('API export failed, using frontend generation:', apiErr)
+        const csvHeaders = ['Item ID', 'SKU', 'Title', 'Supplier', 'Price', 'Platform', 'Action']
+        const csvRows = items.map(item => [
+          item.ebay_item_id || item.item_id || '',
+          item.sku || '',
+          `"${(item.title || '').replace(/"/g, '""')}"`,
+          item.supplier_name || item.supplier || 'Unknown',
+          item.price || 0,
+          item.marketplace || 'eBay',
+          'DELETE'
+        ])
+
+        const csvContent = [
+          csvHeaders.join(','),
+          ...csvRows.map(row => row.join(','))
+        ].join('\n')
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        
+        const sourceLower = source.toLowerCase().replace(/\s+/g, '_')
+        const exportTypeLabel = exportType === 'shopify' ? 'shopify' : 'supplier'
+        const timestamp = new Date().toISOString().split('T')[0]
+        link.setAttribute('download', `optlisting_${sourceLower}_${exportTypeLabel}_delete_${timestamp}.csv`)
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        window.URL.revokeObjectURL(url)
+      }
+
+      // Try to log deletion to API
       try {
         await axios.post(`${API_BASE_URL}/api/log-deletion`, { items: items })
       } catch (logErr) {
-        console.log('API log skipped (demo mode)')
+        console.log('API log skipped')
       }
 
-      // Mark this group as downloaded (don't remove)
+      // Mark this group as downloaded
       setDownloadedGroups(prev => new Set([...prev, source]))
       
       // Update history count
       if (onHistoryUpdate) {
         onHistoryUpdate()
       }
+
+      // Close modal if open
+      setShowShopifyModal(false)
+      setPendingExport(null)
     } catch (err) {
       alert(`Failed to export ${source} CSV: ${err.message}`)
       console.error(err)
+    }
+  }
+
+  const handleShopifyModalChoice = async (choice) => {
+    if (!pendingExport) return
+
+    const { source, shopifyItems, supplierItems } = pendingExport
+
+    if (choice === 'shopify') {
+      // Export only Shopify items via Shopify
+      if (shopifyItems.length > 0) {
+        await performExport(source, shopifyItems, 'shopify')
+      }
+      // Also export supplier items if any
+      if (supplierItems.length > 0) {
+        await performExport(source, supplierItems, 'supplier')
+      }
+    } else if (choice === 'supplier') {
+      // Export all items via source supplier
+      await performExport(source, pendingExport.items, 'supplier')
     }
   }
 
@@ -190,12 +305,21 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                         {item.title}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <SourceBadge 
-                          source={item.supplier_name || item.supplier || "Unknown"} 
-                          editable={!!onSourceChange}
-                          onSourceChange={onSourceChange}
-                          itemId={item.id}
-                        />
+                        <div className="flex items-center gap-2">
+                          <SourceBadge 
+                            source={item.supplier_name || item.supplier || "Unknown"} 
+                            editable={!!onSourceChange}
+                            onSourceChange={onSourceChange}
+                            itemId={item.id}
+                          />
+                          {/* Show "via Shopify" badge if product goes through Shopify */}
+                          {(item.management_hub === 'Shopify' || item.marketplace === 'Shopify' ||
+                            (item.raw_data && typeof item.raw_data === 'object' && item.raw_data.management_hub === 'Shopify')) && (
+                            <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded text-[10px] font-medium">
+                              via Shopify
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                         {item.sku}
@@ -269,6 +393,69 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
           </div>
         )
       })}
+
+      {/* Shopify Export Choice Modal */}
+      {showShopifyModal && pendingExport && createPortal(
+        <div 
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => {
+            setShowShopifyModal(false)
+            setPendingExport(null)
+          }}
+        >
+          <div 
+            className="bg-zinc-900 border border-zinc-700 rounded-lg p-6 max-w-md w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-white mb-2">Export Options</h3>
+            <p className="text-sm text-zinc-400 mb-4">
+              Some items go through Shopify. Choose where to delete them:
+            </p>
+            
+            <div className="space-y-3 mb-4">
+              <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3">
+                <div className="text-xs text-zinc-500 mb-1">Shopify Items</div>
+                <div className="text-sm text-white font-semibold">
+                  {pendingExport.shopifyItems.length} items via Shopify
+                </div>
+              </div>
+              {pendingExport.supplierItems.length > 0 && (
+                <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3">
+                  <div className="text-xs text-zinc-500 mb-1">Direct Supplier Items</div>
+                  <div className="text-sm text-white font-semibold">
+                    {pendingExport.supplierItems.length} items from source supplier
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <button
+                onClick={() => handleShopifyModalChoice('shopify')}
+                className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-lg transition-colors"
+              >
+                Delete via Shopify ({pendingExport.shopifyItems.length} items)
+              </button>
+              <button
+                onClick={() => handleShopifyModalChoice('supplier')}
+                className="w-full px-4 py-3 bg-zinc-700 hover:bg-zinc-600 text-white font-semibold rounded-lg transition-colors"
+              >
+                Delete from Source Supplier ({pendingExport.items.length} items)
+              </button>
+              <button
+                onClick={() => {
+                  setShowShopifyModal(false)
+                  setPendingExport(null)
+                }}
+                className="w-full px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-sm rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }
