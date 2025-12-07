@@ -21,7 +21,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
            (item.metrics && typeof item.metrics === 'object' && item.metrics.management_hub === 'Shopify')
   }
   
-  // Group items by supplier AND Shopify status (separate groups for Shopify vs Direct)
+  // Group items by supplier only (Shopify 경유와 Direct를 같은 그룹으로 묶음)
   const groupedBySource = queue.reduce((acc, item) => {
     // Safely extract supplier name, handling null, undefined, empty string, and "undefined" string
     let supplier = item.supplier_name || item.supplier || null
@@ -29,18 +29,14 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
       supplier = "Unknown"
     }
     
-    // Create separate groups: "Supplier" and "Supplier (via Shopify)"
-    const isShopify = isShopifyItem(item)
-    const groupKey = isShopify ? `${supplier} (via Shopify)` : `${supplier} (Direct)`
-    
-    if (!acc[groupKey]) {
-      acc[groupKey] = {
+    // 같은 공급처로 그룹화 (Shopify 경유 여부는 나중에 Export 시 분리)
+    if (!acc[supplier]) {
+      acc[supplier] = {
         supplier: supplier,
-        isShopify: isShopify,
         items: []
       }
     }
-    acc[groupKey].items.push(item)
+    acc[supplier].items.push(item)
     return acc
   }, {})
 
@@ -82,17 +78,37 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
     return { shopifyItems, supplierItems }
   }
 
-  const handleSourceExport = async (groupKey, items, isShopifyGroup) => {
+  const handleSourceExport = async (supplier, items) => {
     if (items.length === 0) {
       alert(`No items in queue to export.`)
       return
     }
 
-    // Since we already separated by Shopify status in grouping, directly export
-    const supplier = items[0]?.supplier_name || items[0]?.supplier || 'Unknown'
-    const exportType = isShopifyGroup ? 'shopify' : 'supplier'
+    // 같은 공급처 내에서 Shopify 경유와 Direct를 분리
+    const { shopifyItems, supplierItems } = separateByShopify(items)
     
-    await performExport(supplier, items, exportType, groupKey)
+    // Shopify 경유와 Direct가 모두 있으면 두 개의 CSV를 자동으로 다운로드
+    if (shopifyItems.length > 0 && supplierItems.length > 0) {
+      // 두 개의 CSV를 순차적으로 다운로드
+      await performExport(supplier, shopifyItems, 'shopify', `${supplier} (via Shopify)`)
+      // 약간의 지연을 두고 두 번째 CSV 다운로드
+      setTimeout(async () => {
+        await performExport(supplier, supplierItems, 'supplier', `${supplier} (Direct)`)
+      }, 500)
+      return
+    }
+    
+    // Shopify 경유만 있으면 Shopify CSV
+    if (shopifyItems.length > 0) {
+      await performExport(supplier, shopifyItems, 'shopify', `${supplier} (via Shopify)`)
+      return
+    }
+    
+    // Direct만 있으면 공급처 CSV
+    if (supplierItems.length > 0) {
+      await performExport(supplier, supplierItems, 'supplier', `${supplier} (Direct)`)
+      return
+    }
   }
 
   const performExport = async (source, items, exportType, groupKey) => {
@@ -392,7 +408,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                     <span>Downloaded - {items.length} items exported</span>
                   </div>
                   <button
-                    onClick={() => handleSourceExport(groupKey, items, isShopify)}
+                    onClick={() => handleSourceExport(supplier, items)}
                     className="w-full bg-zinc-700 hover:bg-zinc-600 text-zinc-300 font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
                   >
                     <span>🔄</span>
@@ -401,11 +417,18 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                 </div>
               ) : (
                 <button
-                  onClick={() => handleSourceExport(groupKey, items, isShopify)}
+                  onClick={() => handleSourceExport(supplier, items)}
                   className={`w-full ${colors.buttonBg} ${colors.buttonHover} text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2`}
                 >
                   <span>📥</span>
-                  <span>Download {supplier} {isShopify ? '(via Shopify)' : '(Direct)'} CSV ({items.length} items)</span>
+                  <span>
+                    {hasBothTypes 
+                      ? `Download CSV (${shopifyItems.length} Shopify + ${supplierItems.length} Direct)`
+                      : shopifyItems.length > 0
+                      ? `Download Shopify CSV (${items.length} items)`
+                      : `Download ${supplier} CSV (${items.length} items)`
+                    }
+                  </span>
                 </button>
               )}
             </div>
