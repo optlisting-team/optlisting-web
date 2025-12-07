@@ -452,36 +452,27 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                     </button>
                   )}
                 </div>
-              ) : hasBothTypes ? (
-                <div className="space-y-2">
-                  <button
-                    onClick={() => handleShopifyExport(supplier, items)}
-                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
-                  >
-                    <span>📥</span>
-                    <span>Download Shopify CSV ({shopifyItems.length} items)</span>
-                  </button>
-                  <button
-                    onClick={() => handleSupplierExport(supplier, items)}
-                    className={`w-full ${colors.buttonBg} ${colors.buttonHover} text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2`}
-                  >
-                    <span>📥</span>
-                    <span>Download {supplier} CSV ({supplierItems.length} items)</span>
-                  </button>
-                </div>
               ) : (
-                <button
-                  onClick={() => handleSourceExport(supplier, items)}
-                  className={`w-full ${colors.buttonBg} ${colors.buttonHover} text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2`}
-                >
-                  <span>📥</span>
-                  <span>
-                    {shopifyItems.length > 0
-                      ? `Download Shopify CSV (${items.length} items)`
-                      : `Download ${supplier} CSV (${items.length} items)`
-                    }
-                  </span>
-                </button>
+                <div className="space-y-2">
+                  {shopifyItems.length > 0 && (
+                    <button
+                      onClick={() => handleShopifyExport(supplier, items)}
+                      className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                    >
+                      <span>📥</span>
+                      <span>Download Shopify CSV ({shopifyItems.length} items)</span>
+                    </button>
+                  )}
+                  {supplierItems.length > 0 && (
+                    <button
+                      onClick={() => handleSupplierExport(supplier, items)}
+                      className={`w-full ${colors.buttonBg} ${colors.buttonHover} text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2`}
+                    >
+                      <span>📥</span>
+                      <span>Download {supplier} CSV ({supplierItems.length} items)</span>
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
