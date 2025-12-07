@@ -656,40 +656,41 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                     {zombie.views || 0}
                   </td>
                   <td className="px-2 py-4">
-                    <div className="flex flex-col gap-1.5">
-                      <div 
-                        className="group relative inline-block"
-                        title={zombie.supplier_name || zombie.supplier || "Unknown"}
-                      >
-                        <SourceBadge 
-                          source={zombie.supplier_name || zombie.supplier || "Unknown"} 
-                          editable={!!onSourceChange}
-                          onSourceChange={onSourceChange}
-                          itemId={zombie.id}
-                        />
-                        {/* Tooltip */}
-                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                          {zombie.supplier_name || zombie.supplier || "Unknown"}
-                        </div>
+                    <div 
+                      className="group relative inline-block"
+                      title={zombie.supplier_name || zombie.supplier || "Unknown"}
+                    >
+                      <SourceBadge 
+                        source={zombie.supplier_name || zombie.supplier || "Unknown"} 
+                        editable={!!onSourceChange}
+                        onSourceChange={onSourceChange}
+                        itemId={zombie.id}
+                      />
+                      {/* Tooltip */}
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                        {zombie.supplier_name || zombie.supplier || "Unknown"}
                       </div>
-                      {/* Show "via Shopify" badge if product goes through Shopify */}
-                      {(() => {
-                        // Check multiple possible fields for Shopify indication
-                        const isShopify = 
-                          zombie.management_hub === 'Shopify' || 
-                          zombie.marketplace === 'Shopify' ||
-                          zombie.platform === 'Shopify' ||
-                          (zombie.raw_data && typeof zombie.raw_data === 'object' && zombie.raw_data.management_hub === 'Shopify') ||
-                          (zombie.analysis_meta && typeof zombie.analysis_meta === 'object' && zombie.analysis_meta.management_hub === 'Shopify') ||
-                          (zombie.metrics && typeof zombie.metrics === 'object' && zombie.metrics.management_hub === 'Shopify')
-                        
-                        return isShopify ? (
-                          <span className="inline-block px-2 py-0.5 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded text-[10px] font-medium whitespace-nowrap">
-                            via Shopify
-                          </span>
-                        ) : null
-                      })()}
                     </div>
+                  </td>
+                  <td className="px-2 py-4">
+                    {(() => {
+                      // Check multiple possible fields for Shopify indication
+                      const isShopify = 
+                        zombie.management_hub === 'Shopify' || 
+                        zombie.marketplace === 'Shopify' ||
+                        zombie.platform === 'Shopify' ||
+                        (zombie.raw_data && typeof zombie.raw_data === 'object' && zombie.raw_data.management_hub === 'Shopify') ||
+                        (zombie.analysis_meta && typeof zombie.analysis_meta === 'object' && zombie.analysis_meta.management_hub === 'Shopify') ||
+                        (zombie.metrics && typeof zombie.metrics === 'object' && zombie.metrics.management_hub === 'Shopify')
+                      
+                      return isShopify ? (
+                        <span className="inline-block px-2 py-0.5 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded text-[10px] font-medium whitespace-nowrap">
+                          Shopify
+                        </span>
+                      ) : (
+                        <span className="text-zinc-500 text-[10px]">—</span>
+                      )
+                    })()}
                   </td>
                   <td className="px-2 py-4 text-xs text-white data-value">
                     {formatPrice(zombie.price)}
