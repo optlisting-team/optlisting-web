@@ -533,8 +533,17 @@ function SummaryCard({
             </div>
           </div>
 
-      {/* Product Journey Section - Auto-detected from Low-Performing items */}
-      <ProductJourneySection zombies={zombies} />
+      {/* Product Journey Section - Only show when viewing Low-Performing items */}
+      {viewMode === 'zombies' && zombies.length > 0 && (
+        <>
+          <div className="mb-2">
+            <p className="text-xs text-zinc-400 italic">
+              💡 This shows the distribution path of products you're about to delete
+            </p>
+          </div>
+          <ProductJourneySection zombies={zombies} />
+        </>
+      )}
 
       {/* Filter Panel Slot */}
       {filterContent}
