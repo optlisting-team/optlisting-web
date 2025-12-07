@@ -49,7 +49,7 @@ function ProductJourneySection({ zombies = [] }) {
       
       <div className="flex items-center gap-3">
         {/* Supplier Selection - Auto-detected */}
-        <div className="relative flex-1" ref={supplierRef}>
+        <div className="relative flex-1">
           <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">YOUR SUPPLIER</div>
           <div className="w-full flex items-center justify-between px-3 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-lg">
             <div className="flex items-center gap-2 flex-1">
@@ -64,41 +64,13 @@ function ProductJourneySection({ zombies = [] }) {
               <span className="text-[10px] text-zinc-600 italic">No data</span>
             )}
           </div>
-
-          {isSupplierOpen && (
-            <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setIsSupplierOpen(false)}
-              ></div>
-              <div className="absolute top-full left-0 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl overflow-hidden z-50">
-                {suppliers.map((supplier) => (
-                  <button
-                    key={supplier}
-                    onClick={() => {
-                      setSelectedSupplier(supplier)
-                      setIsSupplierOpen(false)
-                    }}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 hover:bg-zinc-800/50 transition-all ${
-                      selectedSupplier === supplier ? 'bg-zinc-800/50' : ''
-                    }`}
-                  >
-                    <span className="text-sm text-white">{supplier}</span>
-                    {selectedSupplier === supplier && (
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
         </div>
 
         {/* Arrow */}
         <ArrowRight className="w-5 h-5 text-zinc-600 mt-6 flex-shrink-0" />
 
         {/* Automation Tool Selection - Inferred */}
-        <div className="relative flex-1" ref={toolRef}>
+        <div className="relative flex-1">
           <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">YOUR AUTOMATION TOOL</div>
           <div className="w-full flex items-center justify-between px-3 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-lg">
             <span className="text-sm font-semibold text-white">{detectedTool}</span>
@@ -106,34 +78,6 @@ function ProductJourneySection({ zombies = [] }) {
               <span className="text-[10px] text-zinc-600 italic">No data</span>
             )}
           </div>
-
-          {isToolOpen && (
-            <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setIsToolOpen(false)}
-              ></div>
-              <div className="absolute top-full left-0 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl overflow-hidden z-50">
-                {automationTools.map((tool) => (
-                  <button
-                    key={tool}
-                    onClick={() => {
-                      setSelectedTool(tool)
-                      setIsToolOpen(false)
-                    }}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 hover:bg-zinc-800/50 transition-all ${
-                      selectedTool === tool ? 'bg-zinc-800/50' : ''
-                    }`}
-                  >
-                    <span className="text-sm text-white">{tool}</span>
-                    {selectedTool === tool && (
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
         </div>
 
         {/* Arrow */}
