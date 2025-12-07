@@ -337,7 +337,19 @@ function Sidebar() {
                   ? 'border-amber-500/50 shadow-amber-500/10'
                   : 'border-amber-500/40'
               }`}>
-                {/* Dropdown Selector */}
+                {/* Price Display - Prominently Featured */}
+                <div className="text-center mb-4">
+                  <div className="mb-2">
+                    <span className="text-5xl font-black text-amber-400">${selectedPack.price}</span>
+                  </div>
+                  {selectedPack.discount > 0 && (
+                    <div className="mb-2">
+                      <span className="text-emerald-400 text-sm font-bold">-{selectedPack.discount}% OFF</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Dropdown Selector - Credits Only */}
                 <div className="mb-4">
                   <div className="relative">
                     <button
@@ -345,11 +357,8 @@ function Sidebar() {
                       className="w-full flex items-center justify-between px-4 py-3 bg-zinc-900/80 border border-amber-500/30 rounded-xl text-white font-bold hover:border-amber-500/50 transition-all"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-lg font-black text-amber-400">${selectedPack.price}</span>
-                        <span className="text-sm text-zinc-300">({selectedPack.credits.toLocaleString()} credits)</span>
-                        {selectedPack.discount > 0 && (
-                          <span className="text-emerald-400 text-xs font-bold">-{selectedPack.discount}%</span>
-                        )}
+                        <span className="text-lg font-black text-amber-400">{selectedPack.credits.toLocaleString()}</span>
+                        <span className="text-sm text-zinc-300">Credits</span>
                       </div>
                       <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
                     </button>
@@ -369,8 +378,8 @@ function Sidebar() {
                             }`}
                           >
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-amber-400">${pack.price}</span>
-                              <span className="text-zinc-400">{pack.credits.toLocaleString()} credits</span>
+                              <span className="font-bold text-amber-400">{pack.credits.toLocaleString()}</span>
+                              <span className="text-zinc-400">Credits</span>
                               {pack.popular && (
                                 <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs font-bold rounded">POPULAR</span>
                               )}
@@ -378,27 +387,17 @@ function Sidebar() {
                                 <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs font-bold rounded">BEST</span>
                               )}
                             </div>
-                            {pack.discount > 0 && (
-                              <span className="text-emerald-400 text-xs font-bold">{pack.discount}% OFF</span>
-                            )}
+                            <div className="flex items-center gap-2">
+                              <span className="text-zinc-500 text-xs">${pack.price}</span>
+                              {pack.discount > 0 && (
+                                <span className="text-emerald-400 text-xs font-bold">{pack.discount}% OFF</span>
+                              )}
+                            </div>
                           </button>
                         ))}
                       </div>
                     )}
                   </div>
-                </div>
-
-                {/* Selected Pack Display */}
-                <div className="text-center mb-4 p-3 bg-amber-500/10 rounded-lg">
-                  <div className="flex items-center justify-center gap-2 mb-1">
-                    <span className="text-3xl font-black text-white">{selectedPack.credits.toLocaleString()}</span>
-                    <span className="text-sm text-zinc-400">Credits</span>
-                  </div>
-                  {selectedPack.discount > 0 && (
-                    <div className="mt-1">
-                      <span className="text-emerald-400 text-xs font-bold">-{selectedPack.discount}% OFF</span>
-                    </div>
-                  )}
                 </div>
 
                 {/* 1 Credit = 1 Scan Notice */}
