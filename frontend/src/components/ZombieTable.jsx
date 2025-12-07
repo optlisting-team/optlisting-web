@@ -452,7 +452,7 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                   </div>
                 </th>
                 <th 
-                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors min-w-[200px]"
+                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-40"
                   onClick={() => handleSort('title')}
                 >
                   <div className="flex items-center gap-1.5">
@@ -617,10 +617,12 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                   <td className="px-2 py-4 text-xs font-mono text-zinc-300">
                     {zombie.ebay_item_id || zombie.item_id || 'N/A'}
                   </td>
-                  <td className="px-2 py-4 min-w-[200px]">
+                  <td className="px-2 py-4 max-w-[150px]">
                     <div className="flex items-start gap-2">
-                      <span className="text-xs text-white truncate" title={zombie.title}>
-                        {zombie.title}
+                      <span className="text-xs text-white truncate block" title={zombie.title}>
+                        {zombie.title && zombie.title.length > 30 
+                          ? `${zombie.title.substring(0, 30)}...` 
+                          : zombie.title}
                       </span>
                       {zombie.is_active_elsewhere && (
                         <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30">
