@@ -22,7 +22,13 @@ export const AccountProvider = ({ children }) => {
 
   const fetchCredits = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/credits?user_id=default-user`)
+      const response = await fetch(`${API_BASE_URL}/api/credits?user_id=default-user`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      })
       if (response.ok) {
         const data = await response.json()
         setCredits(data.available_credits)

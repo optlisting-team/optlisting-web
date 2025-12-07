@@ -160,7 +160,11 @@ function Dashboard() {
   const fetchUserCredits = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/credits`, {
-        params: { user_id: CURRENT_USER_ID }
+        params: { user_id: CURRENT_USER_ID },
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json',
+        },
       })
       if (response.data) {
         setUserCredits(response.data.available_credits || 0)
