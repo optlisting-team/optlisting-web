@@ -386,6 +386,13 @@ function SummaryCard({
 
   return (
     <div className="space-y-4 pt-2">
+      {/* Your Store - With Dropdown */}
+      <StoreSelector 
+        connectedStore={connectedStore}
+        apiConnected={apiConnected}
+        onConnectionChange={onConnectionChange}
+      />
+
       {/* Stats Row - 3 Columns: Flow visualization */}
       <div className="grid grid-cols-3 gap-4">
         {/* 1. Active Listings - Click to see all listings */}
