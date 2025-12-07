@@ -564,6 +564,9 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                     {getSortIcon('supplier')}
                   </div>
                 </th>
+                <th className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider w-20">
+                  <span>VIA</span>
+                </th>
                 <th 
                   className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-20"
                   onClick={() => handleSort('price')}
