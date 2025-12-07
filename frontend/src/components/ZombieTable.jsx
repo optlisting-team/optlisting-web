@@ -670,11 +670,22 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                         </div>
                       </div>
                       {/* Show "via Shopify" badge if product goes through Shopify */}
-                      {(zombie.management_hub === 'Shopify' || zombie.marketplace === 'Shopify') && (
-                        <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded text-[10px] font-medium">
-                          via Shopify
-                        </span>
-                      )}
+                      {(() => {
+                        // Check multiple possible fields for Shopify indication
+                        const isShopify = 
+                          zombie.management_hub === 'Shopify' || 
+                          zombie.marketplace === 'Shopify' ||
+                          zombie.platform === 'Shopify' ||
+                          (zombie.raw_data && typeof zombie.raw_data === 'object' && zombie.raw_data.management_hub === 'Shopify') ||
+                          (zombie.analysis_meta && typeof zombie.analysis_meta === 'object' && zombie.analysis_meta.management_hub === 'Shopify') ||
+                          (zombie.metrics && typeof zombie.metrics === 'object' && zombie.metrics.management_hub === 'Shopify')
+                        
+                        return isShopify ? (
+                          <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded text-[10px] font-medium whitespace-nowrap">
+                            via Shopify
+                          </span>
+                        ) : null
+                      })()}
                     </div>
                   </td>
                   <td className="px-2 py-4 text-xs text-white data-value">

@@ -582,7 +582,15 @@ def analyze_zombies(
                 "sold_qty": (z.metrics.get('sales') if z.metrics and 'sales' in z.metrics else None) or z.sold_qty or 0,
                 "watch_count": (z.metrics.get('views') if z.metrics and 'views' in z.metrics else None) or z.watch_count or 0,
                 "is_global_winner": bool(getattr(z, 'is_global_winner', 0)),  # Cross-Platform Health Check flag
-                "is_active_elsewhere": bool(getattr(z, 'is_active_elsewhere', 0))  # Cross-Platform Activity Check flag
+                "is_active_elsewhere": bool(getattr(z, 'is_active_elsewhere', 0)),  # Cross-Platform Activity Check flag
+                # Management hub information (for Shopify detection)
+                "management_hub": (
+                    z.metrics.get('management_hub') if z.metrics and isinstance(z.metrics, dict) and 'management_hub' in z.metrics else None
+                ) or (
+                    z.analysis_meta.get('management_hub') if z.analysis_meta and isinstance(z.analysis_meta, dict) and 'management_hub' in z.analysis_meta else None
+                ) or getattr(z, 'management_hub', None),
+                "raw_data": z.metrics if z.metrics else {},
+                "analysis_meta": z.analysis_meta if z.analysis_meta else {}
             }
             for z in zombies
         ]
