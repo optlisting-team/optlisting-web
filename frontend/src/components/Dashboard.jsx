@@ -141,16 +141,33 @@ function Dashboard() {
   // API Health Check - Check connection on mount
   const checkApiHealth = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/health`, { timeout: 10000 })
+      const response = await axios.get(`${API_BASE_URL}/api/health`, { 
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
       if (response.status === 200) {
         setApiConnected(true)
         setApiError(null)
         return true
       }
     } catch (err) {
-      console.error('API Health Check failed:', err)
+      // 502 Bad Gateway, 네트워크 에러, CORS 에러 등 모든 에러 처리
+      if (err.code === 'ERR_NETWORK' || err.code === 'ECONNABORTED') {
+        console.warn('API Health Check failed: Server may be down or unreachable')
+      } else {
+        console.error('API Health Check failed:', err)
+      }
       setApiConnected(false)
-      setApiError('Connection Error')
+      // 502 에러인 경우 더 명확한 메시지
+      if (err.response?.status === 502) {
+        setApiError('Server Error (502)')
+      } else if (err.code === 'ERR_NETWORK') {
+        setApiError('Network Error')
+      } else {
+        setApiError('Connection Error')
+      }
       return false
     }
     return false

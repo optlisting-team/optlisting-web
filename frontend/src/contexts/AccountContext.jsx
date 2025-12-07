@@ -22,24 +22,39 @@ export const AccountProvider = ({ children }) => {
 
   const fetchCredits = async () => {
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10초 타임아웃
+      
       const response = await fetch(`${API_BASE_URL}/api/credits?user_id=default-user`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
+        signal: controller.signal,
       })
+      
+      clearTimeout(timeoutId)
+      
       if (response.ok) {
         const data = await response.json()
-        setCredits(data.available_credits)
+        setCredits(data.available_credits || 0)
         setPlan(data.current_plan || 'FREE')
         setApiStatus('connected')
       } else {
+        // 502, 503, 504 등의 서버 에러는 'error' 상태로 설정
         setApiStatus('error')
+        // 기본값 유지 (credits는 null로 유지)
       }
     } catch (err) {
-      console.error('Failed to fetch credits:', err)
+      // 네트워크 에러, 타임아웃, CORS 에러 등 모든 에러 처리
+      if (err.name === 'AbortError') {
+        console.warn('Credits fetch timeout')
+      } else {
+        console.error('Failed to fetch credits:', err)
+      }
       setApiStatus('error')
+      // 에러 발생 시에도 기본값 유지 (앱이 계속 작동하도록)
     }
   }
 
