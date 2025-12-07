@@ -55,7 +55,7 @@ def generate_dummy_listings(db: Session, count: int = 50, user_id: str = "defaul
             # Determine source (diverse suppliers + pro aggregators)
             # Amazon: 15%, Walmart: 12%, AliExpress: 15%, CJ Dropshipping: 12%, 
             # Home Depot: 8%, Wayfair: 6%, Costco: 5%,
-            # Pro Aggregators: Wholesale2B: 8%, Spocket: 6%, SaleHoo: 4%, Inventory Source: 3%, Dropified: 2%, Unverified: 4%
+            # AutoDS: 8% (treated as supplier), Wholesale2B: 8%, Spocket: 6%, SaleHoo: 4%, Inventory Source: 3%, Dropified: 2%, Unverified: 4%
             # Note: Unverified items require manual source identification (strict classification policy)
             source_rand = random.random()
             brand = None
@@ -108,22 +108,26 @@ def generate_dummy_listings(db: Session, count: int = 50, user_id: str = "defaul
                 if random.random() < 0.5:  # 50% chance
                     brand = random.choice(["Kirkland", "Kirkland Signature"])
             elif source_rand < 0.81:
+                source = "AutoDS"  # AutoDS treated as supplier
+                sku = f"ADS{random.randint(100000, 999999)}"
+                image_url = f"https://autods.com/images/{random.randint(100000, 999999)}.jpg"
+            elif source_rand < 0.89:
                 source = "Wholesale2B"
                 sku = f"W2B{random.randint(100000, 999999)}"
                 image_url = f"https://wholesale2b.com/images/{random.randint(100000, 999999)}.jpg"
-            elif source_rand < 0.87:
+            elif source_rand < 0.95:
                 source = "Spocket"
                 sku = f"SPK{random.randint(100000, 999999)}"
                 image_url = f"https://spocket.co/images/{random.randint(100000, 999999)}.jpg"
-            elif source_rand < 0.91:
+            elif source_rand < 0.97:
                 source = "SaleHoo"
                 sku = f"SH{random.randint(100000, 999999)}"
                 image_url = f"https://salehoo.com/images/{random.randint(100000, 999999)}.jpg"
-            elif source_rand < 0.94:
+            elif source_rand < 0.98:
                 source = "Inventory Source"
                 sku = f"IS{random.randint(100000, 999999)}"
                 image_url = f"https://inventorysource.com/images/{random.randint(100000, 999999)}.jpg"
-            elif source_rand < 0.96:
+            elif source_rand < 0.99:
                 source = "Dropified"
                 sku = f"DF{random.randint(100000, 999999)}"
                 image_url = f"https://dropified.com/images/{random.randint(100000, 999999)}.jpg"
