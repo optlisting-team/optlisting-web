@@ -148,12 +148,14 @@ function ProductJourneySection({ zombies = [], onSupplierExport }) {
                     </span>
                   )}
                   {/* Export button for this supplier */}
-                  <button
-                    onClick={() => handleSupplierExport(supplier)}
-                    className="text-[10px] px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded transition-colors"
-                  >
-                    Export CSV
-                  </button>
+                  {onSupplierExport && (
+                    <button
+                      onClick={() => handleSupplierExport(supplier)}
+                      className="text-[10px] px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded transition-colors"
+                    >
+                      Export CSV
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
