@@ -392,7 +392,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                     <span>Downloaded - {items.length} items exported</span>
                   </div>
                   <button
-                    onClick={() => handleSourceExport(source, items)}
+                    onClick={() => handleSourceExport(groupKey, items, isShopify)}
                     className="w-full bg-zinc-700 hover:bg-zinc-600 text-zinc-300 font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
                   >
                     <span>🔄</span>
@@ -401,11 +401,11 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                 </div>
               ) : (
                 <button
-                  onClick={() => handleSourceExport(source, items)}
+                  onClick={() => handleSourceExport(groupKey, items, isShopify)}
                   className={`w-full ${colors.buttonBg} ${colors.buttonHover} text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2`}
                 >
                   <span>📥</span>
-                  <span>Download {source} CSV ({items.length} items)</span>
+                  <span>Download {supplier} {isShopify ? '(via Shopify)' : '(Direct)'} CSV ({items.length} items)</span>
                 </button>
               )}
             </div>
