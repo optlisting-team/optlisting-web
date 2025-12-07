@@ -17,7 +17,7 @@ const CREDIT_PACKS = [
 
 function Sidebar() {
   const location = useLocation()
-  const { showPlanModal, setShowPlanModal, showCreditModal, setShowCreditModal } = useAccount()
+  const { credits, showPlanModal, setShowPlanModal, showCreditModal, setShowCreditModal, refreshCredits } = useAccount()
   const [selectedPack, setSelectedPack] = useState(CREDIT_PACKS[0])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const planModalRef = useRef(null)
@@ -312,10 +312,31 @@ function Sidebar() {
             </div>
             
             <div className="p-6">
+              {/* Current Credits Display */}
+              <div className="mb-6 p-4 bg-gradient-to-r from-emerald-500/10 to-blue-500/10 border border-emerald-500/20 rounded-xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+                      <span className="text-xl">💰</span>
+                    </div>
+                    <div>
+                      <p className="text-xs text-zinc-400 uppercase tracking-wider font-medium">Current Credits</p>
+                      <p className="text-2xl font-black text-white mt-0.5">
+                        {credits !== null ? credits.toLocaleString() : '---'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-zinc-400">Available</p>
+                    <p className="text-sm font-semibold text-emerald-400 mt-0.5">Ready to use</p>
+                  </div>
+                </div>
+              </div>
+
               <div className="text-center mb-4">
                 <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-500/20 rounded-full mb-2">
                   <span className="text-sm">💰</span>
-                  <span className="text-sm font-bold text-amber-400">CREDIT PACKS</span>
+                  <span className="text-sm font-bold text-amber-400">BUY MORE CREDITS</span>
                 </div>
                 <p className="text-zinc-400 text-xs">No subscription • Pay as you go</p>
               </div>
