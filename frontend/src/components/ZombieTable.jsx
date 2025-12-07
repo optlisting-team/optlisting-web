@@ -555,9 +555,6 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                     {getSortIcon('views')}
                   </div>
                 </th>
-                <th className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider w-28">
-                  {showMoveToZombies ? 'Action' : 'Recommendation'}
-                </th>
                 <th 
                   className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-24"
                   onClick={() => handleSort('supplier')}
@@ -654,26 +651,6 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                   </td>
                   <td className="px-2 py-4 text-sm text-zinc-400 data-value text-center">
                     {zombie.views || 0}
-                  </td>
-                  <td className="px-2 py-4">
-                    {showMoveToZombies ? (
-                      <div className="relative group">
-                        <button
-                          onClick={() => onMoveToZombies(zombie.id)}
-                          className="flex items-center gap-1 px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-semibold hover:bg-red-500/40 hover:border-red-500/50 hover:text-red-300 transition-all"
-                          title="이 리스팅을 수동으로 저성과 목록에 영구 지정하여 분석 대상에 포함합니다."
-                        >
-                          <span>🧟</span>
-                          <span>To Zombie</span>
-                        </button>
-                        {/* Tooltip */}
-                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                          이 리스팅을 수동으로 저성과 목록에 영구 지정하여 분석 대상에 포함합니다.
-                        </div>
-                      </div>
-                    ) : (
-                      <RecommendationBadge recommendation={zombie.recommendation} />
-                    )}
                   </td>
                   <td className="px-2 py-4">
                     <div 
