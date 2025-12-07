@@ -122,78 +122,72 @@ function ProductJourneySection({ zombies = [], onSupplierExport }) {
 
   return (
     <div className="opt-card p-5">
-      <div className="mb-3">
-        <p className="text-xs text-zinc-500 uppercase tracking-wider font-bold">YOUR PRODUCT JOURNEY</p>
+      <div className="mb-4">
+        <p className="text-xs text-zinc-500 uppercase tracking-wider font-bold mb-1">YOUR PRODUCT JOURNEY</p>
+        <p className="text-xs text-zinc-400">Suppliers of low-performing items</p>
       </div>
       
-      {/* Suppliers Display - Supplier → eBay Store */}
-      <div className="space-y-2">
+      {/* Suppliers Display - Simple grid layout */}
+      <div className="grid grid-cols-2 gap-3">
         {displayedSuppliers.map((supplier, index) => (
-          <div key={supplier.name} className="flex items-center gap-2">
-            {/* Supplier - This is our data target */}
-            <div className="relative flex-shrink-0 group" style={{ minWidth: '140px' }}>
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">SUPPLIER {suppliers.length > 1 ? `#${index + 1}` : ''}</div>
-              <div 
-                className="w-full flex items-center justify-between px-3 py-2 bg-zinc-800/50 border border-zinc-700 rounded-lg transition-all hover:bg-zinc-800 hover:border-zinc-600"
-                title={`${supplier.name}: ${supplier.count} items (${supplier.percentage}% of low-performing SKUs)`}
-              >
-                <div className="flex items-center gap-2 flex-1">
-                  <span className="text-sm font-semibold text-white">{supplier.name}</span>
-                  <span className="text-[10px] text-zinc-500 bg-zinc-900/50 px-1.5 py-0.5 rounded">
-                    {supplier.count} items ({supplier.percentage}%)
+          <div 
+            key={supplier.name}
+            className="group relative px-4 py-3 bg-zinc-800/30 border border-zinc-700/50 rounded-lg hover:bg-zinc-800/50 hover:border-zinc-600 transition-all cursor-pointer"
+            title={`${supplier.name}: ${supplier.count} items (${supplier.percentage}% of low-performing SKUs)`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-white truncate group-hover:text-zinc-100 transition-colors">
+                  {supplier.name}
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs text-zinc-500">
+                    {supplier.count} items
+                  </span>
+                  <span className="text-xs text-zinc-600">•</span>
+                  <span className="text-xs text-zinc-500">
+                    {supplier.percentage}%
                   </span>
                 </div>
               </div>
-            </div>
-
-            {/* Arrow - Flexible space with pulse animation on hover */}
-            <div className="flex items-center flex-1 min-w-[40px] group-hover:opacity-100">
-              <div className="w-full h-0.5 bg-blue-400 group-hover:bg-blue-300 transition-colors"></div>
-              <ArrowRight className="w-4 h-4 text-blue-400 flex-shrink-0 group-hover:text-blue-300 transition-colors" />
-            </div>
-
-            {/* eBay Store - Right side, aligned to the right */}
-            <div className="flex-shrink-0 ml-auto group" style={{ minWidth: '120px' }}>
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">EBAY STORE</div>
-              <div 
-                className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800/50 border border-zinc-700 rounded-lg transition-all hover:bg-zinc-800 hover:border-zinc-600"
-                title="eBay API를 통해 실시간 데이터를 수집 중입니다."
-              >
-                <div className="w-6 h-6 bg-zinc-700 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <span className="text-[10px] font-bold text-white">ebay</span>
+              {supplier.hasAutomationTool && (
+                <div className="ml-2 px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded text-[10px] text-blue-400">
+                  {supplier.automationTool}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-white truncate">eBay Store</p>
+              )}
+              {supplier.directUpload && (
+                <div className="ml-2 px-2 py-1 bg-zinc-700/50 border border-zinc-600/50 rounded text-[10px] text-zinc-400">
+                  Direct
                 </div>
-              </div>
+              )}
             </div>
           </div>
         ))}
-        
-        {/* More button */}
-        {hasMore && !showAll && (
-          <div className="flex justify-center pt-2">
-            <button
-              onClick={() => setShowAll(true)}
-              className="text-xs px-3 py-1.5 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white rounded-lg transition-colors"
-            >
-              +{suppliers.length - 2} More Suppliers
-            </button>
-          </div>
-        )}
-        
-        {/* Show less button */}
-        {hasMore && showAll && (
-          <div className="flex justify-center pt-2">
-            <button
-              onClick={() => setShowAll(false)}
-              className="text-xs px-3 py-1.5 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white rounded-lg transition-colors"
-            >
-              Show Less
-            </button>
-          </div>
-        )}
       </div>
+      
+      {/* More button */}
+      {hasMore && !showAll && (
+        <div className="flex justify-center pt-3">
+          <button
+            onClick={() => setShowAll(true)}
+            className="text-xs px-4 py-2 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white rounded-lg transition-colors"
+          >
+            +{suppliers.length - 2} More Suppliers
+          </button>
+        </div>
+      )}
+      
+      {/* Show less button */}
+      {hasMore && showAll && (
+        <div className="flex justify-center pt-3">
+          <button
+            onClick={() => setShowAll(false)}
+            className="text-xs px-4 py-2 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white rounded-lg transition-colors"
+          >
+            Show Less
+          </button>
+        </div>
+      )}
     </div>
   )
 }
