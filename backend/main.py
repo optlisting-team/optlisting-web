@@ -354,7 +354,15 @@ def get_listings(
                     )
                 ),
                 "sold_qty": (l.metrics.get('sales') if l.metrics and isinstance(l.metrics, dict) and 'sales' in l.metrics else None) or getattr(l, 'sold_qty', 0) or 0,
-                "watch_count": (l.metrics.get('views') if l.metrics and isinstance(l.metrics, dict) and 'views' in l.metrics else None) or getattr(l, 'watch_count', 0) or 0
+                "watch_count": (l.metrics.get('views') if l.metrics and isinstance(l.metrics, dict) and 'views' in l.metrics else None) or getattr(l, 'watch_count', 0) or 0,
+                # Management hub information (for Shopify detection)
+                "management_hub": (
+                    l.metrics.get('management_hub') if l.metrics and isinstance(l.metrics, dict) and 'management_hub' in l.metrics else None
+                ) or (
+                    l.analysis_meta.get('management_hub') if l.analysis_meta and isinstance(l.analysis_meta, dict) and 'management_hub' in l.analysis_meta else None
+                ) or getattr(l, 'management_hub', None),
+                "raw_data": l.metrics if l.metrics else {},
+                "analysis_meta": l.analysis_meta if l.analysis_meta else {}
             }
             for l in listings
         ]
