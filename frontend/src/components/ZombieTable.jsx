@@ -65,8 +65,8 @@ function ZombieScoreBadge({ score }) {
   }
   
   return (
-    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${getScoreColor(score)}`}>
-      <div className="relative w-8 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
+    <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border ${getScoreColor(score)}`}>
+      <div className="relative w-6 h-1 bg-zinc-700 rounded-full overflow-hidden">
         <div 
           className={`absolute left-0 top-0 h-full rounded-full transition-all ${
             score <= 20 ? 'bg-red-500' : score <= 40 ? 'bg-orange-500' : score <= 60 ? 'bg-yellow-500' : 'bg-blue-500'
@@ -74,7 +74,7 @@ function ZombieScoreBadge({ score }) {
           style={{ width: `${100 - score}%` }}
         />
       </div>
-      <span className="text-xs font-bold data-value">{score}</span>
+      <span className="text-[10px] font-bold data-value">{score}</span>
     </div>
   )
 }
@@ -91,9 +91,9 @@ function RecommendationBadge({ recommendation }) {
   }
   
   return (
-    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${colorMap[recommendation.color]}`}>
-      <Icon className="w-3.5 h-3.5" />
-      <span className="text-xs font-semibold">{recommendation.text}</span>
+    <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border ${colorMap[recommendation.color]}`}>
+      <Icon className="w-3 h-3" />
+      <span className="text-[10px] font-semibold">{recommendation.text}</span>
     </div>
   )
 }
@@ -402,10 +402,10 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
       {/* Table */}
       <div className="border border-zinc-800 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-zinc-800">
+          <table className="w-full divide-y divide-zinc-800 table-fixed">
             <thead className="bg-zinc-900/50">
               <tr>
-                <th className="px-4 py-3 text-left">
+                <th className="px-2 py-3 text-left w-12">
                   {someVisibleSelected && !allVisibleSelected ? (
                     <button
                       onClick={() => handleSelectAllPage(false)}
@@ -423,44 +423,54 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                     />
                   )}
                 </th>
+                {/* Filter order: Days (Age) → Sales → Watches → Impressions → Views */}
                 <th 
-                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
-                  onClick={() => handleSort('platform')}
+                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-16"
+                  onClick={() => handleSort('age')}
                 >
                   <div className="flex items-center gap-1.5">
-                    <span>Platform</span>
-                    {getSortIcon('platform')}
+                    <span title="Days Listed">Age</span>
+                    {getSortIcon('age')}
                   </div>
                 </th>
                 <th 
-                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
-                  onClick={() => handleSort('sku')}
+                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-16"
+                  onClick={() => handleSort('sales')}
                 >
                   <div className="flex items-center gap-1.5">
-                    <span>SKU</span>
-                    {getSortIcon('sku')}
+                    <span title="Total Sales">Sales</span>
+                    {getSortIcon('sales')}
                   </div>
                 </th>
                 <th 
-                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
-                  onClick={() => handleSort('itemId')}
+                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-20"
+                  onClick={() => handleSort('watches')}
                 >
                   <div className="flex items-center gap-1.5">
-                    <span>Item ID</span>
-                    {getSortIcon('itemId')}
+                    <span title="Watch Count">Watch</span>
+                    {getSortIcon('watches')}
                   </div>
                 </th>
                 <th 
-                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider max-w-xs cursor-pointer hover:bg-zinc-800/50 transition-colors"
-                  onClick={() => handleSort('title')}
+                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-16"
+                  onClick={() => handleSort('impressions')}
                 >
                   <div className="flex items-center gap-1.5">
-                    <span>Title</span>
-                    {getSortIcon('title')}
+                    <span title="Search Impressions">Imp</span>
+                    {getSortIcon('impressions')}
                   </div>
                 </th>
                 <th 
-                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
+                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-16"
+                  onClick={() => handleSort('views')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span title="Page Views">Views</span>
+                    {getSortIcon('views')}
+                  </div>
+                </th>
+                <th 
+                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-32"
                   onClick={() => handleSort('performanceScore')}
                 >
                   <div className="flex items-center gap-1.5">
@@ -504,15 +514,52 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                         </div>
                       )}
                     </div>
-                    <span className="text-red-400">Performance Score</span>
+                    <span className="text-red-400">Score</span>
                     {getSortIcon('performanceScore')}
                   </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                {/* Remaining columns */}
+                <th 
+                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-20"
+                  onClick={() => handleSort('platform')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Platform</span>
+                    {getSortIcon('platform')}
+                  </div>
+                </th>
+                <th 
+                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-24"
+                  onClick={() => handleSort('sku')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>SKU</span>
+                    {getSortIcon('sku')}
+                  </div>
+                </th>
+                <th 
+                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-28"
+                  onClick={() => handleSort('itemId')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Item ID</span>
+                    {getSortIcon('itemId')}
+                  </div>
+                </th>
+                <th 
+                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors min-w-[200px]"
+                  onClick={() => handleSort('title')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Title</span>
+                    {getSortIcon('title')}
+                  </div>
+                </th>
+                <th className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider w-28">
                   {showMoveToZombies ? 'Action' : 'Recommendation'}
                 </th>
                 <th 
-                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
+                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-24"
                   onClick={() => handleSort('supplier')}
                 >
                   <div className="flex items-center gap-1.5">
@@ -521,57 +568,12 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                   </div>
                 </th>
                 <th 
-                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
+                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-20"
                   onClick={() => handleSort('price')}
                 >
                   <div className="flex items-center gap-1.5">
                     <span>Price</span>
                     {getSortIcon('price')}
-                  </div>
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
-                  onClick={() => handleSort('age')}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span title="Days Listed">Age</span>
-                    {getSortIcon('age')}
-                  </div>
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
-                  onClick={() => handleSort('sales')}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span title="Total Sales">Sales</span>
-                    {getSortIcon('sales')}
-                  </div>
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
-                  onClick={() => handleSort('watches')}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span title="Watch Count">Watches</span>
-                    {getSortIcon('watches')}
-                  </div>
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
-                  onClick={() => handleSort('impressions')}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span title="Search Impressions">Imp</span>
-                    {getSortIcon('impressions')}
-                  </div>
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors"
-                  onClick={() => handleSort('views')}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span title="Page Views">Views</span>
-                    {getSortIcon('views')}
                   </div>
                 </th>
               </tr>
@@ -584,7 +586,7 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                     selectedIds.includes(zombie.id) ? 'bg-zinc-800/30' : ''
                   }`}
                 >
-                  <td className="px-4 py-4">
+                  <td className="px-2 py-4">
                     <input
                       type="checkbox"
                       checked={selectedIds.includes(zombie.id)}
@@ -592,7 +594,27 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                       className="w-5 h-5 rounded border-zinc-600 text-white focus:ring-white bg-zinc-800 cursor-pointer"
                     />
                   </td>
-                  <td className="px-4 py-4">
+                  {/* Filter order: Days (Age) → Sales → Watches → Impressions → Views */}
+                  <td className="px-2 py-4 text-sm text-zinc-400 text-center">
+                    {zombie.days_listed || 'N/A'}d
+                  </td>
+                  <td className="px-2 py-4 text-sm text-zinc-400 data-value text-center">
+                    {zombie.total_sales || 0}
+                  </td>
+                  <td className="px-2 py-4 text-sm text-zinc-400 data-value text-center">
+                    {zombie.watch_count || 0}
+                  </td>
+                  <td className="px-2 py-4 text-sm text-zinc-400 data-value text-center">
+                    {zombie.impressions || 0}
+                  </td>
+                  <td className="px-2 py-4 text-sm text-zinc-400 data-value text-center">
+                    {zombie.views || 0}
+                  </td>
+                  <td className="px-2 py-4">
+                    <ZombieScoreBadge score={zombie.zombieScore} />
+                  </td>
+                  {/* Remaining columns */}
+                  <td className="px-2 py-4">
                     <div className="relative group inline-block">
                       <PlatformBadge marketplace={zombie.marketplace || 'eBay'} />
                       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-zinc-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all pointer-events-none whitespace-nowrap z-50">
@@ -600,15 +622,15 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-4 text-sm font-mono text-zinc-400">
+                  <td className="px-2 py-4 text-xs font-mono text-zinc-400">
                     {zombie.sku || '-'}
                   </td>
-                  <td className="px-4 py-4 text-sm font-mono text-zinc-300">
+                  <td className="px-2 py-4 text-xs font-mono text-zinc-300">
                     {zombie.ebay_item_id || zombie.item_id || 'N/A'}
                   </td>
-                  <td className="px-4 py-4 max-w-xs">
+                  <td className="px-2 py-4 min-w-[200px]">
                     <div className="flex items-start gap-2">
-                      <span className="text-sm text-white truncate" title={zombie.title}>
+                      <span className="text-xs text-white truncate" title={zombie.title}>
                         {zombie.title}
                       </span>
                       {zombie.is_active_elsewhere && (
@@ -623,14 +645,11 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-4">
-                    <ZombieScoreBadge score={zombie.zombieScore} />
-                  </td>
-                  <td className="px-4 py-4">
+                  <td className="px-2 py-4">
                     {showMoveToZombies ? (
                       <button
                         onClick={() => onMoveToZombies(zombie.id)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-semibold hover:bg-red-500/30 transition-all"
+                        className="flex items-center gap-1 px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-semibold hover:bg-red-500/30 transition-all"
                       >
                         <span>🧟</span>
                         <span>To Zombie</span>
@@ -639,7 +658,7 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                       <RecommendationBadge recommendation={zombie.recommendation} />
                     )}
                   </td>
-                  <td className="px-4 py-4">
+                  <td className="px-2 py-4">
                     <SourceBadge 
                       source={zombie.supplier_name || zombie.supplier || "Unknown"} 
                       editable={!!onSourceChange}
@@ -647,23 +666,8 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                       itemId={zombie.id}
                     />
                   </td>
-                  <td className="px-4 py-4 text-sm text-white data-value">
+                  <td className="px-2 py-4 text-xs text-white data-value">
                     {formatPrice(zombie.price)}
-                  </td>
-                  <td className="px-4 py-4 text-sm text-zinc-400">
-                    {zombie.days_listed || 'N/A'}d
-                  </td>
-                  <td className="px-4 py-4 text-sm text-zinc-400 data-value">
-                    {zombie.total_sales || 0}
-                  </td>
-                  <td className="px-4 py-4 text-sm text-zinc-400 data-value">
-                    {zombie.watch_count || 0}
-                  </td>
-                  <td className="px-4 py-4 text-sm text-zinc-400 data-value">
-                    {zombie.impressions || 0}
-                  </td>
-                  <td className="px-4 py-4 text-sm text-zinc-400 data-value">
-                    {zombie.views || 0}
                   </td>
                 </tr>
               ))}
