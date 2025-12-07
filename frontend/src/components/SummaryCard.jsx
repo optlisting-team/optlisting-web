@@ -76,93 +76,78 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
 
   return (
     <div className="opt-card p-4 px-6 relative z-50" ref={dropdownRef}>
-      <div className="flex items-center justify-between gap-4">
-        {/* Store Dropdown */}
-        <div className="relative flex-1" style={{ zIndex: 9999 }}>
+      <div className="flex items-center gap-3">
+        {/* Minimized Store Button */}
+        <div className="relative" style={{ zIndex: 9999 }}>
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="flex items-center gap-3 w-full text-left hover:bg-zinc-800/50 rounded-lg px-3 py-2 transition-all"
+            className="flex items-center gap-2 px-3 py-2 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700 rounded-lg transition-all"
           >
-            <span className="text-xl">{getPlatformIcon(selectedStore?.platform)}</span>
-            <span className="text-base font-bold text-white">{selectedStore?.name || 'Select Store'}</span>
-            {selectedStore?.connected ? (
-              <span className="flex items-center gap-1.5 text-xs text-emerald-400">
-                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                Connected
-              </span>
-            ) : (
-              <span className="text-xs text-zinc-500">Not connected</span>
-            )}
-            <ChevronDown className={`w-4 h-4 text-zinc-500 ml-auto transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            <span className="text-lg">{getPlatformIcon(selectedStore?.platform)}</span>
+            <span className="text-sm font-semibold text-white">{selectedStore?.name || 'Select Store'}</span>
+            <ChevronDown className={`w-3 h-3 text-zinc-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {/* Dropdown Menu */}
           {isOpen && (
-            <div className="absolute top-full left-0 mt-1 w-72 bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl overflow-hidden" style={{ zIndex: 99999 }}>
-              <div className="p-2 border-b border-zinc-800">
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Your Stores</p>
-              </div>
-              
-              {stores.map((store) => (
-                <div
-                  key={store.id}
-                  className={`flex items-center gap-3 px-3 py-2 hover:bg-zinc-800/50 transition-all ${
-                    selectedStore?.id === store.id ? 'bg-zinc-800/50' : ''
-                  }`}
-                >
-                  <button
-                    onClick={() => {
-                      setSelectedStore(store)
-                      setIsOpen(false)
-                    }}
-                    className="flex items-center gap-3 flex-1"
+            <>
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setIsOpen(false)}
+              ></div>
+              <div className="absolute top-full left-0 mt-1 w-72 bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl overflow-hidden" style={{ zIndex: 99999 }}>
+                <div className="p-2 border-b border-zinc-800">
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Your Stores</p>
+                </div>
+                
+                {stores.map((store) => (
+                  <div
+                    key={store.id}
+                    className={`flex items-center gap-3 px-3 py-2 hover:bg-zinc-800/50 transition-all ${
+                      selectedStore?.id === store.id ? 'bg-zinc-800/50' : ''
+                    }`}
                   >
-                    <span className="text-sm">{getPlatformIcon(store.platform)}</span>
-                    <div className="flex-1 text-left">
-                      <p className="text-xs font-semibold text-white">{store.name}</p>
-                      <p className="text-[10px] text-zinc-500">{store.platform}</p>
-                    </div>
-                    {store.connected ? (
-                      <span className="flex items-center gap-1 text-[10px] text-emerald-400">
-                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-                        Live
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-zinc-600">Offline</span>
-                    )}
-                    {selectedStore?.id === store.id && (
-                      <Check className="w-3 h-3 text-emerald-400" />
-                    )}
+                    <button
+                      onClick={() => {
+                        setSelectedStore(store)
+                        setIsOpen(false)
+                      }}
+                      className="flex items-center gap-3 flex-1"
+                    >
+                      <span className="text-sm">{getPlatformIcon(store.platform)}</span>
+                      <div className="flex-1 text-left">
+                        <p className="text-xs font-semibold text-white">{store.name}</p>
+                        <p className="text-[10px] text-zinc-500">{store.platform}</p>
+                      </div>
+                      {store.connected ? (
+                        <span className="flex items-center gap-1 text-[10px] text-emerald-400">
+                          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                          Live
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-zinc-600">Offline</span>
+                      )}
+                      {selectedStore?.id === store.id && (
+                        <Check className="w-3 h-3 text-emerald-400" />
+                      )}
+                    </button>
+                  </div>
+                ))}
+
+                {/* Add New Store */}
+                <div className="p-2 border-t border-zinc-800">
+                  <button
+                    onClick={handleRealConnect}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="text-xs font-semibold">Connect New Store (Real API)</span>
                   </button>
                 </div>
-              ))}
-
-              {/* Add New Store */}
-              <div className="p-2 border-t border-zinc-800">
-                <button
-                  onClick={handleRealConnect}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span className="text-xs font-semibold">Connect New Store (Real API)</span>
-                </button>
               </div>
-            </div>
+            </>
           )}
         </div>
-
-        {/* API Status Indicator */}
-        {selectedStore?.connected ? (
-          <div className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-xs font-bold text-emerald-400">LIVE</span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg">
-            <div className="w-2 h-2 bg-zinc-500 rounded-full" />
-            <span className="text-xs font-bold text-zinc-500">OFFLINE</span>
-          </div>
-        )}
 
         {/* Connect / Disconnect Button */}
         {selectedStore?.connected ? (
@@ -191,6 +176,19 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
               </>
             )}
           </button>
+        )}
+
+        {/* API Status Indicator - Rightmost */}
+        {selectedStore?.connected ? (
+          <div className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg ml-auto">
+            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+            <span className="text-xs font-bold text-emerald-400">LIVE</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg ml-auto">
+            <div className="w-2 h-2 bg-zinc-500 rounded-full" />
+            <span className="text-xs font-bold text-zinc-500">OFFLINE</span>
+          </div>
         )}
       </div>
     </div>
