@@ -1,7 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import StoreSwitcher from './StoreSwitcher'
 import { useAuth } from '../contexts/AuthContext'
 import { useAccount } from '../contexts/AccountContext'
 import { LayoutDashboard, List, History, Settings, X, Check, ChevronDown, ChevronRight } from 'lucide-react'
@@ -86,17 +85,6 @@ function Sidebar() {
             </div>
           </div>
         </Link>
-
-        {/* Store Switcher */}
-        <div className="mb-4">
-          <StoreSwitcher />
-        </div>
-
-        {/* API Status */}
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 transition-all duration-300">
-          <span className="status-dot status-dot-success" />
-          <span>API Connected</span>
-        </div>
       </div>
 
       {/* Navigation */}
