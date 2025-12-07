@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { ChevronDown, Plus, Check, Unplug } from 'lucide-react'
+import { ChevronDown, Plus, Check, Unplug, ArrowRight } from 'lucide-react'
 
 // Demo stores for testing - initial state
 const INITIAL_STORES = [
@@ -7,6 +7,162 @@ const INITIAL_STORES = [
   { id: 'store-2', name: 'Amazon Store', platform: 'Amazon', connected: false },
   { id: 'store-3', name: 'Shopify Store', platform: 'Shopify', connected: false },
 ]
+
+// Product Journey Section Component
+function ProductJourneySection() {
+  const [selectedSupplier, setSelectedSupplier] = useState('AliExpress')
+  const [selectedTool, setSelectedTool] = useState('AutoDS')
+  const [isSupplierOpen, setIsSupplierOpen] = useState(false)
+  const [isToolOpen, setIsToolOpen] = useState(false)
+  const supplierRef = useRef(null)
+  const toolRef = useRef(null)
+
+  const suppliers = [
+    'AliExpress',
+    'Amazon',
+    'CJ Dropshipping',
+    'Wholesale2B',
+    'Spocket',
+    'Zendrop',
+    'Other'
+  ]
+
+  const automationTools = [
+    'AutoDS',
+    'Wholesale2B',
+    'Yaballe',
+    'Shopify Matrixify',
+    'eBay File Exchange',
+    'Other'
+  ]
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (supplierRef.current && !supplierRef.current.contains(event.target)) {
+        setIsSupplierOpen(false)
+      }
+      if (toolRef.current && !toolRef.current.contains(event.target)) {
+        setIsToolOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  return (
+    <div className="opt-card p-5">
+      <div className="mb-3">
+        <p className="text-xs text-zinc-500 uppercase tracking-wider font-bold">YOUR PRODUCT JOURNEY</p>
+      </div>
+      
+      <div className="flex items-center gap-3">
+        {/* Supplier Selection */}
+        <div className="relative flex-1" ref={supplierRef}>
+          <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">YOUR SUPPLIER</div>
+          <button
+            onClick={() => setIsSupplierOpen(!isSupplierOpen)}
+            className="w-full flex items-center justify-between px-3 py-2.5 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700 rounded-lg transition-all"
+          >
+            <span className="text-sm font-semibold text-white">{selectedSupplier}</span>
+            <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${isSupplierOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {isSupplierOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setIsSupplierOpen(false)}
+              ></div>
+              <div className="absolute top-full left-0 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl overflow-hidden z-50">
+                {suppliers.map((supplier) => (
+                  <button
+                    key={supplier}
+                    onClick={() => {
+                      setSelectedSupplier(supplier)
+                      setIsSupplierOpen(false)
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 hover:bg-zinc-800/50 transition-all ${
+                      selectedSupplier === supplier ? 'bg-zinc-800/50' : ''
+                    }`}
+                  >
+                    <span className="text-sm text-white">{supplier}</span>
+                    {selectedSupplier === supplier && (
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Arrow */}
+        <ArrowRight className="w-5 h-5 text-zinc-600 mt-6 flex-shrink-0" />
+
+        {/* Automation Tool Selection */}
+        <div className="relative flex-1" ref={toolRef}>
+          <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">YOUR AUTOMATION TOOL</div>
+          <button
+            onClick={() => setIsToolOpen(!isToolOpen)}
+            className="w-full flex items-center justify-between px-3 py-2.5 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700 rounded-lg transition-all"
+          >
+            <span className="text-sm font-semibold text-white">{selectedTool}</span>
+            <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${isToolOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {isToolOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setIsToolOpen(false)}
+              ></div>
+              <div className="absolute top-full left-0 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl overflow-hidden z-50">
+                {automationTools.map((tool) => (
+                  <button
+                    key={tool}
+                    onClick={() => {
+                      setSelectedTool(tool)
+                      setIsToolOpen(false)
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 hover:bg-zinc-800/50 transition-all ${
+                      selectedTool === tool ? 'bg-zinc-800/50' : ''
+                    }`}
+                  >
+                    <span className="text-sm text-white">{tool}</span>
+                    {selectedTool === tool && (
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Arrow */}
+        <ArrowRight className="w-5 h-5 text-zinc-600 mt-6 flex-shrink-0" />
+
+        {/* eBay Store Status */}
+        <div className="flex-1">
+          <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">EBAY STORE</div>
+          <div className="flex items-center gap-2 px-3 py-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+            <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+              <span className="text-xs font-bold text-emerald-400">ebay</span>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-white">eBay Store</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                <span className="text-[10px] text-emerald-400 font-semibold">Connected</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // Store Selector Component
 function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
@@ -392,6 +548,9 @@ function SummaryCard({
         apiConnected={apiConnected}
         onConnectionChange={onConnectionChange}
       />
+
+      {/* Product Journey Section */}
+      <ProductJourneySection />
 
       {/* Stats Row - 3 Columns: Flow visualization */}
       <div className="grid grid-cols-3 gap-4">
