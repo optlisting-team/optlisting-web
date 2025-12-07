@@ -622,7 +622,15 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                       </div>
                     </div>
                   </td>
-                  <td className="px-2 py-4 text-xs font-mono text-zinc-400">
+                  <td 
+                    className="px-2 py-4 text-xs font-mono text-zinc-400 group cursor-pointer hover:bg-zinc-800/50 transition-colors relative"
+                    title={`SKU: ${zombie.sku || 'N/A'}\n클릭 시 SKU가 클립보드에 복사됩니다.`}
+                    onClick={() => {
+                      if (zombie.sku) {
+                        navigator.clipboard.writeText(zombie.sku)
+                      }
+                    }}
+                  >
                     {zombie.sku || '-'}
                   </td>
                   <td className="px-2 py-4 text-xs font-mono text-zinc-300">
@@ -647,24 +655,40 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                   </td>
                   <td className="px-2 py-4">
                     {showMoveToZombies ? (
-                      <button
-                        onClick={() => onMoveToZombies(zombie.id)}
-                        className="flex items-center gap-1 px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-semibold hover:bg-red-500/30 transition-all"
-                      >
-                        <span>🧟</span>
-                        <span>To Zombie</span>
-                      </button>
+                      <div className="relative group">
+                        <button
+                          onClick={() => onMoveToZombies(zombie.id)}
+                          className="flex items-center gap-1 px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-semibold hover:bg-red-500/40 hover:border-red-500/50 hover:text-red-300 transition-all"
+                          title="이 리스팅을 수동으로 저성과 목록에 영구 지정하여 분석 대상에 포함합니다."
+                        >
+                          <span>🧟</span>
+                          <span>To Zombie</span>
+                        </button>
+                        {/* Tooltip */}
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                          이 리스팅을 수동으로 저성과 목록에 영구 지정하여 분석 대상에 포함합니다.
+                        </div>
+                      </div>
                     ) : (
                       <RecommendationBadge recommendation={zombie.recommendation} />
                     )}
                   </td>
                   <td className="px-2 py-4">
-                    <SourceBadge 
-                      source={zombie.supplier_name || zombie.supplier || "Unknown"} 
-                      editable={!!onSourceChange}
-                      onSourceChange={onSourceChange}
-                      itemId={zombie.id}
-                    />
+                    <div 
+                      className="group relative"
+                      title={zombie.supplier_name || zombie.supplier || "Unknown"}
+                    >
+                      <SourceBadge 
+                        source={zombie.supplier_name || zombie.supplier || "Unknown"} 
+                        editable={!!onSourceChange}
+                        onSourceChange={onSourceChange}
+                        itemId={zombie.id}
+                      />
+                      {/* Tooltip */}
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                        {zombie.supplier_name || zombie.supplier || "Unknown"}
+                      </div>
+                    </div>
                   </td>
                   <td className="px-2 py-4 text-xs text-white data-value">
                     {formatPrice(zombie.price)}
