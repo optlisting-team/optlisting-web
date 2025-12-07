@@ -137,9 +137,9 @@ def generate_dummy_listings(db: Session, count: int = 50, user_id: str = "defaul
             price = round(random.uniform(9.99, 199.99), 2)
             
             # Date listed (mix of old and new)
-            # Generate exactly 500 zombies and 50 active items
-            # First 500 items are zombies, last 50 are active
-            is_zombie = i < 500
+            # Generate exactly 500 active items and 50 zombies
+            # First 500 items are active, last 50 are zombies
+            is_zombie = i >= 500
             if is_zombie:
                 days_ago = random.randint(61, 180)  # 61-180 days ago
             else:

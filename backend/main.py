@@ -194,7 +194,7 @@ def startup_event():
             try:
                 count = db.query(Listing).count()
                 if count == 0:
-                    print("Generating 550 dummy listings (500 zombies, 50 active)... This may take a moment.")
+                    print("Generating 550 dummy listings (500 active, 50 zombies)... This may take a moment.")
                     generate_dummy_listings(db, count=550, user_id="default-user")
                     print("Dummy data generated successfully")
                 else:
