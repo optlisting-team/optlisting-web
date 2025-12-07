@@ -250,11 +250,12 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
-      {Object.entries(groupedBySource).map(([source, items]) => {
-        const isDownloaded = downloadedGroups.has(source)
+      {Object.entries(groupedBySource).map(([groupKey, groupData]) => {
+        const { supplier, isShopify, items } = groupData
+        const isDownloaded = downloadedGroups.has(groupKey)
         return (
           <div
-            key={source}
+            key={groupKey}
             className={`rounded-lg border overflow-hidden flex flex-col transition-all ${
               isDownloaded 
                 ? 'bg-zinc-800 border-zinc-700 opacity-60' 
@@ -266,15 +267,20 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <h2 className="text-xl font-bold">
-                    {source.toUpperCase()} - {items.length} Item{items.length !== 1 ? 's' : ''}
+                    {supplier.toUpperCase()} - {items.length} Item{items.length !== 1 ? 's' : ''}
                   </h2>
+                  {isShopify && (
+                    <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded text-[10px] font-medium">
+                      via Shopify
+                    </span>
+                  )}
                   {isDownloaded && (
                     <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded-full">
                       ✓ Downloaded
                     </span>
                   )}
                 </div>
-                <SourceBadge source={source} />
+                <SourceBadge source={supplier} />
               </div>
             </div>
 
@@ -319,7 +325,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                         {item.title}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col gap-1.5">
                           <SourceBadge 
                             source={item.supplier_name || item.supplier || "Unknown"} 
                             editable={!!onSourceChange}
@@ -327,9 +333,8 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                             itemId={item.id}
                           />
                           {/* Show "via Shopify" badge if product goes through Shopify */}
-                          {(item.management_hub === 'Shopify' || item.marketplace === 'Shopify' ||
-                            (item.raw_data && typeof item.raw_data === 'object' && item.raw_data.management_hub === 'Shopify')) && (
-                            <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded text-[10px] font-medium">
+                          {isShopifyItem(item) && (
+                            <span className="inline-block px-2 py-0.5 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded text-[10px] font-medium">
                               via Shopify
                             </span>
                           )}
