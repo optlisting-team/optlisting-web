@@ -1219,17 +1219,49 @@ def start_analysis(
             }
         )
     
-    # 4. 분석 작업 시작 (실제 분석은 비동기로 처리 가능)
-    # TODO: 실제 분석 로직 연동 (현재는 즉시 완료로 처리)
-    
-    return AnalysisStartResponse(
-        success=True,
-        analysis_id=analysis_id,
-        listings_to_analyze=listing_count,
-        credits_deducted=result.deducted_amount,
-        remaining_credits=result.remaining_credits,
-        message=f"분석 시작: {listing_count}개 리스팅, {result.deducted_amount} 크레딧 차감"
-    )
+    # 4. 분석 작업 시작 (실제 분석 로직 연동)
+    # analyze_zombie_listings 함수를 호출하여 실제 분석 수행
+    try:
+        zombies, zombie_breakdown = analyze_zombie_listings(
+            db=db,
+            user_id=user_id,
+            min_days=request.analytics_period_days or request.min_days or 7,
+            max_sales=request.max_sales or 0,
+            max_watches=request.max_watches or request.max_watch_count or 0,
+            max_impressions=request.max_impressions or 100,
+            max_views=request.max_views or 10,
+            supplier_filter=request.supplier_filter or "All",
+            platform_filter=request.marketplace or "eBay",
+            store_id=request.store_id,
+            skip=0,  # 분석 작업은 전체 리스팅 대상
+            limit=10000  # 충분히 큰 값으로 설정
+        )
+        
+        zombie_count = len(zombies)
+        logger.info(f"✅ Analysis completed: {zombie_count} zombie listings found out of {listing_count} total listings")
+        
+        return AnalysisStartResponse(
+            success=True,
+            analysis_id=analysis_id,
+            listings_to_analyze=listing_count,
+            credits_deducted=result.deducted_amount,
+            remaining_credits=result.remaining_credits,
+            message=f"분석 완료: {listing_count}개 리스팅 중 {zombie_count}개 Low-Performing 발견, {result.deducted_amount} 크레딧 차감"
+        )
+    except Exception as e:
+        logger.error(f"❌ Analysis failed: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        # 분석 실패 시에도 크레딧은 이미 차감되었으므로 성공 응답 반환
+        # (크레딧 환불은 별도 프로세스로 처리)
+        return AnalysisStartResponse(
+            success=True,
+            analysis_id=analysis_id,
+            listings_to_analyze=listing_count,
+            credits_deducted=result.deducted_amount,
+            remaining_credits=result.remaining_credits,
+            message=f"분석 시작: {listing_count}개 리스팅, {result.deducted_amount} 크레딧 차감 (분석 중 오류 발생: {str(e)})"
+        )
 
 
 @app.post("/api/credits/add")
