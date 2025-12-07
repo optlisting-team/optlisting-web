@@ -388,16 +388,6 @@ function SummaryCard({
 
   return (
     <div className="space-y-4 pt-2">
-      {/* Compact Status Bar */}
-      <div className="flex items-center justify-between gap-3 opacity-0 animate-fade-in" style={{ animationDelay: '50ms' }}>
-        {/* Left: Title */}
-        <h2 className="text-sm font-semibold text-zinc-400 tracking-wide flex items-center gap-2">
-          <span className="w-1 h-4 bg-gradient-to-b from-blue-500 to-cyan-500 rounded-full" />
-            Store Analytics
-          </h2>
-      </div>
-
-      
       {/* Your Store - With Dropdown */}
       <StoreSelector 
         connectedStore={connectedStore}
