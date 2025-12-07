@@ -78,6 +78,28 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
     return { shopifyItems, supplierItems }
   }
 
+  const handleShopifyExport = async (supplier, items) => {
+    if (items.length === 0) {
+      alert(`No items in queue to export.`)
+      return
+    }
+    const { shopifyItems } = separateByShopify(items)
+    if (shopifyItems.length > 0) {
+      await performExport(supplier, shopifyItems, 'shopify', `${supplier} (via Shopify)`)
+    }
+  }
+
+  const handleSupplierExport = async (supplier, items) => {
+    if (items.length === 0) {
+      alert(`No items in queue to export.`)
+      return
+    }
+    const { supplierItems } = separateByShopify(items)
+    if (supplierItems.length > 0) {
+      await performExport(supplier, supplierItems, 'supplier', `${supplier} (Direct)`)
+    }
+  }
+
   const handleSourceExport = async (supplier, items) => {
     if (items.length === 0) {
       alert(`No items in queue to export.`)
@@ -87,25 +109,14 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
     // 같은 공급처 내에서 Shopify 경유와 Direct를 분리
     const { shopifyItems, supplierItems } = separateByShopify(items)
     
-    // Shopify 경유와 Direct가 모두 있으면 두 개의 CSV를 자동으로 다운로드
-    if (shopifyItems.length > 0 && supplierItems.length > 0) {
-      // 두 개의 CSV를 순차적으로 다운로드
-      await performExport(supplier, shopifyItems, 'shopify', `${supplier} (via Shopify)`)
-      // 약간의 지연을 두고 두 번째 CSV 다운로드
-      setTimeout(async () => {
-        await performExport(supplier, supplierItems, 'supplier', `${supplier} (Direct)`)
-      }, 500)
-      return
-    }
-    
     // Shopify 경유만 있으면 Shopify CSV
-    if (shopifyItems.length > 0) {
+    if (shopifyItems.length > 0 && supplierItems.length === 0) {
       await performExport(supplier, shopifyItems, 'shopify', `${supplier} (via Shopify)`)
       return
     }
     
     // Direct만 있으면 공급처 CSV
-    if (supplierItems.length > 0) {
+    if (supplierItems.length > 0 && shopifyItems.length === 0) {
       await performExport(supplier, supplierItems, 'supplier', `${supplier} (Direct)`)
       return
     }
@@ -422,6 +433,23 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                     <span>Download Again</span>
                   </button>
                 </div>
+              ) : hasBothTypes ? (
+                <div className="space-y-2">
+                  <button
+                    onClick={() => handleShopifyExport(supplier, items)}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span>📥</span>
+                    <span>Download Shopify CSV ({shopifyItems.length} items)</span>
+                  </button>
+                  <button
+                    onClick={() => handleSupplierExport(supplier, items)}
+                    className={`w-full ${colors.buttonBg} ${colors.buttonHover} text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2`}
+                  >
+                    <span>📥</span>
+                    <span>Download {supplier} CSV ({supplierItems.length} items)</span>
+                  </button>
+                </div>
               ) : (
                 <button
                   onClick={() => handleSourceExport(supplier, items)}
@@ -429,9 +457,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                 >
                   <span>📥</span>
                   <span>
-                    {hasBothTypes 
-                      ? `Download CSV (${shopifyItems.length} Shopify + ${supplierItems.length} Direct)`
-                      : shopifyItems.length > 0
+                    {shopifyItems.length > 0
                       ? `Download Shopify CSV (${items.length} items)`
                       : `Download ${supplier} CSV (${items.length} items)`
                     }
