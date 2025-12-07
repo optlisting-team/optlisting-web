@@ -107,8 +107,8 @@ function ProductJourneySection({ zombies = [] }) {
                 </div>
               </div>
 
-              {/* Arrow */}
-              <ArrowRight className="w-5 h-5 text-zinc-600 mt-6 flex-shrink-0" />
+              {/* Arrow - Colored for better visibility */}
+              <ArrowRight className="w-5 h-5 text-blue-400 mt-6 flex-shrink-0" />
 
               {/* Automation Tool Selection - Inferred or Direct Upload */}
               {hasAutomationTool ? (
@@ -119,8 +119,8 @@ function ProductJourneySection({ zombies = [] }) {
                       <span className="text-sm font-semibold text-white">{automationTool}</span>
                     </div>
                   </div>
-                  {/* Arrow */}
-                  <ArrowRight className="w-5 h-5 text-zinc-600 mt-6 flex-shrink-0" />
+                  {/* Arrow - Colored for better visibility */}
+                  <ArrowRight className="w-5 h-5 text-blue-400 mt-6 flex-shrink-0" />
                 </>
               ) : (
                 <>
@@ -130,24 +130,20 @@ function ProductJourneySection({ zombies = [] }) {
                       <span className="text-sm font-semibold text-blue-400">Direct Upload</span>
                     </div>
                   </div>
-                  {/* Arrow */}
-                  <ArrowRight className="w-5 h-5 text-zinc-600 mt-6 flex-shrink-0" />
+                  {/* Arrow - Colored for better visibility */}
+                  <ArrowRight className="w-5 h-5 text-blue-400 mt-6 flex-shrink-0" />
                 </>
               )}
 
-              {/* eBay Store Status */}
+              {/* eBay Store Status - No green color to avoid confusion */}
               <div className="flex-1">
                 <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">EBAY STORE</div>
-                <div className="flex items-center gap-2 px-3 py-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                  <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center">
-                    <span className="text-xs font-bold text-emerald-400">ebay</span>
+                <div className="flex items-center gap-2 px-3 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-lg">
+                  <div className="w-8 h-8 bg-zinc-700 rounded-lg flex items-center justify-center">
+                    <span className="text-xs font-bold text-white">ebay</span>
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-white">eBay Store</p>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-                      <span className="text-[10px] text-emerald-400 font-semibold">Connected</span>
-                    </div>
                   </div>
                 </div>
               </div>
