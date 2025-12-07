@@ -99,11 +99,17 @@ function ProductJourneySection({ zombies = [], onSupplierExport }) {
 
   // Handle export for a specific supplier
   const handleSupplierExport = (supplier) => {
-    if (onSupplierExport && supplier.items) {
-      // Determine target tool based on automation tool or direct upload
-      const targetTool = supplier.directUpload ? 'ebay' : (supplier.automationTool?.toLowerCase() || 'autods')
-      onSupplierExport(supplier.items, targetTool, supplier.name)
+    if (!onSupplierExport) {
+      console.warn('onSupplierExport is not defined')
+      return
     }
+    if (!supplier || !supplier.items || supplier.items.length === 0) {
+      console.warn('No items to export for supplier:', supplier?.name)
+      return
+    }
+    // Determine target tool based on automation tool or direct upload
+    const targetTool = supplier.directUpload ? 'ebay' : (supplier.automationTool?.toLowerCase() || 'autods')
+    onSupplierExport(supplier.items, targetTool, supplier.name)
   }
 
   if (suppliers.length === 0) {
