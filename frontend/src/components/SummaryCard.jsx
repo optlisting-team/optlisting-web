@@ -396,26 +396,14 @@ function SummaryCard({
             Store Analytics
           </h2>
         
-        {/* Right: Compact Badges */}
+        {/* Right: API Status Only */}
         <div className="flex items-center gap-2">
-          <div className={`flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r ${planColor} border rounded-md text-[10px]`}>
-            <span>👑</span>
-            <span className="font-bold">{userPlan}</span>
-            <span className="opacity-70">({connectedStoresCount}/{planStoreLimit} Stores)</span>
-          </div>
-          
-          <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
-            <span className="text-[10px]">💰</span>
-            <span className="text-[10px] font-bold text-emerald-400">{(userCredits - usedCredits).toLocaleString()}</span>
-            <span className="text-[10px] text-emerald-300/70">Credits</span>
-          </div>
-          
           {apiConnected ? (
             <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
               <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
               <span className="text-[10px] font-bold text-emerald-400">LIVE</span>
-          </div>
-        ) : (
+            </div>
+          ) : (
             <div className="flex items-center gap-1.5 px-2 py-1 bg-red-500/10 border border-red-500/20 rounded-md">
               <div className="w-1.5 h-1.5 bg-red-500 rounded-full" />
               <span className="text-[10px] font-bold text-red-400">{apiError || 'Offline'}</span>
