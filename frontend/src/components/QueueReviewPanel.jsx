@@ -10,17 +10,37 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
   const [downloadedGroups, setDownloadedGroups] = useState(new Set())
   const [showShopifyModal, setShowShopifyModal] = useState(false)
   const [pendingExport, setPendingExport] = useState(null) // { source, items, shopifyItems, supplierItems }
-  // Group items by supplier
+  
+  // Check if item goes through Shopify
+  const isShopifyItem = (item) => {
+    return item.management_hub === 'Shopify' || 
+           item.marketplace === 'Shopify' ||
+           item.platform === 'Shopify' ||
+           (item.raw_data && typeof item.raw_data === 'object' && item.raw_data.management_hub === 'Shopify') ||
+           (item.analysis_meta && typeof item.analysis_meta === 'object' && item.analysis_meta.management_hub === 'Shopify') ||
+           (item.metrics && typeof item.metrics === 'object' && item.metrics.management_hub === 'Shopify')
+  }
+  
+  // Group items by supplier AND Shopify status (separate groups for Shopify vs Direct)
   const groupedBySource = queue.reduce((acc, item) => {
     // Safely extract supplier name, handling null, undefined, empty string, and "undefined" string
     let supplier = item.supplier_name || item.supplier || null
     if (!supplier || supplier === "undefined" || supplier === "null" || supplier.trim() === "") {
       supplier = "Unknown"
     }
-    if (!acc[supplier]) {
-      acc[supplier] = []
+    
+    // Create separate groups: "Supplier" and "Supplier (via Shopify)"
+    const isShopify = isShopifyItem(item)
+    const groupKey = isShopify ? `${supplier} (via Shopify)` : `${supplier} (Direct)`
+    
+    if (!acc[groupKey]) {
+      acc[groupKey] = {
+        supplier: supplier,
+        isShopify: isShopify,
+        items: []
+      }
     }
-    acc[supplier].push(item)
+    acc[groupKey].items.push(item)
     return acc
   }, {})
 
@@ -62,26 +82,20 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
     return { shopifyItems, supplierItems }
   }
 
-  const handleSourceExport = async (source, items) => {
+  const handleSourceExport = async (groupKey, items, isShopifyGroup) => {
     if (items.length === 0) {
-      alert(`No ${source} items in queue to export.`)
+      alert(`No items in queue to export.`)
       return
     }
 
-    // Check if any items go through Shopify
-    if (hasShopifyItems(items)) {
-      const { shopifyItems, supplierItems } = separateByShopify(items)
-      // Show modal to choose export option
-      setPendingExport({ source, items, shopifyItems, supplierItems })
-      setShowShopifyModal(true)
-      return
-    }
-
-    // No Shopify items, proceed with normal export
-    await performExport(source, items, 'supplier')
+    // Since we already separated by Shopify status in grouping, directly export
+    const supplier = items[0]?.supplier_name || items[0]?.supplier || 'Unknown'
+    const exportType = isShopifyGroup ? 'shopify' : 'supplier'
+    
+    await performExport(supplier, items, exportType, groupKey)
   }
 
-  const performExport = async (source, items, exportType) => {
+  const performExport = async (source, items, exportType, groupKey) => {
     try {
       // Determine target tool based on export type
       let targetTool = 'autods' // Default
@@ -172,7 +186,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
       }
 
       // Mark this group as downloaded
-      setDownloadedGroups(prev => new Set([...prev, source]))
+      setDownloadedGroups(prev => new Set([...prev, groupKey || source]))
       
       // Update history count
       if (onHistoryUpdate) {

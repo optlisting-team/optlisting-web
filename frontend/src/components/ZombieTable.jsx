@@ -653,9 +653,9 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                     {zombie.views || 0}
                   </td>
                   <td className="px-2 py-4">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-1.5">
                       <div 
-                        className="group relative"
+                        className="group relative inline-block"
                         title={zombie.supplier_name || zombie.supplier || "Unknown"}
                       >
                         <SourceBadge 
@@ -681,7 +681,7 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                           (zombie.metrics && typeof zombie.metrics === 'object' && zombie.metrics.management_hub === 'Shopify')
                         
                         return isShopify ? (
-                          <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded text-[10px] font-medium whitespace-nowrap">
+                          <span className="inline-block px-2 py-0.5 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded text-[10px] font-medium whitespace-nowrap">
                             via Shopify
                           </span>
                         ) : null
