@@ -117,9 +117,9 @@ app.add_middleware(
     allow_origins=allowed_origins,  # Explicit production and local URLs
     allow_origin_regex=vercel_regex,  # CRITICAL: Regex pattern for all Vercel subdomains
     allow_credentials=True,  # Enable credentials for authenticated requests
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],
-    allow_headers=["*"],
-    expose_headers=["*"],
+    allow_methods=["*"],  # Allow all HTTP methods
+    allow_headers=["*"],  # Allow all headers
+    expose_headers=["*"],  # Expose all headers
     max_age=3600,  # Cache preflight requests for 1 hour
 )
 
