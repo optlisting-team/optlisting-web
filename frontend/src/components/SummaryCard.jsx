@@ -37,14 +37,44 @@ function ProductJourneySection({ zombies = [] }) {
   }
 
   // Infer automation tool based on supplier patterns
-  const inferAutomationTool = () => {
-    // Common patterns: AutoDS is most popular, but we can infer from supplier
-    // For now, default to AutoDS as it's the most common
+  const inferAutomationTool = (supplierName) => {
+    // Suppliers that typically use direct upload (no automation tool)
+    const directUploadSuppliers = [
+      'Home Depot',
+      'Walmart',
+      'Costco',
+      'Wayfair'
+    ]
+    
+    // Check if supplier uses direct upload
+    if (directUploadSuppliers.includes(supplierName)) {
+      return null // null means direct upload, no automation tool
+    }
+    
+    // Common patterns: AutoDS is most popular for dropshipping suppliers
+    // For dropshipping suppliers, default to AutoDS
+    const dropshippingSuppliers = [
+      'AliExpress',
+      'CJ Dropshipping',
+      'Wholesale2B',
+      'Spocket',
+      'Zendrop'
+    ]
+    
+    if (dropshippingSuppliers.includes(supplierName)) {
+      return 'AutoDS'
+    }
+    
+    // Amazon can use various tools, default to AutoDS
+    if (supplierName === 'Amazon') {
+      return 'AutoDS'
+    }
+    
+    // Default: Unknown automation tool
     return 'AutoDS'
   }
 
   const suppliers = analyzeSuppliers()
-  const detectedTool = inferAutomationTool()
 
   if (suppliers.length === 0) {
     return null
@@ -58,53 +88,72 @@ function ProductJourneySection({ zombies = [] }) {
       
       {/* Multiple Suppliers Display */}
       <div className="space-y-3">
-        {suppliers.map((supplier, index) => (
-          <div key={supplier.name} className="flex items-center gap-3">
-            {/* Supplier - Multiple can be shown */}
-            <div className="relative flex-1">
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">YOUR SUPPLIER {suppliers.length > 1 ? `#${index + 1}` : ''}</div>
-              <div className="w-full flex items-center justify-between px-3 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-lg">
-                <div className="flex items-center gap-2 flex-1">
-                  <span className="text-sm font-semibold text-white">{supplier.name}</span>
-                  <span className="text-[10px] text-zinc-500 bg-zinc-900/50 px-1.5 py-0.5 rounded">
-                    {supplier.count} items ({supplier.percentage}%)
-                  </span>
+        {suppliers.map((supplier, index) => {
+          const automationTool = inferAutomationTool(supplier.name)
+          const hasAutomationTool = automationTool !== null
+          
+          return (
+            <div key={supplier.name} className="flex items-center gap-3">
+              {/* Supplier - Multiple can be shown */}
+              <div className="relative flex-1">
+                <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">YOUR SUPPLIER {suppliers.length > 1 ? `#${index + 1}` : ''}</div>
+                <div className="w-full flex items-center justify-between px-3 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-lg">
+                  <div className="flex items-center gap-2 flex-1">
+                    <span className="text-sm font-semibold text-white">{supplier.name}</span>
+                    <span className="text-[10px] text-zinc-500 bg-zinc-900/50 px-1.5 py-0.5 rounded">
+                      {supplier.count} items ({supplier.percentage}%)
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Arrow */}
-            <ArrowRight className="w-5 h-5 text-zinc-600 mt-6 flex-shrink-0" />
+              {/* Arrow */}
+              <ArrowRight className="w-5 h-5 text-zinc-600 mt-6 flex-shrink-0" />
 
-            {/* Automation Tool Selection - Inferred */}
-            <div className="relative flex-1">
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">YOUR AUTOMATION TOOL</div>
-              <div className="w-full flex items-center justify-between px-3 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-lg">
-                <span className="text-sm font-semibold text-white">{detectedTool}</span>
-              </div>
-            </div>
+              {/* Automation Tool Selection - Inferred or Direct Upload */}
+              {hasAutomationTool ? (
+                <>
+                  <div className="relative flex-1">
+                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">YOUR AUTOMATION TOOL</div>
+                    <div className="w-full flex items-center justify-between px-3 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-lg">
+                      <span className="text-sm font-semibold text-white">{automationTool}</span>
+                    </div>
+                  </div>
+                  {/* Arrow */}
+                  <ArrowRight className="w-5 h-5 text-zinc-600 mt-6 flex-shrink-0" />
+                </>
+              ) : (
+                <>
+                  <div className="relative flex-1">
+                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">UPLOAD METHOD</div>
+                    <div className="w-full flex items-center justify-between px-3 py-2.5 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                      <span className="text-sm font-semibold text-blue-400">Direct Upload</span>
+                    </div>
+                  </div>
+                  {/* Arrow */}
+                  <ArrowRight className="w-5 h-5 text-zinc-600 mt-6 flex-shrink-0" />
+                </>
+              )}
 
-            {/* Arrow */}
-            <ArrowRight className="w-5 h-5 text-zinc-600 mt-6 flex-shrink-0" />
-
-            {/* eBay Store Status */}
-            <div className="flex-1">
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">EBAY STORE</div>
-              <div className="flex items-center gap-2 px-3 py-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center">
-                  <span className="text-xs font-bold text-emerald-400">ebay</span>
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-white">eBay Store</p>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-                    <span className="text-[10px] text-emerald-400 font-semibold">Connected</span>
+              {/* eBay Store Status */}
+              <div className="flex-1">
+                <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">EBAY STORE</div>
+                <div className="flex items-center gap-2 px-3 py-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                  <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+                    <span className="text-xs font-bold text-emerald-400">ebay</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-white">eBay Store</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                      <span className="text-[10px] text-emerald-400 font-semibold">Connected</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
