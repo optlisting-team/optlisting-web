@@ -409,17 +409,17 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                   {someVisibleSelected && !allVisibleSelected ? (
                     <button
                       onClick={() => handleSelectAllPage(false)}
-                      className="w-4 h-4 rounded border border-zinc-600 bg-blue-500 flex items-center justify-center"
+                      className="w-5 h-5 rounded border border-zinc-600 bg-blue-500 flex items-center justify-center"
                       title="Clear selection"
                     >
-                      <div className="w-2 h-0.5 bg-white rounded"></div>
+                      <div className="w-3 h-0.5 bg-white rounded"></div>
                     </button>
                   ) : (
                     <input
                       type="checkbox"
                       checked={allVisibleSelected}
                       onChange={(e) => handleSelectAllPage(e.target.checked)}
-                      className="rounded border-zinc-600 text-white focus:ring-white bg-zinc-800"
+                      className="w-5 h-5 rounded border-zinc-600 text-white focus:ring-white bg-zinc-800 cursor-pointer"
                     />
                   )}
                 </th>
@@ -589,7 +589,7 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                       type="checkbox"
                       checked={selectedIds.includes(zombie.id)}
                       onChange={(e) => onSelect(zombie.id, e.target.checked)}
-                      className="rounded border-zinc-600 text-white focus:ring-white bg-zinc-800"
+                      className="w-5 h-5 rounded border-zinc-600 text-white focus:ring-white bg-zinc-800 cursor-pointer"
                     />
                   </td>
                   <td className="px-4 py-4">
