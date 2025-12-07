@@ -162,6 +162,10 @@ def generate_dummy_listings(db: Session, count: int = 50, user_id: str = "defaul
             if brand:
                 title = f"{brand} {title}"
             
+            # Determine if product goes through Shopify (30% chance)
+            # Shopify 경유 제품: marketplace는 eBay이지만 management_hub가 Shopify
+            goes_through_shopify = random.random() < 0.3
+            
             # Build metrics JSONB
             metrics = {
                 "sales": sold_qty,
@@ -169,6 +173,10 @@ def generate_dummy_listings(db: Session, count: int = 50, user_id: str = "defaul
                 "price": price,
                 "date_listed": date_listed.isoformat()
             }
+            
+            # Add management_hub to metrics if product goes through Shopify
+            if goes_through_shopify:
+                metrics["management_hub"] = "Shopify"
             
             # Build analysis_meta JSONB (for CSV export testing)
             analysis_meta = {
@@ -178,6 +186,10 @@ def generate_dummy_listings(db: Session, count: int = 50, user_id: str = "defaul
                 },
                 "zombie_score": random.uniform(0.7, 1.0) if is_zombie else random.uniform(0.0, 0.3)
             }
+            
+            # Add management_hub to analysis_meta as well (for redundancy)
+            if goes_through_shopify:
+                analysis_meta["management_hub"] = "Shopify"
             
             listing = Listing(
                 ebay_item_id=ebay_item_id,
