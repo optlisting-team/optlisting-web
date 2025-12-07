@@ -519,6 +519,8 @@ function SummaryCard({
   usedCredits = 0,
   // Store connection callback
   onConnectionChange = null,
+  // Supplier export callback
+  onSupplierExport = null,
   // Low-Performing items data for Product Journey analysis
   zombies = []
 }) {
