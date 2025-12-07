@@ -131,9 +131,12 @@ function ProductJourneySection({ zombies = [], onSupplierExport }) {
         {displayedSuppliers.map((supplier, index) => (
           <div key={supplier.name} className="flex items-center gap-2">
             {/* Supplier - This is our data target */}
-            <div className="relative flex-shrink-0" style={{ minWidth: '140px' }}>
+            <div className="relative flex-shrink-0 group" style={{ minWidth: '140px' }}>
               <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">SUPPLIER {suppliers.length > 1 ? `#${index + 1}` : ''}</div>
-              <div className="w-full flex items-center justify-between px-3 py-2 bg-zinc-800/50 border border-zinc-700 rounded-lg">
+              <div 
+                className="w-full flex items-center justify-between px-3 py-2 bg-zinc-800/50 border border-zinc-700 rounded-lg transition-all hover:bg-zinc-800 hover:border-zinc-600"
+                title={`${supplier.name}: ${supplier.count} items (${supplier.percentage}% of low-performing SKUs)`}
+              >
                 <div className="flex items-center gap-2 flex-1">
                   <span className="text-sm font-semibold text-white">{supplier.name}</span>
                   <span className="text-[10px] text-zinc-500 bg-zinc-900/50 px-1.5 py-0.5 rounded">
@@ -143,16 +146,19 @@ function ProductJourneySection({ zombies = [], onSupplierExport }) {
               </div>
             </div>
 
-            {/* Arrow - Flexible space */}
-            <div className="flex items-center flex-1 min-w-[40px]">
-              <div className="w-full h-0.5 bg-blue-400"></div>
-              <ArrowRight className="w-4 h-4 text-blue-400 flex-shrink-0" />
+            {/* Arrow - Flexible space with pulse animation on hover */}
+            <div className="flex items-center flex-1 min-w-[40px] group-hover:opacity-100">
+              <div className="w-full h-0.5 bg-blue-400 group-hover:bg-blue-300 transition-colors"></div>
+              <ArrowRight className="w-4 h-4 text-blue-400 flex-shrink-0 group-hover:text-blue-300 transition-colors" />
             </div>
 
             {/* eBay Store - Right side, aligned to the right */}
-            <div className="flex-shrink-0 ml-auto" style={{ minWidth: '120px' }}>
+            <div className="flex-shrink-0 ml-auto group" style={{ minWidth: '120px' }}>
               <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">EBAY STORE</div>
-              <div className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800/50 border border-zinc-700 rounded-lg">
+              <div 
+                className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800/50 border border-zinc-700 rounded-lg transition-all hover:bg-zinc-800 hover:border-zinc-600"
+                title="eBay API를 통해 실시간 데이터를 수집 중입니다."
+              >
                 <div className="w-6 h-6 bg-zinc-700 rounded-lg flex items-center justify-center flex-shrink-0">
                   <span className="text-[10px] font-bold text-white">ebay</span>
                 </div>
@@ -607,19 +613,21 @@ function SummaryCard({
         {/* 2. Zombies - Click to view low-performing SKUs */}
         <div 
           onClick={() => handleCardClick('zombies')}
-          className={`opt-card p-6 cursor-pointer transition-all text-center hover:bg-zinc-800/50 ${viewMode === 'zombies' ? 'ring-2 ring-red-500/50' : ''} ${totalZombies > 0 ? 'border-red-500/30' : ''}`}
+          className={`opt-card p-6 cursor-pointer transition-all text-center group hover:bg-zinc-800/50 ${viewMode === 'zombies' ? 'ring-2 ring-red-500/50' : ''} ${totalZombies > 0 ? 'border-red-500/30' : ''} hover:ring-2 hover:ring-red-500/30 hover:border-red-500/20`}
+          title="현재 설정된 필터 기준으로 감지된 저성과(삭제 대상) SKU 개수입니다."
         >
-          <div className={`text-4xl font-black ${totalZombies > 0 ? 'text-red-400' : 'text-white'}`}>{totalZombies || 0}</div>
-          <div className={`text-sm uppercase mt-1 ${totalZombies > 0 ? 'text-red-400' : 'text-zinc-500'}`}>Low-Performing</div>
+          <div className={`text-4xl font-black group-hover:opacity-90 transition-opacity ${totalZombies > 0 ? 'text-red-400' : 'text-white'}`}>{totalZombies || 0}</div>
+          <div className={`text-sm uppercase mt-1 group-hover:opacity-90 transition-opacity ${totalZombies > 0 ? 'text-red-400' : 'text-zinc-500'}`}>Low-Performing</div>
             </div>
 
         {/* 3. CSV Export - Selected for export */}
         <div 
           onClick={() => handleCardClick('queue')}
-          className={`opt-card p-6 cursor-pointer transition-all text-center hover:bg-zinc-800/50 ${viewMode === 'queue' ? 'ring-2 ring-orange-500/50' : ''}`}
+          className={`opt-card p-6 cursor-pointer transition-all text-center group hover:bg-zinc-800/50 ${viewMode === 'queue' ? 'ring-2 ring-orange-500/50' : ''} hover:ring-2 hover:ring-orange-500/30 hover:border-orange-500/20`}
+          title="클릭 시, 분석된 저성과 SKU에 대한 맞춤형 근원 제거용 CSV를 다운로드합니다."
         >
-          <div className={`text-4xl font-black ${queueCount > 0 ? 'text-orange-400' : 'text-white'}`}>{queueCount || 0}</div>
-          <div className="text-sm text-zinc-500 uppercase mt-1">CSV Export</div>
+          <div className={`text-4xl font-black group-hover:opacity-90 transition-opacity ${queueCount > 0 ? 'text-orange-400' : 'text-white'}`}>{queueCount || 0}</div>
+          <div className="text-sm text-zinc-500 uppercase mt-1 group-hover:text-zinc-400 transition-colors">CSV Export</div>
             </div>
           </div>
 

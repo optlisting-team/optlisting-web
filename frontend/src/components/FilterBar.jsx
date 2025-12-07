@@ -219,20 +219,27 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
         </div>
 
         {/* Find Low-Interest Items Button - Large, Below */}
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-red-600 to-orange-500 text-white text-base font-bold rounded-xl hover:from-red-500 hover:to-orange-400 disabled:opacity-50 transition-all shadow-lg shadow-red-500/30"
-        >
-          {loading ? (
-            <RotateCw className="w-5 h-5 animate-spin" />
-          ) : (
-            <>
-              <span className="text-xl">🔍</span>
-              <span>Find Low-Performing SKUs</span>
-            </>
-          )}
-        </button>
+        <div className="relative group">
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-red-600 to-orange-500 text-white text-base font-bold rounded-xl hover:from-red-500 hover:to-orange-400 disabled:opacity-50 transition-all shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 hover:-translate-y-0.5"
+            title="현재 필터 설정으로 분석을 시작합니다. 클릭 시 유통 경로 분석 결과를 확인합니다."
+          >
+            {loading ? (
+              <RotateCw className="w-5 h-5 animate-spin" />
+            ) : (
+              <>
+                <span className="text-xl">🔍</span>
+                <span>Find Low-Performing SKUs</span>
+              </>
+            )}
+          </button>
+          {/* Tooltip */}
+          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+            현재 필터 설정으로 분석을 시작합니다. 클릭 시 유통 경로 분석 결과를 확인합니다.
+          </div>
+        </div>
       </form>
     </div>
   )
