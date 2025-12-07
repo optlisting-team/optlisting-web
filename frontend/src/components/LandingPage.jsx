@@ -160,7 +160,7 @@ function LandingPage() {
               <span className="text-white dark:text-white">Cleaner.</span>
             </h1>
             <h2 className="text-xl md:text-2xl text-zinc-400 dark:text-zinc-400 font-normal mb-10 max-w-3xl mx-auto leading-relaxed font-sans">
-              Instantly generate a CSV of Low-Interest Items
+              Instantly generate a CSV of Low-Performing Listings
             </h2>
             <div className="flex flex-col items-center mt-8">
               <motion.a
@@ -400,7 +400,7 @@ function LandingPage() {
               <div className="w-16 h-16 bg-zinc-800 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-6">
                 <span className="text-3xl font-bold text-white dark:text-white font-sans">2</span>
               </div>
-              <h3 className="text-2xl font-bold text-white dark:text-white mb-4 font-sans">Detect Low-Interest Items</h3>
+              <h3 className="text-2xl font-bold text-white dark:text-white mb-4 font-sans">Detect Low-Performing Listings</h3>
               <p className="text-zinc-400 dark:text-zinc-400 text-lg leading-relaxed font-sans">
                 We analyze your listings and flag dead stock, low impressions, and non-performers.
               </p>
