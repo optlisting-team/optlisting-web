@@ -266,12 +266,14 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
-      {Object.entries(groupedBySource).map(([groupKey, groupData]) => {
-        const { supplier, isShopify, items } = groupData
-        const isDownloaded = downloadedGroups.has(groupKey)
+      {Object.entries(groupedBySource).map(([supplier, groupData]) => {
+        const { items } = groupData
+        const { shopifyItems, supplierItems } = separateByShopify(items)
+        const hasBothTypes = shopifyItems.length > 0 && supplierItems.length > 0
+        const isDownloaded = downloadedGroups.has(supplier)
         return (
           <div
-            key={groupKey}
+            key={supplier}
             className={`rounded-lg border overflow-hidden flex flex-col transition-all ${
               isDownloaded 
                 ? 'bg-zinc-800 border-zinc-700 opacity-60' 
@@ -285,7 +287,12 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                   <h2 className="text-xl font-bold">
                     {supplier.toUpperCase()} - {items.length} Item{items.length !== 1 ? 's' : ''}
                   </h2>
-                  {isShopify && (
+                  {hasBothTypes && (
+                    <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded text-[10px] font-medium">
+                      Mixed (Shopify + Direct)
+                    </span>
+                  )}
+                  {shopifyItems.length > 0 && supplierItems.length === 0 && (
                     <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded text-[10px] font-medium">
                       via Shopify
                     </span>
