@@ -96,6 +96,38 @@ class Profile(Base):
         return f"<Profile(user_id={self.user_id}, subscription_status={self.subscription_status}, plan={self.subscription_plan})>"
 
 
+class CSVFormat(Base):
+    """
+    공급처별 공식 CSV 포맷 정의
+    각 공급처/도구별로 CSV 컬럼 구조와 데이터 매핑 규칙을 저장
+    """
+    __tablename__ = "csv_formats"
+
+    id = Column(Integer, primary_key=True, index=True)
+    supplier_name = Column(String, nullable=False, index=True)  # 공급처/도구 이름 (e.g., "autods", "wholesale2b", "shopify_matrixify")
+    display_name = Column(String, nullable=True)  # 표시용 이름 (e.g., "AutoDS", "Wholesale2B")
+    
+    # CSV 포맷 정의 (JSONB로 저장)
+    # 예: {
+    #   "columns": ["Source ID", "File Action"],
+    #   "column_order": ["Source ID", "File Action"],
+    #   "mappings": {
+    #     "Source ID": {"source": "supplier_id", "fallback": "sku"},
+    #     "File Action": {"value": "delete"}
+    #   }
+    # }
+    format_schema = Column(JSONB, nullable=False)  # CSV 포맷 스키마
+    
+    # 메타데이터
+    description = Column(String, nullable=True)  # 포맷 설명
+    is_active = Column(Boolean, default=True, nullable=False)  # 활성화 여부
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<CSVFormat(supplier_name={self.supplier_name}, display_name={self.display_name})>"
+
+
 # Database setup
 # Use Supabase PostgreSQL if DATABASE_URL is set, otherwise fall back to SQLite
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()

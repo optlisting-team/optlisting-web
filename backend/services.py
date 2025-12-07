@@ -986,6 +986,29 @@ def export_zombies_to_csv(zombie_listings: List[Listing]) -> str:
     return output.getvalue()
 
 
+def get_csv_format(db: Session, supplier_name: str) -> Optional[dict]:
+    """
+    DB에서 CSV 포맷 가져오기
+    
+    Args:
+        db: Database session
+        supplier_name: 공급처/도구 이름 (e.g., "autods", "wholesale2b")
+    
+    Returns:
+        CSV 포맷 스키마 또는 None
+    """
+    from models import CSVFormat
+    
+    csv_format = db.query(CSVFormat).filter(
+        CSVFormat.supplier_name == supplier_name,
+        CSVFormat.is_active == True
+    ).first()
+    
+    if csv_format:
+        return csv_format.format_schema
+    return None
+
+
 def generate_export_csv(
     listings,
     target_tool: str,
@@ -997,10 +1020,10 @@ def generate_export_csv(
     """
     CSV Export for Dropshipping Automation Tools Only
     
-    MVP Focus: High-Volume Dropshippers using automation tools.
-    All exports are tool-specific formats - no generic/fallback formats.
+    CSV 포맷은 DB에서 가져와서 사용합니다.
+    각 공급처별 공식 포맷에 맞춰 데이터를 매핑합니다.
     
-    Supported export formats:
+    Supported export formats (DB에서 관리):
     1. AutoDS: Headers: "Source ID", "File Action" | Data: supplier_id, "delete"
     2. Wholesale2B: Headers: "SKU", "Action" | Data: sku, "Delete"
     3. Shopify (Matrixify/Excelify): Headers: "ID", "Command" | Data: item_id, "DELETE"
@@ -1104,6 +1127,17 @@ def generate_export_csv(
             db.add_all(deletion_logs)
             db.commit()
     
+    # Get CSV format from database
+    if not db:
+        raise ValueError("Database session is required to fetch CSV format")
+    
+    format_schema = get_csv_format(db, target_tool)
+    if not format_schema:
+        raise ValueError(f"CSV format not found for target tool: {target_tool}. Please ensure the format is initialized in the database.")
+    
+    columns = format_schema.get("column_order", format_schema.get("columns", [])
+    mappings = format_schema.get("mappings", {})
+    
     data = []
     
     for listing in listings:
@@ -1137,45 +1171,50 @@ def generate_export_csv(
                     raw_data = {}
             handle = raw_data.get("handle") if raw_data else sku
         
-        # Use supplier_id if available, otherwise use SKU (both work with automation tools)
-        effective_supplier_id = supplier_id if supplier_id else sku
+        # Build row data based on format schema mappings
+        row = {}
+        for column_name in columns:
+            mapping = mappings.get(column_name, {})
+            
+            # Check if it's a static value
+            if "value" in mapping:
+                row[column_name] = mapping["value"]
+            # Otherwise, get value from listing data
+            elif "source" in mapping:
+                source_field = mapping["source"]
+                value = None
+                
+                # Get value from listing data
+                if source_field == "item_id":
+                    value = item_id
+                elif source_field == "sku":
+                    value = sku
+                elif source_field == "supplier_id":
+                    value = supplier_id
+                elif source_field == "handle":
+                    value = handle
+                
+                # Use fallback if value is empty and fallback is specified
+                if not value and "fallback" in mapping:
+                    fallback_field = mapping["fallback"]
+                    if fallback_field == "sku":
+                        value = sku
+                    elif fallback_field == "supplier_id":
+                        value = supplier_id
+                    elif fallback_field == "item_id":
+                        value = item_id
+                
+                row[column_name] = value or ""
+            else:
+                row[column_name] = ""
         
-        if target_tool == "autods":
-            data.append({
-                "Source ID": effective_supplier_id,
-                "File Action": "delete"
-            })
-        elif target_tool == "wholesale2b":
-            data.append({
-                "SKU": sku,
-                "Action": "Delete"
-            })
-        elif target_tool == "shopify_matrixify":
-            # Shopify Matrixify/Excelify format
-            data.append({
-                "ID": item_id,
-                "Command": "DELETE"
-            })
-        elif target_tool == "shopify_tagging":
-            # Shopify Tagging Method (users upload to tag items, then filter & delete manually)
-            data.append({
-                "Handle": handle,
-                "Tags": "OptListing_Delete"
-            })
-        elif target_tool == "ebay":
-            data.append({
-                "Action": "End",
-                "ItemID": item_id
-            })
-        elif target_tool == "yaballe":
-            data.append({
-                "Monitor ID": effective_supplier_id,
-                "Action": "DELETE"
-            })
-        else:
-            raise ValueError(f"Unknown target tool: {target_tool}. Supported: autods, wholesale2b, shopify_matrixify, shopify_tagging, ebay, yaballe")
+        data.append(row)
     
     df = pd.DataFrame(data)
+    
+    # Ensure columns are in the correct order
+    if columns:
+        df = df[columns]
     
     # Convert to CSV string
     output = StringIO()

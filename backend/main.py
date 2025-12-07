@@ -12,7 +12,7 @@ import json
 import logging
 from pydantic import BaseModel
 
-from .models import init_db, get_db, Listing, DeletionLog, Profile, Base, engine
+from .models import init_db, get_db, Listing, DeletionLog, Profile, CSVFormat, Base, engine
 from .services import detect_source, extract_supplier_info, analyze_zombie_listings, generate_export_csv
 from .dummy_data import generate_dummy_listings
 from .webhooks import verify_webhook_signature, process_webhook_event
@@ -1408,6 +1408,104 @@ async def lemonsqueezy_webhook(request: Request, db: Session = Depends(get_db)):
             status_code=200,
             content={"status": "error", "message": "Request processing failed (logged)"}
         )
+
+
+# ============================================================
+# CSV Format Management API
+# ============================================================
+
+@app.get("/api/csv-formats")
+def get_csv_formats(
+    supplier_name: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    CSV 포맷 목록 조회
+    supplier_name이 제공되면 해당 포맷만 반환
+    """
+    if supplier_name:
+        csv_format = db.query(CSVFormat).filter(
+            CSVFormat.supplier_name == supplier_name,
+            CSVFormat.is_active == True
+        ).first()
+        if not csv_format:
+            raise HTTPException(status_code=404, detail=f"CSV format not found for supplier: {supplier_name}")
+        return {
+            "supplier_name": csv_format.supplier_name,
+            "display_name": csv_format.display_name,
+            "description": csv_format.description,
+            "format_schema": csv_format.format_schema,
+            "is_active": csv_format.is_active
+        }
+    else:
+        formats = db.query(CSVFormat).filter(CSVFormat.is_active == True).all()
+        return {
+            "formats": [
+                {
+                    "supplier_name": f.supplier_name,
+                    "display_name": f.display_name,
+                    "description": f.description,
+                    "format_schema": f.format_schema,
+                    "is_active": f.is_active
+                }
+                for f in formats
+            ]
+        }
+
+
+class CSVFormatUpdate(BaseModel):
+    display_name: Optional[str] = None
+    description: Optional[str] = None
+    format_schema: Optional[Dict] = None
+    is_active: Optional[bool] = None
+
+
+@app.put("/api/csv-formats/{supplier_name}")
+def update_csv_format(
+    supplier_name: str,
+    update_data: CSVFormatUpdate,
+    db: Session = Depends(get_db)
+):
+    """
+    CSV 포맷 업데이트
+    """
+    csv_format = db.query(CSVFormat).filter(
+        CSVFormat.supplier_name == supplier_name
+    ).first()
+    
+    if not csv_format:
+        raise HTTPException(status_code=404, detail=f"CSV format not found for supplier: {supplier_name}")
+    
+    if update_data.display_name is not None:
+        csv_format.display_name = update_data.display_name
+    if update_data.description is not None:
+        csv_format.description = update_data.description
+    if update_data.format_schema is not None:
+        csv_format.format_schema = update_data.format_schema
+    if update_data.is_active is not None:
+        csv_format.is_active = update_data.is_active
+    
+    csv_format.updated_at = datetime.utcnow()
+    db.commit()
+    
+    return {
+        "message": "CSV format updated successfully",
+        "supplier_name": csv_format.supplier_name,
+        "display_name": csv_format.display_name
+    }
+
+
+@app.post("/api/csv-formats/init")
+def init_csv_formats_endpoint(db: Session = Depends(get_db)):
+    """
+    CSV 포맷 초기 데이터 생성
+    """
+    try:
+        from .init_csv_formats import init_csv_formats
+        init_csv_formats(db)
+        return {"message": "CSV formats initialized successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to initialize CSV formats: {str(e)}")
 
 
 if __name__ == "__main__":
