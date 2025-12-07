@@ -45,6 +45,9 @@ const generateDummyListings = (count) => {
     const daysListed = Math.floor(Math.random() * 90) + 7
     const zombieScore = isZombie ? Math.floor(Math.random() * 40) : Math.floor(Math.random() * 40) + 60
     
+    // Determine if product goes through Shopify (30% chance)
+    const goesThroughShopify = Math.random() < 0.3
+    
     // Generate SKU based on supplier
     const skuPrefix = supplier === 'Amazon' ? 'B0' : supplier === 'Walmart' ? 'WM' : supplier === 'AliExpress' ? 'AE' : supplier === 'Home Depot' ? 'HD' : 'XX'
     const sku = `${skuPrefix}${String(Math.floor(Math.random() * 100000000)).padStart(8, '0')}`
@@ -66,7 +69,21 @@ const generateDummyListings = (count) => {
       zombie_score: zombieScore,
       recommendation: zombieScore <= 20 ? 'DELETE' : zombieScore <= 40 ? 'DELETE' : zombieScore <= 60 ? 'OPTIMIZE' : 'MONITOR',
       global_winner: Math.random() > 0.9,
-      active_elsewhere: Math.random() > 0.8
+      active_elsewhere: Math.random() > 0.8,
+      // Shopify 경유 정보 추가
+      management_hub: goesThroughShopify ? 'Shopify' : null,
+      metrics: {
+        sales,
+        views,
+        price: Math.round((Math.random() * 150 + 10) * 100) / 100,
+        management_hub: goesThroughShopify ? 'Shopify' : undefined
+      },
+      analysis_meta: {
+        management_hub: goesThroughShopify ? 'Shopify' : undefined
+      },
+      raw_data: {
+        management_hub: goesThroughShopify ? 'Shopify' : undefined
+      }
     }
   })
 }
