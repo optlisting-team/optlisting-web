@@ -161,7 +161,7 @@ function PageHeader() {
                   <Zap className="w-4 h-4 text-white" />
                 </div>
                 <div className="text-left hidden md:block">
-                  <div className="text-xs text-zinc-500 text-[10px] uppercase tracking-wider">나의 크레딧</div>
+                  <div className="text-xs text-zinc-500 text-[10px] uppercase tracking-wider">My Credits</div>
                   <div className="text-sm font-bold text-white">
                     {credits !== null ? credits.toLocaleString() : '...'}
                   </div>
@@ -185,7 +185,7 @@ function PageHeader() {
                   {plan === 'PRO' ? '👑' : plan === 'BUSINESS' ? '🚀' : '📦'}
                 </span>
                 <div className="text-left">
-                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider">나의 플랜</div>
+                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider">My Plan</div>
                   <div className={`text-sm font-bold ${
                     plan === 'PRO' 
                       ? 'text-amber-400' 
