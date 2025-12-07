@@ -567,7 +567,7 @@ function LandingPage() {
               <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
                 1 Hour → 5 Minutes
               </h2>
-              <p className="text-xl text-zinc-400 max-w-2xl mx-auto">
+              <p className="text-xl text-zinc-400 max-w-4xl mx-auto whitespace-nowrap">
                 Time is money for sellers. Dramatically reduce your product cleanup time.
               </p>
             </div>
