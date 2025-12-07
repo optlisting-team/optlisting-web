@@ -564,11 +564,11 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                     {getSortIcon('supplier')}
                   </div>
                 </th>
-                <th className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider w-20">
+                <th className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider w-24">
                   <span>VIA</span>
                 </th>
                 <th 
-                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-20"
+                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-24"
                   onClick={() => handleSort('price')}
                 >
                   <div className="flex items-center gap-1.5">
@@ -672,7 +672,7 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                       </div>
                     </div>
                   </td>
-                  <td className="px-2 py-4">
+                  <td className="px-2 py-4 w-24">
                     {(() => {
                       // Check multiple possible fields for Shopify indication
                       const isShopify = 
@@ -692,7 +692,7 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                       )
                     })()}
                   </td>
-                  <td className="px-2 py-4 text-xs text-white data-value">
+                  <td className="px-2 py-4 text-xs text-white data-value w-24 whitespace-nowrap">
                     {formatPrice(zombie.price)}
                   </td>
                 </tr>
