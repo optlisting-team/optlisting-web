@@ -10,6 +10,7 @@ import LoginPage from './components/LoginPage'
 import SignupPage from './components/SignupPage'
 import TermsOfService from './components/TermsOfService'
 import PrivacyPolicy from './components/PrivacyPolicy'
+import Pricing from './components/Pricing'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -28,6 +29,7 @@ function App() {
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
+              <Route path="/pricing" element={<Pricing />} />
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
               
