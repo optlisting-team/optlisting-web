@@ -10,6 +10,51 @@ import re
 import json
 
 
+def detect_shopify_routing(
+    sku: str = "",
+    image_url: str = "",
+    title: str = "",
+    brand: str = ""
+) -> bool:
+    """
+    Shopify 경유 여부 감지
+    
+    Returns: True if product goes through Shopify, False otherwise
+    
+    Detection Methods:
+    1. SKU 패턴: "SHOP-", "SH-", "Shopify-", "SHOPIFY-"
+    2. Image URL: shopify 관련 도메인 (cdn.shopify.com, *.myshopify.com)
+    3. Title/Brand에 shopify 관련 키워드
+    """
+    sku_upper = sku.upper() if sku else ""
+    image_url_lower = image_url.lower() if image_url else ""
+    title_lower = title.lower() if title else ""
+    brand_lower = brand.lower() if brand else ""
+    
+    # SKU 패턴 확인
+    shopify_sku_patterns = ["SHOP-", "SH-", "SHOPIFY-", "SHOPIFY", "SHOP"]
+    if any(sku_upper.startswith(pattern) for pattern in shopify_sku_patterns):
+        return True
+    
+    # Image URL 패턴 확인
+    shopify_url_patterns = [
+        "cdn.shopify.com",
+        ".myshopify.com",
+        "shopifycdn.com",
+        "shopify.com"
+    ]
+    if any(pattern in image_url_lower for pattern in shopify_url_patterns):
+        return True
+    
+    # Title/Brand에 shopify 관련 키워드
+    search_text = f"{title_lower} {brand_lower}".strip()
+    shopify_keywords = ["shopify", "shopify store", "via shopify"]
+    if any(keyword in search_text for keyword in shopify_keywords):
+        return True
+    
+    return False
+
+
 def extract_supplier_info(
     sku: str = "",
     image_url: str = "",
@@ -29,6 +74,8 @@ def extract_supplier_info(
     - Walmart: If SKU has "WM", extract the ID -> save to supplier_id
     - AliExpress/Others: Regex matching logic
     - Fallback: If unknown, set supplier_name="Unverified"
+    
+    Note: Shopify 경유 여부는 별도 함수 detect_shopify_routing()으로 감지
     """
     sku_upper = sku.upper() if sku else ""
     image_url_lower = image_url.lower() if image_url else ""
@@ -843,6 +890,26 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
                 if hasattr(listing, 'source'):
                     listing.source = supplier_name
             
+            # ✅ Shopify 경유 여부 자동 감지
+            is_shopify = detect_shopify_routing(
+                sku=listing.sku or "",
+                image_url=listing.image_url or "",
+                title=listing.title or "",
+                brand=listing.brand or ""
+            )
+            
+            # metrics와 analysis_meta에 management_hub 설정
+            if is_shopify:
+                if not listing.metrics:
+                    listing.metrics = {}
+                if isinstance(listing.metrics, dict):
+                    listing.metrics["management_hub"] = "Shopify"
+                
+                if not listing.analysis_meta:
+                    listing.analysis_meta = {}
+                if isinstance(listing.analysis_meta, dict):
+                    listing.analysis_meta["management_hub"] = "Shopify"
+            
             # ✅ FIX: platform 필드가 없으면 marketplace 사용, item_id가 없으면 ebay_item_id 사용
             platform = getattr(listing, 'platform', None) or getattr(listing, 'marketplace', None) or "eBay"
             item_id = getattr(listing, 'item_id', None) or getattr(listing, 'ebay_item_id', None) or ""
@@ -870,8 +937,9 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
                 existing.supplier_id = supplier_id  # 자동 감지된 값 사용
                 existing.brand = listing.brand
                 existing.upc = listing.upc
-                existing.metrics = listing.metrics if listing.metrics else {}
+                existing.metrics = listing.metrics if listing.metrics else {}  # Shopify 경유 정보 포함
                 existing.raw_data = listing.raw_data if listing.raw_data else {}
+                existing.analysis_meta = listing.analysis_meta if listing.analysis_meta else {}  # Shopify 경유 정보 포함
                 existing.last_synced_at = listing.last_synced_at if listing.last_synced_at else datetime.utcnow()
                 existing.updated_at = datetime.utcnow()
                 existing.price = listing.price
