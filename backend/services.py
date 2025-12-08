@@ -874,8 +874,9 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
                 'supplier_id': excluded.supplier_id,
                 'brand': excluded.brand,
                 'upc': excluded.upc,
-                'metrics': excluded.metrics,
+                'metrics': excluded.metrics,  # Shopify 경유 정보 포함
                 'raw_data': excluded.raw_data,
+                'analysis_meta': excluded.analysis_meta,  # Shopify 경유 정보 포함
                 'last_synced_at': excluded.last_synced_at,
                 'updated_at': datetime.utcnow(),
                 # Legacy fields
