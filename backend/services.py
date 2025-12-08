@@ -212,48 +212,93 @@ def extract_supplier_info(
         return ("AliExpress", supplier_id)
     
     # CJ Dropshipping
-    if sku_upper.startswith("CJ") or "cjdropshipping" in image_url_lower:
+    cj_sku_patterns = ["CJ", "CJDROPSHIPPING", "CJ-DROP"]
+    cj_url_patterns = ["cjdropshipping.com", "cjdropshipping"]
+    cj_in_sku = sku_upper.startswith("CJ") or any(part in cj_sku_patterns for part in sku_parts)
+    if cj_in_sku or any(pattern in image_url_lower for pattern in cj_url_patterns):
         cj_id = sku_upper.replace("CJ", "").strip("-").strip() if sku_upper.startswith("CJ") else None
         return ("CJ Dropshipping", cj_id)
     
     # Home Depot
-    if sku_upper.startswith("HD") or "homedepot" in image_url_lower:
+    hd_sku_patterns = ["HD", "HOMEDEPOT", "HOME-DEPOT"]
+    hd_url_patterns = ["homedepot.com", "homedepot"]
+    hd_keywords = ["husky", "hdx", "glacier bay"]
+    hd_in_sku = sku_upper.startswith("HD") or any(part in hd_sku_patterns for part in sku_parts)
+    is_hd = (
+        hd_in_sku or
+        any(pattern in image_url_lower for pattern in hd_url_patterns) or
+        any(keyword in title_lower or keyword in brand_lower for keyword in hd_keywords)
+    )
+    if is_hd:
         hd_id = sku_upper.replace("HD", "").strip("-").strip() if sku_upper.startswith("HD") else None
         return ("Home Depot", hd_id)
     
     # Wayfair
-    if sku_upper.startswith("WF") or "wayfair" in image_url_lower:
+    wf_sku_patterns = ["WF", "WAYFAIR"]
+    wf_url_patterns = ["wayfair.com", "wayfair"]
+    wf_keywords = ["wayfair basics", "mercury row"]
+    wf_in_sku = sku_upper.startswith("WF") or any(part in wf_sku_patterns for part in sku_parts)
+    is_wf = (
+        wf_in_sku or
+        any(pattern in image_url_lower for pattern in wf_url_patterns) or
+        any(keyword in title_lower or keyword in brand_lower for keyword in wf_keywords)
+    )
+    if is_wf:
         wf_id = sku_upper.replace("WF", "").strip("-").strip() if sku_upper.startswith("WF") else None
         return ("Wayfair", wf_id)
     
     # Costco
-    if sku_upper.startswith("CO") or "costco" in image_url_lower:
+    costco_sku_patterns = ["CO", "COSTCO"]
+    costco_keywords = ["kirkland", "kirkland signature"]
+    costco_in_sku = sku_upper.startswith("CO") or any(part in costco_sku_patterns for part in sku_parts)
+    is_costco = (
+        costco_in_sku or
+        "costco.com" in image_url_lower or
+        any(keyword in title_lower or keyword in brand_lower for keyword in costco_keywords)
+    )
+    if is_costco:
         co_id = sku_upper.replace("CO", "").strip("-").strip() if sku_upper.startswith("CO") else None
         return ("Costco", co_id)
     
     # Costway
-    if sku_upper.startswith("CW") or "costway" in image_url_lower:
+    cw_sku_patterns = ["CW", "COSTWAY"]
+    cw_in_sku = sku_upper.startswith("CW") or any(part in cw_sku_patterns for part in sku_parts)
+    if cw_in_sku or "costway" in image_url_lower:
         cw_id = sku_upper.replace("CW", "").strip("-").strip() if sku_upper.startswith("CW") else None
         return ("Costway", cw_id)
     
     # Pro Aggregators
-    if sku_upper.startswith("W2B") or "wholesale2b" in image_url_lower:
+    w2b_sku_patterns = ["W2B", "WHOLESALE2B", "WHOLESALE-2B"]
+    w2b_in_sku = sku_upper.startswith("W2B") or any(part in w2b_sku_patterns for part in sku_parts)
+    if w2b_in_sku or "wholesale2b" in image_url_lower:
         w2b_id = sku_upper.replace("W2B", "").strip("-").strip() if sku_upper.startswith("W2B") else None
         return ("Wholesale2B", w2b_id)
     
-    if sku_upper.startswith("SPK") or "spocket" in image_url_lower:
+    spk_sku_patterns = ["SPK", "SPOCKET"]
+    spk_in_sku = sku_upper.startswith("SPK") or any(part in spk_sku_patterns for part in sku_parts)
+    if spk_in_sku or "spocket" in image_url_lower:
         spk_id = sku_upper.replace("SPK", "").strip("-").strip() if sku_upper.startswith("SPK") else None
         return ("Spocket", spk_id)
     
-    if sku_upper.startswith("SH") or "salehoo" in image_url_lower:
+    # SaleHoo (주의: "SH"는 Shopify와 겹칠 수 있으므로 더 구체적인 패턴 필요)
+    salehoo_sku_patterns = ["SH", "SALEHOO", "SALE-HOO"]
+    salehoo_in_sku = (
+        (sku_upper.startswith("SH") and not any(shopify_part in sku_parts for shopify_part in ["SHOP", "SHOPIFY"])) or
+        any(part in salehoo_sku_patterns for part in sku_parts)
+    )
+    if salehoo_in_sku or "salehoo" in image_url_lower:
         sh_id = sku_upper.replace("SH", "").strip("-").strip() if sku_upper.startswith("SH") else None
         return ("SaleHoo", sh_id)
     
-    if sku_upper.startswith("IS") or "inventorysource" in image_url_lower:
+    is_sku_patterns = ["IS", "INVENTORYSOURCE", "INVENTORY-SOURCE"]
+    is_in_sku = sku_upper.startswith("IS") or any(part in is_sku_patterns for part in sku_parts)
+    if is_in_sku or "inventorysource" in image_url_lower:
         is_id = sku_upper.replace("IS", "").strip("-").strip() if sku_upper.startswith("IS") else None
         return ("Inventory Source", is_id)
     
-    if sku_upper.startswith("DF") or "dropified" in image_url_lower:
+    df_sku_patterns = ["DF", "DROPIFIED"]
+    df_in_sku = sku_upper.startswith("DF") or any(part in df_sku_patterns for part in sku_parts)
+    if df_in_sku or "dropified" in image_url_lower:
         df_id = sku_upper.replace("DF", "").strip("-").strip() if sku_upper.startswith("DF") else None
         return ("Dropified", df_id)
     
