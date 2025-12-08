@@ -1135,7 +1135,7 @@ def generate_export_csv(
     if not format_schema:
         raise ValueError(f"CSV format not found for target tool: {target_tool}. Please ensure the format is initialized in the database.")
     
-    columns = format_schema.get("column_order", format_schema.get("columns", [])
+    columns = format_schema.get("column_order", format_schema.get("columns", []))
     mappings = format_schema.get("mappings", {})
     
     data = []
