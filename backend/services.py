@@ -85,7 +85,28 @@ def extract_supplier_info(
     # Amazon Detection
     # Pattern 1: SKU starts with "AMZ" or contains "B0" (ASIN pattern)
     amazon_asin_pattern = r'B0[0-9A-Z]{8}'  # ASIN format: B + 9 alphanumeric
-    if sku_upper.startswith("AMZ") or re.search(amazon_asin_pattern, sku_upper):
+    
+    # Amazon Image URL 패턴 (강화)
+    amazon_url_patterns = [
+        "ssl-images-amazon.com",
+        "images-na.ssl-images-amazon.com",
+        "m.media-amazon.com",
+        "images.amazon.com",
+        "amazon-adsystem.com"
+    ]
+    
+    # Amazon Title/Brand 키워드
+    amazon_keywords = ["amazon basics", "solimo", "happy belly"]
+    
+    # Amazon 감지 (우선순위: SKU > Image URL > Title/Brand)
+    is_amazon = (
+        sku_upper.startswith("AMZ") or 
+        re.search(amazon_asin_pattern, sku_upper) or
+        any(pattern in image_url_lower for pattern in amazon_url_patterns) or
+        any(keyword in title_lower or keyword in brand_lower for keyword in amazon_keywords)
+    )
+    
+    if is_amazon:
         # Extract ASIN
         asin_match = re.search(amazon_asin_pattern, sku_upper)
         if asin_match:
@@ -104,7 +125,24 @@ def extract_supplier_info(
         return ("Amazon", supplier_id)
     
     # Walmart Detection
-    if sku_upper.startswith("WM") or "WALMART" in image_url_lower:
+    # Walmart Image URL 패턴 (강화)
+    walmart_url_patterns = [
+        "walmartimages.com",
+        "i5.walmartimages.com",
+        "i.walmartimages.com",
+        "walmart.com/images"
+    ]
+    
+    # Walmart Title/Brand 키워드
+    walmart_keywords = ["mainstays", "great value", "equate", "pen+gear", "pen & gear", "hyper tough"]
+    
+    is_walmart = (
+        sku_upper.startswith("WM") or
+        any(pattern in image_url_lower for pattern in walmart_url_patterns) or
+        any(keyword in title_lower or keyword in brand_lower for keyword in walmart_keywords)
+    )
+    
+    if is_walmart:
         # Extract Walmart ID (usually after "WM-" prefix)
         if sku_upper.startswith("WM"):
             walmart_id = sku_upper.replace("WM", "").strip("-").strip()
@@ -114,7 +152,22 @@ def extract_supplier_info(
         return ("Walmart", supplier_id)
     
     # AliExpress Detection
-    if sku_upper.startswith("AE") or sku_upper.startswith("ALI") or "aliexpress" in image_url_lower or "alicdn" in image_url_lower:
+    # AliExpress Image URL 패턴 (강화)
+    aliexpress_url_patterns = [
+        "alicdn.com",
+        "ae01.alicdn.com",
+        "ae02.alicdn.com",
+        "ae03.alicdn.com",
+        "aliexpress.com"
+    ]
+    
+    is_aliexpress = (
+        sku_upper.startswith("AE") or 
+        sku_upper.startswith("ALI") or
+        any(pattern in image_url_lower for pattern in aliexpress_url_patterns)
+    )
+    
+    if is_aliexpress:
         # Extract AliExpress product ID
         if sku_upper.startswith("AE") or sku_upper.startswith("ALI"):
             ali_id = sku_upper.replace("AE", "").replace("ALI", "").strip("-").strip()
