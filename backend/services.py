@@ -796,6 +796,27 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
                 if hasattr(listing, 'source'):
                     listing.source = supplier_name
             
+            # ✅ Shopify 경유 여부 자동 감지
+            is_shopify = detect_shopify_routing(
+                sku=listing.sku or "",
+                image_url=listing.image_url or "",
+                title=listing.title or "",
+                brand=listing.brand or ""
+            )
+            
+            # metrics와 analysis_meta에 management_hub 설정
+            metrics = listing.metrics if listing.metrics else {}
+            if not isinstance(metrics, dict):
+                metrics = {}
+            
+            analysis_meta = listing.analysis_meta if listing.analysis_meta else {}
+            if not isinstance(analysis_meta, dict):
+                analysis_meta = {}
+            
+            if is_shopify:
+                metrics["management_hub"] = "Shopify"
+                analysis_meta["management_hub"] = "Shopify"
+            
             # Convert Listing object to dictionary
             # ✅ FIX: platform 필드가 없으면 marketplace 사용
             platform = getattr(listing, 'platform', None) or getattr(listing, 'marketplace', None) or "eBay"
@@ -813,8 +834,9 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
                 'supplier_id': supplier_id,  # 자동 감지된 값 사용
                 'brand': listing.brand,
                 'upc': listing.upc,
-                'metrics': listing.metrics if listing.metrics else {},
+                'metrics': metrics,  # Shopify 경유 정보 포함
                 'raw_data': listing.raw_data if listing.raw_data else {},
+                'analysis_meta': analysis_meta,  # Shopify 경유 정보 포함
                 'last_synced_at': listing.last_synced_at if listing.last_synced_at else datetime.utcnow(),
                 'updated_at': datetime.utcnow(),
                 # Legacy fields
