@@ -82,9 +82,31 @@ def extract_supplier_info(
     title_lower = title.lower() if title else ""
     brand_lower = brand.lower() if brand else ""
     
+    # SKU에서 공급처 힌트 추출 (더 정교한 파싱)
+    # SKU 패턴 예시:
+    # - "AMZ-B08ABC1234" → Amazon
+    # - "WM-123456" → Walmart
+    # - "AE-789012" → AliExpress
+    # - "CJ-345678" → CJ Dropshipping
+    # - "SHOP-AMZ-B08ABC1234" → Shopify 경유 Amazon
+    # - "AUTODS-B08ABC1234" → AutoDS 사용
+    # - "YABALLE-AMZ-123" → Yaballe 사용
+    # - "B08ABC1234" → ASIN만 있으면 Amazon
+    
+    # SKU를 하이픈(-) 또는 언더스코어(_)로 분리하여 분석
+    sku_parts = re.split(r'[-_]', sku_upper)
+    
     # Amazon Detection
     # Pattern 1: SKU starts with "AMZ" or contains "B0" (ASIN pattern)
     amazon_asin_pattern = r'B0[0-9A-Z]{8}'  # ASIN format: B + 9 alphanumeric
+    
+    # Amazon SKU 패턴 (확장)
+    amazon_sku_patterns = ["AMZ", "AMAZON", "AUTODS"]  # AutoDS도 보통 Amazon 제품
+    amazon_in_sku = (
+        sku_upper.startswith("AMZ") or
+        any(part in amazon_sku_patterns for part in sku_parts) or
+        re.search(amazon_asin_pattern, sku_upper)  # ASIN 패턴이 있으면 Amazon
+    )
     
     # Amazon Image URL 패턴 (강화)
     amazon_url_patterns = [
@@ -100,8 +122,7 @@ def extract_supplier_info(
     
     # Amazon 감지 (우선순위: SKU > Image URL > Title/Brand)
     is_amazon = (
-        sku_upper.startswith("AMZ") or 
-        re.search(amazon_asin_pattern, sku_upper) or
+        amazon_in_sku or
         any(pattern in image_url_lower for pattern in amazon_url_patterns) or
         any(keyword in title_lower or keyword in brand_lower for keyword in amazon_keywords)
     )
@@ -125,6 +146,13 @@ def extract_supplier_info(
         return ("Amazon", supplier_id)
     
     # Walmart Detection
+    # Walmart SKU 패턴 (확장)
+    walmart_sku_patterns = ["WM", "WALMART", "WMT"]
+    walmart_in_sku = (
+        sku_upper.startswith("WM") or
+        any(part in walmart_sku_patterns for part in sku_parts)
+    )
+    
     # Walmart Image URL 패턴 (강화)
     walmart_url_patterns = [
         "walmartimages.com",
@@ -137,7 +165,7 @@ def extract_supplier_info(
     walmart_keywords = ["mainstays", "great value", "equate", "pen+gear", "pen & gear", "hyper tough"]
     
     is_walmart = (
-        sku_upper.startswith("WM") or
+        walmart_in_sku or
         any(pattern in image_url_lower for pattern in walmart_url_patterns) or
         any(keyword in title_lower or keyword in brand_lower for keyword in walmart_keywords)
     )
@@ -152,6 +180,14 @@ def extract_supplier_info(
         return ("Walmart", supplier_id)
     
     # AliExpress Detection
+    # AliExpress SKU 패턴 (확장)
+    aliexpress_sku_patterns = ["AE", "ALI", "ALIEXPRESS", "ALI-EXPRESS"]
+    aliexpress_in_sku = (
+        sku_upper.startswith("AE") or
+        sku_upper.startswith("ALI") or
+        any(part in aliexpress_sku_patterns for part in sku_parts)
+    )
+    
     # AliExpress Image URL 패턴 (강화)
     aliexpress_url_patterns = [
         "alicdn.com",
@@ -162,8 +198,7 @@ def extract_supplier_info(
     ]
     
     is_aliexpress = (
-        sku_upper.startswith("AE") or 
-        sku_upper.startswith("ALI") or
+        aliexpress_in_sku or
         any(pattern in image_url_lower for pattern in aliexpress_url_patterns)
     )
     
