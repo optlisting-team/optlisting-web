@@ -683,6 +683,8 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
     instead of raising IntegrityError. Uses the unique index 'idx_user_platform_item'
     which is on (user_id, platform, item_id).
     
+    **공급처 자동 감지**: supplier_name과 supplier_id가 없으면 SKU, image_url, title, brand, upc를 기반으로 자동 감지합니다.
+    
     For PostgreSQL: Uses INSERT ... ON CONFLICT DO UPDATE
     For SQLite: Falls back to individual INSERT OR REPLACE (less efficient but compatible)
     
@@ -695,6 +697,23 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
     """
     if not listings:
         return 0
+    
+    # 공급처 자동 감지: supplier_name이 없거나 "Unverified"인 경우 자동 감지
+    for listing in listings:
+        if not listing.supplier_name or listing.supplier_name == "Unverified" or listing.supplier_name == "Unknown":
+            # extract_supplier_info를 사용하여 공급처 자동 감지
+            supplier_name, supplier_id = extract_supplier_info(
+                sku=listing.sku or "",
+                image_url=listing.image_url or "",
+                title=listing.title or "",
+                brand=listing.brand or "",
+                upc=listing.upc or ""
+            )
+            listing.supplier_name = supplier_name
+            listing.supplier_id = supplier_id
+            # source 필드도 업데이트 (legacy 호환성)
+            if hasattr(listing, 'source'):
+                listing.source = supplier_name
     
     # Check if we're using PostgreSQL (has insert().on_conflict_do_update)
     # or SQLite (needs different approach)
@@ -710,6 +729,26 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
         # Prepare data dictionaries for bulk insert
         values_list = []
         for listing in listings:
+            # ✅ 공급처 자동 감지: supplier_name이 없거나 "Unverified"/"Unknown"인 경우 자동 감지
+            supplier_name = listing.supplier_name
+            supplier_id = listing.supplier_id
+            
+            if not supplier_name or supplier_name in ["Unverified", "Unknown", ""]:
+                # extract_supplier_info를 사용하여 공급처 자동 감지
+                supplier_name, supplier_id = extract_supplier_info(
+                    sku=listing.sku or "",
+                    image_url=listing.image_url or "",
+                    title=listing.title or "",
+                    brand=listing.brand or "",
+                    upc=listing.upc or ""
+                )
+                # Listing 객체도 업데이트 (나중에 사용할 수 있도록)
+                listing.supplier_name = supplier_name
+                listing.supplier_id = supplier_id
+                # source 필드도 업데이트 (legacy 호환성)
+                if hasattr(listing, 'source'):
+                    listing.source = supplier_name
+            
             # Convert Listing object to dictionary
             # ✅ FIX: platform 필드가 없으면 marketplace 사용
             platform = getattr(listing, 'platform', None) or getattr(listing, 'marketplace', None) or "eBay"
@@ -723,8 +762,8 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
                 'title': listing.title,
                 'image_url': listing.image_url,
                 'sku': listing.sku,
-                'supplier_name': listing.supplier_name,
-                'supplier_id': listing.supplier_id,
+                'supplier_name': supplier_name,  # 자동 감지된 값 사용
+                'supplier_id': supplier_id,  # 자동 감지된 값 사용
                 'brand': listing.brand,
                 'upc': listing.upc,
                 'metrics': listing.metrics if listing.metrics else {},
@@ -784,6 +823,26 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
     else:
         # SQLite: Use individual INSERT OR REPLACE (less efficient but compatible)
         for listing in listings:
+            # ✅ 공급처 자동 감지: supplier_name이 없거나 "Unverified"/"Unknown"인 경우 자동 감지
+            supplier_name = listing.supplier_name
+            supplier_id = listing.supplier_id
+            
+            if not supplier_name or supplier_name in ["Unverified", "Unknown", ""]:
+                # extract_supplier_info를 사용하여 공급처 자동 감지
+                supplier_name, supplier_id = extract_supplier_info(
+                    sku=listing.sku or "",
+                    image_url=listing.image_url or "",
+                    title=listing.title or "",
+                    brand=listing.brand or "",
+                    upc=listing.upc or ""
+                )
+                # Listing 객체도 업데이트
+                listing.supplier_name = supplier_name
+                listing.supplier_id = supplier_id
+                # source 필드도 업데이트 (legacy 호환성)
+                if hasattr(listing, 'source'):
+                    listing.source = supplier_name
+            
             # ✅ FIX: platform 필드가 없으면 marketplace 사용, item_id가 없으면 ebay_item_id 사용
             platform = getattr(listing, 'platform', None) or getattr(listing, 'marketplace', None) or "eBay"
             item_id = getattr(listing, 'item_id', None) or getattr(listing, 'ebay_item_id', None) or ""
@@ -807,8 +866,8 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
                 existing.title = listing.title
                 existing.image_url = listing.image_url
                 existing.sku = listing.sku
-                existing.supplier_name = listing.supplier_name
-                existing.supplier_id = listing.supplier_id
+                existing.supplier_name = supplier_name  # 자동 감지된 값 사용
+                existing.supplier_id = supplier_id  # 자동 감지된 값 사용
                 existing.brand = listing.brand
                 existing.upc = listing.upc
                 existing.metrics = listing.metrics if listing.metrics else {}
