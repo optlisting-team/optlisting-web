@@ -475,18 +475,23 @@ function Dashboard() {
 
   // Handle store connection change
   const handleStoreConnection = (connected) => {
+    const wasConnected = isStoreConnected
     setIsStoreConnected(connected)
     
-    if (connected) {
-      // When connected, load listings (demo data)
+    console.log('🔄 eBay 연결 상태 변경:', { wasConnected, connected })
+    
+    if (connected && !wasConnected) {
+      // 연결됨: 제품 로드
+      console.log('✅ eBay 연결됨 - 제품 로드 시작')
       if (DEMO_MODE) {
         setAllListings(DUMMY_ALL_LISTINGS)
         setTotalListings(DUMMY_ALL_LISTINGS.length)
       } else {
         fetchAllListings()
       }
-    } else {
-      // When disconnected, clear listings
+    } else if (!connected && wasConnected) {
+      // 연결 해제됨: 제품 초기화
+      console.log('❌ eBay 연결 해제됨 - 제품 초기화')
       setAllListings([])
       setTotalListings(0)
       setZombies([])
@@ -788,6 +793,37 @@ function Dashboard() {
     }
   }
 
+  // OAuth 콜백 후 URL 파라미터 확인
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const ebayConnected = urlParams.get('ebay_connected')
+    const ebayError = urlParams.get('ebay_error')
+    
+    if (ebayConnected === 'true') {
+      console.log('✅ OAuth 콜백 성공 - eBay 연결됨')
+      // URL 파라미터 제거 (깔끔한 URL 유지)
+      window.history.replaceState({}, '', window.location.pathname)
+      // 연결 상태 확인 (SummaryCard에서 자동으로 확인하지만, 명시적으로 확인)
+      // 약간의 지연 후 연결 상태 확인 (토큰이 DB에 저장되는 시간 고려)
+      setTimeout(() => {
+        if (!isStoreConnected) {
+          console.log('🔄 OAuth 콜백 후 연결 상태 업데이트')
+          setIsStoreConnected(true)
+          // 제품 로드
+          if (!DEMO_MODE) {
+            fetchAllListings()
+          }
+        }
+      }, 2000)
+    } else if (ebayError) {
+      console.error('❌ OAuth 콜백 에러:', ebayError)
+      const errorMessage = urlParams.get('message') || 'eBay 연결에 실패했습니다'
+      alert(`eBay 연결 실패: ${errorMessage}`)
+      // URL 파라미터 제거
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
+  
   // Initial Load - Check API health and fetch data
   useEffect(() => {
     const initializeDashboard = async () => {

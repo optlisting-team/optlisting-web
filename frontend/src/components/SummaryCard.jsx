@@ -44,7 +44,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
         setCheckingConnection(true)
         const response = await axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
           params: { user_id: CURRENT_USER_ID },
-          timeout: 5000
+          timeout: 10000 // 10초로 증가 (Railway 응답 대기)
         })
         
         const isConnected = response.data?.connected === true
@@ -83,8 +83,8 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
 
     checkEbayConnection()
     
-    // 30초마다 연결 상태 확인
-    const interval = setInterval(checkEbayConnection, 30000)
+    // 10초마다 연결 상태 확인 (더 빠른 반응)
+    const interval = setInterval(checkEbayConnection, 10000)
     return () => clearInterval(interval)
   }, [selectedStore?.platform, onConnectionChange])
 
