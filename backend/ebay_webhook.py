@@ -618,12 +618,14 @@ async def ebay_auth_callback(
                     ebay_token_updated_at=datetime.utcnow()
                 )
                 db.add(profile)
+                logger.info(f"📝 Creating new profile for user: {user_id}")
             else:
                 # 기존 프로필 업데이트
                 profile.ebay_access_token = access_token
                 profile.ebay_refresh_token = refresh_token
                 profile.ebay_token_expires_at = token_expires_at
                 profile.ebay_token_updated_at = datetime.utcnow()
+                logger.info(f"📝 Updating existing profile for user: {user_id}")
             
             db.commit()
             logger.info(f"✅ Tokens saved to database for user: {user_id}")
@@ -631,42 +633,10 @@ async def ebay_auth_callback(
         except Exception as e:
             db.rollback()
             logger.error(f"❌ Failed to save tokens to database: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             error_redirect = f"{FRONTEND_URL}/settings?ebay_error=db_save&message=Failed to save tokens"
             return RedirectResponse(url=error_redirect, status_code=302)
-        
-        # DB 저장 로직 (간단 버전)
-        try:
-            from .models import get_db, Profile
-            
-            # DB 세션 생성
-            db = next(get_db())
-            
-            # 사용자 프로필 찾기 또는 생성
-            profile = db.query(Profile).filter(Profile.user_id == user_id).first()
-            
-            if not profile:
-                # 새 프로필 생성
-                profile = Profile(
-                    user_id=user_id,
-                    ebay_access_token=access_token,
-                    ebay_refresh_token=refresh_token,
-                    ebay_token_expires_at=token_expires_at,
-                    ebay_token_updated_at=datetime.utcnow()
-                )
-                db.add(profile)
-            else:
-                # 기존 프로필 업데이트
-                profile.ebay_access_token = access_token
-                profile.ebay_refresh_token = refresh_token
-                profile.ebay_token_expires_at = token_expires_at
-                profile.ebay_token_updated_at = datetime.utcnow()
-            
-            db.commit()
-            logger.info(f"✅ Tokens saved to database for user: {user_id}")
-            
-        except Exception as db_err:
-            logger.error(f"⚠️ DB save error (non-fatal): {db_err}")
-            # DB 저장 실패해도 성공으로 처리 (토큰은 받았으니)
         
         # 성공! 프론트엔드로 리다이렉트
         success_redirect = f"{FRONTEND_URL}/settings?ebay_connected=true&message=eBay account connected successfully"
