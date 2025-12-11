@@ -630,6 +630,15 @@ async def ebay_auth_callback(
             db.commit()
             logger.info(f"✅ Tokens saved to database for user: {user_id}")
             
+            # 저장 후 즉시 확인 (검증)
+            db.refresh(profile)
+            if profile.ebay_access_token:
+                logger.info(f"✅ Token verification: Access token exists in DB")
+                logger.info(f"   Token length: {len(profile.ebay_access_token)}")
+                logger.info(f"   Refresh token exists: {bool(profile.ebay_refresh_token)}")
+            else:
+                logger.error(f"❌ Token verification failed: Access token not found after save!")
+            
         except Exception as e:
             db.rollback()
             logger.error(f"❌ Failed to save tokens to database: {e}")
@@ -639,7 +648,8 @@ async def ebay_auth_callback(
             return RedirectResponse(url=error_redirect, status_code=302)
         
         # 성공! 프론트엔드로 리다이렉트
-        success_redirect = f"{FRONTEND_URL}/settings?ebay_connected=true&message=eBay account connected successfully"
+        # Dashboard로 리다이렉트 (settings 대신)
+        success_redirect = f"{FRONTEND_URL}/dashboard?ebay_connected=true&message=eBay account connected successfully"
         logger.info(f"✅ OAuth complete! Redirecting to: {success_redirect}")
         logger.info("=" * 60)
         
@@ -669,25 +679,53 @@ async def ebay_auth_status(
         from .models import get_db, Profile
         
         db = next(get_db())
+        
+        # 모든 프로필 조회 (디버깅용)
+        all_profiles = db.query(Profile).all()
+        logger.info(f"🔍 Total profiles in DB: {len(all_profiles)}")
+        for p in all_profiles:
+            logger.info(f"   - Profile user_id: {p.user_id}, has_token: {bool(p.ebay_access_token)}")
+        
         profile = db.query(Profile).filter(Profile.user_id == user_id).first()
         
         if not profile:
+            logger.warning(f"⚠️ No profile found for user_id: {user_id}")
             return {
                 "connected": False,
-                "message": "No profile found"
+                "message": "No profile found",
+                "debug": {
+                    "user_id": user_id,
+                    "total_profiles": len(all_profiles),
+                    "profile_user_ids": [p.user_id for p in all_profiles]
+                }
             }
         
+        logger.info(f"✅ Profile found for user: {user_id}")
+        logger.info(f"   - Has access token: {bool(profile.ebay_access_token)}")
+        logger.info(f"   - Has refresh token: {bool(profile.ebay_refresh_token)}")
+        logger.info(f"   - Token expires at: {profile.ebay_token_expires_at}")
+        logger.info(f"   - Token updated at: {profile.ebay_token_updated_at}")
+        
         if not profile.ebay_access_token:
+            logger.warning(f"⚠️ Profile exists but no access token for user: {user_id}")
             return {
                 "connected": False,
-                "message": "No eBay token found"
+                "message": "No eBay token found",
+                "debug": {
+                    "user_id": user_id,
+                    "profile_exists": True,
+                    "has_refresh_token": bool(profile.ebay_refresh_token),
+                    "token_updated_at": profile.ebay_token_updated_at.isoformat() if profile.ebay_token_updated_at else None
+                }
             }
         
         # 토큰 만료 확인
         is_expired = False
         if profile.ebay_token_expires_at:
             is_expired = profile.ebay_token_expires_at < datetime.utcnow()
+            logger.info(f"   - Token expired: {is_expired}")
         
+        logger.info(f"✅ eBay connected for user: {user_id}")
         return {
             "connected": True,
             "user_id": user_id,
@@ -700,6 +738,8 @@ async def ebay_auth_status(
         
     except Exception as e:
         logger.error(f"❌ Status check error: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         return {
             "connected": False,
             "error": str(e)
