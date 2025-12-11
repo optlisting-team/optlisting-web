@@ -42,7 +42,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
 
       try {
         setCheckingConnection(true)
-        const response = await axios.get(`${API_BASE_URL}/api/ebay/status`, {
+        const response = await axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
           params: { user_id: CURRENT_USER_ID },
           timeout: 5000
         })
