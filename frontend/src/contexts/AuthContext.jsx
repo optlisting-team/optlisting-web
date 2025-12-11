@@ -60,7 +60,12 @@ export const AuthProvider = ({ children }) => {
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
+            // Google OAuth 동의 화면에 표시될 도메인 설정
+            // 주의: Google Cloud Console의 OAuth 동의 화면 → 승인된 도메인 순서가 우선 적용됨
+            // optlisting.com을 첫 번째로 설정하면 Google 로그인 화면에 표시됨
           },
+          // 스코프 설정
+          scopes: 'email profile',
         },
       })
       

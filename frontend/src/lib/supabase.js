@@ -19,6 +19,8 @@ export const supabase = createClient(
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: true,
+      // OAuth 리디렉션 시 표시될 도메인 설정
+      // Supabase Dashboard의 Site URL 설정이 우선 적용됨
     },
   }
 )

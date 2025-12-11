@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { ChevronDown, Plus, Check, Unplug } from 'lucide-react'
+import axios from 'axios'
 
 // Demo stores for testing - initial state
 const INITIAL_STORES = [
@@ -8,12 +9,16 @@ const INITIAL_STORES = [
   { id: 'store-3', name: 'Shopify Store', platform: 'Shopify', connected: false },
 ]
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://web-production-3dc73.up.railway.app'
+const CURRENT_USER_ID = 'default-user'
+
 // Store Selector Component
 function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
   const [isOpen, setIsOpen] = useState(false)
   const [stores, setStores] = useState(INITIAL_STORES)
   const [selectedStore, setSelectedStore] = useState(stores[0])
   const [connecting, setConnecting] = useState(false)
+  const [checkingConnection, setCheckingConnection] = useState(true)
   const dropdownRef = useRef(null)
 
   // Close dropdown when clicking outside
@@ -26,6 +31,62 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  // 실제 eBay 연결 상태 확인
+  useEffect(() => {
+    const checkEbayConnection = async () => {
+      if (selectedStore?.platform !== 'eBay') {
+        setCheckingConnection(false)
+        return
+      }
+
+      try {
+        setCheckingConnection(true)
+        const response = await axios.get(`${API_BASE_URL}/api/ebay/status`, {
+          params: { user_id: CURRENT_USER_ID },
+          timeout: 5000
+        })
+        
+        const isConnected = response.data?.connected === true
+        
+        console.log('eBay 연결 상태 확인:', isConnected, response.data)
+        
+        // eBay 스토어 연결 상태 업데이트
+        setStores(prev => prev.map(s => 
+          s.platform === 'eBay' ? { ...s, connected: isConnected } : s
+        ))
+        
+        if (selectedStore?.platform === 'eBay') {
+          setSelectedStore(prev => ({ ...prev, connected: isConnected }))
+        }
+        
+        // 부모 컴포넌트에 알림
+        if (onConnectionChange) {
+          onConnectionChange(isConnected)
+        }
+      } catch (err) {
+        console.error('eBay 연결 상태 확인 실패:', err)
+        // 에러 시 연결 안 됨으로 처리
+        setStores(prev => prev.map(s => 
+          s.platform === 'eBay' ? { ...s, connected: false } : s
+        ))
+        if (selectedStore?.platform === 'eBay') {
+          setSelectedStore(prev => ({ ...prev, connected: false }))
+        }
+        if (onConnectionChange) {
+          onConnectionChange(false)
+        }
+      } finally {
+        setCheckingConnection(false)
+      }
+    }
+
+    checkEbayConnection()
+    
+    // 30초마다 연결 상태 확인
+    const interval = setInterval(checkEbayConnection, 30000)
+    return () => clearInterval(interval)
+  }, [selectedStore?.platform, onConnectionChange])
 
   const getPlatformIcon = (platform) => {
     switch (platform) {
@@ -68,10 +129,38 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
   }
 
   // Real API connect (for production)
-  const handleRealConnect = () => {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+  const handleRealConnect = (e) => {
+    // 이벤트 전파 방지
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    
+    // API URL 우선순위: 환경 변수 > 하드코딩된 프로덕션 URL > localhost
+    const apiUrl = import.meta.env.VITE_API_URL || 
+                   'https://web-production-3dc73.up.railway.app' || 
+                   'http://localhost:8000'
     const userId = 'default-user'
-    window.location.href = `${apiUrl}/api/ebay/auth/start?user_id=${userId}`
+    const oauthUrl = `${apiUrl}/api/ebay/auth/start?user_id=${userId}`
+    
+    console.log('🔗 eBay OAuth 연결 시도')
+    console.log('API URL:', apiUrl)
+    console.log('OAuth URL:', oauthUrl)
+    console.log('User ID:', userId)
+    console.log('VITE_API_URL env:', import.meta.env.VITE_API_URL)
+    
+    // 즉시 리다이렉트 (동기적으로)
+    console.log('리다이렉트 시작...')
+    console.log('oauthUrl:', oauthUrl)
+    
+    // window.location.replace를 직접 사용 (가장 확실)
+    window.location.replace(oauthUrl)
+    
+    // 만약 replace가 작동하지 않으면 href 사용
+    setTimeout(() => {
+      console.warn('replace가 작동하지 않음, href로 재시도')
+      window.location.href = oauthUrl
+    }, 100)
   }
 
   return (
@@ -159,23 +248,20 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
             Disconnect
           </button>
         ) : (
-          <button 
-            onClick={handleConnect}
-            disabled={connecting}
-            className="text-sm px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-all flex items-center gap-2 disabled:opacity-50"
+          <a
+            href={`${import.meta.env.VITE_API_URL || 'https://web-production-3dc73.up.railway.app'}/api/ebay/auth/start?user_id=default-user`}
+            onClick={(e) => {
+              console.log('🔗 eBay OAuth 링크 클릭됨')
+              const apiUrl = import.meta.env.VITE_API_URL || 'https://web-production-3dc73.up.railway.app'
+              const oauthUrl = `${apiUrl}/api/ebay/auth/start?user_id=default-user`
+              console.log('OAuth URL:', oauthUrl)
+              // 기본 동작 허용 (리다이렉트)
+            }}
+            className="text-sm px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-all flex items-center gap-2 disabled:opacity-50 inline-block text-center"
           >
-            {connecting ? (
-              <>
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Connecting...
-              </>
-            ) : (
-              <>
-                <Plus className="w-4 h-4" />
-                Connect
-              </>
-            )}
-          </button>
+            <Plus className="w-4 h-4" />
+            Connect
+          </a>
         )}
 
         {/* API Status Indicator - Rightmost */}

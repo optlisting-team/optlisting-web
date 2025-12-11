@@ -600,9 +600,39 @@ async def ebay_auth_callback(
         # 토큰 만료 시간 계산
         token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
         
-        # TODO: DB에 토큰 저장
-        # 여기서 profiles 테이블에 토큰을 저장해야 합니다
-        # 현재는 성공 메시지만 반환
+        # DB에 토큰 저장
+        from .models import Profile, get_db
+        db = next(get_db())
+        
+        try:
+            # 프로필 조회 또는 생성
+            profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+            
+            if not profile:
+                # 새 프로필 생성
+                profile = Profile(
+                    user_id=user_id,
+                    ebay_access_token=access_token,
+                    ebay_refresh_token=refresh_token,
+                    ebay_token_expires_at=token_expires_at,
+                    ebay_token_updated_at=datetime.utcnow()
+                )
+                db.add(profile)
+            else:
+                # 기존 프로필 업데이트
+                profile.ebay_access_token = access_token
+                profile.ebay_refresh_token = refresh_token
+                profile.ebay_token_expires_at = token_expires_at
+                profile.ebay_token_updated_at = datetime.utcnow()
+            
+            db.commit()
+            logger.info(f"✅ Tokens saved to database for user: {user_id}")
+            
+        except Exception as e:
+            db.rollback()
+            logger.error(f"❌ Failed to save tokens to database: {e}")
+            error_redirect = f"{FRONTEND_URL}/settings?ebay_error=db_save&message=Failed to save tokens"
+            return RedirectResponse(url=error_redirect, status_code=302)
         
         # DB 저장 로직 (간단 버전)
         try:
@@ -618,7 +648,6 @@ async def ebay_auth_callback(
                 # 새 프로필 생성
                 profile = Profile(
                     user_id=user_id,
-                    email=f"{user_id}@ebay.com",
                     ebay_access_token=access_token,
                     ebay_refresh_token=refresh_token,
                     ebay_token_expires_at=token_expires_at,
@@ -1011,12 +1040,49 @@ async def get_active_listings_trading_api(
                 # SKU
                 sku = item.findtext("ebay:SKU", "", ns)
                 
-                # 이미지
-                picture_url = item.findtext("ebay:PictureDetails/ebay:PictureURL", "", ns)
+                # 이미지 - 썸네일 이미지 URL 추출
+                picture_details = item.find("ebay:PictureDetails", ns)
+                picture_url = ""
+                thumbnail_url = ""
+                
+                if picture_details is not None:
+                    # 모든 PictureURL 찾기 (여러 이미지 지원)
+                    picture_urls = picture_details.findall("ebay:PictureURL", ns)
+                    
+                    if picture_urls and len(picture_urls) > 0:
+                        # 첫 번째 PictureURL을 메인 이미지로 사용
+                        first_picture = picture_urls[0]
+                        if first_picture is not None and first_picture.text:
+                            picture_url = first_picture.text.strip()
+                            
+                            # eBay 이미지 URL을 썸네일로 변환
+                            # eBay 이미지 URL 패턴: https://i.ebayimg.com/images/g/.../s-l500.jpg
+                            # 썸네일 버전: s-l500 -> s-l225 (더 작은 크기)
+                            thumbnail_url = picture_url
+                            
+                            # eBay 이미지 URL에서 썸네일 버전 생성
+                            if "s-l" in thumbnail_url:
+                                # s-l500, s-l140 등을 s-l225로 변경 (썸네일 크기)
+                                import re
+                                thumbnail_url = re.sub(r's-l\d+', 's-l225', thumbnail_url)
+                            elif thumbnail_url and "ebayimg.com" in thumbnail_url:
+                                # eBay 이미지 URL이지만 크기 파라미터가 없는 경우
+                                # URL 끝에 썸네일 크기 추가
+                                if "?" in thumbnail_url:
+                                    thumbnail_url = f"{thumbnail_url}&s-l225"
+                                else:
+                                    # .jpg, .png 등 확장자 앞에 썸네일 크기 추가
+                                    if thumbnail_url.endswith(('.jpg', '.jpeg', '.png', '.gif')):
+                                        base_url = thumbnail_url.rsplit('.', 1)[0]
+                                        ext = thumbnail_url.rsplit('.', 1)[1]
+                                        thumbnail_url = f"{base_url}_s-l225.{ext}"
+                                    else:
+                                        thumbnail_url = f"{thumbnail_url}?s-l225"
                 
                 listing = {
                     "item_id": item_id,
                     "ebay_item_id": item_id,
+                    "sell_item_id": item_id,  # Sell Item ID 명시적으로 추가
                     "title": title,
                     "price": price,
                     "quantity_available": quantity,
@@ -1027,7 +1093,8 @@ async def get_active_listings_trading_api(
                     "sku": sku,
                     "start_time": start_time,
                     "end_time": end_time,
-                    "picture_url": picture_url,
+                    "picture_url": picture_url,  # 메인 이미지 URL
+                    "thumbnail_url": thumbnail_url,  # 썸네일 이미지 URL (좀비 SKU 리포트용)
                     "days_listed": 0  # 계산 필요
                 }
                 

@@ -619,7 +619,19 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                   </td>
                   <td className="px-2 py-4 max-w-[150px]">
                     <div className="flex items-start gap-2">
-                      <span className="text-xs text-white truncate block" title={zombie.title}>
+                      {/* 썸네일 이미지 (좀비 SKU 리포트용 시각적 확인) */}
+                      {zombie.thumbnail_url && (
+                        <img 
+                          src={zombie.thumbnail_url} 
+                          alt={zombie.title || 'Product thumbnail'}
+                          className="w-10 h-10 object-cover rounded border border-zinc-700 flex-shrink-0"
+                          onError={(e) => {
+                            // 이미지 로드 실패 시 숨김
+                            e.target.style.display = 'none'
+                          }}
+                        />
+                      )}
+                      <span className="text-xs text-white truncate block flex-1" title={zombie.title}>
                         {zombie.title && zombie.title.length > 30 
                           ? `${zombie.title.substring(0, 30)}...` 
                           : zombie.title}

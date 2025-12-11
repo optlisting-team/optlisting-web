@@ -10,6 +10,8 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
   const [downloadedGroups, setDownloadedGroups] = useState(new Set())
   const [showShopifyModal, setShowShopifyModal] = useState(false)
   const [pendingExport, setPendingExport] = useState(null) // { source, items, shopifyItems, supplierItems }
+  const [exporting, setExporting] = useState(false) // 로딩 상태 추가
+  const [exportError, setExportError] = useState(null) // 에러 상태 추가
   
   // Check if item goes through Shopify
   const isShopifyItem = (item) => {
@@ -123,6 +125,17 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
   }
 
   const performExport = async (source, items, exportType, groupKey) => {
+    // 동시 요청 방지
+    if (exporting) {
+      console.warn('Export already in progress')
+      return
+    }
+    
+    setExporting(true)
+    setExportError(null)
+    
+    let apiErrorMsg = null // API 에러 메시지 저장용
+    
     try {
       // Determine target tool based on export type
       let targetTool = 'autods' // Default
@@ -154,7 +167,8 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
             export_mode: targetTool
           },
           {
-            responseType: 'blob'
+            responseType: 'blob',
+            timeout: 30000 // 30초 타임아웃 추가
           }
         )
 
@@ -172,8 +186,21 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
         link.remove()
         window.URL.revokeObjectURL(url)
       } catch (apiErr) {
-        // Fallback to frontend CSV generation if API fails
+        // API 에러 발생 시 fallback으로 프론트엔드 CSV 생성
         console.warn('API export failed, using frontend generation:', apiErr)
+        
+        // 에러 메시지 저장 (나중에 사용자에게 표시)
+        if (apiErr.code === 'ECONNABORTED') {
+          apiErrorMsg = '요청 시간이 초과되어 기본 형식으로 CSV를 생성합니다.'
+        } else if (apiErr.response) {
+          apiErrorMsg = `서버 오류 (${apiErr.response.status}). 기본 형식으로 CSV를 생성합니다.`
+        } else if (apiErr.request) {
+          apiErrorMsg = '서버 연결 실패. 기본 형식으로 CSV를 생성합니다.'
+        } else {
+          apiErrorMsg = 'API를 통한 CSV 생성에 실패했습니다. 기본 형식으로 생성합니다.'
+        }
+        
+        // Fallback to frontend CSV generation
         const csvHeaders = ['Item ID', 'SKU', 'Title', 'Supplier', 'Price', 'Platform', 'Action']
         const csvRows = items.map(item => [
           item.ebay_item_id || item.item_id || '',
@@ -203,13 +230,25 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
         link.click()
         link.remove()
         window.URL.revokeObjectURL(url)
+        
+        // API 실패 시 경고 메시지 표시 (하지만 CSV는 다운로드됨)
+        if (apiErrorMsg) {
+          console.warn(apiErrorMsg)
+          // 사용자에게 알림 (하지만 CSV는 이미 다운로드되었으므로 경고만)
+          setTimeout(() => {
+            alert(`${apiErrorMsg}\n\nCSV 파일은 기본 형식으로 생성되었습니다.`)
+          }, 500)
+        }
       }
 
       // Try to log deletion to API
       try {
-        await axios.post(`${API_BASE_URL}/api/log-deletion`, { items: items })
+        await axios.post(`${API_BASE_URL}/api/log-deletion`, { items: items }, {
+          timeout: 10000 // 10초 타임아웃 추가
+        })
       } catch (logErr) {
-        console.log('API log skipped')
+        console.log('API log skipped:', logErr.message)
+        // 로깅 실패는 치명적이지 않으므로 계속 진행
       }
 
       // Mark this group as downloaded
@@ -223,9 +262,12 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
       // Close modal if open
       setShowShopifyModal(false)
       setPendingExport(null)
+      setExporting(false)
     } catch (err) {
-      alert(`Failed to export ${source} CSV: ${err.message}`)
-      console.error(err)
+      setExporting(false)
+      setExportError(err.message || 'CSV 추출 중 오류가 발생했습니다.')
+      console.error('Export error:', err)
+      alert(`CSV 추출 실패: ${err.message || '알 수 없는 오류가 발생했습니다.'}`)
     }
   }
 
@@ -396,6 +438,17 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
 
             {/* Footer (Download Button) */}
             <div className="bg-white px-4 py-4 border-t border-gray-300 flex-shrink-0">
+              {exportError && (
+                <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-600">{exportError}</p>
+                  <button
+                    onClick={() => setExportError(null)}
+                    className="mt-2 text-xs text-red-500 hover:text-red-700"
+                  >
+                    닫기
+                  </button>
+                </div>
+              )}
               {source === 'Unverified' ? (
                 <div className="space-y-3">
                   <div className="bg-gray-50 border border-gray-300 rounded-lg p-3">
@@ -429,26 +482,56 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         onClick={() => handleShopifyExport(supplier, items)}
-                        className="bg-zinc-700 hover:bg-zinc-600 text-zinc-300 font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+                        disabled={exporting}
+                        className="bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-300 font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
                       >
-                        <span>🔄</span>
-                        <span>Shopify</span>
+                        {exporting ? (
+                          <>
+                            <span className="animate-spin">⏳</span>
+                            <span>생성 중...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>🔄</span>
+                            <span>Shopify</span>
+                          </>
+                        )}
                       </button>
                       <button
                         onClick={() => handleSupplierExport(supplier, items)}
-                        className="bg-zinc-700 hover:bg-zinc-600 text-zinc-300 font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+                        disabled={exporting}
+                        className="bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-300 font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
                       >
-                        <span>🔄</span>
-                        <span>Supplier</span>
+                        {exporting ? (
+                          <>
+                            <span className="animate-spin">⏳</span>
+                            <span>생성 중...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>🔄</span>
+                            <span>Supplier</span>
+                          </>
+                        )}
                       </button>
                     </div>
                   ) : (
                     <button
                       onClick={() => handleSourceExport(supplier, items)}
-                      className="w-full bg-zinc-700 hover:bg-zinc-600 text-zinc-300 font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+                      disabled={exporting}
+                      className="w-full bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-300 font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
                     >
-                      <span>🔄</span>
-                      <span>Download Again</span>
+                      {exporting ? (
+                        <>
+                          <span className="animate-spin">⏳</span>
+                          <span>CSV 생성 중...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>🔄</span>
+                          <span>Download Again</span>
+                        </>
+                      )}
                     </button>
                   )}
                 </div>
@@ -457,19 +540,39 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                   {shopifyItems.length > 0 && (
                     <button
                       onClick={() => handleShopifyExport(supplier, items)}
-                      className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                      disabled={exporting}
+                      className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
                     >
-                      <span>📥</span>
-                      <span>Download Shopify CSV ({shopifyItems.length} items)</span>
+                      {exporting ? (
+                        <>
+                          <span className="animate-spin">⏳</span>
+                          <span>CSV 생성 중...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>📥</span>
+                          <span>Download Shopify CSV ({shopifyItems.length} items)</span>
+                        </>
+                      )}
                     </button>
                   )}
                   {supplierItems.length > 0 && (
                     <button
                       onClick={() => handleSupplierExport(supplier, items)}
-                      className={`w-full ${colors.buttonBg} ${colors.buttonHover} text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2`}
+                      disabled={exporting}
+                      className={`w-full ${colors.buttonBg} ${colors.buttonHover} disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2`}
                     >
-                      <span>📥</span>
-                      <span>Download {supplier} CSV ({supplierItems.length} items)</span>
+                      {exporting ? (
+                        <>
+                          <span className="animate-spin">⏳</span>
+                          <span>CSV 생성 중...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>📥</span>
+                          <span>Download {supplier} CSV ({supplierItems.length} items)</span>
+                        </>
+                      )}
                     </button>
                   )}
                 </div>

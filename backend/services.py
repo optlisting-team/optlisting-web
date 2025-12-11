@@ -267,6 +267,67 @@ def extract_supplier_info(
         cw_id = sku_upper.replace("CW", "").strip("-").strip() if sku_upper.startswith("CW") else None
         return ("Costway", cw_id)
     
+    # ============================================
+    # 자동화 툴 감지 (AutoDS, Yaballe 등)
+    # 우선순위: 자동화 툴 > 공급처
+    # ============================================
+    
+    # AutoDS 감지
+    # AutoDS SKU 패턴: "AUTODS-", "ADS-", "AD-", "AUTODS", "AUTODS-AMZ-", "AUTODS-WM-"
+    autods_sku_patterns = ["AUTODS", "ADS", "AD"]
+    autods_in_sku = (
+        sku_upper.startswith("AUTODS") or
+        sku_upper.startswith("ADS") or
+        sku_upper.startswith("AD-") or
+        any(part in autods_sku_patterns for part in sku_parts)
+    )
+    
+    # AutoDS Image URL 패턴
+    autods_url_patterns = ["autods.com", "autods.io"]
+    
+    is_autods = (
+        autods_in_sku or
+        any(pattern in image_url_lower for pattern in autods_url_patterns) or
+        "autods" in title_lower
+    )
+    
+    if is_autods:
+        # AutoDS SKU에서 실제 공급처 추출 시도 (예: "AUTODS-AMZ-B08ABC1234")
+        autods_id = None
+        if sku_upper.startswith("AUTODS"):
+            autods_id = sku_upper.replace("AUTODS", "").strip("-").strip()
+        elif sku_upper.startswith("ADS"):
+            autods_id = sku_upper.replace("ADS", "").strip("-").strip()
+        return ("AutoDS", autods_id)
+    
+    # Yaballe 감지
+    # Yaballe SKU 패턴: "YAB-", "YB-", "YABALLE-", "YABALLE", "YABALLE-AMZ-"
+    yaballe_sku_patterns = ["YABALLE", "YAB", "YB"]
+    yaballe_in_sku = (
+        sku_upper.startswith("YABALLE") or
+        sku_upper.startswith("YAB-") or
+        sku_upper.startswith("YB-") or
+        any(part in yaballe_sku_patterns for part in sku_parts)
+    )
+    
+    yaballe_url_patterns = ["yaballe.com", "yaballe.io"]
+    
+    is_yaballe = (
+        yaballe_in_sku or
+        any(pattern in image_url_lower for pattern in yaballe_url_patterns) or
+        "yaballe" in title_lower
+    )
+    
+    if is_yaballe:
+        yaballe_id = None
+        if sku_upper.startswith("YABALLE"):
+            yaballe_id = sku_upper.replace("YABALLE", "").strip("-").strip()
+        elif sku_upper.startswith("YAB"):
+            yaballe_id = sku_upper.replace("YAB", "").strip("-").strip()
+        elif sku_upper.startswith("YB"):
+            yaballe_id = sku_upper.replace("YB", "").strip("-").strip()
+        return ("Yaballe", yaballe_id)
+    
     # Pro Aggregators
     w2b_sku_patterns = ["W2B", "WHOLESALE2B", "WHOLESALE-2B"]
     w2b_in_sku = sku_upper.startswith("W2B") or any(part in w2b_sku_patterns for part in sku_parts)

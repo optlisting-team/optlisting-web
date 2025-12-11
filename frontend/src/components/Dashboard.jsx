@@ -16,8 +16,8 @@ const CURRENT_USER_ID = "default-user" // Temporary user ID for MVP phase
 
 // Demo Mode - Set to true to use dummy data (false for production with real API)
 // 🧪 테스트용: true = 더미 데이터, false = 실제 API
-// Force redeploy: 2024-12-04
-const DEMO_MODE = true
+// Force redeploy: 2024-12-11 - 실제 eBay 테스트를 위해 false로 변경
+const DEMO_MODE = false
 
 // Dummy data for demo/testing
 // Generate 100 dummy listings
@@ -212,10 +212,52 @@ function Dashboard() {
   }
 
   // 공급처 자동 감지 함수
+  // 우선순위: 자동화 툴 > 공급처
   const detectSupplier = (title, sku = '') => {
     const text = `${title} ${sku}`.toLowerCase()
+    const skuUpper = sku.toUpperCase()
     
-    // 패턴 매칭
+    // ============================================
+    // 자동화 툴 감지 (우선순위 높음)
+    // ============================================
+    
+    // AutoDS 감지
+    if (
+      skuUpper.startsWith('AUTODS') ||
+      skuUpper.startsWith('ADS') ||
+      skuUpper.startsWith('AD-') ||
+      skuUpper.includes('AUTODS') ||
+      text.includes('autods')
+    ) {
+      return 'AutoDS'
+    }
+    
+    // Yaballe 감지
+    if (
+      skuUpper.startsWith('YABALLE') ||
+      skuUpper.startsWith('YAB-') ||
+      skuUpper.startsWith('YB-') ||
+      skuUpper.includes('YABALLE') ||
+      text.includes('yaballe')
+    ) {
+      return 'Yaballe'
+    }
+    
+    // Wholesale2B 감지
+    if (
+      skuUpper.startsWith('W2B') ||
+      skuUpper.startsWith('WHOLESALE2B') ||
+      skuUpper.includes('W2B') ||
+      skuUpper.includes('WHOLESALE2B') ||
+      text.includes('wholesale2b')
+    ) {
+      return 'Wholesale2B'
+    }
+    
+    // ============================================
+    // 공급처 감지
+    // ============================================
+    
     if (text.includes('aliexpress') || text.includes('ali-') || /^ae\d/i.test(sku)) {
       return 'AliExpress'
     }
@@ -323,6 +365,7 @@ function Dashboard() {
             id: item.item_id || `ebay-${index}`,
             item_id: item.item_id || item.ebay_item_id,
             ebay_item_id: item.ebay_item_id || item.item_id,
+            sell_item_id: item.sell_item_id || item.item_id || item.ebay_item_id, // Sell Item ID 명시적으로 포함
             title: item.title,
             price: item.price,
             sku: item.sku,
@@ -336,7 +379,8 @@ function Dashboard() {
             impressions: item.impressions || 0,
             days_listed: item.days_listed || 0,
             start_time: item.start_time,
-            picture_url: item.picture_url,
+            picture_url: item.picture_url, // 메인 이미지 URL
+            thumbnail_url: item.thumbnail_url || item.picture_url, // 썸네일 이미지 URL (좀비 SKU 리포트용)
             is_zombie: false, // 아래에서 필터링으로 결정
             zombie_score: zombieScore,
             recommendation: zombieScore <= 20 ? 'DELETE' : zombieScore <= 40 ? 'DELETE' : zombieScore <= 60 ? 'OPTIMIZE' : 'MONITOR'
@@ -492,6 +536,7 @@ function Dashboard() {
             id: item.item_id || `ebay-${index}`,
             item_id: item.item_id || item.ebay_item_id,
             ebay_item_id: item.ebay_item_id || item.item_id,
+            sell_item_id: item.sell_item_id || item.item_id || item.ebay_item_id, // Sell Item ID 명시적으로 포함
             title: item.title,
             price: item.price,
             sku: item.sku,
@@ -505,7 +550,8 @@ function Dashboard() {
             impressions: item.impressions || 0,
             days_listed: item.days_listed || 0,
             start_time: item.start_time,
-            picture_url: item.picture_url
+            picture_url: item.picture_url, // 메인 이미지 URL
+            thumbnail_url: item.thumbnail_url || item.picture_url // 썸네일 이미지 URL (좀비 SKU 리포트용)
           }
         })
         
@@ -789,15 +835,27 @@ function Dashboard() {
       return
     }
 
+    // 동시 요청 방지
+    if (loading) {
+      console.warn('Export already in progress')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
     try {
       // Step 1: Log deletion to history BEFORE exporting
       try {
         await axios.post(`${API_BASE_URL}/api/log-deletion`, {
           items: items
+        }, {
+          timeout: 10000 // 10초 타임아웃
         })
         // Refresh total deleted count
         const historyResponse = await axios.get(`${API_BASE_URL}/api/history`, {
-          params: { skip: 0, limit: 1 }
+          params: { skip: 0, limit: 1 },
+          timeout: 10000
         })
         setTotalDeleted(historyResponse.data.total_count || 0)
       } catch (logErr) {
@@ -814,7 +872,8 @@ function Dashboard() {
           target_tool: mode // Use mode as target_tool for backward compatibility
         },
         {
-          responseType: 'blob'
+          responseType: 'blob',
+          timeout: 30000 // 30초 타임아웃 추가
         }
       )
 
@@ -835,6 +894,7 @@ function Dashboard() {
       document.body.appendChild(link)
       link.click()
       link.remove()
+      window.URL.revokeObjectURL(url) // 메모리 누수 방지
 
       // Step 3: Remove exported items from queue if they were in queue
       if (itemsToExport === null) {
@@ -842,8 +902,23 @@ function Dashboard() {
         setQueue(queue.filter(item => !exportedIds.includes(item.id)))
       }
     } catch (err) {
-      alert('Failed to export CSV')
-      console.error(err)
+      let errorMessage = 'CSV 추출 중 오류가 발생했습니다.'
+      
+      if (err.code === 'ECONNABORTED') {
+        errorMessage = '요청 시간이 초과되었습니다. 다시 시도해주세요.'
+      } else if (err.response) {
+        errorMessage = `서버 오류: ${err.response.status} - ${err.response.statusText || err.response.data?.detail || '알 수 없는 오류'}`
+      } else if (err.request) {
+        errorMessage = '서버에 연결할 수 없습니다. 네트워크 연결을 확인해주세요.'
+      } else {
+        errorMessage = `CSV 추출 실패: ${err.message || '알 수 없는 오류'}`
+      }
+      
+      setError(errorMessage)
+      alert(errorMessage)
+      console.error('Export error:', err)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -854,15 +929,27 @@ function Dashboard() {
       return
     }
 
+    // 동시 요청 방지
+    if (loading) {
+      console.warn('Export already in progress')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
     try {
       // Step 1: Log deletion to history BEFORE exporting
       try {
         await axios.post(`${API_BASE_URL}/api/log-deletion`, {
           items: items
+        }, {
+          timeout: 10000 // 10초 타임아웃
         })
         // Refresh total deleted count
         const historyResponse = await axios.get(`${API_BASE_URL}/api/history`, {
-          params: { skip: 0, limit: 1 }
+          params: { skip: 0, limit: 1 },
+          timeout: 10000
         })
         setTotalDeleted(historyResponse.data.total_count || 0)
       } catch (logErr) {
@@ -879,7 +966,8 @@ function Dashboard() {
           export_mode: targetTool // For backward compatibility
         },
         {
-          responseType: 'blob'
+          responseType: 'blob',
+          timeout: 30000 // 30초 타임아웃 추가
         }
       )
 
@@ -894,9 +982,25 @@ function Dashboard() {
       document.body.appendChild(link)
       link.click()
       link.remove()
+      window.URL.revokeObjectURL(url) // 메모리 누수 방지
     } catch (err) {
-      alert(`Failed to export CSV for ${supplierName}`)
-      console.error(err)
+      let errorMessage = `CSV 추출 중 오류가 발생했습니다.`
+      
+      if (err.code === 'ECONNABORTED') {
+        errorMessage = '요청 시간이 초과되었습니다. 다시 시도해주세요.'
+      } else if (err.response) {
+        errorMessage = `서버 오류: ${err.response.status} - ${err.response.statusText || err.response.data?.detail || '알 수 없는 오류'}`
+      } else if (err.request) {
+        errorMessage = '서버에 연결할 수 없습니다. 네트워크 연결을 확인해주세요.'
+      } else {
+        errorMessage = `CSV 추출 실패: ${err.message || '알 수 없는 오류'}`
+      }
+      
+      setError(errorMessage)
+      alert(`Failed to export CSV for ${supplierName}: ${errorMessage}`)
+      console.error('Export error:', err)
+    } finally {
+      setLoading(false)
     }
   }
 
