@@ -555,16 +555,27 @@ async def ebay_auth_callback(
         return RedirectResponse(url=error_redirect, status_code=302)
     
     # State에서 user_id 추출
-    user_id = "default-user"
-    if state and state.startswith("user_"):
-        try:
-            parts = state.split("_")
-            if len(parts) >= 2:
-                user_id = parts[1]
-        except:
-            pass
+    # State 형식: "user_default-user_1765552671.251053"
+    user_id = "default-user"  # 기본값
+    if state:
+        logger.info(f"   Raw state parameter: {state}")
+        if state.startswith("user_"):
+            try:
+                # "user_default-user_1765552671.251053" -> ["user", "default-user", "1765552671.251053"]
+                parts = state.split("_")
+                logger.info(f"   State parts: {parts}")
+                if len(parts) >= 2:
+                    user_id = parts[1]  # "default-user"
+                    logger.info(f"   Extracted user_id from state: {user_id}")
+                else:
+                    logger.warning(f"   State format unexpected, parts count: {len(parts)}")
+            except Exception as e:
+                logger.error(f"   Error parsing state: {e}")
+                # 기본값 유지
+        else:
+            logger.warning(f"   State does not start with 'user_': {state[:50]}")
     
-    logger.info(f"   Extracted user_id: {user_id}")
+    logger.info(f"   Final user_id to use: {user_id}")
     
     # 환경변수 확인
     if not EBAY_CLIENT_ID or not EBAY_CLIENT_SECRET:
