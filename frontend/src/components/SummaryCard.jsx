@@ -250,27 +250,8 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
           </button>
         ) : (
           <a
-            href={`${import.meta.env.VITE_API_URL || 'https://optlisting-production.up.railway.app'}/api/ebay/auth/start?user_id=default-user`}
+            href="https://optlisting-production.up.railway.app/api/ebay/auth/start?user_id=default-user"
             target="_self"
-            rel="noopener noreferrer"
-            onClick={(e) => {
-              const apiUrl = import.meta.env.VITE_API_URL || 'https://optlisting-production.up.railway.app'
-              const oauthUrl = `${apiUrl}/api/ebay/auth/start?user_id=default-user`
-              
-              console.log('🔗 eBay OAuth 링크 클릭됨')
-              console.log('API URL:', apiUrl)
-              console.log('OAuth URL:', oauthUrl)
-              console.log('VITE_API_URL env:', import.meta.env.VITE_API_URL)
-              
-              // preventDefault()를 호출하지 않음 - 브라우저가 자동으로 리다이렉트
-              // 만약 리다이렉트가 안 되면 강제로 리다이렉트
-              setTimeout(() => {
-                if (window.location.href.includes('dashboard')) {
-                  console.warn('리다이렉트가 작동하지 않음, 강제 리다이렉트 시도')
-                  window.location.href = oauthUrl
-                }
-              }, 100)
-            }}
             className="text-sm px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-all flex items-center gap-2 disabled:opacity-50 inline-block text-center no-underline"
           >
             <Plus className="w-4 h-4" />
