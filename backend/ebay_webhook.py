@@ -1103,32 +1103,31 @@ async def get_active_listings_trading_api(
     logger.info("=" * 60)
     logger.info(f"📦 Fetching active listings (Trading API) for user: {user_id}")
     
-    try:
-        access_token = get_user_access_token(user_id)
+    access_token = get_user_access_token(user_id)
+    
+    if not access_token:
+        logger.error(f"❌ No access token found for user_id: {user_id}")
+        # 디버그 정보 추가
+        try:
+            from .models import get_db, Profile
+            db = next(get_db())
+            profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+            debug_info = {
+                "profile_exists": bool(profile),
+                "has_access_token": bool(profile.ebay_access_token) if profile else False,
+                "has_refresh_token": bool(profile.ebay_refresh_token) if profile else False,
+                "token_expires_at": profile.ebay_token_expires_at.isoformat() if profile and profile.ebay_token_expires_at else None,
+                "is_expired": profile.ebay_token_expires_at < datetime.utcnow() if profile and profile.ebay_token_expires_at else None
+            }
+            db.close()
+            logger.error(f"   Debug info: {debug_info}")
+        except Exception as debug_err:
+            logger.error(f"   Debug info error: {debug_err}")
         
-        if not access_token:
-            logger.error(f"❌ No access token found for user_id: {user_id}")
-            # 디버그 정보 추가
-            try:
-                from .models import get_db, Profile
-                db = next(get_db())
-                profile = db.query(Profile).filter(Profile.user_id == user_id).first()
-                debug_info = {
-                    "profile_exists": bool(profile),
-                    "has_access_token": bool(profile.ebay_access_token) if profile else False,
-                    "has_refresh_token": bool(profile.ebay_refresh_token) if profile else False,
-                    "token_expires_at": profile.ebay_token_expires_at.isoformat() if profile and profile.ebay_token_expires_at else None,
-                    "is_expired": profile.ebay_token_expires_at < datetime.utcnow() if profile and profile.ebay_token_expires_at else None
-                }
-                db.close()
-                logger.error(f"   Debug info: {debug_info}")
-            except Exception as debug_err:
-                logger.error(f"   Debug info error: {debug_err}")
-            
-            raise HTTPException(
-                status_code=401, 
-                detail="eBay not connected. Please connect your eBay account."
-            )
+        raise HTTPException(
+            status_code=401, 
+            detail="eBay not connected. Please connect your eBay account."
+        )
     
     try:
         env = EBAY_ENVIRONMENT if EBAY_ENVIRONMENT in EBAY_API_ENDPOINTS else "PRODUCTION"
