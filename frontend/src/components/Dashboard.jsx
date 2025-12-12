@@ -794,7 +794,7 @@ function Dashboard() {
     }
   }
 
-  // OAuth 콜백 후 URL 파라미터 확인
+  // OAuth 콜백 후 URL 파라미터 확인 및 연결 상태 강제 업데이트
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const ebayConnected = urlParams.get('ebay_connected')
@@ -802,20 +802,42 @@ function Dashboard() {
     
     if (ebayConnected === 'true') {
       console.log('✅ OAuth 콜백 성공 - eBay 연결됨')
+      
+      // 즉시 연결 상태 업데이트
+      setIsStoreConnected(true)
+      console.log('🔄 연결 상태를 true로 설정')
+      
       // URL 파라미터 제거 (깔끔한 URL 유지)
       window.history.replaceState({}, '', window.location.pathname)
-      // 연결 상태 확인 (SummaryCard에서 자동으로 확인하지만, 명시적으로 확인)
-      // 약간의 지연 후 연결 상태 확인 (토큰이 DB에 저장되는 시간 고려)
+      
+      // 제품 로드 (약간의 지연 후 - 토큰이 DB에 저장되는 시간 고려)
       setTimeout(() => {
-        if (!isStoreConnected) {
-          console.log('🔄 OAuth 콜백 후 연결 상태 업데이트')
-          setIsStoreConnected(true)
-          // 제품 로드
-          if (!DEMO_MODE) {
-            fetchAllListings()
-          }
+        console.log('📦 OAuth 콜백 후 제품 로드 시작')
+        if (!DEMO_MODE) {
+          fetchAllListings().catch(err => {
+            console.error('제품 로드 실패:', err)
+          })
         }
-      }, 2000)
+      }, 3000) // 3초 대기 (DB 저장 시간 고려)
+      
+      // 연결 상태 재확인 (SummaryCard가 자동으로 확인하지만, 강제로 한 번 더)
+      setTimeout(async () => {
+        try {
+          const statusResponse = await axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
+            params: { user_id: CURRENT_USER_ID },
+            timeout: 30000
+          })
+          if (statusResponse.data?.connected === true) {
+            console.log('✅ 연결 상태 확인 완료:', statusResponse.data)
+            setIsStoreConnected(true)
+          } else {
+            console.warn('⚠️ 연결 상태 확인 실패:', statusResponse.data)
+          }
+        } catch (err) {
+          console.error('❌ 연결 상태 확인 에러:', err)
+        }
+      }, 5000) // 5초 후 재확인
+      
     } else if (ebayError) {
       console.error('❌ OAuth 콜백 에러:', ebayError)
       const errorMessage = urlParams.get('message') || 'eBay 연결에 실패했습니다'
