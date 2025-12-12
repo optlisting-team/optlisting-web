@@ -1168,6 +1168,22 @@ async def get_active_listings_trading_api(
         import xml.etree.ElementTree as ET
         root = ET.fromstring(response.text)
         
+        # 디버깅: 첫 번째 Item의 XML 구조 확인 (이미지 관련)
+        first_item = root.find(".//{urn:ebay:apis:eBLBaseComponents}Item")
+        if first_item is not None:
+            logger.info("🔍 First Item XML structure check:")
+            picture_details = first_item.find(".//{urn:ebay:apis:eBLBaseComponents}PictureDetails")
+            gallery_url = first_item.find(".//{urn:ebay:apis:eBLBaseComponents}GalleryURL")
+            logger.info(f"   PictureDetails found: {picture_details is not None}")
+            logger.info(f"   GalleryURL found: {gallery_url is not None}")
+            if picture_details is not None:
+                picture_urls = picture_details.findall(".//{urn:ebay:apis:eBLBaseComponents}PictureURL")
+                logger.info(f"   PictureURL count: {len(picture_urls)}")
+                if picture_urls:
+                    logger.info(f"   First PictureURL: {picture_urls[0].text[:80] if picture_urls[0].text else 'None'}...")
+            if gallery_url is not None:
+                logger.info(f"   GalleryURL: {gallery_url.text[:80] if gallery_url.text else 'None'}...")
+        
         # Namespace 처리
         ns = {"ebay": "urn:ebay:apis:eBLBaseComponents"}
         
@@ -1316,6 +1332,20 @@ async def get_active_listings_trading_api(
         total_pages = int(pagination.findtext("ebay:TotalNumberOfPages", "1", ns)) if pagination is not None else 1
         
         logger.info(f"✅ Retrieved {len(listings)} active listings (Page {page}/{total_pages})")
+        
+        # 디버깅: 이미지 URL 통계
+        listings_with_images = sum(1 for l in listings if l.get("picture_url") or l.get("thumbnail_url") or l.get("image_url"))
+        listings_without_images = len(listings) - listings_with_images
+        logger.info(f"📊 Image statistics: {listings_with_images} with images, {listings_without_images} without images")
+        
+        # 첫 번째 리스팅의 이미지 정보 로깅
+        if listings and len(listings) > 0:
+            first_listing = listings[0]
+            logger.info(f"🔍 First listing image data (Item ID: {first_listing.get('item_id', 'N/A')}):")
+            logger.info(f"   picture_url: {first_listing.get('picture_url', 'MISSING')[:80] if first_listing.get('picture_url') else 'MISSING'}")
+            logger.info(f"   thumbnail_url: {first_listing.get('thumbnail_url', 'MISSING')[:80] if first_listing.get('thumbnail_url') else 'MISSING'}")
+            logger.info(f"   image_url: {first_listing.get('image_url', 'MISSING')[:80] if first_listing.get('image_url') else 'MISSING'}")
+        
         logger.info("=" * 60)
         
         return {

@@ -357,15 +357,16 @@ function Dashboard() {
         const allListingsFromEbay = response.data.listings || []
         console.log(`✅ Received ${allListingsFromEbay.length} listings from eBay`)
         
-        // 디버깅: 첫 번째 리스팅의 이미지 정보 확인
+        // 디버깅: 모든 리스팅의 이미지 정보 확인
         if (allListingsFromEbay.length > 0) {
-          const firstListing = allListingsFromEbay[0]
-          console.log('🔍 First listing image data:', {
-            picture_url: firstListing.picture_url,
-            thumbnail_url: firstListing.thumbnail_url,
-            image_url: firstListing.image_url,
-            item_id: firstListing.item_id,
-            title: firstListing.title
+          console.log('🔍 Image data check for all listings:')
+          allListingsFromEbay.forEach((listing, index) => {
+            console.log(`  Listing ${index + 1} (${listing.item_id}):`, {
+              picture_url: listing.picture_url || 'MISSING',
+              thumbnail_url: listing.thumbnail_url || 'MISSING',
+              image_url: listing.image_url || 'MISSING',
+              title: listing.title?.substring(0, 30) || 'N/A'
+            })
           })
         }
         
