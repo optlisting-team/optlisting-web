@@ -249,14 +249,18 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
             Disconnect
           </button>
         ) : (
-          <a
-            href="https://optlisting-production.up.railway.app/api/ebay/auth/start?user_id=default-user"
-            target="_self"
-            className="text-sm px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-all flex items-center gap-2 disabled:opacity-50 inline-block text-center no-underline"
+          <button
+            type="button"
+            onClick={() => {
+              const oauthUrl = 'https://optlisting-production.up.railway.app/api/ebay/auth/start?user_id=default-user'
+              console.log('🔗 Connect 버튼 클릭 - 리다이렉트 시작:', oauthUrl)
+              window.location.href = oauthUrl
+            }}
+            className="text-sm px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             Connect
-          </a>
+          </button>
         )}
 
         {/* API Status Indicator - Rightmost */}
