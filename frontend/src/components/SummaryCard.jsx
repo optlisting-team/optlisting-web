@@ -251,10 +251,23 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
         ) : (
           <button
             type="button"
-            onClick={(e) => {
+            onClick={async (e) => {
               e.preventDefault()
               e.stopPropagation()
-              const oauthUrl = 'https://optlisting-production.up.railway.app/api/ebay/auth/start?user_id=default-user'
+              
+              // 먼저 현재 토큰 상태 확인 (디버깅)
+              try {
+                const debugResponse = await axios.get(`${API_BASE_URL}/api/ebay/debug/tokens`, {
+                  params: { user_id: CURRENT_USER_ID },
+                  timeout: 10000
+                })
+                console.log('🔍 현재 토큰 상태:', debugResponse.data)
+              } catch (err) {
+                console.error('토큰 상태 확인 실패:', err)
+              }
+              
+              // OAuth 시작
+              const oauthUrl = `${API_BASE_URL}/api/ebay/auth/start?user_id=${CURRENT_USER_ID}`
               console.log('🔗 Connect 버튼 클릭 - 리다이렉트 시작:', oauthUrl)
               window.location.href = oauthUrl
             }}

@@ -807,6 +807,55 @@ async def ebay_oauth_config():
     }
 
 
+@router.get("/debug/tokens")
+async def debug_tokens(
+    user_id: str = Query("default-user", description="User ID to check")
+):
+    """
+    🔍 디버그: 모든 토큰 정보 확인 (긴급 디버깅용)
+    """
+    try:
+        from .models import get_db, Profile
+        
+        db = next(get_db())
+        
+        # 모든 프로필 조회
+        all_profiles = db.query(Profile).all()
+        
+        # 특정 user_id의 프로필
+        profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+        
+        result = {
+            "total_profiles": len(all_profiles),
+            "all_user_ids": [p.user_id for p in all_profiles],
+            "requested_user_id": user_id,
+            "profile_found": bool(profile),
+        }
+        
+        if profile:
+            result.update({
+                "has_access_token": bool(profile.ebay_access_token),
+                "has_refresh_token": bool(profile.ebay_refresh_token),
+                "token_length": len(profile.ebay_access_token) if profile.ebay_access_token else 0,
+                "token_expires_at": profile.ebay_token_expires_at.isoformat() if profile.ebay_token_expires_at else None,
+                "token_updated_at": profile.ebay_token_updated_at.isoformat() if profile.ebay_token_updated_at else None,
+                "is_expired": profile.ebay_token_expires_at < datetime.utcnow() if profile.ebay_token_expires_at else None,
+                "token_preview": profile.ebay_access_token[:20] + "..." if profile.ebay_access_token else None
+            })
+        else:
+            result["message"] = f"No profile found for user_id: {user_id}"
+        
+        db.close()
+        return result
+        
+    except Exception as e:
+        import traceback
+        return {
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
+
 # =====================================================
 # eBay Listings API - 리스팅 가져오기
 # =====================================================
