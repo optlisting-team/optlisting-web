@@ -4,7 +4,8 @@ import SourceBadge from './SourceBadge'
 import PlatformBadge from './PlatformBadge'
 import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+// Railway URL이 변경되었을 수 있으므로 환경 변수 우선 사용
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://optlisting-production.up.railway.app'
 
 function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, onSourceChange, onMarkDownloaded }) {
   const [downloadedGroups, setDownloadedGroups] = useState(new Set())

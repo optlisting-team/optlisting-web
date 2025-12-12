@@ -11,7 +11,8 @@ import HistoryView from './HistoryView'
 import QueueReviewPanel from './QueueReviewPanel'
 import { Button } from './ui/button'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+// Railway URL이 변경되었을 수 있으므로 환경 변수 우선 사용
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://optlisting-production.up.railway.app'
 const CURRENT_USER_ID = "default-user" // Temporary user ID for MVP phase
 
 // Demo Mode - Set to true to use dummy data (false for production with real API)

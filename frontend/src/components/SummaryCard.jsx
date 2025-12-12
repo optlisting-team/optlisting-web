@@ -9,7 +9,8 @@ const INITIAL_STORES = [
   { id: 'store-3', name: 'Shopify Store', platform: 'Shopify', connected: false },
 ]
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://web-production-3dc73.up.railway.app'
+// Railway URL이 변경되었을 수 있으므로 환경 변수 우선 사용
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://optlisting-production.up.railway.app'
 const CURRENT_USER_ID = 'default-user'
 
 // Store Selector Component
@@ -44,7 +45,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
         setCheckingConnection(true)
         const response = await axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
           params: { user_id: CURRENT_USER_ID },
-          timeout: 10000 // 10초로 증가 (Railway 응답 대기)
+          timeout: 30000 // 30초로 증가 (Railway 응답 대기)
         })
         
         const isConnected = response.data?.connected === true
@@ -249,9 +250,9 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
           </button>
         ) : (
           <a
-            href={`${import.meta.env.VITE_API_URL || 'https://web-production-3dc73.up.railway.app'}/api/ebay/auth/start?user_id=default-user`}
+            href={`${import.meta.env.VITE_API_URL || 'https://optlisting-production.up.railway.app'}/api/ebay/auth/start?user_id=default-user`}
             onClick={(e) => {
-              const apiUrl = import.meta.env.VITE_API_URL || 'https://web-production-3dc73.up.railway.app'
+              const apiUrl = import.meta.env.VITE_API_URL || 'https://optlisting-production.up.railway.app'
               const oauthUrl = `${apiUrl}/api/ebay/auth/start?user_id=default-user`
               
               console.log('🔗 eBay OAuth 링크 클릭됨')
