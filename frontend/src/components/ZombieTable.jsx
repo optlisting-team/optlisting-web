@@ -620,13 +620,14 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                   <td className="px-2 py-4 max-w-[150px]">
                     <div className="flex items-start gap-2">
                       {/* 썸네일 이미지 (좀비 SKU 리포트용 시각적 확인) */}
-                      {zombie.thumbnail_url && (
+                      {(zombie.image_url || zombie.picture_url || zombie.thumbnail_url) && (
                         <img 
-                          src={zombie.thumbnail_url} 
+                          src={zombie.image_url || zombie.picture_url || zombie.thumbnail_url} 
                           alt={zombie.title || 'Product thumbnail'}
                           className="w-10 h-10 object-cover rounded border border-zinc-700 flex-shrink-0"
                           onError={(e) => {
                             // 이미지 로드 실패 시 숨김
+                            console.warn('Image load failed:', zombie.image_url || zombie.picture_url || zombie.thumbnail_url)
                             e.target.style.display = 'none'
                           }}
                         />

@@ -1210,11 +1210,12 @@ async def get_active_listings_trading_api(
                 # SKU
                 sku = item.findtext("ebay:SKU", "", ns)
                 
-                # 이미지 - 썸네일 이미지 URL 추출
-                picture_details = item.find("ebay:PictureDetails", ns)
+                # 이미지 - 썸네일 이미지 URL 추출 (여러 방법 시도)
                 picture_url = ""
                 thumbnail_url = ""
                 
+                # 방법 1: PictureDetails에서 PictureURL 찾기
+                picture_details = item.find("ebay:PictureDetails", ns)
                 if picture_details is not None:
                     # 모든 PictureURL 찾기 (여러 이미지 지원)
                     picture_urls = picture_details.findall("ebay:PictureURL", ns)
@@ -1224,7 +1225,7 @@ async def get_active_listings_trading_api(
                         first_picture = picture_urls[0]
                         if first_picture is not None and first_picture.text:
                             picture_url = first_picture.text.strip()
-                            logger.info(f"   📷 Image found: {picture_url[:50]}...")
+                            logger.info(f"   📷 Image found (PictureURL): {picture_url[:50]}...")
                             
                             # eBay 이미지 URL을 썸네일로 변환
                             # eBay 이미지 URL 패턴: https://i.ebayimg.com/images/g/.../s-l500.jpg
@@ -1253,13 +1254,30 @@ async def get_active_listings_trading_api(
                         logger.warning(f"   ⚠️ No PictureURL found in PictureDetails for item {item_id}")
                 else:
                     logger.warning(f"   ⚠️ No PictureDetails found for item {item_id}")
-                    
-                    # 대체 방법: GalleryURL 시도
+                
+                # 방법 2: GalleryURL 시도 (PictureDetails가 없을 때)
+                if not picture_url:
                     gallery_url = item.findtext("ebay:GalleryURL", "", ns)
-                    if gallery_url:
+                    if gallery_url and gallery_url.strip():
                         picture_url = gallery_url.strip()
                         thumbnail_url = gallery_url.strip()
                         logger.info(f"   📷 Using GalleryURL as fallback: {picture_url[:50]}...")
+                
+                # 방법 3: ListingDetails에서 GalleryURL 시도
+                if not picture_url:
+                    listing_details = item.find("ebay:ListingDetails", ns)
+                    if listing_details is not None:
+                        gallery_url = listing_details.findtext("ebay:GalleryURL", "", ns)
+                        if gallery_url and gallery_url.strip():
+                            picture_url = gallery_url.strip()
+                            thumbnail_url = gallery_url.strip()
+                            logger.info(f"   📷 Using ListingDetails GalleryURL: {picture_url[:50]}...")
+                
+                # 방법 4: ItemID로 eBay 이미지 URL 생성 (최후의 수단)
+                if not picture_url and item_id:
+                    # eBay는 일반적으로 ItemID로 이미지 URL을 생성할 수 있음
+                    # 하지만 이 방법은 신뢰할 수 없으므로 로그만 남김
+                    logger.warning(f"   ⚠️ No image URL found for item {item_id} after all methods")
                 
                 listing = {
                     "item_id": item_id,

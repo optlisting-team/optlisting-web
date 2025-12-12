@@ -357,6 +357,18 @@ function Dashboard() {
         const allListingsFromEbay = response.data.listings || []
         console.log(`✅ Received ${allListingsFromEbay.length} listings from eBay`)
         
+        // 디버깅: 첫 번째 리스팅의 이미지 정보 확인
+        if (allListingsFromEbay.length > 0) {
+          const firstListing = allListingsFromEbay[0]
+          console.log('🔍 First listing image data:', {
+            picture_url: firstListing.picture_url,
+            thumbnail_url: firstListing.thumbnail_url,
+            image_url: firstListing.image_url,
+            item_id: firstListing.item_id,
+            title: firstListing.title
+          })
+        }
+        
         // 리스팅 데이터 변환 및 공급처 감지
         const transformedListings = allListingsFromEbay.map((item, index) => {
           const supplier = detectSupplier(item.title, item.sku)
