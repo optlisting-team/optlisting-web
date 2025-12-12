@@ -46,7 +46,10 @@ EBAY_CLIENT_ID = os.getenv("EBAY_CLIENT_ID", "")
 EBAY_CLIENT_SECRET = os.getenv("EBAY_CLIENT_SECRET", "")
 EBAY_ENVIRONMENT = os.getenv("EBAY_ENVIRONMENT", "PRODUCTION")  # SANDBOX or PRODUCTION
 EBAY_RU_NAME = os.getenv("EBAY_RU_NAME", "")  # eBay Redirect URL Name (RuName)
+# FRONTEND_URL: Supabase Site URL과 일치해야 함
+# 기본값: optlisting.com (Supabase Site URL)
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://optlisting.com")
+logger.info(f"🌐 FRONTEND_URL configured: {FRONTEND_URL}")
 
 # eBay OAuth Endpoints
 EBAY_AUTH_ENDPOINTS = {
@@ -609,8 +612,15 @@ async def ebay_auth_callback(
         logger.info(f"   refresh_token: {'Yes' if refresh_token else 'No'}")
         logger.info(f"   expires_in: {expires_in} seconds")
         
-        # 토큰 만료 시간 계산
+        # 토큰 만료 시간 계산 (UTC 기준)
+        # eBay 토큰은 UTC 시간으로 만료 시간을 제공하므로 UTC로 저장
         token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+        token_updated_at = datetime.utcnow()
+        
+        logger.info(f"📅 Token expiration calculation:")
+        logger.info(f"   Current UTC time: {datetime.utcnow().isoformat()}")
+        logger.info(f"   Expires in: {expires_in} seconds ({expires_in / 3600:.2f} hours)")
+        logger.info(f"   Token expires at (UTC): {token_expires_at.isoformat()}")
         
         # DB에 토큰 저장
         from .models import Profile, get_db
@@ -627,7 +637,7 @@ async def ebay_auth_callback(
                     ebay_access_token=access_token,
                     ebay_refresh_token=refresh_token,
                     ebay_token_expires_at=token_expires_at,
-                    ebay_token_updated_at=datetime.utcnow()
+                    ebay_token_updated_at=token_updated_at
                 )
                 db.add(profile)
                 logger.info(f"📝 Creating new profile for user: {user_id}")
@@ -636,9 +646,10 @@ async def ebay_auth_callback(
                 profile.ebay_access_token = access_token
                 profile.ebay_refresh_token = refresh_token
                 profile.ebay_token_expires_at = token_expires_at
-                profile.ebay_token_updated_at = datetime.utcnow()
+                profile.ebay_token_updated_at = token_updated_at
                 logger.info(f"📝 Updating existing profile for user: {user_id}")
             
+            # 트랜잭션 커밋
             db.commit()
             logger.info(f"✅ Tokens saved to database for user: {user_id}")
             
@@ -648,6 +659,13 @@ async def ebay_auth_callback(
                 logger.info(f"✅ Token verification: Access token exists in DB")
                 logger.info(f"   Token length: {len(profile.ebay_access_token)}")
                 logger.info(f"   Refresh token exists: {bool(profile.ebay_refresh_token)}")
+                logger.info(f"   Token expires at (DB): {profile.ebay_token_expires_at.isoformat() if profile.ebay_token_expires_at else 'None'}")
+                logger.info(f"   Token updated at (DB): {profile.ebay_token_updated_at.isoformat() if profile.ebay_token_updated_at else 'None'}")
+                
+                # 만료 시간 검증
+                if profile.ebay_token_expires_at:
+                    time_until_expiry = (profile.ebay_token_expires_at - datetime.utcnow()).total_seconds()
+                    logger.info(f"   Time until expiry: {time_until_expiry:.0f} seconds ({time_until_expiry / 3600:.2f} hours)")
             else:
                 logger.error(f"❌ Token verification failed: Access token not found after save!")
             

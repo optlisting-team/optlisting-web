@@ -154,12 +154,25 @@ async def validation_exception_handler(request, exc):
 async def global_exception_handler(request, exc):
     """Handle all other exceptions and ensure CORS headers are present"""
     import traceback
-    traceback.print_exc()
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    # 상세한 에러 로깅
+    error_traceback = traceback.format_exc()
+    logger.error(f"❌ Unhandled exception: {type(exc).__name__}: {str(exc)}")
+    logger.error(f"   Request URL: {request.url}")
+    logger.error(f"   Request method: {request.method}")
+    logger.error(f"   Error traceback:\n{error_traceback}")
     
     # Return error response with CORS headers
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error"},
+        content={
+            "detail": "Internal server error",
+            "error_type": type(exc).__name__,
+            "error_message": str(exc) if not isinstance(exc, Exception) else str(exc)
+        },
         headers={
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH",
