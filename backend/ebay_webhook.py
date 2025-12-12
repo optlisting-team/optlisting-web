@@ -501,7 +501,12 @@ async def ebay_auth_start(
     logger.info("=" * 60)
     
     # eBay 로그인 페이지로 리다이렉트
-    return RedirectResponse(url=auth_url, status_code=302)
+    # CORS 헤더 추가 (리다이렉트 시에도 필요)
+    response = RedirectResponse(url=auth_url, status_code=302)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
 
 
 @router.get("/auth/callback")
@@ -653,7 +658,11 @@ async def ebay_auth_callback(
         logger.info(f"✅ OAuth complete! Redirecting to: {success_redirect}")
         logger.info("=" * 60)
         
-        return RedirectResponse(url=success_redirect, status_code=302)
+        response = RedirectResponse(url=success_redirect, status_code=302)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        return response
         
     except Exception as e:
         logger.error(f"❌ OAuth callback error: {str(e)}")

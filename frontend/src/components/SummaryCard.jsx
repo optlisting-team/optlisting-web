@@ -251,12 +251,26 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
           <a
             href={`${import.meta.env.VITE_API_URL || 'https://web-production-3dc73.up.railway.app'}/api/ebay/auth/start?user_id=default-user`}
             onClick={(e) => {
-              console.log('🔗 eBay OAuth 링크 클릭됨')
               const apiUrl = import.meta.env.VITE_API_URL || 'https://web-production-3dc73.up.railway.app'
               const oauthUrl = `${apiUrl}/api/ebay/auth/start?user_id=default-user`
+              
+              console.log('🔗 eBay OAuth 링크 클릭됨')
+              console.log('API URL:', apiUrl)
               console.log('OAuth URL:', oauthUrl)
+              console.log('VITE_API_URL env:', import.meta.env.VITE_API_URL)
+              
+              // 링크가 작동하지 않으면 강제 리다이렉트
+              setTimeout(() => {
+                if (document.location.href === window.location.href) {
+                  console.warn('링크 리다이렉트가 작동하지 않음, 강제 리다이렉트 시도')
+                  window.location.href = oauthUrl
+                }
+              }, 100)
+              
               // 기본 동작 허용 (리다이렉트)
             }}
+            target="_self"
+            rel="noopener noreferrer"
             className="text-sm px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-all flex items-center gap-2 disabled:opacity-50 inline-block text-center"
           >
             <Plus className="w-4 h-4" />
