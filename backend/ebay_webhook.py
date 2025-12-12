@@ -464,14 +464,18 @@ async def ebay_auth_start(
     logger.info("=" * 60)
     logger.info("🚀 eBay OAuth Start Request")
     logger.info(f"   user_id: {user_id}")
+    logger.info(f"   state: {state}")
+    logger.info(f"   Request headers: {dict(request.headers) if hasattr(request, 'headers') else 'N/A'}")
     
     # 환경변수 확인
     if not EBAY_CLIENT_ID:
         logger.error("❌ EBAY_CLIENT_ID not configured!")
+        logger.error(f"   EBAY_CLIENT_ID value: {EBAY_CLIENT_ID[:10] if EBAY_CLIENT_ID else 'None'}...")
         raise HTTPException(status_code=500, detail="eBay Client ID not configured")
     
     if not EBAY_RU_NAME:
         logger.error("❌ EBAY_RU_NAME not configured!")
+        logger.error(f"   EBAY_RU_NAME value: {EBAY_RU_NAME[:20] if EBAY_RU_NAME else 'None'}...")
         raise HTTPException(status_code=500, detail="eBay RuName not configured")
     
     # Environment 선택
