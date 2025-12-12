@@ -382,6 +382,7 @@ function Dashboard() {
             start_time: item.start_time,
             picture_url: item.picture_url, // 메인 이미지 URL
             thumbnail_url: item.thumbnail_url || item.picture_url, // 썸네일 이미지 URL (좀비 SKU 리포트용)
+            image_url: item.image_url || item.picture_url || item.thumbnail_url, // 프론트엔드 호환성을 위한 필드
             is_zombie: false, // 아래에서 필터링으로 결정
             zombie_score: zombieScore,
             recommendation: zombieScore <= 20 ? 'DELETE' : zombieScore <= 40 ? 'DELETE' : zombieScore <= 60 ? 'OPTIMIZE' : 'MONITOR'
@@ -557,7 +558,8 @@ function Dashboard() {
             days_listed: item.days_listed || 0,
             start_time: item.start_time,
             picture_url: item.picture_url, // 메인 이미지 URL
-            thumbnail_url: item.thumbnail_url || item.picture_url // 썸네일 이미지 URL (좀비 SKU 리포트용)
+            thumbnail_url: item.thumbnail_url || item.picture_url, // 썸네일 이미지 URL (좀비 SKU 리포트용)
+            image_url: item.image_url || item.picture_url || item.thumbnail_url // 프론트엔드 호환성을 위한 필드
           }
         })
         

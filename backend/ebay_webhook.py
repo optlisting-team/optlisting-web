@@ -1224,6 +1224,7 @@ async def get_active_listings_trading_api(
                         first_picture = picture_urls[0]
                         if first_picture is not None and first_picture.text:
                             picture_url = first_picture.text.strip()
+                            logger.info(f"   📷 Image found: {picture_url[:50]}...")
                             
                             # eBay 이미지 URL을 썸네일로 변환
                             # eBay 이미지 URL 패턴: https://i.ebayimg.com/images/g/.../s-l500.jpg
@@ -1248,6 +1249,17 @@ async def get_active_listings_trading_api(
                                         thumbnail_url = f"{base_url}_s-l225.{ext}"
                                     else:
                                         thumbnail_url = f"{thumbnail_url}?s-l225"
+                    else:
+                        logger.warning(f"   ⚠️ No PictureURL found in PictureDetails for item {item_id}")
+                else:
+                    logger.warning(f"   ⚠️ No PictureDetails found for item {item_id}")
+                    
+                    # 대체 방법: GalleryURL 시도
+                    gallery_url = item.findtext("ebay:GalleryURL", "", ns)
+                    if gallery_url:
+                        picture_url = gallery_url.strip()
+                        thumbnail_url = gallery_url.strip()
+                        logger.info(f"   📷 Using GalleryURL as fallback: {picture_url[:50]}...")
                 
                 listing = {
                     "item_id": item_id,
@@ -1265,6 +1277,7 @@ async def get_active_listings_trading_api(
                     "end_time": end_time,
                     "picture_url": picture_url,  # 메인 이미지 URL
                     "thumbnail_url": thumbnail_url,  # 썸네일 이미지 URL (좀비 SKU 리포트용)
+                    "image_url": picture_url or thumbnail_url,  # 프론트엔드 호환성을 위한 필드 (메인 이미지 우선, 없으면 썸네일)
                     "days_listed": 0  # 계산 필요
                 }
                 
