@@ -636,9 +636,12 @@ async def ebay_auth_callback(
         
         # DB에 토큰 저장
         from .models import Profile, get_db
-        db = next(get_db())
+        db = None
+        db_verify = None
         
         try:
+            db = next(get_db())
+            
             # 프로필 조회 또는 생성
             profile = db.query(Profile).filter(Profile.user_id == user_id).first()
             
@@ -664,11 +667,17 @@ async def ebay_auth_callback(
             # 트랜잭션 커밋
             db.commit()
             logger.info(f"✅ Tokens saved to database for user: {user_id}")
+            logger.info(f"   Access token length: {len(access_token)}")
+            logger.info(f"   Refresh token exists: {bool(refresh_token)}")
+            logger.info(f"   Token expires at: {token_expires_at.isoformat()}")
             
             # 저장 후 즉시 확인 (검증) - 새 세션으로 다시 조회
             db.close()
-            db = next(get_db())
-            profile_verify = db.query(Profile).filter(Profile.user_id == user_id).first()
+            db = None
+            
+            # 새 세션으로 검증
+            db_verify = next(get_db())
+            profile_verify = db_verify.query(Profile).filter(Profile.user_id == user_id).first()
             
             if profile_verify and profile_verify.ebay_access_token:
                 logger.info(f"✅ Token verification: Access token exists in DB")
@@ -688,12 +697,18 @@ async def ebay_auth_callback(
                 if profile_verify:
                     logger.error(f"   Has access token: {bool(profile_verify.ebay_access_token)}")
                     logger.error(f"   Profile user_id: {profile_verify.user_id}")
+                # 검증 실패해도 계속 진행 (DB에 저장은 되었을 수 있음)
             
-            db.close()
+            if db_verify:
+                db_verify.close()
+                db_verify = None
             
         except Exception as e:
-            db.rollback()
-            db.close()
+            if db:
+                db.rollback()
+                db.close()
+            if db_verify:
+                db_verify.close()
             logger.error(f"❌ Failed to save tokens to database: {e}")
             import traceback
             logger.error(traceback.format_exc())
