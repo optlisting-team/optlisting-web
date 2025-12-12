@@ -799,6 +799,22 @@ function Dashboard() {
     const urlParams = new URLSearchParams(window.location.search)
     const ebayConnected = urlParams.get('ebay_connected')
     const ebayError = urlParams.get('ebay_error')
+    const code = urlParams.get('code')
+    const state = urlParams.get('state')
+    
+    // 🔥 중요: eBay가 프론트엔드로 직접 리다이렉트한 경우 (code 파라미터가 있음)
+    // 백엔드 콜백 엔드포인트로 리다이렉트
+    if (code && !ebayConnected && !ebayError) {
+      console.log('🔄 eBay OAuth code 감지 - 백엔드로 리다이렉트')
+      console.log('   Code:', code.substring(0, 20) + '...')
+      console.log('   State:', state)
+      
+      // 백엔드 콜백 엔드포인트로 리다이렉트 (모든 파라미터 전달)
+      const callbackUrl = `${API_BASE_URL}/api/ebay/auth/callback?${urlParams.toString()}`
+      console.log('   Redirecting to:', callbackUrl)
+      window.location.href = callbackUrl
+      return // 리다이렉트 후 실행 중단
+    }
     
     if (ebayConnected === 'true') {
       console.log('✅ OAuth 콜백 성공 - eBay 연결됨')
