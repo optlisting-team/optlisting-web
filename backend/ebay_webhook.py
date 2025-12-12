@@ -531,9 +531,12 @@ async def ebay_auth_callback(
     """
     logger.info("=" * 60)
     logger.info("🔐 eBay OAuth Callback Received")
+    logger.info(f"   Request URL: {str(request.url)}")
+    logger.info(f"   Query params: {dict(request.query_params)}")
     logger.info(f"   code: {code[:20] if code else 'None'}...")
     logger.info(f"   state: {state}")
     logger.info(f"   error: {error}")
+    logger.info(f"   error_description: {error_description}")
     
     # 에러 처리
     if error:
