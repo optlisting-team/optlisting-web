@@ -243,23 +243,25 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
         {selectedStore?.connected ? (
           <button 
             onClick={handleDisconnect}
-            className="text-sm px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 font-semibold rounded-lg border border-red-600/30 transition-all flex items-center gap-2"
+            className="px-5 py-2.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 font-bold rounded-lg border-2 border-red-600/30 transition-all flex items-center gap-2 text-base shadow-lg hover:shadow-red-500/20"
           >
-            <Unplug className="w-4 h-4" />
+            <Unplug className="w-5 h-5" />
             Disconnect
           </button>
         ) : (
           <button
             type="button"
-            onClick={() => {
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
               const oauthUrl = 'https://optlisting-production.up.railway.app/api/ebay/auth/start?user_id=default-user'
               console.log('🔗 Connect 버튼 클릭 - 리다이렉트 시작:', oauthUrl)
               window.location.href = oauthUrl
             }}
-            className="text-sm px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold rounded-lg transition-all flex items-center gap-2 text-base shadow-lg hover:shadow-blue-500/40 transform hover:scale-105 active:scale-95 cursor-pointer border-2 border-blue-500/50"
           >
-            <Plus className="w-4 h-4" />
-            Connect
+            <Plus className="w-5 h-5 font-bold" strokeWidth={3} />
+            <span>Connect eBay</span>
           </button>
         )}
 
