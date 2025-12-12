@@ -452,6 +452,7 @@ async def test_challenge(
 
 @router.get("/auth/start")
 async def ebay_auth_start(
+    request: Request,
     user_id: str = Query(..., description="User ID to associate with eBay account"),
     state: Optional[str] = Query(None, description="Optional state parameter for CSRF protection")
 ):
@@ -468,7 +469,7 @@ async def ebay_auth_start(
     logger.info("🚀 eBay OAuth Start Request")
     logger.info(f"   user_id: {user_id}")
     logger.info(f"   state: {state}")
-    logger.info(f"   Request headers: {dict(request.headers) if hasattr(request, 'headers') else 'N/A'}")
+    logger.info(f"   Request headers: {dict(request.headers)}")
     
     # 환경변수 확인
     if not EBAY_CLIENT_ID:
