@@ -423,7 +423,7 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                     />
                   )}
                 </th>
-                {/* Column order: Platform → SKU → Item ID → Title → Score → Filter order (Age → Sales → Watch → Imp → Views) → Recommendation → Supplier → Price */}
+                {/* Column order: Platform → Image → SKU → Item ID → Title → Score → Filter order (Age → Sales → Watch → Imp → Views) → Recommendation → Supplier → Price */}
                 <th 
                   className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-20"
                   onClick={() => handleSort('platform')}
@@ -432,6 +432,9 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                     <span>Platform</span>
                     {getSortIcon('platform')}
                   </div>
+                </th>
+                <th className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider w-16">
+                  <span>Image</span>
                 </th>
                 <th 
                   className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-24"
@@ -594,7 +597,7 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                       className="w-5 h-5 rounded border-zinc-600 text-white focus:ring-white bg-zinc-800 cursor-pointer"
                     />
                   </td>
-                  {/* Column order: Platform → SKU → Item ID → Title → Score → Filter order (Age → Sales → Watch → Imp → Views) → Recommendation → Supplier → Price */}
+                  {/* Column order: Platform → Image → SKU → Item ID → Title → Score → Filter order (Age → Sales → Watch → Imp → Views) → Recommendation → Supplier → Price */}
                   <td className="px-2 py-4">
                     <div className="relative group inline-block">
                       <PlatformBadge marketplace={zombie.marketplace || 'eBay'} />
@@ -602,6 +605,25 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                         {getManagementHubTooltip(zombie)}
                       </div>
                     </div>
+                  </td>
+                  <td className="px-2 py-4">
+                    {/* 썸네일 이미지 (좀비 SKU 리포트용 시각적 확인) */}
+                    {(zombie.image_url || zombie.picture_url || zombie.thumbnail_url) ? (
+                      <img 
+                        src={zombie.image_url || zombie.picture_url || zombie.thumbnail_url} 
+                        alt={zombie.title || 'Product thumbnail'}
+                        className="w-12 h-12 object-cover rounded border border-zinc-700"
+                        onError={(e) => {
+                          // 이미지 로드 실패 시 플레이스홀더 표시
+                          console.warn('Image load failed:', zombie.image_url || zombie.picture_url || zombie.thumbnail_url)
+                          e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="48" height="48"%3E%3Crect width="48" height="48" fill="%23171717"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23717171" font-size="10"%3ENo Image%3C/text%3E%3C/svg%3E'
+                        }}
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-zinc-800 border border-zinc-700 rounded flex items-center justify-center">
+                        <span className="text-[8px] text-zinc-500">No Image</span>
+                      </div>
+                    )}
                   </td>
                   <td 
                     className="px-2 py-4 text-xs font-mono text-zinc-400 group cursor-pointer hover:bg-zinc-800/50 transition-colors relative"
@@ -619,19 +641,6 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                   </td>
                   <td className="px-2 py-4 max-w-[150px]">
                     <div className="flex items-start gap-2">
-                      {/* 썸네일 이미지 (좀비 SKU 리포트용 시각적 확인) */}
-                      {(zombie.image_url || zombie.picture_url || zombie.thumbnail_url) && (
-                        <img 
-                          src={zombie.image_url || zombie.picture_url || zombie.thumbnail_url} 
-                          alt={zombie.title || 'Product thumbnail'}
-                          className="w-10 h-10 object-cover rounded border border-zinc-700 flex-shrink-0"
-                          onError={(e) => {
-                            // 이미지 로드 실패 시 숨김
-                            console.warn('Image load failed:', zombie.image_url || zombie.picture_url || zombie.thumbnail_url)
-                            e.target.style.display = 'none'
-                          }}
-                        />
-                      )}
                       <span className="text-xs text-white truncate block flex-1" title={zombie.title}>
                         {zombie.title && zombie.title.length > 30 
                           ? `${zombie.title.substring(0, 30)}...` 
