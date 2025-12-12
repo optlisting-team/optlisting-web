@@ -891,17 +891,24 @@ def get_user_access_token(user_id: str) -> Optional[str]:
     DB에서 사용자의 eBay access token 가져오기
     토큰이 만료됐으면 refresh token으로 갱신
     """
+    db = None
     try:
         from .models import get_db, Profile
         
         db = next(get_db())
         profile = db.query(Profile).filter(Profile.user_id == user_id).first()
         
-        if not profile or not profile.ebay_access_token:
+        if not profile:
+            logger.warning(f"⚠️ No profile found for user_id: {user_id}")
+            return None
+        
+        if not profile.ebay_access_token:
+            logger.warning(f"⚠️ No access token found for user_id: {user_id}")
             return None
         
         # 토큰 만료 확인
         if profile.ebay_token_expires_at and profile.ebay_token_expires_at < datetime.utcnow():
+            logger.info(f"🔄 Token expired for user_id: {user_id}, attempting refresh...")
             # 토큰 갱신 필요
             if profile.ebay_refresh_token:
                 new_token = refresh_access_token(profile.ebay_refresh_token)
@@ -911,14 +918,25 @@ def get_user_access_token(user_id: str) -> Optional[str]:
                     profile.ebay_token_expires_at = datetime.utcnow() + timedelta(seconds=new_token.get("expires_in", 7200))
                     profile.ebay_token_updated_at = datetime.utcnow()
                     db.commit()
+                    logger.info(f"✅ Token refreshed successfully for user_id: {user_id}")
                     return new_token["access_token"]
+                else:
+                    logger.error(f"❌ Token refresh failed for user_id: {user_id}")
+            else:
+                logger.error(f"❌ No refresh token available for user_id: {user_id}")
             return None
         
+        logger.info(f"✅ Valid access token found for user_id: {user_id}")
         return profile.ebay_access_token
         
     except Exception as e:
-        logger.error(f"Error getting access token: {e}")
+        logger.error(f"❌ Error getting access token for user_id {user_id}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return None
+    finally:
+        if db:
+            db.close()
 
 
 def refresh_access_token(refresh_token: str) -> Optional[Dict]:
@@ -1070,10 +1088,32 @@ async def get_active_listings_trading_api(
     logger.info("=" * 60)
     logger.info(f"📦 Fetching active listings (Trading API) for user: {user_id}")
     
-    access_token = get_user_access_token(user_id)
-    
-    if not access_token:
-        raise HTTPException(status_code=401, detail="eBay not connected. Please connect your eBay account.")
+    try:
+        access_token = get_user_access_token(user_id)
+        
+        if not access_token:
+            logger.error(f"❌ No access token found for user_id: {user_id}")
+            # 디버그 정보 추가
+            try:
+                from .models import get_db, Profile
+                db = next(get_db())
+                profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+                debug_info = {
+                    "profile_exists": bool(profile),
+                    "has_access_token": bool(profile.ebay_access_token) if profile else False,
+                    "has_refresh_token": bool(profile.ebay_refresh_token) if profile else False,
+                    "token_expires_at": profile.ebay_token_expires_at.isoformat() if profile and profile.ebay_token_expires_at else None,
+                    "is_expired": profile.ebay_token_expires_at < datetime.utcnow() if profile and profile.ebay_token_expires_at else None
+                }
+                db.close()
+                logger.error(f"   Debug info: {debug_info}")
+            except Exception as debug_err:
+                logger.error(f"   Debug info error: {debug_err}")
+            
+            raise HTTPException(
+                status_code=401, 
+                detail="eBay not connected. Please connect your eBay account."
+            )
     
     try:
         env = EBAY_ENVIRONMENT if EBAY_ENVIRONMENT in EBAY_API_ENDPOINTS else "PRODUCTION"
