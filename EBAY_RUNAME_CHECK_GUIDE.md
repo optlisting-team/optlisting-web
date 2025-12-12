@@ -3,8 +3,8 @@
 ## 📍 현재 화면에서 확인할 수 있는 것
 
 현재 **"Application Keys"** 화면에서는:
-- ✅ **App ID (Client ID)**: `Supersel-OptListi-PRD-c71b3bcb7-6d545ace`
-- ✅ **Cert ID (Client Secret)**: `PRD-71b3bcb7d038-d14c-494d-a67f-3b60`
+- ✅ **App ID (Client ID)**: (eBay Developer Console에서 확인)
+- ✅ **Cert ID (Client Secret)**: (eBay Developer Console에서 확인)
 - ❌ **RuName**: 여기서는 보이지 않음
 
 ## 🔍 RuName 확인 방법
@@ -61,8 +61,8 @@
 
 ### Railway 환경 변수:
 - [ ] `EBAY_RU_NAME` 환경 변수가 eBay의 RuName과 **정확히 일치**하는지 확인
-- [ ] `EBAY_CLIENT_ID` = `Supersel-OptListi-PRD-c71b3bcb7-6d545ace`
-- [ ] `EBAY_CLIENT_SECRET` = `PRD-71b3bcb7d038-d14c-494d-a67f-3b60`
+- [ ] `EBAY_CLIENT_ID` = (eBay Developer Console의 App ID)
+- [ ] `EBAY_CLIENT_SECRET` = (eBay Developer Console의 Cert ID)
 - [ ] `EBAY_ENVIRONMENT` = `PRODUCTION`
 
 ## 🎯 다음 단계

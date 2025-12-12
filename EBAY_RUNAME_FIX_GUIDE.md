@@ -47,8 +47,8 @@ Railway 대시보드 → Variables에서 확인:
 
 ```bash
 EBAY_RU_NAME=Supersell_Inter-Supersel-OptLis-ikjzwgcjy
-EBAY_CLIENT_ID=Supersel-OptListi-PRD-c71b3bcb7-6d545ace
-EBAY_CLIENT_SECRET=PRD-71b3bcb7d038-d14c-494d-a67f-3b60
+EBAY_CLIENT_ID=(eBay Developer Console의 App ID)
+EBAY_CLIENT_SECRET=(eBay Developer Console의 Cert ID)
 EBAY_ENVIRONMENT=PRODUCTION
 FRONTEND_URL=https://optlisting.com
 ```
@@ -93,8 +93,8 @@ Connect 버튼 클릭 후:
 
 ### Railway 환경 변수:
 - [ ] `EBAY_RU_NAME=Supersell_Inter-Supersel-OptLis-ikjzwgcjy` (정확히 일치)
-- [ ] `EBAY_CLIENT_ID=Supersel-OptListi-PRD-c71b3bcb7-6d545ace`
-- [ ] `EBAY_CLIENT_SECRET=PRD-71b3bcb7d038-d14c-494d-a67f-3b60`
+- [ ] `EBAY_CLIENT_ID` = (eBay Developer Console의 App ID)
+- [ ] `EBAY_CLIENT_SECRET` = (eBay Developer Console의 Cert ID)
 - [ ] `EBAY_ENVIRONMENT=PRODUCTION`
 - [ ] `FRONTEND_URL=https://optlisting.com`
 
