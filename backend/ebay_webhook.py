@@ -654,28 +654,39 @@ async def ebay_auth_callback(
             db.commit()
             logger.info(f"✅ Tokens saved to database for user: {user_id}")
             
-            # 저장 후 즉시 확인 (검증)
-            db.refresh(profile)
-            if profile.ebay_access_token:
+            # 저장 후 즉시 확인 (검증) - 새 세션으로 다시 조회
+            db.close()
+            db = next(get_db())
+            profile_verify = db.query(Profile).filter(Profile.user_id == user_id).first()
+            
+            if profile_verify and profile_verify.ebay_access_token:
                 logger.info(f"✅ Token verification: Access token exists in DB")
-                logger.info(f"   Token length: {len(profile.ebay_access_token)}")
-                logger.info(f"   Refresh token exists: {bool(profile.ebay_refresh_token)}")
-                logger.info(f"   Token expires at (DB): {profile.ebay_token_expires_at.isoformat() if profile.ebay_token_expires_at else 'None'}")
-                logger.info(f"   Token updated at (DB): {profile.ebay_token_updated_at.isoformat() if profile.ebay_token_updated_at else 'None'}")
+                logger.info(f"   User ID: {user_id}")
+                logger.info(f"   Token length: {len(profile_verify.ebay_access_token)}")
+                logger.info(f"   Refresh token exists: {bool(profile_verify.ebay_refresh_token)}")
+                logger.info(f"   Token expires at (DB): {profile_verify.ebay_token_expires_at.isoformat() if profile_verify.ebay_token_expires_at else 'None'}")
+                logger.info(f"   Token updated at (DB): {profile_verify.ebay_token_updated_at.isoformat() if profile_verify.ebay_token_updated_at else 'None'}")
                 
                 # 만료 시간 검증
-                if profile.ebay_token_expires_at:
-                    time_until_expiry = (profile.ebay_token_expires_at - datetime.utcnow()).total_seconds()
+                if profile_verify.ebay_token_expires_at:
+                    time_until_expiry = (profile_verify.ebay_token_expires_at - datetime.utcnow()).total_seconds()
                     logger.info(f"   Time until expiry: {time_until_expiry:.0f} seconds ({time_until_expiry / 3600:.2f} hours)")
             else:
                 logger.error(f"❌ Token verification failed: Access token not found after save!")
+                logger.error(f"   Profile exists: {bool(profile_verify)}")
+                if profile_verify:
+                    logger.error(f"   Has access token: {bool(profile_verify.ebay_access_token)}")
+                    logger.error(f"   Profile user_id: {profile_verify.user_id}")
+            
+            db.close()
             
         except Exception as e:
             db.rollback()
+            db.close()
             logger.error(f"❌ Failed to save tokens to database: {e}")
             import traceback
             logger.error(traceback.format_exc())
-            error_redirect = f"{FRONTEND_URL}/settings?ebay_error=db_save&message=Failed to save tokens"
+            error_redirect = f"{FRONTEND_URL}/dashboard?ebay_error=db_save&message=Failed to save tokens: {str(e)}"
             return RedirectResponse(url=error_redirect, status_code=302)
         
         # 성공! 프론트엔드로 리다이렉트
