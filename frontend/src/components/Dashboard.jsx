@@ -926,7 +926,7 @@ function Dashboard() {
     }
     
     if (connected && !wasConnected) {
-      // 연결됨: 제품 로드 (강제 새로고침)
+      // 🔥 연결됨: 제품 로드 (강제 새로고침) - 버튼 클릭으로 연결된 경우에만 실행
       console.log('✅ eBay 연결됨 - 제품 로드 시작 (강제 새로고침)')
       if (DEMO_MODE) {
         setAllListings(DUMMY_ALL_LISTINGS)

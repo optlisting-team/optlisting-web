@@ -19,7 +19,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
   const [stores, setStores] = useState(INITIAL_STORES)
   const [selectedStore, setSelectedStore] = useState(stores[0])
   const [connecting, setConnecting] = useState(false)
-  const [checkingConnection, setCheckingConnection] = useState(true)
+  const [checkingConnection, setCheckingConnection] = useState(false) // 🔥 초기값 false로 변경 - 버튼 클릭 시에만 확인
   const [ebayUserId, setEbayUserId] = useState(null) // eBay User ID 상태 추가
   const dropdownRef = useRef(null)
 
