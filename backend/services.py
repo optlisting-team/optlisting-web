@@ -852,13 +852,9 @@ def analyze_zombie_listings(
                 ),
                 cast(Listing.metrics['views'].astext, Integer)
             ),
-            # Fallback to direct fields: view_count or views (if column exists)
-            # ✅ FIX: view_count가 없으면 Listing 모델의 직접 필드 사용
-            else_=func.coalesce(
-                func.coalesce(Listing.view_count, 0),  # Fallback to view_count
-                func.coalesce(getattr(Listing, 'views', None), 0),  # Fallback to views (if exists)
-                0
-            )
+            # Fallback to direct fields: view_count (Listing 모델에 정의된 필드)
+            # ✅ FIX: view_count 필드 사용 (Listing 모델에 정의됨)
+            else_=func.coalesce(Listing.view_count, 0)
         )
         query = query.filter(views_value < max_views)
     
