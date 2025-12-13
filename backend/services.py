@@ -741,26 +741,25 @@ def analyze_zombie_listings(
     
     # Sales filter: use metrics['sales'] (JSONB) with robust casting
     # ✅ FIX: JSONB 연산자 안전하게 처리 및 타입 검증 추가
+    # ✅ FIX: metrics가 없을 때 직접 필드(quantity_sold, sold_qty)를 fallback으로 사용
     if max_sales is not None and max_sales >= 0:
         # Use CASE to safely handle NULL metrics or missing keys
-        # ✅ FIX: hasattr 제거, 타입 검증 추가 및 안전한 캐스팅
         sales_value = case(
             (
                 and_(
                     Listing.metrics.isnot(None),
                     Listing.metrics.has_key('sales'),
-                    # ✅ FIX: JSONB 값이 숫자 또는 문자열인지 확인
                     func.jsonb_typeof(Listing.metrics['sales']).in_(['number', 'string']),
-                    # ✅ FIX: NULL 체크 추가
                     Listing.metrics['sales'].astext.isnot(None)
                 ),
-                # ✅ FIX: 안전한 타입 변환 (JSONB ->> 텍스트 추출 후 Integer로 변환)
-                cast(
-                    Listing.metrics['sales'].astext,
-                    Integer
-                )
+                cast(Listing.metrics['sales'].astext, Integer)
             ),
-            else_=0
+            # Fallback to direct fields: quantity_sold or sold_qty
+            else_=func.coalesce(
+                func.coalesce(Listing.quantity_sold, 0),
+                func.coalesce(Listing.sold_qty, 0),
+                0
+            )
         )
         query = query.filter(sales_value <= max_sales)
     
@@ -793,6 +792,7 @@ def analyze_zombie_listings(
         query = query.filter(watches_value <= effective_max_watches)
     
     # 4. Impressions/노출 필터: metrics['impressions'] or metrics['impressions']['total_impressions']
+    # ✅ FIX: metrics가 없을 때 직접 필드(impressions)를 fallback으로 사용
     if max_impressions is not None and max_impressions > 0:
         impressions_value = case(
             # Try nested structure first
@@ -815,11 +815,13 @@ def analyze_zombie_listings(
                 ),
                 cast(Listing.metrics['impressions'].astext, Integer)
             ),
-            else_=0
+            # Fallback to direct impressions field
+            else_=func.coalesce(Listing.impressions, 0)
         )
         query = query.filter(impressions_value < max_impressions)
     
     # 5. Views/조회 필터: metrics['views'] or metrics['views']['total_views']
+    # ✅ FIX: metrics가 없을 때 직접 필드(view_count, views)를 fallback으로 사용
     if max_views is not None and max_views > 0:
         views_value = case(
             # Try nested structure first
@@ -842,7 +844,12 @@ def analyze_zombie_listings(
                 ),
                 cast(Listing.metrics['views'].astext, Integer)
             ),
-            else_=0
+            # Fallback to direct fields: view_count or views
+            else_=func.coalesce(
+                func.coalesce(Listing.view_count, 0),
+                func.coalesce(getattr(Listing, 'views', None), 0),
+                0
+            )
         )
         query = query.filter(views_value < max_views)
     
