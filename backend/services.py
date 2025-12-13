@@ -294,13 +294,18 @@ def extract_supplier_info(
     if is_autods:
         # AutoDS SKU에서 실제 공급처 추출 시도 (예: "AUTODS-AMZ-B08ABC1234" → "B08ABC1234")
         # 패턴 분석: AutoDS 접두사 제거 후 남은 부분에서 실제 공급처 ID 추출
+        # 지원 패턴: AUTODS-, ADS-, AD-, AL- (AutoDS의 일부 변형)
         remaining_sku = None
         if sku_upper.startswith("AUTODS"):
             remaining_sku = sku_upper.replace("AUTODS", "", 1).strip("-").strip()
+        elif sku_upper.startswith("ADS-"):
+            remaining_sku = sku_upper.replace("ADS-", "", 1).strip()
         elif sku_upper.startswith("ADS"):
             remaining_sku = sku_upper.replace("ADS", "", 1).strip("-").strip()
         elif sku_upper.startswith("AD-"):
             remaining_sku = sku_upper.replace("AD-", "", 1).strip()
+        elif sku_upper.startswith("AL-") and not sku_upper.startswith("ALI"):  # AL-는 AutoDS 패턴, ALI-는 AliExpress
+            remaining_sku = sku_upper.replace("AL-", "", 1).strip()
         
         # 남은 SKU에서 실제 공급처 ID 추출 (재귀적 파싱)
         supplier_id = None

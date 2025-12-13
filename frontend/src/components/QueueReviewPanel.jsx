@@ -13,6 +13,9 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
   const [pendingExport, setPendingExport] = useState(null) // { source, items, shopifyItems, supplierItems }
   const [exporting, setExporting] = useState(false) // 로딩 상태 추가
   const [exportError, setExportError] = useState(null) // 에러 상태 추가
+  const [showPreviewModal, setShowPreviewModal] = useState(false) // CSV 미리 보기 모달
+  const [previewData, setPreviewData] = useState(null) // { source, items, exportType, targetTool }
+  const [hoveredImage, setHoveredImage] = useState(null) // 마우스오버 확대 이미지
   
   // Check if item goes through Shopify
   const isShopifyItem = (item) => {
@@ -88,7 +91,15 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
     }
     const { shopifyItems } = separateByShopify(items)
     if (shopifyItems.length > 0) {
-      await performExport(supplier, shopifyItems, 'shopify', `${supplier} (via Shopify)`)
+      // 미리 보기 모달 표시
+      setPreviewData({
+        source: supplier,
+        items: shopifyItems,
+        exportType: 'shopify',
+        targetTool: 'shopify_matrixify',
+        groupKey: `${supplier} (via Shopify)`
+      })
+      setShowPreviewModal(true)
     }
   }
 
@@ -99,7 +110,26 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
     }
     const { supplierItems } = separateByShopify(items)
     if (supplierItems.length > 0) {
-      await performExport(supplier, supplierItems, 'supplier', `${supplier} (Direct)`)
+      // Determine target tool
+      const supplierLower = (supplier || '').toLowerCase()
+      let targetTool = 'autods'
+      if (supplierLower.includes('wholesale2b') || supplierLower === 'wholesale2b') {
+        targetTool = 'wholesale2b'
+      } else if (supplierLower.includes('autods') || supplierLower === 'autods') {
+        targetTool = 'autods'
+      } else if (supplierLower.includes('yaballe') || supplierLower === 'yaballe') {
+        targetTool = 'yaballe'
+      }
+      
+      // 미리 보기 모달 표시
+      setPreviewData({
+        source: supplier,
+        items: supplierItems,
+        exportType: 'supplier',
+        targetTool: targetTool,
+        groupKey: `${supplier} (Direct)`
+      })
+      setShowPreviewModal(true)
     }
   }
 
@@ -112,17 +142,66 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
     // 같은 공급처 내에서 Shopify 경유와 Direct를 분리
     const { shopifyItems, supplierItems } = separateByShopify(items)
     
+    // Determine target tool
+    const supplierLower = (supplier || '').toLowerCase()
+    let targetTool = 'autods'
+    if (supplierLower.includes('wholesale2b') || supplierLower === 'wholesale2b') {
+      targetTool = 'wholesale2b'
+    } else if (supplierLower.includes('autods') || supplierLower === 'autods') {
+      targetTool = 'autods'
+    } else if (supplierLower.includes('yaballe') || supplierLower === 'yaballe') {
+      targetTool = 'yaballe'
+    }
+    
     // Shopify 경유만 있으면 Shopify CSV
     if (shopifyItems.length > 0 && supplierItems.length === 0) {
-      await performExport(supplier, shopifyItems, 'shopify', `${supplier} (via Shopify)`)
+      // 미리 보기 모달 표시
+      setPreviewData({
+        source: supplier,
+        items: shopifyItems,
+        exportType: 'shopify',
+        targetTool: 'shopify_matrixify',
+        groupKey: `${supplier} (via Shopify)`
+      })
+      setShowPreviewModal(true)
       return
     }
     
     // Direct만 있으면 공급처 CSV
     if (supplierItems.length > 0 && shopifyItems.length === 0) {
-      await performExport(supplier, supplierItems, 'supplier', `${supplier} (Direct)`)
+      // 미리 보기 모달 표시
+      setPreviewData({
+        source: supplier,
+        items: supplierItems,
+        exportType: 'supplier',
+        targetTool: targetTool,
+        groupKey: `${supplier} (Direct)`
+      })
+      setShowPreviewModal(true)
       return
     }
+    
+    // 둘 다 있으면 Shopify 모달 표시 (기존 로직)
+    setPendingExport({
+      source: supplier,
+      items: items,
+      shopifyItems: shopifyItems,
+      supplierItems: supplierItems
+    })
+    setShowShopifyModal(true)
+  }
+  
+  const handleConfirmPreview = async () => {
+    if (!previewData) return
+    
+    setShowPreviewModal(false)
+    await performExport(
+      previewData.source,
+      previewData.items,
+      previewData.exportType,
+      previewData.groupKey
+    )
+    setPreviewData(null)
   }
 
   const performExport = async (source, items, exportType, groupKey) => {
@@ -293,20 +372,88 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
     
     // source가 없으면 items에서 추출
     const safeSource = source || pendingExport.items[0]?.supplier_name || pendingExport.items[0]?.supplier || pendingExport.items[0]?.source || 'Unknown'
+    
+    // Determine target tool
+    const supplierLower = (safeSource || '').toLowerCase()
+    let targetTool = 'autods'
+    if (supplierLower.includes('wholesale2b') || supplierLower === 'wholesale2b') {
+      targetTool = 'wholesale2b'
+    } else if (supplierLower.includes('autods') || supplierLower === 'autods') {
+      targetTool = 'autods'
+    } else if (supplierLower.includes('yaballe') || supplierLower === 'yaballe') {
+      targetTool = 'yaballe'
+    }
 
     if (choice === 'shopify') {
       // Export only Shopify items via Shopify
       if (shopifyItems.length > 0) {
-        await performExport(safeSource, shopifyItems, 'shopify')
+        setPreviewData({
+          source: safeSource,
+          items: shopifyItems,
+          exportType: 'shopify',
+          targetTool: 'shopify_matrixify',
+          groupKey: `${safeSource} (via Shopify)`
+        })
+        setShowPreviewModal(true)
       }
-      // Also export supplier items if any
+      // Also export supplier items if any (두 번째 항목은 첫 번째가 완료된 후 표시)
       if (supplierItems.length > 0) {
-        await performExport(safeSource, supplierItems, 'supplier')
+        // 첫 번째 미리 보기 후 두 번째를 표시하기 위해 약간의 지연
+        setTimeout(() => {
+          setPreviewData({
+            source: safeSource,
+            items: supplierItems,
+            exportType: 'supplier',
+            targetTool: targetTool,
+            groupKey: `${safeSource} (Direct)`
+          })
+          setShowPreviewModal(true)
+        }, 100)
       }
+      setShowShopifyModal(false)
+      setPendingExport(null)
     } else if (choice === 'supplier') {
       // Export all items via source supplier
-      await performExport(safeSource, pendingExport.items, 'supplier')
+      setPreviewData({
+        source: safeSource,
+        items: pendingExport.items,
+        exportType: 'supplier',
+        targetTool: targetTool,
+        groupKey: `${safeSource} (All)`
+      })
+      setShowPreviewModal(true)
+      setShowShopifyModal(false)
+      setPendingExport(null)
     }
+  }
+  
+  const handleConfirmPreview = async () => {
+    if (!previewData) return
+    
+    setShowPreviewModal(false)
+    const currentPreview = previewData
+    setPreviewData(null)
+    
+    await performExport(
+      currentPreview.source,
+      currentPreview.items,
+      currentPreview.exportType,
+      currentPreview.groupKey
+    )
+    
+    // Show deletion guide after successful export
+    const toolName = currentPreview.targetTool === 'autods' ? 'AutoDS' : 
+                    currentPreview.targetTool === 'yaballe' ? 'Yaballe' : 
+                    currentPreview.targetTool === 'wholesale2b' ? 'Wholesale2B' : 
+                    currentPreview.targetTool === 'shopify_matrixify' ? 'Shopify' : 'Supplier'
+    
+    setTimeout(() => {
+      if (currentPreview.targetTool === 'shopify_matrixify') {
+        alert(`✅ CSV downloaded successfully!\n\n📋 Next steps:\n1. Log in to your Shopify account\n2. Use Matrixify/Excelify to import the CSV\n3. Review and confirm deletion`)
+      } else {
+        alert(`✅ CSV downloaded successfully!\n\n📋 Next steps:\n1. Log in to your ${toolName} account\n2. Upload the CSV file using Bulk Actions\n3. Review and confirm deletion`)
+      }
+    }, 500)
   }
 
   // Monochrome theme - all sources use same styling
@@ -599,6 +746,183 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
           </div>
         )
       })}
+
+      {/* CSV Preview Modal */}
+      {showPreviewModal && previewData && createPortal(
+        <div 
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+          onClick={() => {
+            setShowPreviewModal(false)
+            setPreviewData(null)
+          }}
+        >
+          <div 
+            className="bg-zinc-900 border border-zinc-700 rounded-lg max-w-6xl w-full max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-6 border-b border-zinc-700">
+              <h3 className="text-xl font-bold text-white mb-2">CSV Export Preview</h3>
+              <p className="text-sm text-zinc-400">
+                {previewData.items.length} items will be exported to {previewData.targetTool === 'shopify_matrixify' ? 'Shopify' : previewData.source} CSV format
+              </p>
+            </div>
+            
+            {/* Preview Table */}
+            <div className="flex-1 overflow-auto p-6">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-zinc-800 sticky top-0">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Image</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Sell Item ID</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">SKU</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Title</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Supplier ID</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Price</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800">
+                    {previewData.items.map((item, index) => {
+                      const imageUrl = item.image_url || item.picture_url || item.thumbnail_url
+                      const sellItemId = item.sell_item_id || item.item_id || item.ebay_item_id || 'N/A'
+                      const supplierId = item.supplier_id || item.sku || 'N/A'
+                      
+                      return (
+                        <tr key={item.id || index} className="hover:bg-zinc-800/50 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="relative group">
+                              {imageUrl ? (
+                                <img 
+                                  src={imageUrl}
+                                  alt={item.title || 'Product'}
+                                  className="w-16 h-16 object-cover rounded border border-zinc-700 cursor-pointer"
+                                  onMouseEnter={(e) => {
+                                    const rect = e.target.getBoundingClientRect()
+                                    setHoveredImage({
+                                      url: imageUrl,
+                                      x: rect.right + 10,
+                                      y: rect.top
+                                    })
+                                  }}
+                                  onMouseLeave={() => setHoveredImage(null)}
+                                  onError={(e) => {
+                                    e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="64" height="64"%3E%3Crect width="64" height="64" fill="%23171717"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23717171" font-size="10"%3ENo Image%3C/text%3E%3C/svg%3E'
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-16 h-16 bg-zinc-800 border border-zinc-700 rounded flex items-center justify-center">
+                                  <span className="text-xs text-zinc-500">No Image</span>
+                                </div>
+                              )}
+                              {/* Mouseover Zoom */}
+                              {hoveredImage && hoveredImage.url === imageUrl && (
+                                <div 
+                                  className="fixed z-[100] pointer-events-none"
+                                  style={{
+                                    left: `${hoveredImage.x}px`,
+                                    top: `${hoveredImage.y}px`,
+                                    transform: 'translateY(-50%)'
+                                  }}
+                                >
+                                  <img 
+                                    src={imageUrl}
+                                    alt="Zoomed"
+                                    className="w-64 h-64 object-contain rounded-lg border-2 border-zinc-600 shadow-2xl bg-zinc-900"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="font-mono text-xs text-zinc-300">{sellItemId}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="font-mono text-xs text-zinc-300">{item.sku || 'N/A'}</span>
+                          </td>
+                          <td className="px-4 py-3 max-w-xs">
+                            <span className="text-zinc-300 text-xs line-clamp-2" title={item.title}>
+                              {item.title || 'N/A'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="font-mono text-xs text-zinc-300">{supplierId}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-zinc-300 text-xs">${(item.price || 0).toFixed(2)}</span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            {/* Footer */}
+            <div className="p-6 border-t border-zinc-700">
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-sm text-zinc-400">
+                  Total: {previewData.items.length} items
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setShowPreviewModal(false)
+                      setPreviewData(null)
+                    }}
+                    className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirmPreview}
+                    disabled={exporting}
+                    className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
+                  >
+                    {exporting ? 'Exporting...' : 'Confirm & Download CSV'}
+                  </button>
+                </div>
+              </div>
+              
+              {/* Supplier Deletion Guide */}
+              {previewData.targetTool !== 'shopify_matrixify' && (
+                <div className="mt-4 p-4 bg-zinc-800/50 border border-zinc-700 rounded-lg">
+                  <h4 className="text-sm font-semibold text-white mb-2">
+                    📋 {previewData.targetTool === 'autods' ? 'AutoDS' : previewData.targetTool === 'yaballe' ? 'Yaballe' : 'Supplier'} CSV Upload Guide
+                  </h4>
+                  <div className="text-xs text-zinc-400 space-y-1">
+                    {previewData.targetTool === 'autods' && (
+                      <>
+                        <p>1. Log in to your AutoDS account</p>
+                        <p>2. Go to <strong className="text-zinc-300">Products → Bulk Actions</strong></p>
+                        <p>3. Click <strong className="text-zinc-300">Upload CSV</strong> and select the downloaded file</p>
+                        <p>4. Review the items and confirm deletion</p>
+                      </>
+                    )}
+                    {previewData.targetTool === 'yaballe' && (
+                      <>
+                        <p>1. Log in to your Yaballe account</p>
+                        <p>2. Go to <strong className="text-zinc-300">Monitors → Bulk Actions</strong></p>
+                        <p>3. Click <strong className="text-zinc-300">Import CSV</strong> and select the downloaded file</p>
+                        <p>4. Review the items and confirm deletion</p>
+                      </>
+                    )}
+                    {previewData.targetTool === 'wholesale2b' && (
+                      <>
+                        <p>1. Log in to your Wholesale2B account</p>
+                        <p>2. Go to <strong className="text-zinc-300">Products → Bulk Import</strong></p>
+                        <p>3. Upload the CSV file and confirm deletion</p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Shopify Export Choice Modal */}
       {showShopifyModal && pendingExport && createPortal(
