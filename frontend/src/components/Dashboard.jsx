@@ -1200,6 +1200,32 @@ function Dashboard() {
     setFilters(newFilters)
     setSelectedIds([]) // Reset selection when filters change
     
+    // 🔥 Active 카드에서 데이터가 없으면 먼저 조회
+    let currentTotalListings = totalListings || allListings.length
+    if (currentTotalListings === 0) {
+      console.log('⚠️ Active 카드 데이터가 없음 - 먼저 조회 필요')
+      try {
+        setLoading(true)
+        const response = await axios.get(`${API_BASE_URL}/api/ebay/listings/active`, {
+          params: {
+            user_id: CURRENT_USER_ID,
+            page: 1,
+            entries_per_page: 200
+          }
+        })
+        
+        if (response.data.success) {
+          const listings = response.data.listings || []
+          currentTotalListings = listings.length
+          console.log(`✅ Active 카드 데이터 조회 완료: ${currentTotalListings}개 리스팅`)
+        }
+      } catch (err) {
+        console.error('❌ Active 카드 데이터 조회 실패:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
     // 🔥 "Find Low-Performing SKUs" 버튼 클릭 시 항상 크레딧 차감 팝업 표시
     // Active 카드에서 이미 조회된 데이터를 사용하더라도 분석 시에는 크레딧 차감 필요
     try {
@@ -1214,9 +1240,9 @@ function Dashboard() {
       
       const availableCredits = creditsResponse.data?.available_credits || 0
       // 🔥 전체 스캔하는 제품 수만큼 크레딧 차감
-      const requiredCredits = Math.max(1, totalListings || allListings.length || 0) // 최소 1 크레딧
+      const requiredCredits = Math.max(1, currentTotalListings) // 최소 1 크레딧
       
-      console.log(`💰 크레딧 정보: 보유=${availableCredits}, 필요=${requiredCredits} (전체 ${totalListings || allListings.length}개 리스팅 스캔)`)
+      console.log(`💰 크레딧 정보: 보유=${availableCredits}, 필요=${requiredCredits} (전체 ${currentTotalListings}개 리스팅 스캔)`)
       
       // 크레딧 부족 확인
       if (availableCredits < requiredCredits) {
@@ -1231,7 +1257,7 @@ function Dashboard() {
       
       // 크레딧 충분 - 확인 팝업 표시
       console.log('✅ 크레딧 충분 - 확인 팝업 표시')
-      const confirmMessage = `분석을 시작하시겠습니까?\n\n필요한 크레딧: ${requiredCredits} (전체 ${totalListings || allListings.length}개 리스팅 스캔)\n보유 크레딧: ${availableCredits}\n차감 후 잔액: ${availableCredits - requiredCredits}`
+      const confirmMessage = `분석을 시작하시겠습니까?\n\n필요한 크레딧: ${requiredCredits} (전체 ${currentTotalListings}개 리스팅 스캔)\n보유 크레딧: ${availableCredits}\n차감 후 잔액: ${availableCredits - requiredCredits}`
       
       console.log('💬 확인 팝업 메시지:', confirmMessage)
       const userConfirmed = confirm(confirmMessage)
