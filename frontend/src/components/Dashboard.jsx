@@ -1245,6 +1245,25 @@ function Dashboard() {
       }
     }
     
+    // 🔥 DB에서 전체 리스팅 수 확인 (크레딧 차감 기준)
+    if (currentTotalListings === 0) {
+      try {
+        const dbResponse = await axios.get(`${API_BASE_URL}/api/listings`, {
+          params: {
+            user_id: CURRENT_USER_ID,
+            skip: 0,
+            limit: 1
+          }
+        })
+        // total_count가 응답에 있으면 사용, 없으면 listings 배열 길이 사용
+        currentTotalListings = dbResponse.data?.total_count || dbResponse.data?.listings?.length || 0
+        console.log(`✅ DB에서 전체 리스팅 수 확인: ${currentTotalListings}개`)
+      } catch (err) {
+        console.warn('⚠️ DB 리스팅 수 확인 실패, 기본값 사용:', err)
+        currentTotalListings = 12 // 기본값 (최소 1 크레딧 차감)
+      }
+    }
+    
     // 🔥 "Find Low-Performing SKUs" 버튼 클릭 시 항상 크레딧 차감 팝업 표시
     // Active 카드에서 이미 조회된 데이터를 사용하더라도 분석 시에는 크레딧 차감 필요
     try {
@@ -1268,7 +1287,7 @@ function Dashboard() {
         console.log('⚠️ 크레딧 부족 - 구매 안내 팝업 표시')
         const userMessage = `크레딧이 부족합니다.\n\n필요한 크레딧: ${requiredCredits}\n보유 크레딧: ${availableCredits}\n\n크레딧을 구매하시겠습니까?`
         
-        if (confirm(userMessage)) {
+        if (window.confirm(userMessage)) {
           window.location.href = '/#pricing'
         }
         return
@@ -1279,13 +1298,14 @@ function Dashboard() {
       const confirmMessage = `분석을 시작하시겠습니까?\n\n필요한 크레딧: ${requiredCredits} (전체 ${currentTotalListings}개 리스팅 스캔)\n보유 크레딧: ${availableCredits}\n차감 후 잔액: ${availableCredits - requiredCredits}`
       
       console.log('💬 확인 팝업 메시지:', confirmMessage)
-      const userConfirmed = confirm(confirmMessage)
+      const userConfirmed = window.confirm(confirmMessage)
       console.log(`👤 사용자 확인: ${userConfirmed}`)
       
       if (userConfirmed) {
         // 사용자 확인 후 필터링 진행 (크레딧 차감 포함, 백엔드 API 호출)
         console.log('🚀 사용자 확인 완료 - 분석 시작')
-        fetchZombies(newFilters, true)
+        await fetchZombies(newFilters, true)
+        setViewMode('zombies')
       } else {
         console.log('❌ 사용자 취소 - 분석 중단')
       }
@@ -1297,9 +1317,10 @@ function Dashboard() {
       const errorMessage = err.response?.data?.detail || err.message || '알 수 없는 오류'
       const userMessage = `크레딧 확인에 실패했습니다.\n\n에러: ${errorMessage}\n\n계속 진행하시겠습니까? (백엔드에서 크레딧 차감이 시도됩니다)`
       
-      if (confirm(userMessage)) {
+      if (window.confirm(userMessage)) {
         console.log('🚀 사용자 확인 - 에러 발생했지만 계속 진행')
-        fetchZombies(newFilters, true)
+        await fetchZombies(newFilters, true)
+        setViewMode('zombies')
       } else {
         console.log('❌ 사용자 취소 - 에러 발생으로 중단')
       }
