@@ -1152,6 +1152,16 @@ function Dashboard() {
     if (mode === 'total') {
       // Statistical view - no data fetching needed
       return
+    } else if (mode === 'zombies') {
+      // 🔥 좀비 카드 클릭 시: 이미 필터링된 결과가 있으면 그대로 사용 (재필터링하지 않음)
+      // 필터링된 결과가 없으면 현재 필터로 다시 필터링 (로컬 필터링만, 크레딧 차감 없음)
+      if (zombies.length === 0 && allListings.length > 0) {
+        console.log('🔄 좀비 카드 클릭 - 로컬 필터링 실행 (크레딧 차감 없음)')
+        fetchZombies(filters, false) // 로컬 필터링만 수행
+      } else {
+        console.log(`✅ 좀비 카드 클릭 - 이미 필터링된 결과 사용 (${zombies.length}개)`)
+      }
+      return
     } else if (mode === 'all') {
       // Show ALL listings (no filtering)
       // 🔥 데이터가 이미 있고 캐시가 유효하면 API 호출하지 않음
