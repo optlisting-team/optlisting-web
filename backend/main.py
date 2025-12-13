@@ -495,6 +495,59 @@ def analyze_zombies(
     # Get total count using SQL COUNT
     total_count = base_query.count()
     
+    # 🔥 크레딧 차감: 필터링(분석) 요청 시 전체 스캔하는 제품 수만큼 크레딧 차감
+    # 프리 구독 사용자는 전체 리스팅 수만큼 크레딧이 차감됩니다 (1 리스팅 = 1 크레딧)
+    # Pro 이상 구독자는 크레딧 차감 없음
+    try:
+        from .credit_service import deduct_credits_atomic, get_credit_summary
+        from fastapi import status as http_status
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # 사용자 프로필 확인
+        profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+        
+        # 프리 구독인 경우에만 크레딧 차감
+        if profile and (not profile.subscription_plan or profile.subscription_plan == 'free'):
+            # 전체 스캔하는 제품 수만큼 크레딧 차감
+            required_credits = max(1, total_count)  # 최소 1 크레딧 차감
+            
+            logger.info(f"💰 크레딧 차감: 전체 {total_count}개 리스팅 스캔 → {required_credits} 크레딧 차감")
+            
+            # 크레딧 차감 시도
+            credit_result = deduct_credits_atomic(
+                db=db,
+                user_id=user_id,
+                amount=required_credits,
+                description=f"Zombie listing analysis: {total_count} total listings scanned",
+                reference_id=f"analyze_{user_id}_{cache_key}"
+            )
+            
+            if not credit_result.success:
+                # 크레딧 부족
+                raise HTTPException(
+                    status_code=http_status.HTTP_402_PAYMENT_REQUIRED,
+                    detail={
+                        "error": "insufficient_credits",
+                        "message": f"크레딧이 부족합니다. {required_credits} 크레딧이 필요하며, 현재 {credit_result.remaining_credits} 크레딧만 보유하고 있습니다.",
+                        "available_credits": credit_result.remaining_credits,
+                        "required_credits": required_credits,
+                        "listing_count": total_count
+                    }
+                )
+            else:
+                logger.info(f"✅ 크레딧 차감 완료: {required_credits} 크레딧 차감, 잔액: {credit_result.remaining_credits}")
+        else:
+            logger.info(f"✅ Pro 이상 구독자 - 크레딧 차감 없음 ({total_count}개 리스팅 스캔)")
+        # Pro 이상 구독자는 크레딧 차감 없음
+    except HTTPException:
+        raise  # 크레딧 부족 에러는 그대로 전달
+    except Exception as credit_err:
+        # 크레딧 시스템 오류는 로그만 남기고 계속 진행 (크레딧 시스템이 없어도 분석은 가능하도록)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Credit deduction failed (continuing anyway): {credit_err}")
+    
     # Calculate breakdown by supplier using SQL GROUP BY
     supplier_query = db.query(
         Listing.supplier_name,
@@ -906,6 +959,8 @@ def get_deletion_history(
 
 class UpdateListingRequest(BaseModel):
     supplier: Optional[str] = None
+    supplier_name: Optional[str] = None
+    supplier_id: Optional[str] = None
 
 @app.patch("/api/listing/{listing_id}")
 def update_listing(
@@ -916,20 +971,29 @@ def update_listing(
     """
     Update a listing's supplier (manual override)
     Allows users to correct auto-detected suppliers
+    Supports both supplier (legacy) and supplier_name/supplier_id (new format)
     """
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
     
+    # Support legacy 'supplier' field for backward compatibility
+    supplier_name = request.supplier_name or request.supplier
+    supplier_id = request.supplier_id
+    
     # Validate supplier if provided
-    if request.supplier is not None:
-        valid_suppliers = ["Amazon", "Walmart", "AliExpress", "CJ Dropshipping", "Home Depot", "Wayfair", "Costco", "Wholesale2B", "Spocket", "SaleHoo", "Inventory Source", "Dropified", "Unverified", "Unknown"]
-        if request.supplier not in valid_suppliers:
+    if supplier_name is not None:
+        valid_suppliers = ["Amazon", "Walmart", "AliExpress", "CJ Dropshipping", "Home Depot", "Wayfair", "Costco", "Wholesale2B", "Spocket", "SaleHoo", "Inventory Source", "Dropified", "Unverified", "Unknown", "AutoDS", "Yaballe"]
+        if supplier_name not in valid_suppliers:
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid supplier. Must be one of: {', '.join(valid_suppliers)}"
             )
-        listing.supplier_name = request.supplier
+        listing.supplier_name = supplier_name
+    
+    # Update supplier_id if provided
+    if supplier_id is not None:
+        listing.supplier_id = supplier_id if supplier_id else None
     
     db.commit()
     db.refresh(listing)
@@ -940,6 +1004,7 @@ def update_listing(
         "ebay_item_id": getattr(listing, 'item_id', None) or getattr(listing, 'ebay_item_id', None) or "",  # Backward compatibility
         "title": listing.title,
         "supplier_name": listing.supplier_name,
+        "supplier_id": listing.supplier_id,
         "supplier": listing.supplier_name,  # Backward compatibility
         "message": "Listing updated successfully"
     }

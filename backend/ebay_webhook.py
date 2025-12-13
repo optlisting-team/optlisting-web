@@ -1346,6 +1346,16 @@ async def get_active_listings_trading_api(
                         # 이 방법은 작동하지 않을 수 있지만 시도해봅니다
                         logger.warning(f"   ⚠️ No image URL found for item {item_id} after all methods")
                 
+                # Supplier 정보 추출 (SKU, 이미지 URL, 제목 기반)
+                from .services import extract_supplier_info
+                supplier_name, supplier_id = extract_supplier_info(
+                    sku=sku,
+                    image_url=picture_url or thumbnail_url,
+                    title=title,
+                    brand="",  # Trading API에서 brand 정보는 별도로 가져와야 함
+                    upc=""  # Trading API에서 UPC 정보는 별도로 가져와야 함
+                )
+                
                 listing = {
                     "item_id": item_id,
                     "ebay_item_id": item_id,
@@ -1363,7 +1373,9 @@ async def get_active_listings_trading_api(
                     "picture_url": picture_url,  # 메인 이미지 URL
                     "thumbnail_url": thumbnail_url,  # 썸네일 이미지 URL (좀비 SKU 리포트용)
                     "image_url": picture_url or thumbnail_url,  # 프론트엔드 호환성을 위한 필드 (메인 이미지 우선, 없으면 썸네일)
-                    "days_listed": 0  # 계산 필요
+                    "days_listed": 0,  # 계산 필요
+                    "supplier_name": supplier_name,  # 추출된 공급처 이름
+                    "supplier_id": supplier_id  # 추출된 공급처 ID (예: ASIN, Walmart ID 등)
                 }
                 
                 # days_listed 계산

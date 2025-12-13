@@ -292,13 +292,54 @@ def extract_supplier_info(
     )
     
     if is_autods:
-        # AutoDS SKU에서 실제 공급처 추출 시도 (예: "AUTODS-AMZ-B08ABC1234")
-        autods_id = None
+        # AutoDS SKU에서 실제 공급처 추출 시도 (예: "AUTODS-AMZ-B08ABC1234" → "B08ABC1234")
+        # 패턴 분석: AutoDS 접두사 제거 후 남은 부분에서 실제 공급처 ID 추출
+        remaining_sku = None
         if sku_upper.startswith("AUTODS"):
-            autods_id = sku_upper.replace("AUTODS", "").strip("-").strip()
+            remaining_sku = sku_upper.replace("AUTODS", "", 1).strip("-").strip()
         elif sku_upper.startswith("ADS"):
-            autods_id = sku_upper.replace("ADS", "").strip("-").strip()
-        return ("AutoDS", autods_id)
+            remaining_sku = sku_upper.replace("ADS", "", 1).strip("-").strip()
+        elif sku_upper.startswith("AD-"):
+            remaining_sku = sku_upper.replace("AD-", "", 1).strip()
+        
+        # 남은 SKU에서 실제 공급처 ID 추출 (재귀적 파싱)
+        supplier_id = None
+        if remaining_sku:
+            # 하이픈으로 분리된 부분들 분석
+            remaining_parts = re.split(r'[-_]', remaining_sku)
+            
+            # Amazon ASIN 패턴 찾기 (B0으로 시작하는 10자리)
+            amazon_asin_pattern = r'B0[0-9A-Z]{8}'
+            asin_match = re.search(amazon_asin_pattern, remaining_sku)
+            if asin_match:
+                supplier_id = asin_match.group(0)
+            # AMZ 접두사 제거 후 ASIN 찾기
+            elif remaining_parts and remaining_parts[0] == "AMZ" and len(remaining_parts) > 1:
+                # "AMZ-B08ABC1234" → "B08ABC1234"
+                for part in remaining_parts[1:]:
+                    if re.match(amazon_asin_pattern, part):
+                        supplier_id = part
+                        break
+                if not supplier_id:
+                    # ASIN 패턴이 없으면 나머지 부분을 ID로 사용
+                    supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
+            # Walmart 패턴 (WM 접두사 제거)
+            elif remaining_parts and remaining_parts[0] in ["WM", "WMT", "WALMART"]:
+                # "WM-123456" → "123456"
+                supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
+            # AliExpress 패턴 (AE, ALI 접두사 제거)
+            elif remaining_parts and remaining_parts[0] in ["AE", "ALI", "ALIEXPRESS"]:
+                # "AE-789012" → "789012"
+                supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
+            # 다른 공급처 패턴들
+            elif remaining_parts and remaining_parts[0] in ["CJ", "HD", "WF", "CO", "CW", "BG"]:
+                # "CJ-345678" → "345678"
+                supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
+            else:
+                # 패턴이 없으면 전체를 ID로 사용 (단, AutoDS 접두사는 제외)
+                supplier_id = remaining_sku if remaining_sku else None
+        
+        return ("AutoDS", supplier_id)
     
     # Yaballe 감지
     # Yaballe SKU 패턴: "YAB-", "YB-", "YABALLE-", "YABALLE", "YABALLE-AMZ-"
@@ -319,14 +360,58 @@ def extract_supplier_info(
     )
     
     if is_yaballe:
-        yaballe_id = None
+        # Yaballe SKU에서 실제 공급처 추출 시도 (예: "YABALLE-AMZ-B08ABC1234" → "B08ABC1234")
+        # 패턴 분석: Yaballe 접두사 제거 후 남은 부분에서 실제 공급처 ID 추출
+        remaining_sku = None
         if sku_upper.startswith("YABALLE"):
-            yaballe_id = sku_upper.replace("YABALLE", "").strip("-").strip()
+            remaining_sku = sku_upper.replace("YABALLE", "", 1).strip("-").strip()
+        elif sku_upper.startswith("YAB-"):
+            remaining_sku = sku_upper.replace("YAB-", "", 1).strip()
+        elif sku_upper.startswith("YB-"):
+            remaining_sku = sku_upper.replace("YB-", "", 1).strip()
         elif sku_upper.startswith("YAB"):
-            yaballe_id = sku_upper.replace("YAB", "").strip("-").strip()
+            remaining_sku = sku_upper.replace("YAB", "", 1).strip("-").strip()
         elif sku_upper.startswith("YB"):
-            yaballe_id = sku_upper.replace("YB", "").strip("-").strip()
-        return ("Yaballe", yaballe_id)
+            remaining_sku = sku_upper.replace("YB", "", 1).strip("-").strip()
+        
+        # 남은 SKU에서 실제 공급처 ID 추출 (재귀적 파싱)
+        supplier_id = None
+        if remaining_sku:
+            # 하이픈으로 분리된 부분들 분석
+            remaining_parts = re.split(r'[-_]', remaining_sku)
+            
+            # Amazon ASIN 패턴 찾기 (B0으로 시작하는 10자리)
+            amazon_asin_pattern = r'B0[0-9A-Z]{8}'
+            asin_match = re.search(amazon_asin_pattern, remaining_sku)
+            if asin_match:
+                supplier_id = asin_match.group(0)
+            # AMZ 접두사 제거 후 ASIN 찾기
+            elif remaining_parts and remaining_parts[0] == "AMZ" and len(remaining_parts) > 1:
+                # "AMZ-B08ABC1234" → "B08ABC1234"
+                for part in remaining_parts[1:]:
+                    if re.match(amazon_asin_pattern, part):
+                        supplier_id = part
+                        break
+                if not supplier_id:
+                    # ASIN 패턴이 없으면 나머지 부분을 ID로 사용
+                    supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
+            # Walmart 패턴 (WM 접두사 제거)
+            elif remaining_parts and remaining_parts[0] in ["WM", "WMT", "WALMART"]:
+                # "WM-123456" → "123456"
+                supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
+            # AliExpress 패턴 (AE, ALI 접두사 제거)
+            elif remaining_parts and remaining_parts[0] in ["AE", "ALI", "ALIEXPRESS"]:
+                # "AE-789012" → "789012"
+                supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
+            # 다른 공급처 패턴들
+            elif remaining_parts and remaining_parts[0] in ["CJ", "HD", "WF", "CO", "CW", "BG"]:
+                # "CJ-345678" → "345678"
+                supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
+            else:
+                # 패턴이 없으면 전체를 ID로 사용 (단, Yaballe 접두사는 제외)
+                supplier_id = remaining_sku if remaining_sku else None
+        
+        return ("Yaballe", supplier_id)
     
     # Pro Aggregators
     w2b_sku_patterns = ["W2B", "WHOLESALE2B", "WHOLESALE-2B"]
