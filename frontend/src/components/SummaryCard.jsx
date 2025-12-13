@@ -20,6 +20,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
   const [selectedStore, setSelectedStore] = useState(stores[0])
   const [connecting, setConnecting] = useState(false)
   const [checkingConnection, setCheckingConnection] = useState(true)
+  const [ebayUserId, setEbayUserId] = useState(null) // eBay User ID 상태 추가
   const dropdownRef = useRef(null)
 
   // Ensure dropdown is closed on mount
@@ -59,12 +60,17 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
                              response.data?.token_status?.has_valid_token !== false &&
                              !response.data?.is_expired
         
+        // eBay User ID 가져오기
+        const userId = response.data?.ebay_user_id || response.data?.user_id || null
+        setEbayUserId(userId)
+        
         console.log('eBay 토큰 상태 확인:', {
           connected: response.data?.connected,
           hasValidToken,
           isExpired: response.data?.is_expired,
           needsRefresh: response.data?.needs_refresh,
-          tokenStatus: response.data?.token_status
+          tokenStatus: response.data?.token_status,
+          ebayUserId: userId
         })
         
         // eBay 스토어 연결 상태 업데이트
@@ -89,6 +95,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
         if (selectedStore?.platform === 'eBay') {
           setSelectedStore(prev => ({ ...prev, connected: false }))
         }
+        setEbayUserId(null) // 에러 시 eBay User ID 초기화
         if (onConnectionChange) {
           onConnectionChange(false)
         }
@@ -190,7 +197,12 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
             className="flex items-center gap-2 px-3 py-2 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700 rounded-lg transition-all"
           >
             <span className="text-lg">{getPlatformIcon(selectedStore?.platform)}</span>
-            <span className="text-sm font-semibold text-white">{selectedStore?.name || 'Select Store'}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-white">{selectedStore?.name || 'Select Store'}</span>
+              {selectedStore?.platform === 'eBay' && ebayUserId && (
+                <span className="text-xs text-zinc-400 font-mono">({ebayUserId})</span>
+              )}
+            </div>
             <ChevronDown className={`w-3 h-3 text-zinc-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
           </button>
 
@@ -287,25 +299,13 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
               console.log('🔗 Connect 버튼 클릭 - 리다이렉트 시작:', oauthUrl)
               window.location.href = oauthUrl
             }}
-            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold rounded-lg transition-all flex items-center gap-2 text-base shadow-lg hover:shadow-blue-500/40 transform hover:scale-105 active:scale-95 cursor-pointer border-2 border-blue-500/50"
+            className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold rounded-lg transition-all flex items-center gap-2 text-base shadow-lg hover:shadow-emerald-500/40 transform hover:scale-105 active:scale-95 cursor-pointer border-2 border-emerald-500/50"
           >
             <Plus className="w-5 h-5 font-bold" strokeWidth={3} />
             <span>Connect eBay</span>
           </button>
         )}
 
-        {/* API Status Indicator - Rightmost */}
-        {selectedStore?.connected ? (
-          <div className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg ml-auto">
-            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-xs font-bold text-emerald-400">LIVE</span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg ml-auto">
-            <div className="w-2 h-2 bg-zinc-500 rounded-full" />
-            <span className="text-xs font-bold text-zinc-500">OFFLINE</span>
-          </div>
-        )}
       </div>
     </div>
   )
