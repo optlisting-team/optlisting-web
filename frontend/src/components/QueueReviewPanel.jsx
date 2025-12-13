@@ -138,6 +138,9 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
     let apiErrorMsg = null // API 에러 메시지 저장용
     
     try {
+      // source 파라미터가 없으면 items에서 추출
+      const safeSource = source || items[0]?.supplier_name || items[0]?.supplier || items[0]?.source || 'Unknown'
+      
       // Determine target tool based on export type
       let targetTool = 'autods' // Default
       
@@ -146,7 +149,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
         targetTool = 'shopify_matrixify' // or 'shopify_tagging' based on preference
       } else {
         // Use supplier-specific format (determine from supplier name)
-        const supplier = items[0]?.supplier_name || items[0]?.supplier || 'Unknown'
+        const supplier = items[0]?.supplier_name || items[0]?.supplier || items[0]?.source || 'Unknown'
         const supplierLower = supplier.toLowerCase()
         
         if (supplierLower.includes('wholesale2b') || supplierLower === 'wholesale2b') {
@@ -178,7 +181,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
         const link = document.createElement('a')
         link.href = url
         
-        const sourceLower = source.toLowerCase().replace(/\s+/g, '_')
+        const sourceLower = safeSource.toLowerCase().replace(/\s+/g, '_')
         const exportTypeLabel = exportType === 'shopify' ? 'shopify' : 'supplier'
         const timestamp = new Date().toISOString().split('T')[0]
         link.setAttribute('download', `optlisting_${sourceLower}_${exportTypeLabel}_delete_${timestamp}.csv`)
@@ -207,7 +210,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
           item.ebay_item_id || item.item_id || '',
           item.sku || '',
           `"${(item.title || '').replace(/"/g, '""')}"`,
-          item.supplier_name || item.supplier || 'Unknown',
+          item.supplier_name || item.supplier || item.source || 'Unknown',
           item.price || 0,
           item.marketplace || 'eBay',
           'DELETE'
@@ -223,7 +226,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
         const link = document.createElement('a')
         link.href = url
         
-        const sourceLower = source.toLowerCase().replace(/\s+/g, '_')
+        const sourceLower = safeSource.toLowerCase().replace(/\s+/g, '_')
         const exportTypeLabel = exportType === 'shopify' ? 'shopify' : 'supplier'
         const timestamp = new Date().toISOString().split('T')[0]
         link.setAttribute('download', `optlisting_${sourceLower}_${exportTypeLabel}_delete_${timestamp}.csv`)
@@ -276,19 +279,22 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
     if (!pendingExport) return
 
     const { source, shopifyItems, supplierItems } = pendingExport
+    
+    // source가 없으면 items에서 추출
+    const safeSource = source || pendingExport.items[0]?.supplier_name || pendingExport.items[0]?.supplier || pendingExport.items[0]?.source || 'Unknown'
 
     if (choice === 'shopify') {
       // Export only Shopify items via Shopify
       if (shopifyItems.length > 0) {
-        await performExport(source, shopifyItems, 'shopify')
+        await performExport(safeSource, shopifyItems, 'shopify')
       }
       // Also export supplier items if any
       if (supplierItems.length > 0) {
-        await performExport(source, supplierItems, 'supplier')
+        await performExport(safeSource, supplierItems, 'supplier')
       }
     } else if (choice === 'supplier') {
       // Export all items via source supplier
-      await performExport(source, pendingExport.items, 'supplier')
+      await performExport(safeSource, pendingExport.items, 'supplier')
     }
   }
 
