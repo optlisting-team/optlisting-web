@@ -1157,10 +1157,11 @@ function Dashboard() {
     setViewMode(mode)
     setSelectedIds([]) // Reset selection when switching views
     
-    // Close filter when switching to non-zombie views
-    if (mode === 'all' || mode === 'queue' || mode === 'history') {
+    // Close filter when switching to non-zombie views (단, 'all' 모드로 전환할 때는 필터 유지)
+    if (mode === 'queue' || mode === 'history') {
       setShowFilter(false)
     }
+    // 'all' 모드로 전환할 때는 필터를 닫지 않음 (연결 후 자동 표시 시 필터가 열려있어야 함)
     
     if (mode === 'total') {
       // Statistical view - no data fetching needed
