@@ -1018,6 +1018,7 @@ function Dashboard() {
             supplier: supplierInfo.supplier_name,
             supplier_name: supplierInfo.supplier_name,
             supplier_id: supplierInfo.supplier_id, // supplier_id 추가
+            source: item.source || supplierInfo.supplier_name, // source 필드 추가 (백엔드 응답 우선, 없으면 supplier_name 사용)
             total_sales: item.quantity_sold || 0,
             quantity_sold: item.quantity_sold || 0,
             watch_count: item.watch_count || 0,
