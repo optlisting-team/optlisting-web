@@ -674,8 +674,9 @@ function Dashboard() {
             title: item.title,
             price: item.price,
             sku: item.sku,
-            supplier: supplier,
-            supplier_name: supplier,
+            supplier: supplierInfo.supplier_name,
+            supplier_name: supplierInfo.supplier_name,
+            supplier_id: supplierInfo.supplier_id, // supplier_id 추가
             total_sales: item.quantity_sold || 0,
             quantity_sold: item.quantity_sold || 0,
             watch_count: item.watch_count || 0,
