@@ -1462,6 +1462,67 @@ async def get_active_listings_trading_api(
         
         logger.info("=" * 60)
         
+        # 🔥 DB에 리스팅 저장 (supplier_id 포함)
+        try:
+            from .models import get_db, Listing
+            from .services import upsert_listings
+            from dateutil import parser
+            
+            db = next(get_db())
+            try:
+                # Listing 객체로 변환
+                listing_objects = []
+                for listing_data in listings:
+                    # date_listed 계산
+                    date_listed = date.today()
+                    if listing_data.get("start_time"):
+                        try:
+                            start_date = parser.parse(listing_data["start_time"])
+                            date_listed = start_date.date()
+                        except:
+                            pass
+                    
+                    # Listing 객체 생성
+                    listing_obj = Listing(
+                        ebay_item_id=listing_data["item_id"],
+                        item_id=listing_data["item_id"],
+                        title=listing_data["title"],
+                        sku=listing_data.get("sku", ""),
+                        image_url=listing_data.get("image_url") or listing_data.get("picture_url") or listing_data.get("thumbnail_url") or "",
+                        price=listing_data.get("price", 0),
+                        date_listed=date_listed,
+                        sold_qty=listing_data.get("quantity_sold", 0),
+                        watch_count=listing_data.get("watch_count", 0),
+                        view_count=listing_data.get("view_count", 0),
+                        impressions=listing_data.get("impressions", 0),
+                        user_id=user_id,
+                        supplier_name=listing_data.get("supplier_name"),
+                        supplier_id=listing_data.get("supplier_id"),
+                        source=listing_data.get("supplier_name", "Unknown"),
+                        marketplace="eBay",
+                        platform="eBay",
+                        last_synced_at=datetime.utcnow()
+                    )
+                    listing_objects.append(listing_obj)
+                
+                # Upsert (중복 시 업데이트)
+                if listing_objects:
+                    upserted_count = upsert_listings(db, listing_objects)
+                    db.commit()
+                    logger.info(f"✅ Saved {upserted_count} listings to database (with supplier_id)")
+                else:
+                    logger.warning("⚠️ No listings to save to database")
+            except Exception as db_err:
+                db.rollback()
+                logger.error(f"❌ Database save error: {db_err}")
+                import traceback
+                logger.error(traceback.format_exc())
+            finally:
+                db.close()
+        except Exception as save_err:
+            logger.warning(f"⚠️ Failed to save listings to database: {save_err}")
+            # DB 저장 실패해도 API 응답은 반환
+        
         return {
             "success": True,
             "total": total_entries,
