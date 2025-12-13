@@ -1557,11 +1557,25 @@ function Dashboard() {
       link.href = url
       
       // Determine filename based on supplier and mode
-      // source 필드가 있으면 사용, 없으면 supplier_name 또는 supplier 사용
+      // source 필드가 있으면 사용, 없으면 supplier_name 또는 supplier 사용 (안전하게 처리)
       const getSource = (item) => {
+        if (!item) return "unknown"
         return item.source || item.supplier_name || item.supplier || "unknown"
       }
-      const source = items.length > 0 ? getSource(items[0]).toLowerCase().replace(/\s+/g, '_') : 'all'
+      // source 변수 안전하게 정의 및 유효성 검사
+      let source = 'all'
+      if (items && items.length > 0) {
+        const sourceValue = getSource(items[0])
+        if (sourceValue && typeof sourceValue === 'string') {
+          source = sourceValue.toLowerCase().replace(/\s+/g, '_')
+        }
+      }
+      
+      // source가 유효한지 확인 후 사용
+      if (!source || source === '') {
+        source = 'all'
+      }
+      
       const filenameMap = {
         autods: `${source}_delete.csv`,
         yaballe: `${source}_delete_yaballe.csv`,

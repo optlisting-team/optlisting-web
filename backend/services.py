@@ -1572,11 +1572,12 @@ def generate_export_csv(
     for listing in listings:
         # Handle both Listing objects and dictionaries
         if isinstance(listing, dict):
-            item_id = listing.get("item_id") or listing.get("ebay_item_id", "")
-            sku = listing.get("sku", "")
-            supplier_id = listing.get("supplier_id", "")
-            supplier_name = listing.get("supplier_name") or listing.get("supplier", "") or "Unknown"
-            platform = listing.get("platform", "")
+            item_id = listing.get("item_id") or listing.get("ebay_item_id") or ""
+            sku = listing.get("sku") or ""
+            # supplier_id: 기본값 빈 문자열로 안전하게 처리
+            supplier_id = listing.get("supplier_id") or ""
+            supplier_name = listing.get("supplier_name") or listing.get("supplier") or listing.get("source") or "Unknown"
+            platform = listing.get("platform") or listing.get("marketplace") or ""
             # Try to get handle from raw_data or use SKU as fallback
             raw_data = listing.get("raw_data", {})
             if isinstance(raw_data, str):
@@ -1584,21 +1585,22 @@ def generate_export_csv(
                     raw_data = json.loads(raw_data)
                 except:
                     raw_data = {}
-            handle = raw_data.get("handle") or sku
+            handle = (raw_data.get("handle") if raw_data else None) or sku
         else:
-            item_id = listing.item_id if hasattr(listing, 'item_id') else (listing.ebay_item_id if hasattr(listing, 'ebay_item_id') else "")
-            sku = listing.sku
-            supplier_id = listing.supplier_id if hasattr(listing, 'supplier_id') else None
-            supplier_name = listing.supplier_name if hasattr(listing, 'supplier_name') else (listing.supplier if hasattr(listing, 'supplier') else "Unknown")
-            platform = listing.platform if hasattr(listing, 'platform') else (listing.marketplace if hasattr(listing, 'marketplace') else "")
+            item_id = (listing.item_id if hasattr(listing, 'item_id') and listing.item_id else None) or (listing.ebay_item_id if hasattr(listing, 'ebay_item_id') and listing.ebay_item_id else None) or ""
+            sku = listing.sku if hasattr(listing, 'sku') and listing.sku else ""
+            # supplier_id: 기본값 None 또는 빈 문자열로 안전하게 처리
+            supplier_id = (listing.supplier_id if hasattr(listing, 'supplier_id') and listing.supplier_id else None) or ""
+            supplier_name = (listing.supplier_name if hasattr(listing, 'supplier_name') and listing.supplier_name else None) or (listing.supplier if hasattr(listing, 'supplier') and listing.supplier else None) or (listing.source if hasattr(listing, 'source') and listing.source else None) or "Unknown"
+            platform = (listing.platform if hasattr(listing, 'platform') and listing.platform else None) or (listing.marketplace if hasattr(listing, 'marketplace') and listing.marketplace else None) or ""
             # Try to get handle from raw_data
-            raw_data = listing.raw_data if hasattr(listing, 'raw_data') else {}
+            raw_data = listing.raw_data if hasattr(listing, 'raw_data') and listing.raw_data else {}
             if isinstance(raw_data, str):
                 try:
                     raw_data = json.loads(raw_data)
                 except:
                     raw_data = {}
-            handle = raw_data.get("handle") if raw_data else sku
+            handle = (raw_data.get("handle") if raw_data and isinstance(raw_data, dict) else None) or sku
         
         # Build row data based on format schema mappings
         row = {}
@@ -1613,27 +1615,32 @@ def generate_export_csv(
                 source_field = mapping["source"]
                 value = None
                 
-                # Get value from listing data
+                # Get value from listing data (안전하게 처리)
                 if source_field == "item_id":
-                    value = item_id
+                    value = item_id if item_id else ""
                 elif source_field == "sku":
-                    value = sku
+                    value = sku if sku else ""
                 elif source_field == "supplier_id":
-                    value = supplier_id
+                    value = supplier_id if supplier_id else ""
                 elif source_field == "handle":
-                    value = handle
+                    value = handle if handle else ""
+                else:
+                    value = ""
                 
                 # Use fallback if value is empty and fallback is specified
                 if not value and "fallback" in mapping:
                     fallback_field = mapping["fallback"]
                     if fallback_field == "sku":
-                        value = sku
+                        value = sku if sku else ""
                     elif fallback_field == "supplier_id":
-                        value = supplier_id
+                        value = supplier_id if supplier_id else ""
                     elif fallback_field == "item_id":
-                        value = item_id
+                        value = item_id if item_id else ""
+                    else:
+                        value = ""
                 
-                row[column_name] = value or ""
+                # 최종적으로 빈 문자열 보장
+                row[column_name] = value if value else ""
             else:
                 row[column_name] = ""
         

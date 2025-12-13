@@ -138,8 +138,19 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
     let apiErrorMsg = null // API 에러 메시지 저장용
     
     try {
-      // source 파라미터가 없으면 items에서 추출
-      const safeSource = source || items[0]?.supplier_name || items[0]?.supplier || items[0]?.source || 'Unknown'
+      // source 파라미터 안전하게 정의 및 유효성 검사
+      let safeSource = 'Unknown'
+      if (source && typeof source === 'string' && source.trim() !== '') {
+        safeSource = source
+      } else if (items && items.length > 0 && items[0]) {
+        const item = items[0]
+        safeSource = item.supplier_name || item.supplier || item.source || 'Unknown'
+      }
+      
+      // 최종 유효성 검사
+      if (!safeSource || typeof safeSource !== 'string' || safeSource.trim() === '') {
+        safeSource = 'Unknown'
+      }
       
       // Determine target tool based on export type
       let targetTool = 'autods' // Default
