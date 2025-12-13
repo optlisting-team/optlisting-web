@@ -617,15 +617,26 @@ function Dashboard() {
               const minDays = filterParams.analytics_period_days || filterParams.min_days || 7
               const maxSales = filterParams.max_sales || 0
               const maxWatches = filterParams.max_watches || filterParams.max_watch_count || 0
+              const maxImpressions = filterParams.max_impressions || 100
               const maxViews = filterParams.max_views || 10
               
+              console.log('🔍 로컬 필터링 적용:', { minDays, maxSales, maxWatches, maxImpressions, maxViews })
+              
               const filteredZombies = allListings.filter(item => {
-                if (item.days_listed < minDays) return false
-                if (item.total_sales > maxSales) return false
-                if (item.watch_count > maxWatches) return false
-                if (item.view_count > maxViews) return false
+                // 등록 기간 필터: minDays 이상 등록된 것만 (예: 7일 이상)
+                if ((item.days_listed || 0) < minDays) return false
+                // 판매 필터: maxSales 이하인 것만 (예: 0건 이하)
+                if ((item.total_sales || item.quantity_sold || 0) > maxSales) return false
+                // 찜 필터: maxWatches 이하인 것만 (예: 0개 이하)
+                if ((item.watch_count || 0) > maxWatches) return false
+                // 노출 필터: maxImpressions 이하인 것만 (예: 100 이하)
+                if ((item.impressions || 0) > maxImpressions) return false
+                // 조회 필터: maxViews 이하인 것만 (예: 10 이하)
+                if ((item.view_count || item.views || 0) > maxViews) return false
                 return true
               }).map(item => ({ ...item, is_zombie: true }))
+              
+              console.log(`🧟 로컬 필터링 결과: ${filteredZombies.length}개 좀비 발견 (전체 ${allListings.length}개 중)`)
               
               setZombies(filteredZombies)
               setTotalZombies(filteredZombies.length)
@@ -743,20 +754,28 @@ function Dashboard() {
         const minDays = filterParams.analytics_period_days || filterParams.min_days || 7
         const maxSales = filterParams.max_sales || 0
         const maxWatches = filterParams.max_watches || filterParams.max_watch_count || 0
+        const maxImpressions = filterParams.max_impressions || 100
         const maxViews = filterParams.max_views || 10
         
+        console.log('🔍 필터링 파라미터:', { minDays, maxSales, maxWatches, maxImpressions, maxViews })
+        console.log(`📊 필터링 전: ${transformedListings.length}개 리스팅`)
+        
         const filteredZombies = transformedListings.filter(item => {
-          // 등록 기간 필터
-          if (item.days_listed < minDays) return false
-          // 판매 필터
-          if (item.total_sales > maxSales) return false
-          // 찜 필터
-          if (item.watch_count > maxWatches) return false
-          // 조회 필터
-          if (item.view_count > maxViews) return false
+          // 등록 기간 필터: minDays 이상 등록된 것만 (예: 7일 이상)
+          if ((item.days_listed || 0) < minDays) return false
+          // 판매 필터: maxSales 이하인 것만 (예: 0건 이하)
+          if ((item.total_sales || item.quantity_sold || 0) > maxSales) return false
+          // 찜 필터: maxWatches 이하인 것만 (예: 0개 이하)
+          if ((item.watch_count || 0) > maxWatches) return false
+          // 노출 필터: maxImpressions 이하인 것만 (예: 100 이하)
+          if ((item.impressions || 0) > maxImpressions) return false
+          // 조회 필터: maxViews 이하인 것만 (예: 10 이하)
+          if ((item.view_count || item.views || 0) > maxViews) return false
           
           return true
         }).map(item => ({ ...item, is_zombie: true }))
+        
+        console.log(`🧟 필터링 후: ${filteredZombies.length}개 좀비 발견`)
         
         console.log(`🧟 Found ${filteredZombies.length} zombie listings`)
         
