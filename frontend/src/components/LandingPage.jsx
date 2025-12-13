@@ -163,15 +163,27 @@ function LandingPage() {
               Instantly generate a CSV of Low-Performing Listings
             </h2>
             <div className="flex flex-col items-center mt-8">
-              <motion.a
-                href="/signup"
-                whileHover={{ scale: 1.05, y: -4 }}
-                whileTap={{ scale: 0.95 }}
-                className="px-12 py-5 bg-white dark:bg-white hover:bg-zinc-200 dark:hover:bg-zinc-200 text-black dark:text-black font-semibold text-lg rounded-xl shadow-lg transition-all hover:-translate-y-1 flex items-center gap-2 font-sans"
-              >
-                Sign Up
-                <ArrowRight className="h-5 w-5" />
-              </motion.a>
+              {isAuthenticated ? (
+                <motion.a
+                  href="/dashboard"
+                  whileHover={{ scale: 1.05, y: -4 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-12 py-5 bg-white dark:bg-white hover:bg-zinc-200 dark:hover:bg-zinc-200 text-black dark:text-black font-semibold text-lg rounded-xl shadow-lg transition-all hover:-translate-y-1 flex items-center gap-2 font-sans"
+                >
+                  Go to Dashboard
+                  <LayoutDashboard className="h-5 w-5" />
+                </motion.a>
+              ) : (
+                <motion.a
+                  href="/signup"
+                  whileHover={{ scale: 1.05, y: -4 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-12 py-5 bg-white dark:bg-white hover:bg-zinc-200 dark:hover:bg-zinc-200 text-black dark:text-black font-semibold text-lg rounded-xl shadow-lg transition-all hover:-translate-y-1 flex items-center gap-2 font-sans"
+                >
+                  Sign Up
+                  <ArrowRight className="h-5 w-5" />
+                </motion.a>
+              )}
             </div>
           </motion.div>
 
