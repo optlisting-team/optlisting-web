@@ -39,78 +39,69 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // 경량화된 eBay 토큰 상태 확인 (API 호출 없음, DB만 확인)
-  useEffect(() => {
-    const checkEbayTokenStatus = async () => {
-      if (selectedStore?.platform !== 'eBay') {
-        setCheckingConnection(false)
-        return
-      }
-
-      try {
-        setCheckingConnection(true)
-        // 경량화된 토큰 상태 확인 (API 호출 없음)
-        const response = await axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
-          params: { user_id: CURRENT_USER_ID },
-          timeout: 5000 // 5초로 단축 (경량화된 체크)
-        })
-        
-        // 유효한 토큰이 있는지 확인 (has_valid_token 또는 connected)
-        const hasValidToken = response.data?.connected === true && 
-                             response.data?.token_status?.has_valid_token !== false &&
-                             !response.data?.is_expired
-        
-        // eBay User ID 가져오기
-        const userId = response.data?.ebay_user_id || response.data?.user_id || null
-        setEbayUserId(userId)
-        
-        console.log('eBay 토큰 상태 확인:', {
-          connected: response.data?.connected,
-          hasValidToken,
-          isExpired: response.data?.is_expired,
-          needsRefresh: response.data?.needs_refresh,
-          tokenStatus: response.data?.token_status,
-          ebayUserId: userId
-        })
-        
-        // eBay 스토어 연결 상태 업데이트
-        setStores(prev => prev.map(s => 
-          s.platform === 'eBay' ? { ...s, connected: hasValidToken } : s
-        ))
-        
-        if (selectedStore?.platform === 'eBay') {
-          setSelectedStore(prev => ({ ...prev, connected: hasValidToken }))
-        }
-        
-        // 부모 컴포넌트에 알림
-        if (onConnectionChange) {
-          onConnectionChange(hasValidToken)
-        }
-      } catch (err) {
-        console.error('eBay 토큰 상태 확인 실패:', err)
-        // 에러 시 연결 안 됨으로 처리
-        setStores(prev => prev.map(s => 
-          s.platform === 'eBay' ? { ...s, connected: false } : s
-        ))
-        if (selectedStore?.platform === 'eBay') {
-          setSelectedStore(prev => ({ ...prev, connected: false }))
-        }
-        setEbayUserId(null) // 에러 시 eBay User ID 초기화
-        if (onConnectionChange) {
-          onConnectionChange(false)
-        }
-      } finally {
-        setCheckingConnection(false)
-      }
+  // 🔥 eBay 토큰 상태 확인 함수 (수동 호출만 가능)
+  const checkEbayTokenStatus = async () => {
+    if (selectedStore?.platform !== 'eBay') {
+      setCheckingConnection(false)
+      return
     }
 
-    // 초기 로드 시 한 번만 확인
-    checkEbayTokenStatus()
-    
-    // 30초마다 토큰 상태 확인 (자동 갱신은 백그라운드 워커가 처리)
-    const interval = setInterval(checkEbayTokenStatus, 30000)
-    return () => clearInterval(interval)
-  }, [selectedStore?.platform, onConnectionChange])
+    try {
+      setCheckingConnection(true)
+      // 경량화된 토큰 상태 확인 (API 호출 없음)
+      const response = await axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
+        params: { user_id: CURRENT_USER_ID },
+        timeout: 5000 // 5초로 단축 (경량화된 체크)
+      })
+      
+      // 유효한 토큰이 있는지 확인 (has_valid_token 또는 connected)
+      const hasValidToken = response.data?.connected === true && 
+                           response.data?.token_status?.has_valid_token !== false &&
+                           !response.data?.is_expired
+      
+      // eBay User ID 가져오기
+      const userId = response.data?.ebay_user_id || response.data?.user_id || null
+      setEbayUserId(userId)
+      
+      console.log('eBay 토큰 상태 확인:', {
+        connected: response.data?.connected,
+        hasValidToken,
+        isExpired: response.data?.is_expired,
+        needsRefresh: response.data?.needs_refresh,
+        tokenStatus: response.data?.token_status,
+        ebayUserId: userId
+      })
+      
+      // eBay 스토어 연결 상태 업데이트
+      setStores(prev => prev.map(s => 
+        s.platform === 'eBay' ? { ...s, connected: hasValidToken } : s
+      ))
+      
+      if (selectedStore?.platform === 'eBay') {
+        setSelectedStore(prev => ({ ...prev, connected: hasValidToken }))
+      }
+      
+      // 부모 컴포넌트에 알림
+      if (onConnectionChange) {
+        onConnectionChange(hasValidToken)
+      }
+    } catch (err) {
+      console.error('eBay 토큰 상태 확인 실패:', err)
+      // 에러 시 연결 안 됨으로 처리
+      setStores(prev => prev.map(s => 
+        s.platform === 'eBay' ? { ...s, connected: false } : s
+      ))
+      if (selectedStore?.platform === 'eBay') {
+        setSelectedStore(prev => ({ ...prev, connected: false }))
+      }
+      setEbayUserId(null) // 에러 시 eBay User ID 초기화
+      if (onConnectionChange) {
+        onConnectionChange(false)
+      }
+    } finally {
+      setCheckingConnection(false)
+    }
+  }
 
   const getPlatformIcon = (platform) => {
     switch (platform) {
@@ -282,6 +273,15 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
             onClick={async (e) => {
               e.preventDefault()
               e.stopPropagation()
+              
+              // 🔥 연결 버튼 클릭 시에만 토큰 상태 확인
+              await checkEbayTokenStatus()
+              
+              // 이미 연결되어 있으면 OAuth 시작하지 않음
+              if (selectedStore?.connected) {
+                console.log('✅ 이미 eBay에 연결되어 있습니다')
+                return
+              }
               
               // 먼저 현재 토큰 상태 확인 (디버깅)
               try {
