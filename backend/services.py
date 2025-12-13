@@ -659,6 +659,9 @@ def analyze_zombie_listings(
     max_impressions = max(0, max_impressions)
     max_views = max(0, max_views)
     
+    # ✅ 날짜 필터: min_days 이상 등록된 것만 포함 (예: 7일 이상)
+    # 예: 오늘이 12월 13일이고 min_days=7이면, cutoff_date = 12월 6일
+    # date_listed < 12월 6일 = 12월 6일 이전에 등록된 것 = 7일 이상 등록된 것만 포함
     cutoff_date = date.today() - timedelta(days=min_days)
     
     # Build query with filters

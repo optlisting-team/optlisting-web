@@ -623,7 +623,8 @@ function Dashboard() {
               console.log('🔍 로컬 필터링 적용:', { minDays, maxSales, maxWatches, maxImpressions, maxViews })
               
               const filteredZombies = allListings.filter(item => {
-                // 등록 기간 필터: minDays 이상 등록된 것만 (예: 7일 이상)
+                // 등록 기간 필터: minDays 이상 등록된 것만 포함 (7일 미만은 제외)
+                // 예: minDays=7이면, days_listed >= 7인 것만 포함 (7일 미만은 제외)
                 if ((item.days_listed || 0) < minDays) return false
                 // 판매 필터: maxSales 이하인 것만 (예: 0건 이하)
                 if ((item.total_sales || item.quantity_sold || 0) > maxSales) return false
@@ -761,7 +762,8 @@ function Dashboard() {
         console.log(`📊 필터링 전: ${transformedListings.length}개 리스팅`)
         
         const filteredZombies = transformedListings.filter(item => {
-          // 등록 기간 필터: minDays 이상 등록된 것만 (예: 7일 이상)
+          // 등록 기간 필터: minDays 이상 등록된 것만 포함 (7일 미만은 제외)
+          // 예: minDays=7이면, days_listed >= 7인 것만 포함 (7일 미만은 제외)
           if ((item.days_listed || 0) < minDays) return false
           // 판매 필터: maxSales 이하인 것만 (예: 0건 이하)
           if ((item.total_sales || item.quantity_sold || 0) > maxSales) return false
