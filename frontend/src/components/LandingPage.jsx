@@ -161,6 +161,26 @@ function LandingPage() {
             <h2 className="text-xl md:text-2xl text-zinc-400 dark:text-zinc-400 font-normal mb-10 max-w-3xl mx-auto leading-relaxed font-sans">
               Instantly generate a CSV of Low-Performing Listings
             </h2>
+            
+            {/* 🔥 CTA Button - 로그인 상태에 따라 조건부 렌더링 */}
+            {isAuthenticated ? (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+              >
+                <Link
+                  to="/dashboard"
+                  className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold rounded-xl text-lg transition-all shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transform hover:scale-105"
+                >
+                  <LayoutDashboard className="w-5 h-5" />
+                  Go to Dashboard
+                </Link>
+              </motion.div>
+            ) : (
+              // 🔥 로그인하지 않은 경우 버튼 표시 안 함 (이전 요청에 따라 완전 제거)
+              null
+            )}
           </motion.div>
 
           {/* Dashboard Screenshot */}
