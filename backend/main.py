@@ -607,6 +607,11 @@ def analyze_zombies(
     # Use max_watches if provided, otherwise fall back to max_watch_count
     effective_watches = max_watches if max_watches > 0 else max_watch_count
     
+    # 🔍 디버깅: 필터 파라미터 로깅
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"🔍 Zombie 분석 필터 파라미터: min_days={effective_period}, max_sales={max_sales}, max_watches={effective_watches}, max_impressions={max_impressions}, max_views={max_views}, supplier_filter={supplier_filter}, platform_filter={marketplace}")
+    
     zombies, zombie_breakdown = analyze_zombie_listings(
         db,
         user_id=user_id,
@@ -622,6 +627,8 @@ def analyze_zombies(
         skip=skip,
         limit=limit
     )
+    
+    logger.info(f"✅ Zombie 분석 결과: {len(zombies)}개 좀비 발견 (전체 {total_count}개 중)")
     
     # Cache KPI metrics if this is a full page request
     if skip == 0 and limit >= 100 and not cached_kpi:
