@@ -653,8 +653,13 @@ def analyze_zombies(
                 "supplier_id": getattr(z, 'supplier_id', None),
                 "price": (z.metrics.get('price') if z.metrics and 'price' in z.metrics else None) or z.price,
                 "date_listed": z.date_listed.isoformat() if z.date_listed else None,
-                "sold_qty": (z.metrics.get('sales') if z.metrics and 'sales' in z.metrics else None) or z.sold_qty or 0,
-                "watch_count": (z.metrics.get('views') if z.metrics and 'views' in z.metrics else None) or z.watch_count or 0,
+                "sold_qty": (z.metrics.get('sales') if z.metrics and isinstance(z.metrics, dict) and 'sales' in z.metrics else None) or z.sold_qty or 0,
+                "quantity_sold": (z.metrics.get('sales') if z.metrics and isinstance(z.metrics, dict) and 'sales' in z.metrics else None) or z.sold_qty or 0,
+                "total_sales": (z.metrics.get('sales') if z.metrics and isinstance(z.metrics, dict) and 'sales' in z.metrics else None) or z.sold_qty or 0,
+                "watch_count": (z.metrics.get('watches') if z.metrics and isinstance(z.metrics, dict) and 'watches' in z.metrics else None) or z.watch_count or 0,
+                "view_count": (z.metrics.get('views') if z.metrics and isinstance(z.metrics, dict) and 'views' in z.metrics else None) or getattr(z, 'view_count', None) or 0,
+                "views": (z.metrics.get('views') if z.metrics and isinstance(z.metrics, dict) and 'views' in z.metrics else None) or getattr(z, 'view_count', None) or 0,
+                "impressions": (z.metrics.get('impressions') if z.metrics and isinstance(z.metrics, dict) and 'impressions' in z.metrics else None) or getattr(z, 'impressions', None) or 0,
                 "is_global_winner": bool(getattr(z, 'is_global_winner', 0)),  # Cross-Platform Health Check flag
                 "is_active_elsewhere": bool(getattr(z, 'is_active_elsewhere', 0)),  # Cross-Platform Activity Check flag
                 # Management hub information (for Shopify detection)
