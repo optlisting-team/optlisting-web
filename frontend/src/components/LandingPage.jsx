@@ -161,19 +161,6 @@ function LandingPage() {
             <h2 className="text-xl md:text-2xl text-zinc-400 dark:text-zinc-400 font-normal mb-10 max-w-3xl mx-auto leading-relaxed font-sans">
               Instantly generate a CSV of Low-Performing Listings
             </h2>
-            {isAuthenticated && (
-              <div className="flex flex-col items-center mt-8">
-                <motion.a
-                  href="/dashboard"
-                  whileHover={{ scale: 1.05, y: -4 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="px-12 py-5 bg-white dark:bg-white hover:bg-zinc-200 dark:hover:bg-zinc-200 text-black dark:text-black font-semibold text-lg rounded-xl shadow-lg transition-all hover:-translate-y-1 flex items-center gap-2 font-sans"
-                >
-                  Go to Dashboard
-                  <LayoutDashboard className="h-5 w-5" />
-                </motion.a>
-              </div>
-            )}
           </motion.div>
 
           {/* Dashboard Screenshot */}
