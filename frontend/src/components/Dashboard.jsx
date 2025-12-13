@@ -373,6 +373,16 @@ function Dashboard() {
         // 리스팅 데이터 변환 및 공급처 감지
         const transformedListings = allListingsFromEbay.map((item, index) => {
           const supplier = detectSupplier(item.title, item.sku)
+          
+          // 디버깅: supplier 감지 결과 확인
+          if (index < 3) { // 처음 3개만 로그
+            console.log(`🔍 Supplier detection for item ${index + 1}:`, {
+              title: item.title?.substring(0, 50),
+              sku: item.sku,
+              detected_supplier: supplier
+            })
+          }
+          
           const zombieScore = calculateZombieScore(item, filterParams)
           
           return {
