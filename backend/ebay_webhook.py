@@ -634,6 +634,57 @@ async def ebay_auth_callback(
         logger.info(f"   Expires in: {expires_in} seconds ({expires_in / 3600:.2f} hours)")
         logger.info(f"   Token expires at (UTC): {token_expires_at.isoformat()}")
         
+        # 🔥 eBay User ID 가져오기 (Trading API GetUser 사용)
+        ebay_user_id = None
+        try:
+            logger.info("🔍 Fetching eBay User ID from Trading API...")
+            env = EBAY_ENVIRONMENT if EBAY_ENVIRONMENT in EBAY_API_ENDPOINTS else "PRODUCTION"
+            trading_url = EBAY_API_ENDPOINTS[env]["trading"]
+            
+            # GetUser XML Request
+            get_user_xml = f"""<?xml version="1.0" encoding="utf-8"?>
+<GetUserRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+    <RequesterCredentials>
+        <eBayAuthToken>{access_token}</eBayAuthToken>
+    </RequesterCredentials>
+    <DetailLevel>ReturnAll</DetailLevel>
+</GetUserRequest>"""
+            
+            headers = {
+                "X-EBAY-API-SITEID": "0",  # US site
+                "X-EBAY-API-COMPATIBILITY-LEVEL": "1225",
+                "X-EBAY-API-CALL-NAME": "GetUser",
+                "X-EBAY-API-IAF-TOKEN": access_token,
+                "Content-Type": "text/xml"
+            }
+            
+            user_response = requests.post(trading_url, headers=headers, data=get_user_xml, timeout=30)
+            
+            if user_response.status_code == 200:
+                import xml.etree.ElementTree as ET
+                user_root = ET.fromstring(user_response.text)
+                user_ns = {"ebay": "urn:ebay:apis:eBLBaseComponents"}
+                
+                # 에러 체크
+                ack = user_root.find(".//ebay:Ack", user_ns)
+                if ack is not None and ack.text == "Success":
+                    # UserID 추출
+                    user_id_elem = user_root.find(".//ebay:User", user_ns)
+                    if user_id_elem is not None:
+                        ebay_user_id = user_id_elem.findtext("ebay:UserID", "", user_ns)
+                        logger.info(f"✅ eBay User ID retrieved: {ebay_user_id}")
+                    else:
+                        logger.warning("⚠️ User element not found in GetUser response")
+                else:
+                    errors = user_root.findall(".//ebay:Errors/ebay:ShortMessage", user_ns)
+                    error_msg = errors[0].text if errors else "Unknown error"
+                    logger.warning(f"⚠️ GetUser API error: {error_msg}")
+            else:
+                logger.warning(f"⚠️ GetUser API request failed: {user_response.status_code}")
+        except Exception as user_err:
+            logger.warning(f"⚠️ Failed to get eBay User ID: {user_err}")
+            # eBay User ID 가져오기 실패해도 계속 진행 (토큰 저장은 성공)
+        
         # DB에 토큰 저장
         from .models import Profile, get_db
         db = None
@@ -652,17 +703,20 @@ async def ebay_auth_callback(
                     ebay_access_token=access_token,
                     ebay_refresh_token=refresh_token,
                     ebay_token_expires_at=token_expires_at,
-                    ebay_token_updated_at=token_updated_at
+                    ebay_token_updated_at=token_updated_at,
+                    ebay_user_id=ebay_user_id  # eBay User ID 저장
                 )
                 db.add(profile)
-                logger.info(f"📝 Creating new profile for user: {user_id}")
+                logger.info(f"📝 Creating new profile for user: {user_id} (eBay User ID: {ebay_user_id})")
             else:
                 # 기존 프로필 업데이트
                 profile.ebay_access_token = access_token
                 profile.ebay_refresh_token = refresh_token
                 profile.ebay_token_expires_at = token_expires_at
                 profile.ebay_token_updated_at = token_updated_at
-                logger.info(f"📝 Updating existing profile for user: {user_id}")
+                if ebay_user_id:  # eBay User ID가 있으면 업데이트
+                    profile.ebay_user_id = ebay_user_id
+                logger.info(f"📝 Updating existing profile for user: {user_id} (eBay User ID: {ebay_user_id})")
             
             # 트랜잭션 커밋
             db.commit()
