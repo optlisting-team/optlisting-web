@@ -933,19 +933,26 @@ function Dashboard() {
       return
     }
     
-    // 🔥 연결됨: 제품 로드 (버튼 클릭으로 연결된 경우에만 실행)
+    // 🔥 연결됨: 제품 로드 및 자동 표시 (버튼 클릭으로 연결된 경우에만 실행)
     if (connected && !wasConnected) {
-      console.log('✅ eBay 연결됨 - 제품 로드 시작')
+      console.log('✅ eBay 연결됨 - 제품 로드 및 자동 표시 시작')
       if (DEMO_MODE) {
         setAllListings(DUMMY_ALL_LISTINGS)
         setTotalListings(DUMMY_ALL_LISTINGS.length)
         setViewMode('all')
         setShowFilter(true)
       } else {
+        // 🔥 뷰 모드를 먼저 'all'로 설정하여 제품 목록이 자동으로 표시되도록 함
         setViewMode('all')
         setShowFilter(true)
-        // Active 리스팅 자동 조회 (캐시 우선 사용)
-        fetchAllListings(false)
+        // Active 리스팅 자동 조회 (완료 후에도 뷰 모드 유지)
+        fetchAllListings(false).then(() => {
+          // 🔥 데이터 로드 완료 후에도 'all' 뷰 모드 유지 확인
+          console.log('✅ 제품 로드 완료 - Active 리스팅 자동 표시')
+          setViewMode('all')
+        }).catch((err) => {
+          console.error('제품 로드 실패:', err)
+        })
       }
     }
   }
