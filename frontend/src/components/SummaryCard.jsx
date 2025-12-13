@@ -22,6 +22,11 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
   const [checkingConnection, setCheckingConnection] = useState(true)
   const dropdownRef = useRef(null)
 
+  // Ensure dropdown is closed on mount
+  useEffect(() => {
+    setIsOpen(false)
+  }, [])
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
