@@ -1497,23 +1497,9 @@ function Dashboard() {
         }
       }, 3000) // 3초 대기 (DB 저장 시간 고려)
       
-      // 연결 상태 재확인 (SummaryCard가 자동으로 확인하지만, 강제로 한 번 더)
-      setTimeout(async () => {
-        try {
-          const statusResponse = await axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
-            params: { user_id: CURRENT_USER_ID },
-            timeout: 30000
-          })
-          if (statusResponse.data?.connected === true) {
-            console.log('✅ 연결 상태 확인 완료:', statusResponse.data)
-            setIsStoreConnected(true)
-          } else {
-            console.warn('⚠️ 연결 상태 확인 실패:', statusResponse.data)
-          }
-        } catch (err) {
-          console.error('❌ 연결 상태 확인 에러:', err)
-        }
-      }, 5000) // 5초 후 재확인
+      // 🔥 불필요한 연결 상태 재확인 제거
+      // 이미 setIsStoreConnected(true)로 연결 상태가 업데이트되었고,
+      // handleStoreConnection 콜백이 호출되어 추가 확인 불필요
       
     } else if (ebayError) {
       console.error('❌ OAuth 콜백 에러:', ebayError)
@@ -1548,32 +1534,38 @@ function Dashboard() {
     return () => window.removeEventListener('forceRefresh', handleForceRefresh)
   }, [isStoreConnected, viewMode, filters])
 
-  // Initial Load - Check API health and fetch data
+  // Initial Load - Check API health and fetch data (한 번만 실행)
   useEffect(() => {
     const initializeDashboard = async () => {
-      // Step 1: Check API Health
-      const isHealthy = await checkApiHealth()
-      
-      if (isHealthy) {
-        // Step 2: Fetch user credits
+      // Step 1: Check API Health (초기 로드 시 한 번만)
+      try {
+        const isHealthy = await checkApiHealth()
+        if (isHealthy) {
+          // Step 2: Fetch user credits
+          await fetchUserCredits()
+          
+          // Step 3: Fetch history only (listings require store connection)
+          fetchHistory().catch(err => {
+            console.error('History fetch error on mount:', err)
+          })
+        }
+      } catch (err) {
+        console.warn('API Health Check failed (non-critical):', err)
+        // Health check 실패해도 크레딧과 히스토리는 로드 시도
         await fetchUserCredits()
-        
-        // Step 3: Fetch history only (listings require store connection)
-    fetchHistory().catch(err => {
-      console.error('History fetch error on mount:', err)
-    })
-        
-        // Note: fetchAllListings() is called when store is connected via handleStoreConnection
-        // 캐시가 있으면 자동으로 사용됨
+        fetchHistory().catch(err => {
+          console.error('History fetch error on mount:', err)
+        })
       }
+      
+      // Note: fetchAllListings() is called when store is connected via handleStoreConnection
+      // 캐시가 있으면 자동으로 사용됨
     }
     
     initializeDashboard()
     
-    // Set up periodic health check every 30 seconds
-    const healthCheckInterval = setInterval(checkApiHealth, 30000)
-    
-    return () => clearInterval(healthCheckInterval)
+    // 🔥 주기적인 Health Check 제거 - 불필요한 API 호출 방지
+    // 토큰 갱신은 백그라운드 워커가 처리하므로 프론트엔드에서 주기적 확인 불필요
   }, [])
   
   // Fetch data when store is connected (handled by handleStoreConnection callback)
