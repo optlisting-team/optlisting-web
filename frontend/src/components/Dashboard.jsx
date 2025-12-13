@@ -931,8 +931,15 @@ function Dashboard() {
       if (DEMO_MODE) {
         setAllListings(DUMMY_ALL_LISTINGS)
         setTotalListings(DUMMY_ALL_LISTINGS.length)
+        // Active 카드 뷰로 전환 및 필터 활성화
+        setViewMode('all')
+        setShowFilter(true)
       } else {
-        fetchAllListings()
+        // Active 카드 뷰로 전환 및 필터 활성화
+        setViewMode('all')
+        setShowFilter(true)
+        // Active 리스팅 자동 조회
+        fetchAllListings(false)
       }
     } else if (!connected && wasConnected) {
       // 연결 해제됨: 제품 초기화
@@ -941,6 +948,8 @@ function Dashboard() {
       setTotalListings(0)
       setZombies([])
       setTotalZombies(0)
+      setViewMode('total')
+      setShowFilter(false)
     }
   }
 
