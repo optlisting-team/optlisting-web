@@ -823,8 +823,9 @@ def analyze_zombie_listings(
                 ),
                 cast(Listing.metrics['impressions'].astext, Integer)
             ),
-            # Fallback to direct impressions field
-            else_=func.coalesce(Listing.impressions, 0)
+            # Fallback: impressions 필드는 Listing 모델에 없으므로 0 사용
+            # metrics에 impressions가 없으면 필터링에서 제외하지 않음 (모든 항목 포함)
+            else_=0
         )
         query = query.filter(impressions_value < max_impressions)
     
