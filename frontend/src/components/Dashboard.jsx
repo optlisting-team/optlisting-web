@@ -1172,6 +1172,9 @@ function Dashboard() {
 
   const handleApplyFilter = async (newFilters) => {
     console.log('🔍 handleApplyFilter 호출됨 - Find Low-Performing SKUs 버튼 클릭')
+    console.log('📋 받은 필터:', newFilters)
+    console.log('📊 현재 상태:', { totalListings, allListingsLength: allListings.length })
+    
     setFilters(newFilters)
     setSelectedIds([]) // Reset selection when filters change
     
@@ -1184,6 +1187,8 @@ function Dashboard() {
         params: { user_id: CURRENT_USER_ID },
         timeout: 10000
       })
+      
+      console.log('💰 크레딧 응답:', creditsResponse.data)
       
       const availableCredits = creditsResponse.data?.available_credits || 0
       // 🔥 전체 스캔하는 제품 수만큼 크레딧 차감
@@ -1206,6 +1211,7 @@ function Dashboard() {
       console.log('✅ 크레딧 충분 - 확인 팝업 표시')
       const confirmMessage = `분석을 시작하시겠습니까?\n\n필요한 크레딧: ${requiredCredits} (전체 ${totalListings || allListings.length}개 리스팅 스캔)\n보유 크레딧: ${availableCredits}\n차감 후 잔액: ${availableCredits - requiredCredits}`
       
+      console.log('💬 확인 팝업 메시지:', confirmMessage)
       const userConfirmed = confirm(confirmMessage)
       console.log(`👤 사용자 확인: ${userConfirmed}`)
       
@@ -1218,9 +1224,17 @@ function Dashboard() {
       }
     } catch (err) {
       console.error('❌ 크레딧 확인 실패:', err)
-      // 크레딧 확인 실패 시에도 진행 (백엔드에서 처리)
-      if (confirm('크레딧 확인에 실패했습니다. 계속 진행하시겠습니까?')) {
+      console.error('❌ 에러 상세:', err.response?.data || err.message)
+      
+      // 크레딧 확인 실패 시에도 확인 팝업 표시
+      const errorMessage = err.response?.data?.detail || err.message || '알 수 없는 오류'
+      const userMessage = `크레딧 확인에 실패했습니다.\n\n에러: ${errorMessage}\n\n계속 진행하시겠습니까? (백엔드에서 크레딧 차감이 시도됩니다)`
+      
+      if (confirm(userMessage)) {
+        console.log('🚀 사용자 확인 - 에러 발생했지만 계속 진행')
         fetchZombies(newFilters, true)
+      } else {
+        console.log('❌ 사용자 취소 - 에러 발생으로 중단')
       }
     }
   }

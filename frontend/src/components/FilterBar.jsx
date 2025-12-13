@@ -63,6 +63,7 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    console.log('🔍 FilterBar handleSubmit 호출됨 - Find Low-Performing SKUs 버튼 클릭')
     
     // Ensure values are non-negative
     const safeAnalysisPeriod = Math.max(1, parseInt(analysisPeriod) || 7)
@@ -71,7 +72,7 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
     const safeMaxImpressions = Math.max(0, parseInt(maxImpressions) || 100)
     const safeMaxViews = Math.max(0, parseInt(maxViews) || 10)
     
-    onApplyFilter({
+    const filterParams = {
       analytics_period_days: safeAnalysisPeriod,
       min_days: safeAnalysisPeriod, // Legacy compatibility
       max_sales: safeMaxSales,
@@ -82,7 +83,16 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
       marketplace_filter: marketplaceFilter,
       source_filter: sourceFilter,
       supplier_filter: sourceFilter // Legacy compatibility
-    })
+    }
+    
+    console.log('📋 필터 파라미터:', filterParams)
+    console.log('🔄 onApplyFilter 호출 중...')
+    
+    if (onApplyFilter) {
+      onApplyFilter(filterParams)
+    } else {
+      console.error('❌ onApplyFilter가 정의되지 않음!')
+    }
   }
 
   const handleReset = () => {
