@@ -905,8 +905,14 @@ function Dashboard() {
   // Handle store connection change
   const handleStoreConnection = (connected) => {
     const wasConnected = isStoreConnected
-    setIsStoreConnected(connected)
     
+    // 🔥 상태가 동일하면 아무것도 하지 않음 (불필요한 재실행 방지)
+    if (connected === wasConnected) {
+      console.log('⏭️ eBay 연결 상태 변경 없음 - 스킵:', { wasConnected, connected })
+      return
+    }
+    
+    setIsStoreConnected(connected)
     console.log('🔄 eBay 연결 상태 변경:', { wasConnected, connected })
     
     // 🔥 연결 해제 시 캐시 초기화
@@ -919,37 +925,28 @@ function Dashboard() {
         setTotalListings(0)
         setZombies([])
         setTotalZombies(0)
+        setViewMode('total')
+        setShowFilter(false)
       } catch (err) {
         console.warn('캐시 초기화 실패:', err)
       }
       return
     }
     
+    // 🔥 연결됨: 제품 로드 (버튼 클릭으로 연결된 경우에만 실행)
     if (connected && !wasConnected) {
-      // 🔥 연결됨: 제품 로드 (강제 새로고침) - 버튼 클릭으로 연결된 경우에만 실행
-      console.log('✅ eBay 연결됨 - 제품 로드 시작 (강제 새로고침)')
+      console.log('✅ eBay 연결됨 - 제품 로드 시작')
       if (DEMO_MODE) {
         setAllListings(DUMMY_ALL_LISTINGS)
         setTotalListings(DUMMY_ALL_LISTINGS.length)
-        // Active 카드 뷰로 전환 및 필터 활성화
         setViewMode('all')
         setShowFilter(true)
       } else {
-        // Active 카드 뷰로 전환 및 필터 활성화
         setViewMode('all')
         setShowFilter(true)
-        // Active 리스팅 자동 조회
+        // Active 리스팅 자동 조회 (캐시 우선 사용)
         fetchAllListings(false)
       }
-    } else if (!connected && wasConnected) {
-      // 연결 해제됨: 제품 초기화
-      console.log('❌ eBay 연결 해제됨 - 제품 초기화')
-      setAllListings([])
-      setTotalListings(0)
-      setZombies([])
-      setTotalZombies(0)
-      setViewMode('total')
-      setShowFilter(false)
     }
   }
 

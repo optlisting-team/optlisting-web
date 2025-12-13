@@ -48,13 +48,13 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
 
     try {
       setCheckingConnection(true)
-      // 경량화된 토큰 상태 확인 (API 호출 없음)
+      // 경량화된 토큰 상태 확인
       const response = await axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
         params: { user_id: CURRENT_USER_ID },
-        timeout: 5000 // 5초로 단축 (경량화된 체크)
+        timeout: 5000
       })
       
-      // 유효한 토큰이 있는지 확인 (has_valid_token 또는 connected)
+      // 유효한 토큰이 있는지 확인
       const hasValidToken = response.data?.connected === true && 
                            response.data?.token_status?.has_valid_token !== false &&
                            !response.data?.is_expired
@@ -63,13 +63,23 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
       const userId = response.data?.ebay_user_id || response.data?.user_id || null
       setEbayUserId(userId)
       
+      // 🔥 현재 상태와 동일하면 콜백 호출하지 않음 (불필요한 재실행 방지)
+      const currentConnected = selectedStore?.connected || false
+      if (hasValidToken === currentConnected) {
+        console.log('✅ eBay 연결 상태 변경 없음 - 콜백 호출 스킵')
+        setCheckingConnection(false)
+        return
+      }
+      
       console.log('eBay 토큰 상태 확인:', {
         connected: response.data?.connected,
         hasValidToken,
         isExpired: response.data?.is_expired,
         needsRefresh: response.data?.needs_refresh,
         tokenStatus: response.data?.token_status,
-        ebayUserId: userId
+        ebayUserId: userId,
+        previousState: currentConnected,
+        newState: hasValidToken
       })
       
       // eBay 스토어 연결 상태 업데이트
@@ -81,20 +91,30 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
         setSelectedStore(prev => ({ ...prev, connected: hasValidToken }))
       }
       
-      // 부모 컴포넌트에 알림
+      // 🔥 상태가 변경되었을 때만 부모 컴포넌트에 알림
       if (onConnectionChange) {
         onConnectionChange(hasValidToken)
       }
     } catch (err) {
       console.error('eBay 토큰 상태 확인 실패:', err)
-      // 에러 시 연결 안 됨으로 처리
+      
+      // 🔥 현재 상태가 이미 false면 콜백 호출하지 않음
+      const currentConnected = selectedStore?.connected || false
+      if (!currentConnected) {
+        setCheckingConnection(false)
+        return
+      }
+      
+      // 에러 시 연결 안 됨으로 처리 (상태가 변경된 경우에만)
       setStores(prev => prev.map(s => 
         s.platform === 'eBay' ? { ...s, connected: false } : s
       ))
       if (selectedStore?.platform === 'eBay') {
         setSelectedStore(prev => ({ ...prev, connected: false }))
       }
-      setEbayUserId(null) // 에러 시 eBay User ID 초기화
+      setEbayUserId(null)
+      
+      // 🔥 상태가 변경되었을 때만 부모 컴포넌트에 알림
       if (onConnectionChange) {
         onConnectionChange(false)
       }
@@ -274,7 +294,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
               e.preventDefault()
               e.stopPropagation()
               
-              // 🔥 연결 버튼 클릭 시에만 토큰 상태 확인
+              // 🔥 연결 버튼 클릭 시 토큰 상태 확인
               await checkEbayTokenStatus()
               
               // 이미 연결되어 있으면 OAuth 시작하지 않음
@@ -283,20 +303,9 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
                 return
               }
               
-              // 먼저 현재 토큰 상태 확인 (디버깅)
-              try {
-                const debugResponse = await axios.get(`${API_BASE_URL}/api/ebay/debug/tokens`, {
-                  params: { user_id: CURRENT_USER_ID },
-                  timeout: 10000
-                })
-                console.log('🔍 현재 토큰 상태:', debugResponse.data)
-              } catch (err) {
-                console.error('토큰 상태 확인 실패:', err)
-              }
-              
-              // OAuth 시작
+              // OAuth 시작 (디버깅 로그 제거하여 깔끔하게)
               const oauthUrl = `${API_BASE_URL}/api/ebay/auth/start?user_id=${CURRENT_USER_ID}`
-              console.log('🔗 Connect 버튼 클릭 - 리다이렉트 시작:', oauthUrl)
+              console.log('🔗 Connect 버튼 클릭 - OAuth 시작')
               window.location.href = oauthUrl
             }}
             className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold rounded-lg transition-all flex items-center gap-2 text-base shadow-lg hover:shadow-emerald-500/40 transform hover:scale-105 active:scale-95 cursor-pointer border-2 border-emerald-500/50"
