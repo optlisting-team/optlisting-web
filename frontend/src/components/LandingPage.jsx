@@ -68,27 +68,26 @@ function LandingPage() {
           <div className="flex items-center space-x-6">
             <a href="#features" className="text-zinc-300 dark:text-zinc-300 hover:text-white dark:hover:text-white font-medium transition-colors">Features</a>
             <a href="#pricing" className="text-zinc-300 dark:text-zinc-300 hover:text-white dark:hover:text-white font-medium transition-colors">Pricing</a>
-            {isAuthenticated && (
-              <Link to="/dashboard" className="text-zinc-300 dark:text-zinc-300 hover:text-white dark:hover:text-white font-medium transition-colors">Dashboard</Link>
-            )}
             {isAuthenticated ? (
-              <div className="relative" ref={profileRef}>
-                <button 
-                  onClick={() => setIsProfileOpen(!isProfileOpen)}
-                  className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg transition-all"
-                >
-                  {user?.user_metadata?.avatar_url ? (
-                    <img src={user.user_metadata.avatar_url} alt="" className="w-7 h-7 rounded-full" />
-                  ) : (
-                    <div className="w-7 h-7 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
-                      <User className="w-4 h-4 text-white" />
-                    </div>
-                  )}
-                  <span className="text-white font-medium text-sm">
-                    {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
-                  </span>
-                  <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`} />
-                </button>
+              <>
+                <Link to="/dashboard" className="text-zinc-300 dark:text-zinc-300 hover:text-white dark:hover:text-white font-medium transition-colors">Dashboard</Link>
+                <div className="relative" ref={profileRef}>
+                  <button 
+                    onClick={() => setIsProfileOpen(!isProfileOpen)}
+                    className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg transition-all"
+                  >
+                    {user?.user_metadata?.avatar_url ? (
+                      <img src={user.user_metadata.avatar_url} alt="" className="w-7 h-7 rounded-full" />
+                    ) : (
+                      <div className="w-7 h-7 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
+                        <User className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                    <span className="text-white font-medium text-sm">
+                      {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`} />
+                  </button>
 
                 {/* Profile Dropdown */}
                 {isProfileOpen && (
@@ -127,7 +126,7 @@ function LandingPage() {
                 )}
               </div>
             ) : (
-              <Link to="/login" className="px-5 py-2 bg-white dark:bg-white hover:bg-zinc-200 dark:hover:bg-zinc-200 text-black dark:text-black font-semibold rounded-lg transition-all shadow-md">
+              <Link to="/login" className="text-zinc-300 dark:text-zinc-300 hover:text-white dark:hover:text-white font-medium transition-colors">
                 Sign In
               </Link>
             )}
