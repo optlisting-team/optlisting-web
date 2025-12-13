@@ -800,33 +800,33 @@ def analyze_zombie_listings(
         query = query.filter(watches_value <= effective_max_watches)
     
     # 4. Impressions/노출 필터: metrics['impressions'] or metrics['impressions']['total_impressions']
-    # ✅ FIX: metrics가 없을 때 직접 필드(impressions)를 fallback으로 사용
+    # ✅ FIX: metrics에 impressions가 없으면 필터를 적용하지 않음 (모든 항목 포함)
     if max_impressions is not None and max_impressions > 0:
-        impressions_value = case(
-            # Try nested structure first
-            (
-                and_(
-                    Listing.metrics.isnot(None),
-                    Listing.metrics.has_key('impressions'),
-                    func.jsonb_typeof(Listing.metrics['impressions']) == 'object',
-                    Listing.metrics['impressions'].has_key('total_impressions')
-                ),
-                cast(Listing.metrics['impressions']['total_impressions'].astext, Integer)
+        # metrics에 impressions가 있는 항목만 필터링
+        impressions_filter = or_(
+            # Nested structure: metrics['impressions']['total_impressions']
+            and_(
+                Listing.metrics.isnot(None),
+                Listing.metrics.has_key('impressions'),
+                func.jsonb_typeof(Listing.metrics['impressions']) == 'object',
+                Listing.metrics['impressions'].has_key('total_impressions'),
+                cast(Listing.metrics['impressions']['total_impressions'].astext, Integer) < max_impressions
             ),
-            # Then try flat structure
-            (
-                and_(
-                    Listing.metrics.isnot(None),
-                    Listing.metrics.has_key('impressions'),
-                    func.jsonb_typeof(Listing.metrics['impressions']).in_(['number', 'string']),
-                    Listing.metrics['impressions'].astext.isnot(None)
-                ),
-                cast(Listing.metrics['impressions'].astext, Integer)
+            # Flat structure: metrics['impressions']
+            and_(
+                Listing.metrics.isnot(None),
+                Listing.metrics.has_key('impressions'),
+                func.jsonb_typeof(Listing.metrics['impressions']).in_(['number', 'string']),
+                Listing.metrics['impressions'].astext.isnot(None),
+                cast(Listing.metrics['impressions'].astext, Integer) < max_impressions
             ),
-            # Fallback: impressions 필드가 Listing 모델에 있으면 사용, 없으면 0 사용
-            else_=func.coalesce(getattr(Listing, 'impressions', None), 0) if hasattr(Listing, 'impressions') else 0
+            # metrics에 impressions가 없으면 필터를 통과 (모든 항목 포함)
+            or_(
+                Listing.metrics == None,
+                ~Listing.metrics.has_key('impressions')
+            )
         )
-        query = query.filter(impressions_value < max_impressions)
+        query = query.filter(impressions_filter)
     
     # 5. Views/조회 필터: metrics['views'] or metrics['views']['total_views']
     # ✅ FIX: metrics가 없을 때 직접 필드(view_count, views)를 fallback으로 사용
