@@ -736,76 +736,120 @@ async def ebay_auth_callback(
         return RedirectResponse(url=error_redirect, status_code=302)
 
 
+def check_token_status(user_id: str, db: Session = None) -> Dict[str, Any]:
+    """
+    🔍 경량화된 토큰 상태 확인 함수
+    
+    DB에서 토큰 존재 여부와 만료 상태만 확인 (API 호출 없음)
+    자동 갱신은 백그라운드 워커가 처리
+    
+    Returns:
+        {
+            "has_valid_token": bool,  # 유효한 토큰이 있는지
+            "is_expired": bool,        # 토큰이 만료되었는지
+            "has_refresh_token": bool,  # Refresh token이 있는지
+            "expires_at": str,          # 만료 시간 (ISO format)
+            "needs_refresh": bool       # 갱신이 필요한지 (1시간 이내 만료)
+        }
+    """
+    close_db = False
+    if db is None:
+        from .models import get_db, Profile
+        db = next(get_db())
+        close_db = True
+    
+    try:
+        from .models import Profile
+        
+        profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+        
+        if not profile or not profile.ebay_access_token:
+            return {
+                "has_valid_token": False,
+                "is_expired": True,
+                "has_refresh_token": False,
+                "expires_at": None,
+                "needs_refresh": False
+            }
+        
+        # 토큰 만료 확인
+        is_expired = False
+        needs_refresh = False
+        expires_at = None
+        
+        if profile.ebay_token_expires_at:
+            expires_at = profile.ebay_token_expires_at.isoformat()
+            now = datetime.utcnow()
+            is_expired = profile.ebay_token_expires_at < now
+            # 만료 1시간 전부터 갱신 필요로 표시
+            refresh_threshold = profile.ebay_token_expires_at - timedelta(hours=1)
+            needs_refresh = now >= refresh_threshold
+        
+        return {
+            "has_valid_token": True,
+            "is_expired": is_expired,
+            "has_refresh_token": bool(profile.ebay_refresh_token),
+            "expires_at": expires_at,
+            "needs_refresh": needs_refresh
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Token status check error for user {user_id}: {e}")
+        return {
+            "has_valid_token": False,
+            "is_expired": True,
+            "has_refresh_token": False,
+            "expires_at": None,
+            "needs_refresh": False
+        }
+    finally:
+        if close_db and db:
+            db.close()
+
+
 @router.get("/auth/status")
 async def ebay_auth_status(
     user_id: str = Query(..., description="User ID to check")
 ):
     """
-    📊 eBay 연결 상태 확인
+    📊 eBay 연결 상태 확인 (경량화된 버전)
     
-    사용자의 eBay 연결 상태 및 토큰 유효성 확인
+    DB에서 토큰 상태만 확인 (API 호출 없음)
+    자동 갱신은 백그라운드 워커가 처리
     """
-    logger.info(f"📊 Checking eBay auth status for user: {user_id}")
+    logger.info(f"📊 Checking eBay token status for user: {user_id}")
     
     try:
         from .models import get_db, Profile
         
         db = next(get_db())
         
-        # 모든 프로필 조회 (디버깅용)
-        all_profiles = db.query(Profile).all()
-        logger.info(f"🔍 Total profiles in DB: {len(all_profiles)}")
-        for p in all_profiles:
-            logger.info(f"   - Profile user_id: {p.user_id}, has_token: {bool(p.ebay_access_token)}")
+        # 경량화된 토큰 상태 확인
+        token_status = check_token_status(user_id, db)
         
+        # 프로필 정보 추가 조회 (UI 표시용)
         profile = db.query(Profile).filter(Profile.user_id == user_id).first()
         
-        if not profile:
-            logger.warning(f"⚠️ No profile found for user_id: {user_id}")
+        if not profile or not token_status["has_valid_token"]:
+            logger.info(f"⚠️ No valid token for user: {user_id}")
             return {
                 "connected": False,
-                "message": "No profile found",
-                "debug": {
-                    "user_id": user_id,
-                    "total_profiles": len(all_profiles),
-                    "profile_user_ids": [p.user_id for p in all_profiles]
-                }
+                "user_id": user_id,
+                "message": "No valid eBay token found",
+                "token_status": token_status
             }
         
-        logger.info(f"✅ Profile found for user: {user_id}")
-        logger.info(f"   - Has access token: {bool(profile.ebay_access_token)}")
-        logger.info(f"   - Has refresh token: {bool(profile.ebay_refresh_token)}")
-        logger.info(f"   - Token expires at: {profile.ebay_token_expires_at}")
-        logger.info(f"   - Token updated at: {profile.ebay_token_updated_at}")
-        
-        if not profile.ebay_access_token:
-            logger.warning(f"⚠️ Profile exists but no access token for user: {user_id}")
-            return {
-                "connected": False,
-                "message": "No eBay token found",
-                "debug": {
-                    "user_id": user_id,
-                    "profile_exists": True,
-                    "has_refresh_token": bool(profile.ebay_refresh_token),
-                    "token_updated_at": profile.ebay_token_updated_at.isoformat() if profile.ebay_token_updated_at else None
-                }
-            }
-        
-        # 토큰 만료 확인
-        is_expired = False
-        if profile.ebay_token_expires_at:
-            is_expired = profile.ebay_token_expires_at < datetime.utcnow()
-            logger.info(f"   - Token expired: {is_expired}")
-        
-        logger.info(f"✅ eBay connected for user: {user_id}")
+        logger.info(f"✅ Valid token found for user: {user_id} (expired: {token_status['is_expired']}, needs_refresh: {token_status['needs_refresh']})")
         return {
             "connected": True,
             "user_id": user_id,
             "ebay_user_id": profile.ebay_user_id,
-            "token_expires_at": profile.ebay_token_expires_at.isoformat() if profile.ebay_token_expires_at else None,
-            "is_expired": is_expired,
-            "has_refresh_token": bool(profile.ebay_refresh_token),
-            "last_updated": profile.ebay_token_updated_at.isoformat() if profile.ebay_token_updated_at else None
+            "token_expires_at": token_status["expires_at"],
+            "is_expired": token_status["is_expired"],
+            "has_refresh_token": token_status["has_refresh_token"],
+            "needs_refresh": token_status["needs_refresh"],
+            "last_updated": profile.ebay_token_updated_at.isoformat() if profile.ebay_token_updated_at else None,
+            "token_status": token_status
         }
         
     except Exception as e:
@@ -814,7 +858,14 @@ async def ebay_auth_status(
         logger.error(traceback.format_exc())
         return {
             "connected": False,
-            "error": str(e)
+            "error": str(e),
+            "token_status": {
+                "has_valid_token": False,
+                "is_expired": True,
+                "has_refresh_token": False,
+                "expires_at": None,
+                "needs_refresh": False
+            }
         }
 
 

@@ -247,12 +247,12 @@ def refresh_ebay_token(refresh_token: str) -> Dict[str, Any]:
 def get_profiles_needing_refresh(session) -> list:
     """
     갱신이 필요한 프로필 조회
-    - 만료 30분 전 또는 이미 만료된 토큰
+    - 만료 1시간 전 또는 이미 만료된 토큰
     - refresh_token이 있는 프로필만
     """
     
-    # 30분 후 시간 계산
-    threshold_time = datetime.utcnow() + timedelta(minutes=30)
+    # 1시간 후 시간 계산 (만료 1시간 전부터 갱신)
+    threshold_time = datetime.utcnow() + timedelta(hours=1)
     
     query = text("""
         SELECT 
