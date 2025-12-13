@@ -215,8 +215,11 @@ function Dashboard() {
   // 공급처 자동 감지 함수
   // 우선순위: 자동화 툴 > 공급처
   const detectSupplier = (title, sku = '') => {
+    if (!title && !sku) return 'Unknown'
+    
     const text = `${title} ${sku}`.toLowerCase()
     const skuUpper = sku.toUpperCase()
+    const titleLower = (title || '').toLowerCase()
     
     // ============================================
     // 자동화 툴 감지 (우선순위 높음)
@@ -256,29 +259,63 @@ function Dashboard() {
     }
     
     // ============================================
-    // 공급처 감지
+    // 공급처 감지 (SKU 패턴 우선, 그 다음 제목)
     // ============================================
     
-    if (text.includes('aliexpress') || text.includes('ali-') || /^ae\d/i.test(sku)) {
-      return 'AliExpress'
-    }
-    if (text.includes('amazon') || text.includes('amz-') || /^b0[a-z0-9]{8}/i.test(sku)) {
+    // Amazon 감지 (B0으로 시작하는 ASIN 패턴)
+    if (/^b0[a-z0-9]{8}/i.test(sku) || text.includes('amazon') || text.includes('amz-')) {
       return 'Amazon'
     }
-    if (text.includes('walmart') || text.includes('wmt-')) {
+    
+    // AliExpress 감지
+    if (/^ae\d/i.test(sku) || text.includes('aliexpress') || text.includes('ali-') || text.includes('alibaba')) {
+      return 'AliExpress'
+    }
+    
+    // Walmart 감지
+    if (skuUpper.startsWith('WM') || skuUpper.startsWith('WMT') || text.includes('walmart') || text.includes('wmt-')) {
       return 'Walmart'
     }
-    if (text.includes('home depot') || text.includes('homedepot') || text.includes('hd-')) {
+    
+    // Home Depot 감지
+    if (skuUpper.startsWith('HD') || text.includes('home depot') || text.includes('homedepot') || text.includes('hd-')) {
       return 'Home Depot'
     }
-    if (text.includes('cj drop') || text.includes('cjdrop') || /^cj\d/i.test(sku)) {
+    
+    // CJ Dropshipping 감지
+    if (/^cj\d/i.test(sku) || text.includes('cj drop') || text.includes('cjdrop') || text.includes('cjdropshipping')) {
       return 'CJ Dropshipping'
     }
-    if (text.includes('costway')) {
+    
+    // Costway 감지
+    if (skuUpper.startsWith('CW') || text.includes('costway')) {
       return 'Costway'
     }
-    if (text.includes('banggood') || text.includes('bg-')) {
+    
+    // Banggood 감지
+    if (skuUpper.startsWith('BG') || text.includes('banggood') || text.includes('bg-')) {
       return 'Banggood'
+    }
+    
+    // Doba 감지
+    if (skuUpper.startsWith('DOBA') || text.includes('doba')) {
+      return 'Doba'
+    }
+    
+    // DSers 감지
+    if (skuUpper.startsWith('DSERS') || text.includes('dsers')) {
+      return 'DSers'
+    }
+    
+    // Spocket 감지
+    if (skuUpper.startsWith('SPK') || text.includes('spocket')) {
+      return 'Spocket'
+    }
+    
+    // 일반적인 패턴: D로 시작하는 SKU (예: D0102HEVLYJ-KS Z1 BPNK)
+    // 이런 경우는 "Unverified"로 분류
+    if (skuUpper.startsWith('D') && /^D\d/.test(skuUpper)) {
+      return 'Unverified'
     }
     
     return 'Unknown'
