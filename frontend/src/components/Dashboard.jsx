@@ -212,14 +212,18 @@ function Dashboard() {
     }
   }
 
-  // 공급처 자동 감지 함수
+  // 공급처 자동 감지 함수 (supplier_name과 supplier_id 모두 반환)
   // 우선순위: 자동화 툴 > 공급처
-  const detectSupplier = (title, sku = '') => {
-    if (!title && !sku) return 'Unknown'
+  const extractSupplierInfo = (title, sku = '', imageUrl = '') => {
+    if (!title && !sku) return { supplier_name: 'Unknown', supplier_id: null }
     
     const text = `${title} ${sku}`.toLowerCase()
     const skuUpper = sku.toUpperCase()
     const titleLower = (title || '').toLowerCase()
+    const imageUrlLower = (imageUrl || '').toLowerCase()
+    
+    // SKU를 하이픈(-) 또는 언더스코어(_)로 분리하여 분석
+    const skuParts = skuUpper.split(/[-_]/)
     
     // ============================================
     // 자동화 툴 감지 (우선순위 높음)
@@ -231,9 +235,17 @@ function Dashboard() {
       skuUpper.startsWith('ADS') ||
       skuUpper.startsWith('AD-') ||
       skuUpper.includes('AUTODS') ||
-      text.includes('autods')
+      text.includes('autods') ||
+      imageUrlLower.includes('autods')
     ) {
-      return 'AutoDS'
+      // AutoDS ID 추출 (예: "AUTODS-B08ABC1234" → "B08ABC1234")
+      let supplierId = null
+      if (skuUpper.startsWith('AUTODS')) {
+        supplierId = skuUpper.replace('AUTODS', '').replace(/^[-_]/, '').trim() || null
+      } else if (skuUpper.startsWith('ADS')) {
+        supplierId = skuUpper.replace('ADS', '').replace(/^[-_]/, '').trim() || null
+      }
+      return { supplier_name: 'AutoDS', supplier_id: supplierId }
     }
     
     // Yaballe 감지
@@ -242,9 +254,18 @@ function Dashboard() {
       skuUpper.startsWith('YAB-') ||
       skuUpper.startsWith('YB-') ||
       skuUpper.includes('YABALLE') ||
-      text.includes('yaballe')
+      text.includes('yaballe') ||
+      imageUrlLower.includes('yaballe')
     ) {
-      return 'Yaballe'
+      let supplierId = null
+      if (skuUpper.startsWith('YABALLE')) {
+        supplierId = skuUpper.replace('YABALLE', '').replace(/^[-_]/, '').trim() || null
+      } else if (skuUpper.startsWith('YAB')) {
+        supplierId = skuUpper.replace('YAB', '').replace(/^[-_]/, '').trim() || null
+      } else if (skuUpper.startsWith('YB')) {
+        supplierId = skuUpper.replace('YB', '').replace(/^[-_]/, '').trim() || null
+      }
+      return { supplier_name: 'Yaballe', supplier_id: supplierId }
     }
     
     // Wholesale2B 감지
@@ -253,72 +274,114 @@ function Dashboard() {
       skuUpper.startsWith('WHOLESALE2B') ||
       skuUpper.includes('W2B') ||
       skuUpper.includes('WHOLESALE2B') ||
-      text.includes('wholesale2b')
+      text.includes('wholesale2b') ||
+      imageUrlLower.includes('wholesale2b')
     ) {
-      return 'Wholesale2B'
+      const supplierId = skuUpper.startsWith('W2B') 
+        ? skuUpper.replace('W2B', '').replace(/^[-_]/, '').trim() || null
+        : null
+      return { supplier_name: 'Wholesale2B', supplier_id: supplierId }
     }
     
     // ============================================
-    // 공급처 감지 (SKU 패턴 우선, 그 다음 제목)
+    // 공급처 감지 (SKU 패턴 우선, 그 다음 제목/이미지)
     // ============================================
     
     // Amazon 감지 (B0으로 시작하는 ASIN 패턴)
-    if (/^b0[a-z0-9]{8}/i.test(sku) || text.includes('amazon') || text.includes('amz-')) {
-      return 'Amazon'
+    const amazonAsinPattern = /B0[0-9A-Z]{8}/i
+    if (amazonAsinPattern.test(sku) || text.includes('amazon') || text.includes('amz-') || 
+        imageUrlLower.includes('amazon') || imageUrlLower.includes('ssl-images-amazon')) {
+      // ASIN 추출
+      const asinMatch = sku.match(amazonAsinPattern)
+      const supplierId = asinMatch ? asinMatch[0] : (skuUpper.startsWith('AMZ') ? skuUpper.replace('AMZ', '').replace(/^[-_]/, '').trim() || null : null)
+      return { supplier_name: 'Amazon', supplier_id: supplierId }
     }
     
     // AliExpress 감지
-    if (/^ae\d/i.test(sku) || text.includes('aliexpress') || text.includes('ali-') || text.includes('alibaba')) {
-      return 'AliExpress'
+    if (/^ae\d/i.test(sku) || text.includes('aliexpress') || text.includes('ali-') || text.includes('alibaba') ||
+        imageUrlLower.includes('alicdn') || imageUrlLower.includes('aliexpress')) {
+      const supplierId = /^ae(\d+)/i.test(sku) ? sku.match(/^ae(\d+)/i)[1] : (skuUpper.startsWith('AE') ? skuUpper.replace('AE', '').replace(/^[-_]/, '').trim() || null : null)
+      return { supplier_name: 'AliExpress', supplier_id: supplierId }
     }
     
     // Walmart 감지
-    if (skuUpper.startsWith('WM') || skuUpper.startsWith('WMT') || text.includes('walmart') || text.includes('wmt-')) {
-      return 'Walmart'
+    if (skuUpper.startsWith('WM') || skuUpper.startsWith('WMT') || text.includes('walmart') || text.includes('wmt-') ||
+        imageUrlLower.includes('walmartimages') || imageUrlLower.includes('walmart.com')) {
+      const supplierId = (skuUpper.startsWith('WM') || skuUpper.startsWith('WMT'))
+        ? skuUpper.replace(/^(WM|WMT)/, '').replace(/^[-_]/, '').trim() || null
+        : null
+      return { supplier_name: 'Walmart', supplier_id: supplierId }
     }
     
     // Home Depot 감지
-    if (skuUpper.startsWith('HD') || text.includes('home depot') || text.includes('homedepot') || text.includes('hd-')) {
-      return 'Home Depot'
+    if (skuUpper.startsWith('HD') || text.includes('home depot') || text.includes('homedepot') || text.includes('hd-') ||
+        imageUrlLower.includes('homedepot')) {
+      const supplierId = skuUpper.startsWith('HD') 
+        ? skuUpper.replace('HD', '').replace(/^[-_]/, '').trim() || null
+        : null
+      return { supplier_name: 'Home Depot', supplier_id: supplierId }
     }
     
     // CJ Dropshipping 감지
-    if (/^cj\d/i.test(sku) || text.includes('cj drop') || text.includes('cjdrop') || text.includes('cjdropshipping')) {
-      return 'CJ Dropshipping'
+    if (/^cj\d/i.test(sku) || text.includes('cj drop') || text.includes('cjdrop') || text.includes('cjdropshipping') ||
+        imageUrlLower.includes('cjdropshipping')) {
+      const supplierId = /^cj(\d+)/i.test(sku) ? sku.match(/^cj(\d+)/i)[1] : (skuUpper.startsWith('CJ') ? skuUpper.replace('CJ', '').replace(/^[-_]/, '').trim() || null : null)
+      return { supplier_name: 'CJ Dropshipping', supplier_id: supplierId }
     }
     
     // Costway 감지
-    if (skuUpper.startsWith('CW') || text.includes('costway')) {
-      return 'Costway'
+    if (skuUpper.startsWith('CW') || text.includes('costway') || imageUrlLower.includes('costway')) {
+      const supplierId = skuUpper.startsWith('CW') 
+        ? skuUpper.replace('CW', '').replace(/^[-_]/, '').trim() || null
+        : null
+      return { supplier_name: 'Costway', supplier_id: supplierId }
     }
     
     // Banggood 감지
-    if (skuUpper.startsWith('BG') || text.includes('banggood') || text.includes('bg-')) {
-      return 'Banggood'
+    if (skuUpper.startsWith('BG') || text.includes('banggood') || text.includes('bg-') || imageUrlLower.includes('banggood')) {
+      const supplierId = skuUpper.startsWith('BG') 
+        ? skuUpper.replace('BG', '').replace(/^[-_]/, '').trim() || null
+        : null
+      return { supplier_name: 'Banggood', supplier_id: supplierId }
     }
     
     // Doba 감지
-    if (skuUpper.startsWith('DOBA') || text.includes('doba')) {
-      return 'Doba'
+    if (skuUpper.startsWith('DOBA') || text.includes('doba') || imageUrlLower.includes('doba')) {
+      const supplierId = skuUpper.startsWith('DOBA') 
+        ? skuUpper.replace('DOBA', '').replace(/^[-_]/, '').trim() || null
+        : null
+      return { supplier_name: 'Doba', supplier_id: supplierId }
     }
     
     // DSers 감지
-    if (skuUpper.startsWith('DSERS') || text.includes('dsers')) {
-      return 'DSers'
+    if (skuUpper.startsWith('DSERS') || text.includes('dsers') || imageUrlLower.includes('dsers')) {
+      const supplierId = skuUpper.startsWith('DSERS') 
+        ? skuUpper.replace('DSERS', '').replace(/^[-_]/, '').trim() || null
+        : null
+      return { supplier_name: 'DSers', supplier_id: supplierId }
     }
     
     // Spocket 감지
-    if (skuUpper.startsWith('SPK') || text.includes('spocket')) {
-      return 'Spocket'
+    if (skuUpper.startsWith('SPK') || text.includes('spocket') || imageUrlLower.includes('spocket')) {
+      const supplierId = skuUpper.startsWith('SPK') 
+        ? skuUpper.replace('SPK', '').replace(/^[-_]/, '').trim() || null
+        : null
+      return { supplier_name: 'Spocket', supplier_id: supplierId }
     }
     
     // 일반적인 패턴: D로 시작하는 SKU (예: D0102HEVLYJ-KS Z1 BPNK)
     // 이런 경우는 "Unverified"로 분류
     if (skuUpper.startsWith('D') && /^D\d/.test(skuUpper)) {
-      return 'Unverified'
+      return { supplier_name: 'Unverified', supplier_id: null }
     }
     
-    return 'Unknown'
+    return { supplier_name: 'Unknown', supplier_id: null }
+  }
+  
+  // Legacy 함수 (하위 호환성)
+  const detectSupplier = (title, sku = '') => {
+    const result = extractSupplierInfo(title, sku)
+    return result.supplier_name
   }
 
   // Performance Score 계산 함수 (낮을수록 성능 낮음)
@@ -409,14 +472,16 @@ function Dashboard() {
         
         // 리스팅 데이터 변환 및 공급처 감지
         const transformedListings = allListingsFromEbay.map((item, index) => {
-          const supplier = detectSupplier(item.title, item.sku)
+          // supplier_name과 supplier_id 모두 추출
+          const supplierInfo = extractSupplierInfo(item.title, item.sku, item.image_url || item.picture_url || item.thumbnail_url)
           
           // 디버깅: supplier 감지 결과 확인
           if (index < 3) { // 처음 3개만 로그
             console.log(`🔍 Supplier detection for item ${index + 1}:`, {
               title: item.title?.substring(0, 50),
               sku: item.sku,
-              detected_supplier: supplier
+              detected_supplier: supplierInfo.supplier_name,
+              detected_supplier_id: supplierInfo.supplier_id
             })
           }
           
@@ -430,8 +495,9 @@ function Dashboard() {
             title: item.title,
             price: item.price,
             sku: item.sku,
-            supplier: supplier,
-            supplier_name: supplier,
+            supplier: supplierInfo.supplier_name,
+            supplier_name: supplierInfo.supplier_name,
+            supplier_id: supplierInfo.supplier_id, // supplier_id 추가
             total_sales: item.quantity_sold || 0,
             quantity_sold: item.quantity_sold || 0,
             watch_count: item.watch_count || 0,
@@ -597,7 +663,8 @@ function Dashboard() {
         
         // 리스팅 데이터 변환 및 공급처 감지
         const transformedListings = allListingsFromEbay.map((item, index) => {
-          const supplier = detectSupplier(item.title, item.sku)
+          // supplier_name과 supplier_id 모두 추출
+          const supplierInfo = extractSupplierInfo(item.title, item.sku, item.image_url || item.picture_url || item.thumbnail_url)
           
           return {
             id: item.item_id || `ebay-${index}`,
