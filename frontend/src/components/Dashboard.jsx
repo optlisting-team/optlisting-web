@@ -913,7 +913,10 @@ function Dashboard() {
     }
     
     setIsStoreConnected(connected)
-    console.log('🔄 eBay 연결 상태 변경:', { wasConnected, connected, forceLoad })
+    // 🔥 로그 최소화 - 상태 변경 시에만 출력 (반복 로그 방지)
+    if (wasConnected !== connected || forceLoad) {
+      console.log('🔄 eBay 연결 상태 변경:', { wasConnected, connected, forceLoad })
+    }
     
     // 🔥 연결 해제 시 캐시 초기화
     if (!connected && wasConnected) {

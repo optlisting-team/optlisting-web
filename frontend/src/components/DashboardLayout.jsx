@@ -60,7 +60,7 @@ function DashboardLayout({ children }) {
               <a href="#" className="hover:text-zinc-400 transition-colors">Help</a>
             </div>
             <div className="flex items-center gap-2">
-              <span className="data-value">v1.3.13</span>
+              <span className="data-value">v1.3.14</span>
               <span>•</span>
               <span className="flex items-center gap-1">
                 <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />

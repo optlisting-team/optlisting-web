@@ -63,34 +63,20 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
       const userId = response.data?.ebay_user_id || response.data?.user_id || null
       setEbayUserId(userId)
       
-      // 🔥 현재 상태와 동일하면 콜백 호출하지 않음 (단, 초기 로드 시에는 강제 호출)
+      // 🔥 현재 상태와 동일하면 콜백 호출하지 않음 (불필요한 반복 방지)
       const currentConnected = selectedStore?.connected || false
-      if (hasValidToken === currentConnected && hasValidToken) {
-        // 이미 연결되어 있고 상태가 동일하면 스킵
-        // 단, 초기 로드 시에는 데이터를 로드하기 위해 강제로 호출
-        console.log('✅ eBay 연결 상태 변경 없음 - 콜백 호출 스킵', { 
-          hasValidToken, 
-          currentConnected,
-          checkingConnection: checkingConnection 
-        })
-        // 🔥 초기 로드 시 (checkingConnection이 처음 true가 된 경우) 강제로 콜백 호출
-        if (checkingConnection && hasValidToken && onConnectionChange) {
-          console.log('🔄 초기 로드 감지 - 연결 상태 콜백 강제 호출 (데이터 로드용)')
-          onConnectionChange(hasValidToken, true) // forceLoad = true
-        }
+      if (hasValidToken === currentConnected) {
+        // 상태가 동일하면 스킵 (로그 최소화)
         setCheckingConnection(false)
         return
       }
       
-      console.log('eBay 토큰 상태 확인:', {
-        connected: response.data?.connected,
-        hasValidToken,
-        isExpired: response.data?.is_expired,
-        needsRefresh: response.data?.needs_refresh,
-        tokenStatus: response.data?.token_status,
-        ebayUserId: userId,
+      // 🔥 상태가 변경된 경우에만 로그 출력 (반복 로그 방지)
+      console.log('🔄 eBay 연결 상태 변경:', {
         previousState: currentConnected,
-        newState: hasValidToken
+        newState: hasValidToken,
+        ebayUserId: userId,
+        isExpired: response.data?.is_expired
       })
       
       // eBay 스토어 연결 상태 업데이트
