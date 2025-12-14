@@ -1144,8 +1144,11 @@ function Dashboard() {
             setAllListings(fallbackListings)
             setTotalListings(fallbackListings.length)
             // 🔥 Fallback 데이터 로드 후 'all' 뷰 모드로 자동 전환
-            if (isStoreConnected && fallbackListings.length > 0) {
-              console.log('🔄 Fallback 데이터 로드 완료 - Active 리스팅 뷰로 자동 전환')
+            // isStoreConnected 체크 제거 - 데이터가 있으면 무조건 표시
+            if (fallbackListings.length > 0) {
+              console.log('🔄 Fallback 데이터 로드 완료 - Active 리스팅 뷰로 자동 전환', {
+                isStoreConnected
+              })
               setViewMode('all')
               setShowFilter(true)
             }
