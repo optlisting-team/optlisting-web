@@ -1612,15 +1612,17 @@ function Dashboard() {
   // Fetch data when store is connected (handled by handleStoreConnection callback)
   // This useEffect is removed - connection is managed via onConnectionChange prop
 
-  // 🔥 allListings에 데이터가 있고 viewMode가 'total'이면 자동으로 'all'로 전환 (백업 로직)
+  // 🔥 allListings에 데이터가 있고 viewMode가 'total'이면 자동으로 'all'로 전환 (강제 전환)
   useEffect(() => {
-    if (allListings.length > 0 && viewMode === 'total') {
-      console.log('🔄 [백업] allListings 데이터 감지 - 뷰 모드를 "all"로 자동 전환', {
-        listingsCount: allListings.length,
-        currentViewMode: viewMode
-      })
-      setViewMode('all')
-      setShowFilter(true)
+    if (allListings.length > 0) {
+      if (viewMode === 'total') {
+        console.log('🔄 [강제] allListings 데이터 감지 - 뷰 모드를 "all"로 즉시 전환', {
+          listingsCount: allListings.length,
+          currentViewMode: viewMode
+        })
+        setViewMode('all')
+        setShowFilter(true)
+      }
     }
   }, [allListings.length, viewMode])
 
@@ -1888,8 +1890,8 @@ function Dashboard() {
           )}
         />
 
-        {/* Initial Statistical View - Show when viewMode === 'total' and filter is not shown */}
-        {viewMode === 'total' && !showFilter && (
+        {/* Initial Statistical View - Show when viewMode === 'total' and NO data available */}
+        {viewMode === 'total' && !showFilter && allListings.length === 0 && (
           <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg p-8 mt-8 text-center">
             <p className="text-lg text-zinc-300 dark:text-zinc-300 mb-2">
               📊 <strong className="text-white">Ready to Analyze</strong>
@@ -1913,8 +1915,8 @@ function Dashboard() {
         )}
 
         {/* Dynamic Layout: Full Width for 'all', Split View for 'zombies' */}
-        {/* Hide table and filters on initial load (viewMode === 'total') */}
-        {viewMode !== 'total' && viewMode !== 'history' && (
+        {/* Show products if data exists OR viewMode is 'all' */}
+        {((viewMode !== 'total' && viewMode !== 'history') || (allListings.length > 0 && viewMode === 'total')) && (
           <div className={`flex gap-8 transition-all duration-300 ${
             viewMode === 'all' ? '' : ''
           }`}>
