@@ -300,9 +300,11 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
               // 🔥 이미 연결되어 있으면 제품 조회 및 표시 (OAuth 시작하지 않음)
               if (selectedStore?.connected) {
                 console.log('✅ 이미 eBay에 연결되어 있습니다 - 제품 조회 시작')
-                // 부모 컴포넌트에 연결 상태 알림 (제품 조회 트리거)
+                // 부모 컴포넌트에 연결 상태 알림 (강제 제품 조회 트리거)
                 if (onConnectionChange) {
-                  onConnectionChange(true)
+                  // forceLoad 플래그를 전달할 수 없으므로, 콜백을 두 번 호출하여 강제 로드
+                  // 첫 번째 호출로 상태 확인, 두 번째 호출로 강제 로드
+                  onConnectionChange(true, true) // forceLoad = true
                 }
                 return
               }

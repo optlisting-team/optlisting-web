@@ -903,17 +903,17 @@ function Dashboard() {
   }
 
   // Handle store connection change
-  const handleStoreConnection = (connected) => {
+  const handleStoreConnection = (connected, forceLoad = false) => {
     const wasConnected = isStoreConnected
     
-    // 🔥 상태가 동일하면 아무것도 하지 않음 (불필요한 재실행 방지)
-    if (connected === wasConnected) {
-      console.log('⏭️ eBay 연결 상태 변경 없음 - 스킵:', { wasConnected, connected })
+    // 🔥 상태가 동일하고 강제 로드가 아니면 아무것도 하지 않음 (불필요한 재실행 방지)
+    if (connected === wasConnected && !forceLoad) {
+      console.log('⏭️ eBay 연결 상태 변경 없음 - 스킵:', { wasConnected, connected, forceLoad })
       return
     }
     
     setIsStoreConnected(connected)
-    console.log('🔄 eBay 연결 상태 변경:', { wasConnected, connected })
+    console.log('🔄 eBay 연결 상태 변경:', { wasConnected, connected, forceLoad })
     
     // 🔥 연결 해제 시 캐시 초기화
     if (!connected && wasConnected) {
@@ -933,9 +933,9 @@ function Dashboard() {
       return
     }
     
-    // 🔥 연결됨: 제품 로드 및 자동 표시 (버튼 클릭으로 연결된 경우에만 실행)
-    if (connected && !wasConnected) {
-      console.log('✅ eBay 연결됨 - 제품 로드 및 자동 표시 시작')
+    // 🔥 연결됨: 제품 로드 및 자동 표시 (버튼 클릭으로 연결된 경우 또는 강제 로드)
+    if (connected && (!wasConnected || forceLoad)) {
+      console.log('✅ eBay 연결됨 - 제품 로드 및 자동 표시 시작', { wasConnected, forceLoad })
       if (DEMO_MODE) {
         setAllListings(DUMMY_ALL_LISTINGS)
         setTotalListings(DUMMY_ALL_LISTINGS.length)
