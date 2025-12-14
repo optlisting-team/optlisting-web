@@ -1004,6 +1004,15 @@ function Dashboard() {
               setTotalListings(parsedData.totalListings || 0)
               setTotalBreakdown(parsedData.totalBreakdown || {})
               setPlatformBreakdown(parsedData.platformBreakdown || { eBay: 0 })
+              // 🔥 캐시 데이터 로드 후 'all' 뷰 모드로 자동 전환 (연결 후 자동 표시를 위해)
+              if (isStoreConnected && parsedData.listings?.length > 0) {
+                console.log('🔄 캐시 데이터 로드 완료 - Active 리스팅 뷰로 자동 전환', { 
+                  currentViewMode: viewMode, 
+                  listingsCount: parsedData.listings.length 
+                })
+                setViewMode('all')
+                setShowFilter(true)
+              }
               setLoading(false)
               return
             } else {
@@ -1091,6 +1100,16 @@ function Dashboard() {
           console.log('✅ 데이터 캐시 저장 완료')
         } catch (cacheErr) {
           console.warn('캐시 저장 실패:', cacheErr)
+        }
+        
+        // 🔥 데이터 로드 완료 후 'all' 뷰 모드로 자동 전환 (연결 후 자동 표시를 위해)
+        if (isStoreConnected && transformedListings.length > 0) {
+          console.log('🔄 제품 로드 완료 - Active 리스팅 뷰로 자동 전환', { 
+            currentViewMode: viewMode, 
+            listingsCount: transformedListings.length 
+          })
+          setViewMode('all')
+          setShowFilter(true)
         }
         
         setError(null)
