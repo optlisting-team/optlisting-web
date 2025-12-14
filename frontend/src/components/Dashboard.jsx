@@ -1619,6 +1619,18 @@ function Dashboard() {
   // Fetch data when store is connected (handled by handleStoreConnection callback)
   // This useEffect is removed - connection is managed via onConnectionChange prop
 
+  // 🔥 allListings에 데이터가 있고 viewMode가 'total'이면 자동으로 'all'로 전환
+  useEffect(() => {
+    if (allListings.length > 0 && viewMode === 'total') {
+      console.log('🔄 allListings 데이터 감지 - 뷰 모드를 "all"로 자동 전환', {
+        listingsCount: allListings.length,
+        currentViewMode: viewMode
+      })
+      setViewMode('all')
+      setShowFilter(true)
+    }
+  }, [allListings.length, viewMode])
+
   // Handle URL query param for view mode
   useEffect(() => {
     if (viewParam === 'history') {
