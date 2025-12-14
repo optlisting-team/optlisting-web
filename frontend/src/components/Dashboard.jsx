@@ -1982,30 +1982,39 @@ function Dashboard() {
   return (
     <div className="font-sans bg-black dark:bg-black min-h-full">
       {/* 🔥 Debug HUD - 화면에 직접 표시 (임시) */}
-      <pre style={{
-        position: 'fixed',
-        bottom: 12,
-        right: 12,
-        zIndex: 9999,
-        background: '#000',
-        color: '#0f0',
-        padding: 12,
-        fontSize: 12,
-        border: '1px solid #0f0',
-        borderRadius: 4,
-        maxWidth: 300,
-        overflow: 'auto',
-        maxHeight: 200
-      }}>
-        {JSON.stringify({
-          ebayConnected: isStoreConnected,
-          listingsLoading: loading,
-          listingsLength: allListings.length,
-          totalListings: totalListings,
-          viewMode: viewMode,
-          lastFetchAt: lastFetchAt ? new Date(lastFetchAt).toLocaleTimeString() : null
-        }, null, 2)}
-      </pre>
+      {(() => {
+        const forcedLen = Array.isArray(allListings) ? allListings.length : 0
+        const ebayConnected = isStoreConnected
+        return (
+          <pre style={{
+            position: 'fixed',
+            bottom: 12,
+            right: 12,
+            zIndex: 9999,
+            background: '#000',
+            color: '#0f0',
+            padding: 12,
+            fontSize: 12,
+            border: '1px solid #0f0',
+            borderRadius: 4,
+            maxWidth: 350,
+            overflow: 'auto',
+            maxHeight: 250
+          }}>
+            {JSON.stringify({
+              forcedLen: forcedLen,
+              ebayConnected: ebayConnected,
+              viewMode: viewMode,
+              selectedCard: 'N/A', // selectedCard가 없으면 N/A
+              listingsLoading: loading,
+              listingsLength: allListings.length,
+              totalListings: totalListings,
+              lastFetchAt: lastFetchAt ? new Date(lastFetchAt).toLocaleTimeString() : null,
+              shouldRenderTable: ebayConnected && forcedLen > 0
+            }, null, 2)}
+          </pre>
+        )
+      })()}
       
       <div className="px-6">
         {/* Summary Card */}
@@ -2064,17 +2073,38 @@ function Dashboard() {
           )}
         />
 
-        {/* 🔥 권장 렌더 분기 1: !ebayConnected -> ReadyToAnalyze */}
-        {!isStoreConnected && viewMode === 'total' && (
-          <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg p-8 mt-8 text-center">
-            <p className="text-lg text-zinc-300 dark:text-zinc-300 mb-2">
-              📊 <strong className="text-white">Ready to Analyze</strong>
-            </p>
-            <p className="text-sm text-zinc-400 dark:text-zinc-400 mb-4">
-              Connect your eBay account to start analyzing your listings.
-            </p>
-          </div>
-        )}
+        {/* 🔥 FORCE 렌더: ebayConnected && forcedLen > 0 이면 Ready to Analyze 대신 테이블 렌더 */}
+        {(() => {
+          const forcedLen = Array.isArray(allListings) ? allListings.length : 0
+          const ebayConnected = isStoreConnected
+          
+          // 🔥 FORCE 렌더 조건: ebayConnected && forcedLen > 0 이면 테이블을 여기서 바로 렌더
+          if (ebayConnected && forcedLen > 0) {
+            console.log('[FORCE RENDER] Ready to Analyze 블록에서 테이블 FORCE 렌더:', {
+              ebayConnected,
+              forcedLen,
+              viewMode
+            })
+            // 테이블은 아래에서 렌더되므로 여기서는 null 반환 (Ready to Analyze 숨김)
+            return null
+          }
+          
+          // 🔥 ebayConnected가 false이거나 forcedLen이 0이면 Ready to Analyze 표시
+          if (!ebayConnected && viewMode === 'total') {
+            return (
+              <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg p-8 mt-8 text-center">
+                <p className="text-lg text-zinc-300 dark:text-zinc-300 mb-2">
+                  📊 <strong className="text-white">Ready to Analyze</strong>
+                </p>
+                <p className="text-sm text-zinc-400 dark:text-zinc-400 mb-4">
+                  Connect your eBay account to start analyzing your listings.
+                </p>
+              </div>
+            )
+          }
+          
+          return null
+        })()}
         
         {/* 🔥 권장 렌더 분기 2: listingsLoading -> Skeleton/Loading */}
         {/* (loading 상태는 아래 테이블 영역에서 처리) */}
@@ -2093,8 +2123,22 @@ function Dashboard() {
           />
         )}
 
-        {/* 🔥 강제 렌더링: viewMode !== 'history' 이면 무조건 렌더 (조건은 내부에서 체크) */}
-        {viewMode !== 'history' && (
+        {/* 🔥 FORCE 렌더링: ebayConnected && forcedLen > 0 이면 무조건 렌더 (viewMode 무관, history만 제외) */}
+        {(() => {
+          const forcedLen = Array.isArray(allListings) ? allListings.length : 0
+          const ebayConnected = isStoreConnected
+          const shouldRender = ebayConnected && forcedLen > 0 && viewMode !== 'history'
+          
+          console.log('[MAIN RENDER] 메인 렌더 조건:', {
+            ebayConnected,
+            forcedLen,
+            viewMode,
+            shouldRender,
+            reason: !ebayConnected ? 'not connected' : forcedLen === 0 ? 'no data' : viewMode === 'history' ? 'history mode' : 'should render'
+          })
+          
+          return shouldRender
+        })() && (
           <div className={`flex gap-8 transition-all duration-300 ${
             viewMode === 'all' ? '' : ''
           }`}>
