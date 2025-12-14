@@ -1929,7 +1929,7 @@ function Dashboard() {
                   : 'flex-1 min-w-0'
             }`}>
               {/* Active View - With Filter */}
-              {viewMode === 'all' && (
+              {(viewMode === 'all' || (allListings.length > 0 && viewMode === 'total')) && (
                 <div className="mt-6 space-y-4">
                   {/* Header */}
                   <div className="flex items-center justify-between">
