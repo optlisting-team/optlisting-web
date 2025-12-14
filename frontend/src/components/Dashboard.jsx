@@ -1257,6 +1257,20 @@ function Dashboard() {
     }
   }
 
+  // 🔥 All Listings View를 여는 함수 (Active 카드 클릭 시 사용, 자동 실행 시에도 사용)
+  const openAllListingsView = () => {
+    console.log('[openAllListingsView] All Listings 뷰 열기')
+    setViewMode('all')
+    setShowFilter(true) // 필터 패널 열기
+    setSelectedIds([]) // 선택 초기화
+    
+    // 데이터가 없으면 fetch
+    if (allListings.length === 0 && isStoreConnected) {
+      console.log('[openAllListingsView] 데이터가 없어서 fetchAllListings 호출')
+      fetchAllListings(false)
+    }
+  }
+
   const handleViewModeChange = (mode) => {
     setViewMode(mode)
     setSelectedIds([]) // Reset selection when switching views
@@ -1269,6 +1283,14 @@ function Dashboard() {
     
     if (mode === 'total') {
       // Statistical view - no data fetching needed
+      return
+    } else if (mode === 'all') {
+      // 🔥 'all' 모드로 전환 시 openAllListingsView와 동일한 로직 적용
+      setShowFilter(true)
+      // 데이터가 없으면 fetch
+      if (allListings.length === 0 && isStoreConnected) {
+        fetchAllListings(false)
+      }
       return
     } else if (mode === 'zombies') {
       // 🔥 좀비 카드 클릭 시: 이미 필터링된 결과가 있으면 그대로 사용 (재필터링하지 않음)
