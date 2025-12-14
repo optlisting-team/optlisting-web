@@ -1018,18 +1018,20 @@ function Dashboard() {
               console.log(`✅ 캐시된 데이터 사용 (${Math.floor(cacheAge / 1000)}초 전 조회)`)
               const parsedData = JSON.parse(cachedData)
               const cachedListings = parsedData.listings || []
-              // 🔥 캐시 데이터 설정과 동시에 뷰 모드도 즉시 설정
+              // 🔥 데이터가 있으면 무조건 뷰 모드를 'all'로 설정 (setAllListings 전에 호출)
+              if (cachedListings.length > 0) {
+                setViewMode('all')
+                setShowFilter(true)
+                console.log('🔄 캐시 데이터 로드 완료 - Active 리스팅 뷰로 즉시 전환', { 
+                  listingsCount: cachedListings.length
+                })
+              }
+              // 🔥 캐시 데이터 설정
               setAllListings(cachedListings)
               setTotalListings(parsedData.totalListings || 0)
               setTotalBreakdown(parsedData.totalBreakdown || {})
               setPlatformBreakdown(parsedData.platformBreakdown || { eBay: 0 })
-              // 🔥 데이터가 있으면 무조건 뷰 모드를 'all'로 설정
               if (cachedListings.length > 0) {
-                console.log('🔄 캐시 데이터 로드 완료 - Active 리스팅 뷰로 즉시 전환', { 
-                  listingsCount: cachedListings.length
-                })
-                setViewMode('all')
-                setShowFilter(true)
                 console.log('✅ 캐시 데이터 로드 후 뷰 모드 "all"로 설정 완료 - 제품 표시 예정')
               }
               setLoading(false)
@@ -1101,19 +1103,23 @@ function Dashboard() {
         })
         
         // 🔥 데이터 설정과 동시에 뷰 모드도 즉시 설정 (동기적으로)
-        setAllListings(transformedListings)
-        setTotalListings(transformedListings.length)
-        // 🔥 데이터가 있으면 무조건 뷰 모드를 'all'로 설정
         if (transformedListings.length > 0) {
+          // 🔥 데이터가 있으면 무조건 뷰 모드를 'all'로 설정 (setAllListings 전에 호출)
           setViewMode('all')
           setShowFilter(true)
+          setAllListings(transformedListings)
+          setTotalListings(transformedListings.length)
+          
+          console.log('✅ allListings 상태 업데이트 완료', { 
+            count: transformedListings.length,
+            viewMode: 'all (강제 설정)',
+            willShowProducts: true
+          })
+        } else {
+          setAllListings(transformedListings)
+          setTotalListings(transformedListings.length)
+          console.warn('⚠️ transformedListings가 비어있음')
         }
-        
-        console.log('✅ allListings 상태 업데이트 완료', { 
-          count: transformedListings.length,
-          viewMode: 'all (강제 설정)',
-          willShowProducts: true
-        })
         
         // 공급처별 브레이크다운 계산
         const supplierBreakdown = {}
@@ -1138,26 +1144,11 @@ function Dashboard() {
           console.warn('캐시 저장 실패:', cacheErr)
         }
         
-        // 🔥 데이터 로드 완료 후 즉시 'all' 뷰 모드로 전환 (강제 설정)
+        // 🔥 뷰 모드는 이미 위에서 설정했으므로 여기서는 로그만 출력
         if (transformedListings.length > 0) {
-          console.log('🔄 fetchAllListings 완료 - Active 리스팅 뷰로 즉시 전환', { 
-            listingsCount: transformedListings.length,
-            currentViewMode: viewMode,
-            willSetViewMode: 'all'
+          console.log('✅ fetchAllListings 완료 - 제품 목록 표시 예정', { 
+            listingsCount: transformedListings.length
           })
-          // 🔥 즉시 뷰 모드 설정 (React 상태 업데이트는 비동기이지만 즉시 호출)
-          setViewMode('all')
-          setShowFilter(true)
-          // 🔥 추가 보장: 다음 렌더 사이클에서도 확인
-          setTimeout(() => {
-            if (viewMode !== 'all') {
-              console.log('⚠️ 뷰 모드가 여전히 "all"이 아님 - 재설정', { currentViewMode: viewMode })
-              setViewMode('all')
-            }
-          }, 100)
-          console.log('✅ 뷰 모드 "all"로 설정 완료 - 제품 목록 표시 예정')
-        } else {
-          console.warn('⚠️ transformedListings가 비어있음 - 제품 목록 표시 불가')
         }
         
         setError(null)
@@ -1701,7 +1692,8 @@ function Dashboard() {
   // 🔥 allListings에 데이터가 있고 viewMode가 'total'이면 자동으로 'all'로 전환 (강제 전환)
   useEffect(() => {
     if (allListings.length > 0) {
-      if (viewMode === 'total') {
+      // 🔥 데이터가 있으면 무조건 'all' 뷰 모드로 전환 (viewMode가 'total'이거나 다른 값이어도)
+      if (viewMode === 'total' || viewMode !== 'all') {
         console.log('🔄 [강제] allListings 데이터 감지 - 뷰 모드를 "all"로 즉시 전환', {
           listingsCount: allListings.length,
           currentViewMode: viewMode,
@@ -1713,7 +1705,7 @@ function Dashboard() {
       } else {
         console.log('✅ allListings 데이터 있음, viewMode:', viewMode, {
           listingsCount: allListings.length,
-          shouldShowProducts: viewMode === 'all' || (allListings.length > 0 && viewMode === 'total')
+          shouldShowProducts: true
         })
       }
     } else {
