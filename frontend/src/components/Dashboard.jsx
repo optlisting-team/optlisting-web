@@ -1060,7 +1060,7 @@ function Dashboard() {
         }
         
         const allListingsFromEbay = response.data.listings || []
-        console.log(`✅ Received ${allListingsFromEbay.length} total listings from eBay`)
+        console.log(`[FETCH DONE] Received ${allListingsFromEbay.length} total listings from eBay`)
         
         // 리스팅 데이터 변환 및 공급처 감지
         const transformedListings = allListingsFromEbay.map((item, index) => {
@@ -1106,22 +1106,23 @@ function Dashboard() {
           setAllListings(transformedListings)
           setTotalListings(transformedListings.length)
           
-          // 🔥 State 동기화 확인 로그
-          console.log('✅ allListings 상태 업데이트 완료', { 
-            count: transformedListings.length,
-            viewMode: 'all (강제 설정)',
-            willShowProducts: true,
-            allListingsLength: transformedListings.length,
-            totalListings: transformedListings.length
+          // 🔥 [FETCH DONE] State 동기화 확인 로그
+          console.log('[FETCH DONE] listings length:', transformedListings.length)
+          console.log('[FETCH DONE] setAllListings 호출 전:', {
+            allListingsLength: allListings.length,
+            totalListings: totalListings,
+            viewMode: viewMode,
+            isStoreConnected: isStoreConnected
           })
           
           // 🔥 다음 렌더 사이클에서도 확인
           setTimeout(() => {
-            console.log('🔍 State 동기화 확인:', {
+            console.log('[RENDER CHECK] State 동기화 확인:', {
               allListingsLength: allListings.length,
               totalListings: totalListings,
               viewMode: viewMode,
-              isStoreConnected: isStoreConnected
+              isStoreConnected: isStoreConnected,
+              shouldShowProducts: viewMode === 'all' || (isStoreConnected && (allListings.length > 0 || totalListings > 0))
             })
           }, 100)
         } else {
@@ -1706,8 +1707,14 @@ function Dashboard() {
 
   // 🔥 eBay 연결 상태를 감지하여 자동으로 listings fetch
   useEffect(() => {
-    if (isStoreConnected && !listingsLoadedOnceRef.current) {
-      console.log('🔄 eBay 연결 감지 - 자동으로 listings fetch 시작', {
+    // 🔥 StrictMode 중복 호출 방지
+    if (listingsLoadedOnceRef.current && isStoreConnected) {
+      console.log('⏭️ [GUARD] listingsLoadedOnceRef가 이미 true - 스킵')
+      return
+    }
+    
+    if (isStoreConnected) {
+      console.log('[CONNECTION] eBay 연결 감지 - 자동으로 listings fetch 시작', {
         isStoreConnected,
         listingsLoadedOnce: listingsLoadedOnceRef.current,
         currentAllListingsLength: allListings.length,
@@ -1715,28 +1722,30 @@ function Dashboard() {
         currentViewMode: viewMode
       })
       
+      // 🔥 ref를 먼저 설정하여 중복 실행 방지 (StrictMode 대응)
+      listingsLoadedOnceRef.current = true
+      
       // 🔥 뷰 모드를 먼저 'all'로 설정하여 제품 목록이 자동으로 표시되도록 함
       setViewMode('all')
       setShowFilter(true)
       
-      // 🔥 ref를 먼저 설정하여 중복 실행 방지
-      listingsLoadedOnceRef.current = true
-      
       // Active listings 자동 조회
       fetchAllListings(false).then(() => {
-        console.log('✅ eBay 연결 후 자동 listings fetch 완료', {
+        console.log('[CONNECTION] eBay 연결 후 자동 listings fetch 완료', {
           allListingsLength: allListings.length,
           totalListings: totalListings,
           viewMode: viewMode
         })
       }).catch((err) => {
-        console.error('eBay 연결 후 자동 listings fetch 실패:', err)
+        console.error('[CONNECTION] eBay 연결 후 자동 listings fetch 실패:', err)
         listingsLoadedOnceRef.current = false // 실패 시 재시도 가능하도록
       })
-    } else if (!isStoreConnected) {
+    } else {
       // 연결 해제 시 ref 초기화
-      listingsLoadedOnceRef.current = false
-      console.log('🗑️ eBay 연결 해제 - listingsLoadedOnceRef 초기화')
+      if (listingsLoadedOnceRef.current) {
+        listingsLoadedOnceRef.current = false
+        console.log('[CONNECTION] eBay 연결 해제 - listingsLoadedOnceRef 초기화')
+      }
     }
   }, [isStoreConnected])
 
@@ -2030,12 +2039,23 @@ function Dashboard() {
         )}
 
         {/* Dynamic Layout: Full Width for 'all', Split View for 'zombies' */}
-        {/* 🔥 항상 렌더링: eBay 연결 시 listings 영역 표시 (loading/empty/data 상태 모두 표시) */}
-        {/* 🔥 항상 렌더링: eBay 연결 시 listings 영역 표시 (loading/empty/data 상태 모두 표시) */}
-        {/* Show products if: viewMode is not 'total'/'history', OR (eBay connected AND has data), OR (has data) */}
-        {((viewMode !== 'total' && viewMode !== 'history') || 
-          (isStoreConnected && (allListings.length > 0 || totalListings > 0)) || 
-          (allListings.length > 0 && viewMode === 'total')) && (
+        {/* 🔥 권장 렌더 분기: ebayConnected && listings.length > 0 이면 무조건 ListingsTable 렌더 */}
+        {(() => {
+          const shouldRender = (viewMode !== 'total' && viewMode !== 'history') || 
+                               (isStoreConnected && (allListings.length > 0 || totalListings > 0)) || 
+                               (allListings.length > 0 && viewMode === 'total')
+          
+          // 🔥 [RENDER] State 확인 로그
+          console.log('[RENDER] 렌더 조건 확인:', {
+            ebayConnected: isStoreConnected,
+            listingsStateLength: allListings.length,
+            totalListings: totalListings,
+            viewMode: viewMode,
+            shouldRender: shouldRender
+          })
+          
+          return shouldRender
+        })() && (
           <div className={`flex gap-8 transition-all duration-300 ${
             viewMode === 'all' ? '' : ''
           }`}>
