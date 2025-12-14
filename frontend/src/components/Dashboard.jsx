@@ -112,6 +112,8 @@ function Dashboard() {
   const [isStoreConnected, setIsStoreConnected] = useState(false)
   // 🔥 중복 실행 방지를 위한 ref
   const listingsLoadedOnceRef = useRef(false)
+  // 🔥 Debug HUD용: 마지막 fetch 시간
+  const [lastFetchAt, setLastFetchAt] = useState(null)
   
   // DEMO_MODE 초기 데이터 설정 - 스토어 연결 전에는 0
   const [zombies, setZombies] = useState([]) // Start empty, populate after filter
@@ -1105,6 +1107,7 @@ function Dashboard() {
           setShowFilter(true)
           setAllListings(transformedListings)
           setTotalListings(transformedListings.length)
+          setLastFetchAt(Date.now()) // 🔥 Debug HUD용: fetch 성공 시간 기록
           
           // 🔥 [FETCH DONE] State 동기화 확인 로그
           console.log('[FETCH DONE] listings length:', transformedListings.length)
@@ -1956,6 +1959,32 @@ function Dashboard() {
 
   return (
     <div className="font-sans bg-black dark:bg-black min-h-full">
+      {/* 🔥 Debug HUD - 화면에 직접 표시 (임시) */}
+      <pre style={{
+        position: 'fixed',
+        bottom: 12,
+        right: 12,
+        zIndex: 9999,
+        background: '#000',
+        color: '#0f0',
+        padding: 12,
+        fontSize: 12,
+        border: '1px solid #0f0',
+        borderRadius: 4,
+        maxWidth: 300,
+        overflow: 'auto',
+        maxHeight: 200
+      }}>
+        {JSON.stringify({
+          ebayConnected: isStoreConnected,
+          listingsLoading: loading,
+          listingsLength: allListings.length,
+          totalListings: totalListings,
+          viewMode: viewMode,
+          lastFetchAt: lastFetchAt ? new Date(lastFetchAt).toLocaleTimeString() : null
+        }, null, 2)}
+      </pre>
+      
       <div className="px-6">
         {/* Summary Card */}
         <SummaryCard 
@@ -2013,21 +2042,25 @@ function Dashboard() {
           )}
         />
 
-        {/* Initial Statistical View - Show when NO data available AND NOT connected */}
-        {/* 🔥 eBay 연결 안 됨 또는 데이터 없을 때만 표시 */}
-        {!isStoreConnected && viewMode === 'total' && !showFilter && allListings.length === 0 && totalListings === 0 && (
+        {/* 🔥 권장 렌더 분기 1: !ebayConnected -> ReadyToAnalyze */}
+        {!isStoreConnected && viewMode === 'total' && (
           <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg p-8 mt-8 text-center">
             <p className="text-lg text-zinc-300 dark:text-zinc-300 mb-2">
               📊 <strong className="text-white">Ready to Analyze</strong>
             </p>
             <p className="text-sm text-zinc-400 dark:text-zinc-400 mb-4">
-              Click <strong className="text-blue-400">"Total Active Listings"</strong> card above to open filters and analyze your inventory.
-            </p>
-            <p className="text-xs text-zinc-500">
-              Or click <strong className="text-red-400">"Low Interest"</strong> card to see items that need attention.
+              Connect your eBay account to start analyzing your listings.
             </p>
           </div>
         )}
+        
+        {/* 🔥 권장 렌더 분기 2: listingsLoading -> Skeleton/Loading */}
+        {/* (loading 상태는 아래 테이블 영역에서 처리) */}
+        
+        {/* 🔥 권장 렌더 분기 3: listings.length === 0 -> Empty state */}
+        {/* (empty 상태는 아래 테이블 영역에서 처리) */}
+        
+        {/* 🔥 권장 렌더 분기 4: else -> ListingsTable/ListingsGrid 항상 렌더 */}
 
         {/* History View - Full Page */}
         {viewMode === 'history' && (
@@ -2039,23 +2072,11 @@ function Dashboard() {
         )}
 
         {/* Dynamic Layout: Full Width for 'all', Split View for 'zombies' */}
-        {/* 🔥 권장 렌더 분기: ebayConnected && listings.length > 0 이면 무조건 ListingsTable 렌더 */}
-        {(() => {
-          const shouldRender = (viewMode !== 'total' && viewMode !== 'history') || 
-                               (isStoreConnected && (allListings.length > 0 || totalListings > 0)) || 
-                               (allListings.length > 0 && viewMode === 'total')
-          
-          // 🔥 [RENDER] State 확인 로그
-          console.log('[RENDER] 렌더 조건 확인:', {
-            ebayConnected: isStoreConnected,
-            listingsStateLength: allListings.length,
-            totalListings: totalListings,
-            viewMode: viewMode,
-            shouldRender: shouldRender
-          })
-          
-          return shouldRender
-        })() && (
+        {/* 🔥 권장 렌더 분기 4: ebayConnected && listings.length > 0 이면 무조건 ListingsTable 렌더 */}
+        {/* 조건 단순화: viewMode가 'total'/'history'가 아니거나, eBay 연결되고 데이터가 있으면 무조건 표시 */}
+        {((viewMode !== 'total' && viewMode !== 'history') || 
+          (isStoreConnected && (allListings.length > 0 || totalListings > 0)) || 
+          (allListings.length > 0 && viewMode === 'total')) && (
           <div className={`flex gap-8 transition-all duration-300 ${
             viewMode === 'all' ? '' : ''
           }`}>
