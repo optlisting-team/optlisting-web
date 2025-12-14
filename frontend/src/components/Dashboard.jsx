@@ -2093,24 +2093,32 @@ function Dashboard() {
           />
         )}
 
-        {/* Dynamic Layout: Full Width for 'all', Split View for 'zombies' */}
-        {/* 🔥 강제 단순화: ebayConnected && listingsLength > 0 이면 무조건 테이블 렌더 (임시) */}
+        {/* 🔥 강제 렌더링: ebayConnected && len > 0 이면 무조건 테이블 렌더 */}
         {(() => {
-          const shouldRender = viewMode !== 'history' && (
-            (isStoreConnected && (allListings.length > 0 || totalListings > 0)) ||
-            viewMode === 'all' ||
-            (allListings.length > 0 && viewMode === 'total')
-          )
+          // 🔥 여러 state에서 데이터 확인 (listings, listingsState, currentData)
+          const listings = allListings
+          const listingsState = allListings
+          const currentData = (viewMode === 'all' || 
+            (isStoreConnected && (allListings.length > 0 || totalListings > 0)) || 
+            (allListings.length > 0 && viewMode === 'total')) ? allListings : zombies
           
-          console.log('[RENDER CONDITION] 테이블 렌더 조건 확인:', {
-            ebayConnected: isStoreConnected,
-            listingsLength: allListings.length,
-            totalListings: totalListings,
-            viewMode: viewMode,
-            shouldRender: shouldRender,
-            condition1: isStoreConnected && (allListings.length > 0 || totalListings > 0),
-            condition2: viewMode === 'all',
-            condition3: allListings.length > 0 && viewMode === 'total'
+          const len =
+            (Array.isArray(listings) ? listings.length : 0) ||
+            (Array.isArray(listingsState) ? listingsState.length : 0) ||
+            (Array.isArray(currentData) ? currentData.length : 0) ||
+            0
+          
+          const ebayConnected = isStoreConnected
+          const shouldRender = viewMode !== 'history' && (ebayConnected && len > 0)
+          
+          console.log('[FORCE RENDER] 렌더 조건 확인:', {
+            ebayConnected,
+            len,
+            listingsLength: listings?.length || 0,
+            listingsStateLength: listingsState?.length || 0,
+            currentDataLength: currentData?.length || 0,
+            viewMode,
+            shouldRender
           })
           
           return shouldRender
@@ -2210,46 +2218,43 @@ function Dashboard() {
                     {error}
                   </div>
                 ) : (() => {
-                  // 🔥 테이블이 사용하는 데이터: eBay 연결 시 allListings 사용 (props 기반)
-                  // 🔥 케이스 A: 테이블이 props 기반이므로 Dashboard의 allListings state를 그대로 사용
+                  // 🔥 강제 렌더링 로직: 여러 state에서 데이터 확인
+                  const listings = allListings
+                  const listingsState = allListings
                   const currentData = (viewMode === 'all' || 
                     (isStoreConnected && (allListings.length > 0 || totalListings > 0)) || 
                     (allListings.length > 0 && viewMode === 'total')) ? allListings : zombies
                   
-                  // 🔥 [RENDER] 테이블이 사용하는 데이터 확인 로그
-                  console.log('[RENDER] 테이블 데이터 확인:', {
-                    ebayConnected: isStoreConnected,
-                    listingsStateLength: allListings.length,
-                    currentDataLength: currentData.length,
-                    viewMode: viewMode,
-                    usingAllListings: currentData === allListings
+                  const len =
+                    (Array.isArray(listings) ? listings.length : 0) ||
+                    (Array.isArray(listingsState) ? listingsState.length : 0) ||
+                    (Array.isArray(currentData) ? currentData.length : 0) ||
+                    0
+                  
+                  const ebayConnected = isStoreConnected
+                  
+                  // 🔥 FORCE_RENDER 디버그 정보
+                  console.log('[FORCE_RENDER]', {
+                    len,
+                    ebayConnected: String(ebayConnected),
+                    listingsLength: listings?.length || 0,
+                    listingsStateLength: listingsState?.length || 0,
+                    currentDataLength: currentData?.length || 0
                   })
                   
-                  const isEmpty = currentData.length === 0
-                  
-                  if (isEmpty) {
+                  // 🔥 강제 렌더링: ebayConnected && len > 0 이면 무조건 테이블 렌더
+                  if (ebayConnected && len > 0) {
+                    const tableData = listings || listingsState || currentData
+                    
                     return (
-                      <div className="p-8 text-center text-slate-500">
-                        {(viewMode === 'all' || 
-                          (isStoreConnected && (allListings.length > 0 || totalListings > 0)) || 
-                          (allListings.length > 0 && viewMode === 'total'))
-                          ? (loading 
-                              ? "Loading listings..." 
-                              : isStoreConnected 
-                                ? "No listings found. Please sync from eBay or check your connection."
-                                : "No listings found.")
-                          : queue.length > 0 
-                            ? "All items have been moved to the queue. Apply new filters to see more candidates."
-                            : "No low interest items found! Your inventory is performing well. 🎉"
-                        }
-                      </div>
-                    )
-                  }
-                  
-                  return (
-                    <div className="p-6">
-                      {/* Filter Summary Banner - Only show for zombies view */}
-                      {viewMode === 'zombies' && currentData.length > 0 && (
+                      <div className="p-6">
+                        {/* FORCE_RENDER 디버그 표시 */}
+                        <div style={{ marginBottom: 12, color: '#0f0', fontSize: 12, padding: 8, background: '#000', borderRadius: 4, border: '1px solid #0f0' }}>
+                          FORCE_RENDER len={len} ebayConnected={String(ebayConnected)}
+                        </div>
+                        
+                        {/* Filter Summary Banner - Only show for zombies view */}
+                        {viewMode === 'zombies' && tableData.length > 0 && (
                         <div className="mb-6 p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg">
                           <p className="text-base text-zinc-300">
                             Low-Performing SKUs filtered by: No sales in the past{' '}
@@ -2274,7 +2279,7 @@ function Dashboard() {
                         </div>
                       )}
                       <ZombieTable 
-                        zombies={currentData}
+                        zombies={tableData}
                         selectedIds={selectedIds}
                         onSelect={handleSelect}
                         onSelectAll={handleSelectAll}
@@ -2284,6 +2289,18 @@ function Dashboard() {
                         onMoveToZombies={viewMode === 'all' ? handleMoveToZombies : null}
                         showMoveToZombies={viewMode === 'all'}
                       />
+                    </div>
+                  )
+                  
+                  // 🔥 ebayConnected && len > 0이 아니면 ReadyToAnalyze 표시
+                  return (
+                    <div className="p-8 text-center text-slate-500">
+                      {!ebayConnected 
+                        ? "Connect your eBay account to start analyzing your listings."
+                        : len === 0
+                          ? "No listings found. Please sync from eBay or check your connection."
+                          : "Loading listings..."
+                      }
                     </div>
                   )
                 })()}
