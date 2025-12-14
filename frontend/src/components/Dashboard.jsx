@@ -1695,29 +1695,23 @@ function Dashboard() {
   // Fetch data when store is connected (handled by handleStoreConnection callback)
   // This useEffect is removed - connection is managed via onConnectionChange prop
 
-  // 🔥 allListings에 데이터가 있고 viewMode가 'total'이면 자동으로 'all'로 전환 (강제 전환)
+  // 🔥 allListings에 데이터가 있고 연결되어 있으면 무조건 'all'로 전환 (강제)
   useEffect(() => {
-    if (allListings.length > 0) {
-      // 🔥 데이터가 있으면 무조건 'all' 뷰 모드로 전환 (viewMode가 'total'이거나 다른 값이어도)
-      if (viewMode === 'total' || viewMode !== 'all') {
-        console.log('🔄 [강제] allListings 데이터 감지 - 뷰 모드를 "all"로 즉시 전환', {
+    if (allListings.length > 0 && isStoreConnected) {
+      // 🔥 데이터가 있고 연결되어 있으면 무조건 'all' 뷰 모드로 전환 (zombies, queue 제외)
+      if (viewMode !== 'all' && viewMode !== 'zombies' && viewMode !== 'queue') {
+        console.log('🔄 [강제] allListings 데이터 + 연결 감지 - 뷰 모드를 "all"로 즉시 전환', {
           listingsCount: allListings.length,
           currentViewMode: viewMode,
+          isStoreConnected,
           firstItem: allListings[0]?.title
         })
         setViewMode('all')
         setShowFilter(true)
         console.log('✅ [강제] 뷰 모드 "all"로 전환 완료 - 제품 목록 표시 예정')
-      } else {
-        console.log('✅ allListings 데이터 있음, viewMode:', viewMode, {
-          listingsCount: allListings.length,
-          shouldShowProducts: true
-        })
       }
-    } else {
-      console.log('⚠️ allListings가 비어있음', { viewMode, totalListings })
     }
-  }, [allListings.length, viewMode])
+  }, [allListings.length, isStoreConnected, viewMode])
 
   // 🔥 eBay 연결 상태를 감지하여 자동으로 listings fetch
   useEffect(() => {
@@ -2151,10 +2145,8 @@ function Dashboard() {
                   : 'flex-1 min-w-0'
             }`}>
               {/* Active View - With Filter */}
-              {/* 🔥 eBay 연결 시 항상 표시 (loading/empty/data 상태 모두) */}
-              {(viewMode === 'all' || 
-                (isStoreConnected && (allListings.length > 0 || totalListings > 0)) || 
-                (allListings.length > 0 && viewMode === 'total')) && (
+              {/* 🔥 eBay 연결되고 데이터가 있으면 항상 표시 (viewMode 무관) */}
+              {(isStoreConnected && allListings.length > 0) && (
                 <div className="mt-6 space-y-4">
                   {/* Header */}
                   <div className="flex items-center justify-between">
