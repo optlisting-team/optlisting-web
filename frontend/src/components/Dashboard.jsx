@@ -1127,12 +1127,22 @@ function Dashboard() {
       } catch (ebayErr) {
         console.error('eBay API Error:', ebayErr)
         
-        // eBay 연결 안됨
+        // eBay 연결 안됨 (401만 연결 해제로 처리)
         if (ebayErr.response?.status === 401) {
           setError('eBay not connected. Please connect your eBay account first.')
           setTotalListings(0)
           setAllListings([])
         } else {
+          // 🔥 네트워크 에러나 기타 에러는 기존 데이터 유지
+          console.log('⚠️ eBay API 에러 - 기존 데이터 유지', {
+            error: ebayErr.message,
+            status: ebayErr.response?.status,
+            hasExistingData: allListings.length > 0
+          })
+          // 기존 데이터는 유지하고 에러만 표시
+          if (allListings.length === 0) {
+            setError('Failed to fetch listings. Please try again.')
+          }
           // Fallback: Try existing DB endpoint
           try {
             console.log('⚠️ Falling back to DB data...')

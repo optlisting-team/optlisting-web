@@ -95,27 +95,35 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
     } catch (err) {
       console.error('eBay 토큰 상태 확인 실패:', err)
       
-      // 🔥 현재 상태가 이미 false면 콜백 호출하지 않음
+      // 🔥 에러 발생 시에도 기존 연결 상태 유지 (데이터 보존)
+      // 네트워크 에러나 서버 에러는 일시적일 수 있으므로 연결 해제하지 않음
       const currentConnected = selectedStore?.connected || false
-      if (!currentConnected) {
-        setCheckingConnection(false)
-        return
+      
+      // 🔥 401 (Unauthorized) 에러만 연결 해제로 처리
+      if (err.response?.status === 401) {
+        console.log('⚠️ 401 에러 - eBay 연결 해제 처리')
+        if (currentConnected) {
+          setStores(prev => prev.map(s => 
+            s.platform === 'eBay' ? { ...s, connected: false } : s
+          ))
+          if (selectedStore?.platform === 'eBay') {
+            setSelectedStore(prev => ({ ...prev, connected: false }))
+          }
+          setEbayUserId(null)
+          if (onConnectionChange) {
+            onConnectionChange(false)
+          }
+        }
+      } else {
+        // 🔥 네트워크 에러나 기타 에러는 연결 상태 유지 (데이터 보존)
+        console.log('⚠️ 네트워크/서버 에러 - 연결 상태 유지 (데이터 보존)', {
+          error: err.message,
+          status: err.response?.status,
+          currentConnected
+        })
+        // 연결 상태는 유지하고 콜백 호출하지 않음
       }
       
-      // 에러 시 연결 안 됨으로 처리 (상태가 변경된 경우에만)
-      setStores(prev => prev.map(s => 
-        s.platform === 'eBay' ? { ...s, connected: false } : s
-      ))
-      if (selectedStore?.platform === 'eBay') {
-        setSelectedStore(prev => ({ ...prev, connected: false }))
-      }
-      setEbayUserId(null)
-      
-      // 🔥 상태가 변경되었을 때만 부모 컴포넌트에 알림
-      if (onConnectionChange) {
-        onConnectionChange(false)
-      }
-    } finally {
       setCheckingConnection(false)
     }
   }
