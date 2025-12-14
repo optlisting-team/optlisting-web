@@ -1009,18 +1009,19 @@ function Dashboard() {
               console.log(`✅ 캐시된 데이터 사용 (${Math.floor(cacheAge / 1000)}초 전 조회)`)
               const parsedData = JSON.parse(cachedData)
               const cachedListings = parsedData.listings || []
+              // 🔥 캐시 데이터 설정과 동시에 뷰 모드도 즉시 설정
               setAllListings(cachedListings)
               setTotalListings(parsedData.totalListings || 0)
               setTotalBreakdown(parsedData.totalBreakdown || {})
               setPlatformBreakdown(parsedData.platformBreakdown || { eBay: 0 })
-              // 🔥 캐시 데이터 로드 후 즉시 'all' 뷰 모드로 전환
+              // 🔥 데이터가 있으면 무조건 뷰 모드를 'all'로 설정
               if (cachedListings.length > 0) {
                 console.log('🔄 캐시 데이터 로드 완료 - Active 리스팅 뷰로 즉시 전환', { 
                   listingsCount: cachedListings.length
                 })
                 setViewMode('all')
                 setShowFilter(true)
-                console.log('✅ 캐시 데이터 로드 후 뷰 모드 "all"로 설정 완료')
+                console.log('✅ 캐시 데이터 로드 후 뷰 모드 "all"로 설정 완료 - 제품 표시 예정')
               }
               setLoading(false)
               return
