@@ -1136,8 +1136,15 @@ function Dashboard() {
             const listingsResponse = await axios.get(`${API_BASE_URL}/api/listings`, {
               params: listingsParams
             })
-            setAllListings(listingsResponse.data.listings || [])
-            setTotalListings(listingsResponse.data.listings?.length || 0)
+            const fallbackListings = listingsResponse.data.listings || []
+            setAllListings(fallbackListings)
+            setTotalListings(fallbackListings.length)
+            // 🔥 Fallback 데이터 로드 후 'all' 뷰 모드로 자동 전환
+            if (isStoreConnected && fallbackListings.length > 0) {
+              console.log('🔄 Fallback 데이터 로드 완료 - Active 리스팅 뷰로 자동 전환')
+              setViewMode('all')
+              setShowFilter(true)
+            }
           } catch (fallbackErr) {
             console.error('Fallback also failed:', fallbackErr)
             setError('Failed to fetch listings')
