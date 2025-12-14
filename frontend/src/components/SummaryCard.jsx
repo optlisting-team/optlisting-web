@@ -63,10 +63,21 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
       const userId = response.data?.ebay_user_id || response.data?.user_id || null
       setEbayUserId(userId)
       
-      // 🔥 현재 상태와 동일하면 콜백 호출하지 않음 (불필요한 재실행 방지)
+      // 🔥 현재 상태와 동일하면 콜백 호출하지 않음 (단, 초기 로드 시에는 강제 호출)
       const currentConnected = selectedStore?.connected || false
-      if (hasValidToken === currentConnected) {
-        console.log('✅ eBay 연결 상태 변경 없음 - 콜백 호출 스킵')
+      if (hasValidToken === currentConnected && hasValidToken) {
+        // 이미 연결되어 있고 상태가 동일하면 스킵
+        // 단, 초기 로드 시에는 데이터를 로드하기 위해 강제로 호출
+        console.log('✅ eBay 연결 상태 변경 없음 - 콜백 호출 스킵', { 
+          hasValidToken, 
+          currentConnected,
+          checkingConnection: checkingConnection 
+        })
+        // 🔥 초기 로드 시 (checkingConnection이 처음 true가 된 경우) 강제로 콜백 호출
+        if (checkingConnection && hasValidToken && onConnectionChange) {
+          console.log('🔄 초기 로드 감지 - 연결 상태 콜백 강제 호출 (데이터 로드용)')
+          onConnectionChange(hasValidToken, true) // forceLoad = true
+        }
         setCheckingConnection(false)
         return
       }

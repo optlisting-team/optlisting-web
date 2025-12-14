@@ -1599,6 +1599,33 @@ function Dashboard() {
         })
       }
       
+      // 🔥 초기 로드 시 캐시된 데이터가 있으면 자동으로 제품 표시
+      try {
+        const cachedData = localStorage.getItem(CACHE_KEY)
+        const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
+        
+        if (cachedData && cachedTimestamp) {
+          const cacheAge = Date.now() - parseInt(cachedTimestamp, 10)
+          
+          if (cacheAge < CACHE_DURATION) {
+            console.log('🔄 초기 로드 - 캐시된 데이터 발견, 제품 자동 표시')
+            const parsedData = JSON.parse(cachedData)
+            if (parsedData.listings?.length > 0) {
+              setAllListings(parsedData.listings || [])
+              setTotalListings(parsedData.totalListings || 0)
+              setTotalBreakdown(parsedData.totalBreakdown || {})
+              setPlatformBreakdown(parsedData.platformBreakdown || { eBay: 0 })
+              // 뷰 모드를 'all'로 설정하여 제품 표시
+              setViewMode('all')
+              setShowFilter(true)
+              console.log('✅ 캐시된 제품 자동 표시 완료', { count: parsedData.listings.length })
+            }
+          }
+        }
+      } catch (cacheErr) {
+        console.warn('초기 로드 캐시 확인 실패:', cacheErr)
+      }
+      
       // Note: fetchAllListings() is called when store is connected via handleStoreConnection
       // 캐시가 있으면 자동으로 사용됨
     }
