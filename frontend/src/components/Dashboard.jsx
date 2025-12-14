@@ -1303,9 +1303,9 @@ function Dashboard() {
       }
       return
     } else if (mode === 'all') {
-      // 🔥 Active 카드 클릭은 UI 역할만 (필터/스크롤/강조용)
-      // fetch는 eBay 연결 시 자동으로 실행되므로 여기서는 하지 않음
-      console.log('✅ Active 카드 클릭 - 뷰 모드만 변경 (fetch 없음)')
+      // 🔥 Active 카드 클릭 시 openAllListingsView 사용
+      openAllListingsView()
+      return
     } else if (mode === 'zombies') {
       // Show zombie listings (filter stays open for adjustment) - 캐시 사용
       fetchZombies(filters, false)
