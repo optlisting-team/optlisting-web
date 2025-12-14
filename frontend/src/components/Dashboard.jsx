@@ -1005,20 +1005,19 @@ function Dashboard() {
             if (cacheAge < CACHE_DURATION) {
               console.log(`✅ 캐시된 데이터 사용 (${Math.floor(cacheAge / 1000)}초 전 조회)`)
               const parsedData = JSON.parse(cachedData)
-              setAllListings(parsedData.listings || [])
+              const cachedListings = parsedData.listings || []
+              setAllListings(cachedListings)
               setTotalListings(parsedData.totalListings || 0)
               setTotalBreakdown(parsedData.totalBreakdown || {})
               setPlatformBreakdown(parsedData.platformBreakdown || { eBay: 0 })
-              // 🔥 캐시 데이터 로드 후 'all' 뷰 모드로 자동 전환 (연결 후 자동 표시를 위해)
-              // isStoreConnected 체크 제거 - 데이터가 있으면 무조건 표시
-              if (parsedData.listings?.length > 0) {
-                console.log('🔄 캐시 데이터 로드 완료 - Active 리스팅 뷰로 자동 전환', { 
-                  currentViewMode: viewMode, 
-                  listingsCount: parsedData.listings.length,
-                  isStoreConnected 
+              // 🔥 캐시 데이터 로드 후 즉시 'all' 뷰 모드로 전환
+              if (cachedListings.length > 0) {
+                console.log('🔄 캐시 데이터 로드 완료 - Active 리스팅 뷰로 즉시 전환', { 
+                  listingsCount: cachedListings.length
                 })
                 setViewMode('all')
                 setShowFilter(true)
+                console.log('✅ 캐시 데이터 로드 후 뷰 모드 "all"로 설정 완료')
               }
               setLoading(false)
               return
@@ -1109,21 +1108,15 @@ function Dashboard() {
           console.warn('캐시 저장 실패:', cacheErr)
         }
         
-        // 🔥 데이터 로드 완료 후 'all' 뷰 모드로 자동 전환 (연결 후 자동 표시를 위해)
-        // isStoreConnected 체크 제거 - 데이터가 있으면 무조건 표시
+        // 🔥 데이터 로드 완료 후 즉시 'all' 뷰 모드로 전환 (동기적으로 처리)
         if (transformedListings.length > 0) {
-          console.log('🔄 fetchAllListings 완료 - Active 리스팅 뷰로 자동 전환', { 
-            currentViewMode: viewMode, 
-            listingsCount: transformedListings.length,
-            isStoreConnected,
-            willSetViewMode: 'all'
+          console.log('🔄 fetchAllListings 완료 - Active 리스팅 뷰로 즉시 전환', { 
+            listingsCount: transformedListings.length
           })
-          // 뷰 모드 강제 설정 (비동기 상태 업데이트 문제 해결)
-          setTimeout(() => {
-            setViewMode('all')
-            setShowFilter(true)
-            console.log('✅ 뷰 모드 "all"로 설정 완료')
-          }, 0)
+          // 즉시 뷰 모드 설정 (setTimeout 제거)
+          setViewMode('all')
+          setShowFilter(true)
+          console.log('✅ 뷰 모드 "all"로 설정 완료')
         }
         
         setError(null)
@@ -1153,14 +1146,14 @@ function Dashboard() {
             const fallbackListings = listingsResponse.data.listings || []
             setAllListings(fallbackListings)
             setTotalListings(fallbackListings.length)
-            // 🔥 Fallback 데이터 로드 후 'all' 뷰 모드로 자동 전환
-            // isStoreConnected 체크 제거 - 데이터가 있으면 무조건 표시
+            // 🔥 Fallback 데이터 로드 후 즉시 'all' 뷰 모드로 전환
             if (fallbackListings.length > 0) {
-              console.log('🔄 Fallback 데이터 로드 완료 - Active 리스팅 뷰로 자동 전환', {
-                isStoreConnected
+              console.log('🔄 Fallback 데이터 로드 완료 - Active 리스팅 뷰로 즉시 전환', {
+                listingsCount: fallbackListings.length
               })
               setViewMode('all')
               setShowFilter(true)
+              console.log('✅ Fallback 데이터 로드 후 뷰 모드 "all"로 설정 완료')
             }
           } catch (fallbackErr) {
             console.error('Fallback also failed:', fallbackErr)
@@ -1619,10 +1612,10 @@ function Dashboard() {
   // Fetch data when store is connected (handled by handleStoreConnection callback)
   // This useEffect is removed - connection is managed via onConnectionChange prop
 
-  // 🔥 allListings에 데이터가 있고 viewMode가 'total'이면 자동으로 'all'로 전환
+  // 🔥 allListings에 데이터가 있고 viewMode가 'total'이면 자동으로 'all'로 전환 (백업 로직)
   useEffect(() => {
     if (allListings.length > 0 && viewMode === 'total') {
-      console.log('🔄 allListings 데이터 감지 - 뷰 모드를 "all"로 자동 전환', {
+      console.log('🔄 [백업] allListings 데이터 감지 - 뷰 모드를 "all"로 자동 전환', {
         listingsCount: allListings.length,
         currentViewMode: viewMode
       })
