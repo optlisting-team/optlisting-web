@@ -2172,11 +2172,21 @@ function Dashboard() {
                     {error}
                   </div>
                 ) : (() => {
-                  // 🔥 eBay 연결 시 allListings 사용 (loading/empty/data 상태 모두)
-                  // 🔥 eBay 연결 시 allListings 사용 (loading/empty/data 상태 모두)
+                  // 🔥 테이블이 사용하는 데이터: eBay 연결 시 allListings 사용 (props 기반)
+                  // 🔥 케이스 A: 테이블이 props 기반이므로 Dashboard의 allListings state를 그대로 사용
                   const currentData = (viewMode === 'all' || 
                     (isStoreConnected && (allListings.length > 0 || totalListings > 0)) || 
                     (allListings.length > 0 && viewMode === 'total')) ? allListings : zombies
+                  
+                  // 🔥 [RENDER] 테이블이 사용하는 데이터 확인 로그
+                  console.log('[RENDER] 테이블 데이터 확인:', {
+                    ebayConnected: isStoreConnected,
+                    listingsStateLength: allListings.length,
+                    currentDataLength: currentData.length,
+                    viewMode: viewMode,
+                    usingAllListings: currentData === allListings
+                  })
+                  
                   const isEmpty = currentData.length === 0
                   
                   if (isEmpty) {
