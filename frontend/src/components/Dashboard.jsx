@@ -956,6 +956,12 @@ function Dashboard() {
   }
 
   const fetchAllListings = async (forceRefresh = false) => {
+    // 🔥 중복 실행 방지: 이미 로딩 중이면 스킵
+    if (loading && !forceRefresh) {
+      console.log('⏭️ fetchAllListings 이미 실행 중 - 스킵', { loading, forceRefresh })
+      return
+    }
+    
     try {
       // 🔥 데이터가 이미 있고 캐시가 유효하면 API 호출하지 않음 (로딩 상태도 설정하지 않음)
       if (!forceRefresh && allListings.length > 0) {
@@ -1100,11 +1106,24 @@ function Dashboard() {
           setAllListings(transformedListings)
           setTotalListings(transformedListings.length)
           
+          // 🔥 State 동기화 확인 로그
           console.log('✅ allListings 상태 업데이트 완료', { 
             count: transformedListings.length,
             viewMode: 'all (강제 설정)',
-            willShowProducts: true
+            willShowProducts: true,
+            allListingsLength: transformedListings.length,
+            totalListings: transformedListings.length
           })
+          
+          // 🔥 다음 렌더 사이클에서도 확인
+          setTimeout(() => {
+            console.log('🔍 State 동기화 확인:', {
+              allListingsLength: allListings.length,
+              totalListings: totalListings,
+              viewMode: viewMode,
+              isStoreConnected: isStoreConnected
+            })
+          }, 100)
         } else {
           setAllListings(transformedListings)
           setTotalListings(transformedListings.length)
@@ -1688,16 +1707,28 @@ function Dashboard() {
   // 🔥 eBay 연결 상태를 감지하여 자동으로 listings fetch
   useEffect(() => {
     if (isStoreConnected && !listingsLoadedOnceRef.current) {
-      console.log('🔄 eBay 연결 감지 - 자동으로 listings fetch 시작')
-      listingsLoadedOnceRef.current = true
+      console.log('🔄 eBay 연결 감지 - 자동으로 listings fetch 시작', {
+        isStoreConnected,
+        listingsLoadedOnce: listingsLoadedOnceRef.current,
+        currentAllListingsLength: allListings.length,
+        currentTotalListings: totalListings,
+        currentViewMode: viewMode
+      })
       
-      // 뷰 모드를 'all'로 설정하여 제품 목록이 자동으로 표시되도록 함
+      // 🔥 뷰 모드를 먼저 'all'로 설정하여 제품 목록이 자동으로 표시되도록 함
       setViewMode('all')
       setShowFilter(true)
       
+      // 🔥 ref를 먼저 설정하여 중복 실행 방지
+      listingsLoadedOnceRef.current = true
+      
       // Active listings 자동 조회
       fetchAllListings(false).then(() => {
-        console.log('✅ eBay 연결 후 자동 listings fetch 완료')
+        console.log('✅ eBay 연결 후 자동 listings fetch 완료', {
+          allListingsLength: allListings.length,
+          totalListings: totalListings,
+          viewMode: viewMode
+        })
       }).catch((err) => {
         console.error('eBay 연결 후 자동 listings fetch 실패:', err)
         listingsLoadedOnceRef.current = false // 실패 시 재시도 가능하도록
@@ -1705,6 +1736,7 @@ function Dashboard() {
     } else if (!isStoreConnected) {
       // 연결 해제 시 ref 초기화
       listingsLoadedOnceRef.current = false
+      console.log('🗑️ eBay 연결 해제 - listingsLoadedOnceRef 초기화')
     }
   }, [isStoreConnected])
 
@@ -1972,9 +2004,9 @@ function Dashboard() {
           )}
         />
 
-        {/* Initial Statistical View - Show when viewMode === 'total' and NO data available */}
-        {/* 🔥 allListings가 비어있을 때만 표시 (데이터가 있으면 제품 목록 표시) */}
-        {viewMode === 'total' && !showFilter && allListings.length === 0 && totalListings === 0 && (
+        {/* Initial Statistical View - Show when NO data available AND NOT connected */}
+        {/* 🔥 eBay 연결 안 됨 또는 데이터 없을 때만 표시 */}
+        {!isStoreConnected && viewMode === 'total' && !showFilter && allListings.length === 0 && totalListings === 0 && (
           <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg p-8 mt-8 text-center">
             <p className="text-lg text-zinc-300 dark:text-zinc-300 mb-2">
               📊 <strong className="text-white">Ready to Analyze</strong>
@@ -1999,8 +2031,11 @@ function Dashboard() {
 
         {/* Dynamic Layout: Full Width for 'all', Split View for 'zombies' */}
         {/* 🔥 항상 렌더링: eBay 연결 시 listings 영역 표시 (loading/empty/data 상태 모두 표시) */}
-        {/* Show products if: viewMode is not 'total'/'history', OR data exists, OR store is connected */}
-        {((viewMode !== 'total' && viewMode !== 'history') || (allListings.length > 0 && viewMode === 'total') || (isStoreConnected && viewMode === 'total')) && (
+        {/* 🔥 항상 렌더링: eBay 연결 시 listings 영역 표시 (loading/empty/data 상태 모두 표시) */}
+        {/* Show products if: viewMode is not 'total'/'history', OR (eBay connected AND has data), OR (has data) */}
+        {((viewMode !== 'total' && viewMode !== 'history') || 
+          (isStoreConnected && (allListings.length > 0 || totalListings > 0)) || 
+          (allListings.length > 0 && viewMode === 'total')) && (
           <div className={`flex gap-8 transition-all duration-300 ${
             viewMode === 'all' ? '' : ''
           }`}>
@@ -2014,7 +2049,9 @@ function Dashboard() {
             }`}>
               {/* Active View - With Filter */}
               {/* 🔥 eBay 연결 시 항상 표시 (loading/empty/data 상태 모두) */}
-              {(viewMode === 'all' || (allListings.length > 0 && viewMode === 'total') || (isStoreConnected && viewMode === 'total')) && (
+              {(viewMode === 'all' || 
+                (isStoreConnected && (allListings.length > 0 || totalListings > 0)) || 
+                (allListings.length > 0 && viewMode === 'total')) && (
                 <div className="mt-6 space-y-4">
                   {/* Header */}
                   <div className="flex items-center justify-between">
@@ -2095,13 +2132,18 @@ function Dashboard() {
                   </div>
                 ) : (() => {
                   // 🔥 eBay 연결 시 allListings 사용 (loading/empty/data 상태 모두)
-                  const currentData = (viewMode === 'all' || (allListings.length > 0 && viewMode === 'total') || (isStoreConnected && viewMode === 'total')) ? allListings : zombies
+                  // 🔥 eBay 연결 시 allListings 사용 (loading/empty/data 상태 모두)
+                  const currentData = (viewMode === 'all' || 
+                    (isStoreConnected && (allListings.length > 0 || totalListings > 0)) || 
+                    (allListings.length > 0 && viewMode === 'total')) ? allListings : zombies
                   const isEmpty = currentData.length === 0
                   
                   if (isEmpty) {
                     return (
                       <div className="p-8 text-center text-slate-500">
-                        {(viewMode === 'all' || (allListings.length > 0 && viewMode === 'total') || (isStoreConnected && viewMode === 'total'))
+                        {(viewMode === 'all' || 
+                          (isStoreConnected && (allListings.length > 0 || totalListings > 0)) || 
+                          (allListings.length > 0 && viewMode === 'total'))
                           ? (loading 
                               ? "Loading listings..." 
                               : isStoreConnected 
