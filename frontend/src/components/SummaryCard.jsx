@@ -93,7 +93,13 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
         onConnectionChange(hasValidToken)
       }
     } catch (err) {
-      console.error('eBay 토큰 상태 확인 실패:', err)
+      // 🔥 타임아웃 에러는 조용히 처리 (서버가 느릴 수 있음)
+      const isTimeout = err.code === 'ECONNABORTED' || err.message?.includes('timeout')
+      if (isTimeout) {
+        console.warn('⏱️ eBay 연결 상태 확인 타임아웃 (서버 응답 지연 가능)')
+      } else {
+        console.error('eBay 토큰 상태 확인 실패:', err)
+      }
       
       // 🔥 에러 발생 시에도 기존 연결 상태 유지 (데이터 보존)
       // 네트워크 에러나 서버 에러는 일시적일 수 있으므로 연결 해제하지 않음
@@ -116,11 +122,14 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
         }
       } else {
         // 🔥 네트워크 에러나 기타 에러는 연결 상태 유지 (데이터 보존)
-        console.log('⚠️ 네트워크/서버 에러 - 연결 상태 유지 (데이터 보존)', {
-          error: err.message,
-          status: err.response?.status,
-          currentConnected
-        })
+        // 타임아웃 에러는 로그를 최소화하여 콘솔 스팸 방지
+        if (!isTimeout) {
+          console.log('⚠️ 네트워크/서버 에러 - 연결 상태 유지 (데이터 보존)', {
+            error: err.message,
+            status: err.response?.status,
+            currentConnected
+          })
+        }
         // 연결 상태는 유지하고 콜백 호출하지 않음
       }
       
