@@ -2073,37 +2073,37 @@ function Dashboard() {
           )}
         />
 
-        {/* 🔥 FORCE 렌더: ebayConnected && forcedLen > 0 이면 Ready to Analyze 대신 테이블 렌더 */}
+        {/* 🔥 FORCE 렌더: ebayConnected && forcedLen > 0 이면 Ready to Analyze 완전히 숨김 */}
         {(() => {
           const forcedLen = Array.isArray(allListings) ? allListings.length : 0
           const ebayConnected = isStoreConnected
           
-          // 🔥 FORCE 렌더 조건: ebayConnected && forcedLen > 0 이면 테이블을 여기서 바로 렌더
+          console.log('[READY TO ANALYZE CHECK]', {
+            ebayConnected,
+            forcedLen,
+            viewMode,
+            shouldHide: ebayConnected && forcedLen > 0
+          })
+          
+          // 🔥 FORCE 렌더 조건: ebayConnected && forcedLen > 0 이면 Ready to Analyze 완전히 숨김
           if (ebayConnected && forcedLen > 0) {
-            console.log('[FORCE RENDER] Ready to Analyze 블록에서 테이블 FORCE 렌더:', {
-              ebayConnected,
-              forcedLen,
-              viewMode
-            })
-            // 테이블은 아래에서 렌더되므로 여기서는 null 반환 (Ready to Analyze 숨김)
-            return null
+            return null // Ready to Analyze 숨김
           }
           
           // 🔥 ebayConnected가 false이거나 forcedLen이 0이면 Ready to Analyze 표시
-          if (!ebayConnected && viewMode === 'total') {
-            return (
-              <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg p-8 mt-8 text-center">
-                <p className="text-lg text-zinc-300 dark:text-zinc-300 mb-2">
-                  📊 <strong className="text-white">Ready to Analyze</strong>
-                </p>
-                <p className="text-sm text-zinc-400 dark:text-zinc-400 mb-4">
-                  Connect your eBay account to start analyzing your listings.
-                </p>
-              </div>
-            )
-          }
-          
-          return null
+          return (
+            <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg p-8 mt-8 text-center">
+              <p className="text-lg text-zinc-300 dark:text-zinc-300 mb-2">
+                📊 <strong className="text-white">Ready to Analyze</strong>
+              </p>
+              <p className="text-sm text-zinc-400 dark:text-zinc-400 mb-4">
+                {!ebayConnected 
+                  ? "Connect your eBay account to start analyzing your listings."
+                  : "No listings found. Please sync from eBay or check your connection."
+                }
+              </p>
+            </div>
+          )
         })()}
         
         {/* 🔥 권장 렌더 분기 2: listingsLoading -> Skeleton/Loading */}
@@ -2234,7 +2234,7 @@ function Dashboard() {
                     {error}
                   </div>
                 ) : (() => {
-                  // 🔥 최대한 단순화: isStoreConnected && allListings.length > 0 이면 무조건 테이블 렌더
+                  // 🔥 최대한 단순화: isStoreConnected && allListings.length > 0 이면 무조건 테이블 렌더 (viewMode 무관)
                   const ebayConnected = isStoreConnected
                   const hasData = Array.isArray(allListings) && allListings.length > 0
                   
@@ -2246,10 +2246,10 @@ function Dashboard() {
                     shouldRenderTable: ebayConnected && hasData
                   })
                   
-                  // 🔥 강제 렌더링: ebayConnected && hasData 이면 무조건 테이블 렌더
+                  // 🔥 강제 렌더링: ebayConnected && hasData 이면 무조건 테이블 렌더 (viewMode 무관)
                   if (ebayConnected && hasData) {
-                    // viewMode에 따라 데이터 선택
-                    const tableData = viewMode === 'zombies' ? zombies : allListings
+                    // viewMode에 따라 데이터 선택 (zombies 모드가 아니면 allListings 사용)
+                    const tableData = (viewMode === 'zombies' && zombies.length > 0) ? zombies : allListings
                     
                     return (
                       <div className="p-6">
