@@ -81,7 +81,7 @@ function Sidebar() {
           <div>
             <span className="text-xl font-bold text-white tracking-tight">OptListing</span>
             <div className="text-[10px] font-medium text-zinc-500 tracking-widest uppercase">
-              v1.3.31
+              v1.3.32
             </div>
           </div>
         </Link>

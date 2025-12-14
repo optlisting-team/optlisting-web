@@ -1718,19 +1718,21 @@ function Dashboard() {
   // This useEffect is removed - connection is managed via onConnectionChange prop
 
   // 🔥 allListings에 데이터가 있고 연결되어 있으면 무조건 'all'로 전환 (강제)
+  // 주의: 이 useEffect는 openAllListingsView()와 중복될 수 있으므로, 
+  // openAllListingsView()가 먼저 실행되도록 순서 조정 필요
   useEffect(() => {
     if (allListings.length > 0 && isStoreConnected) {
       // 🔥 데이터가 있고 연결되어 있으면 무조건 'all' 뷰 모드로 전환 (zombies, queue 제외)
-      if (viewMode !== 'all' && viewMode !== 'zombies' && viewMode !== 'queue') {
+      // 단, 이미 openAllListingsView()가 실행되었으면 스킵
+      if (viewMode !== 'all' && viewMode !== 'zombies' && viewMode !== 'queue' && !openedAllListingsOnceRef.current) {
         console.log('🔄 [강제] allListings 데이터 + 연결 감지 - 뷰 모드를 "all"로 즉시 전환', {
           listingsCount: allListings.length,
           currentViewMode: viewMode,
           isStoreConnected,
           firstItem: allListings[0]?.title
         })
-        setViewMode('all')
-        setShowFilter(true)
-        console.log('✅ [강제] 뷰 모드 "all"로 전환 완료 - 제품 목록 표시 예정')
+        // openAllListingsView()와 동일한 로직 사용
+        openAllListingsView()
       }
     }
   }, [allListings.length, isStoreConnected, viewMode])
