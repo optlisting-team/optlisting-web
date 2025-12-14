@@ -975,6 +975,15 @@ function Dashboard() {
             const cacheAge = Date.now() - parseInt(cachedTimestamp, 10)
             if (cacheAge < CACHE_DURATION) {
               console.log(`✅ 데이터가 이미 있고 캐시 유효 - API 호출 건너뜀 (${Math.floor(cacheAge / 1000)}초 전 조회)`)
+              // 🔥 데이터가 있으면 무조건 뷰 모드를 'all'로 설정하여 제품 목록 표시
+              if (viewMode !== 'all') {
+                console.log('🔄 기존 데이터 감지 - 뷰 모드를 "all"로 설정', { 
+                  listingsCount: allListings.length,
+                  currentViewMode: viewMode
+                })
+                setViewMode('all')
+                setShowFilter(true)
+              }
               return // 데이터가 이미 있고 캐시가 유효하면 API 호출하지 않음
             }
           }
@@ -1152,6 +1161,7 @@ function Dashboard() {
         }
         
         setError(null)
+        setLoading(false) // 🔥 로딩 상태 해제
         
       } catch (ebayErr) {
         console.error('eBay API Error:', ebayErr)
@@ -1976,7 +1986,8 @@ function Dashboard() {
         />
 
         {/* Initial Statistical View - Show when viewMode === 'total' and NO data available */}
-        {viewMode === 'total' && !showFilter && allListings.length === 0 && (
+        {/* 🔥 allListings가 비어있을 때만 표시 (데이터가 있으면 제품 목록 표시) */}
+        {viewMode === 'total' && !showFilter && allListings.length === 0 && totalListings === 0 && (
           <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg p-8 mt-8 text-center">
             <p className="text-lg text-zinc-300 dark:text-zinc-300 mb-2">
               📊 <strong className="text-white">Ready to Analyze</strong>
