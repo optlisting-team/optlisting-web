@@ -1186,16 +1186,17 @@ function Dashboard() {
               params: listingsParams
             })
             const fallbackListings = listingsResponse.data.listings || []
+            // 🔥 Fallback 데이터 설정과 동시에 뷰 모드도 즉시 설정
             setAllListings(fallbackListings)
             setTotalListings(fallbackListings.length)
-            // 🔥 Fallback 데이터 로드 후 즉시 'all' 뷰 모드로 전환
+            // 🔥 데이터가 있으면 무조건 뷰 모드를 'all'로 설정
             if (fallbackListings.length > 0) {
               console.log('🔄 Fallback 데이터 로드 완료 - Active 리스팅 뷰로 즉시 전환', {
                 listingsCount: fallbackListings.length
               })
               setViewMode('all')
               setShowFilter(true)
-              console.log('✅ Fallback 데이터 로드 후 뷰 모드 "all"로 설정 완료')
+              console.log('✅ Fallback 데이터 로드 후 뷰 모드 "all"로 설정 완료 - 제품 표시 예정')
             }
           } catch (fallbackErr) {
             console.error('Fallback also failed:', fallbackErr)
@@ -1653,14 +1654,20 @@ function Dashboard() {
             console.log('🔄 초기 로드 - 캐시된 데이터 발견, 제품 자동 표시')
             const parsedData = JSON.parse(cachedData)
             if (parsedData.listings?.length > 0) {
-              setAllListings(parsedData.listings || [])
+              const cachedListings = parsedData.listings || []
+              // 🔥 초기 로드 시 데이터 설정과 동시에 뷰 모드도 즉시 설정
+              setAllListings(cachedListings)
               setTotalListings(parsedData.totalListings || 0)
               setTotalBreakdown(parsedData.totalBreakdown || {})
               setPlatformBreakdown(parsedData.platformBreakdown || { eBay: 0 })
-              // 뷰 모드를 'all'로 설정하여 제품 표시
+              // 🔥 데이터가 있으면 무조건 뷰 모드를 'all'로 설정
               setViewMode('all')
               setShowFilter(true)
-              console.log('✅ 캐시된 제품 자동 표시 완료', { count: parsedData.listings.length })
+              console.log('✅ 캐시된 제품 자동 표시 완료', { 
+                count: cachedListings.length,
+                viewMode: 'all (강제 설정)',
+                willShowProducts: true
+              })
             }
           }
         }
