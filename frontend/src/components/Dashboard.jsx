@@ -2293,6 +2293,12 @@ function Dashboard() {
                   )
                   
                   // 🔥 ebayConnected && len > 0이 아니면 ReadyToAnalyze 표시
+                  console.log('[FORCE_RENDER] 테이블 렌더 스킵 - 조건 미충족:', {
+                    ebayConnected,
+                    len,
+                    reason: !ebayConnected ? 'not connected' : len === 0 ? 'no data' : 'unknown'
+                  })
+                  
                   return (
                     <div className="p-8 text-center text-slate-500">
                       {!ebayConnected 
