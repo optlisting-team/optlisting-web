@@ -1672,11 +1672,20 @@ function Dashboard() {
       if (viewMode === 'total') {
         console.log('🔄 [강제] allListings 데이터 감지 - 뷰 모드를 "all"로 즉시 전환', {
           listingsCount: allListings.length,
-          currentViewMode: viewMode
+          currentViewMode: viewMode,
+          firstItem: allListings[0]?.title
         })
         setViewMode('all')
         setShowFilter(true)
+        console.log('✅ [강제] 뷰 모드 "all"로 전환 완료 - 제품 목록 표시 예정')
+      } else {
+        console.log('✅ allListings 데이터 있음, viewMode:', viewMode, {
+          listingsCount: allListings.length,
+          shouldShowProducts: viewMode === 'all' || (allListings.length > 0 && viewMode === 'total')
+        })
       }
+    } else {
+      console.log('⚠️ allListings가 비어있음', { viewMode, totalListings })
     }
   }, [allListings.length, viewMode])
 
