@@ -297,13 +297,17 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
               // 🔥 연결 버튼 클릭 시 토큰 상태 확인
               await checkEbayTokenStatus()
               
-              // 이미 연결되어 있으면 OAuth 시작하지 않음
+              // 🔥 이미 연결되어 있으면 제품 조회 및 표시 (OAuth 시작하지 않음)
               if (selectedStore?.connected) {
-                console.log('✅ 이미 eBay에 연결되어 있습니다')
+                console.log('✅ 이미 eBay에 연결되어 있습니다 - 제품 조회 시작')
+                // 부모 컴포넌트에 연결 상태 알림 (제품 조회 트리거)
+                if (onConnectionChange) {
+                  onConnectionChange(true)
+                }
                 return
               }
               
-              // OAuth 시작 (디버깅 로그 제거하여 깔끔하게)
+              // 연결되어 있지 않으면 OAuth 시작
               const oauthUrl = `${API_BASE_URL}/api/ebay/auth/start?user_id=${CURRENT_USER_ID}`
               console.log('🔗 Connect 버튼 클릭 - OAuth 시작')
               window.location.href = oauthUrl
