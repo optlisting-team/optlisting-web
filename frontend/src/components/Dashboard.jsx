@@ -2009,13 +2009,13 @@ function Dashboard() {
                     {error}
                   </div>
                 ) : (() => {
-                  const currentData = viewMode === 'all' ? allListings : zombies
+                  const currentData = (viewMode === 'all' || (allListings.length > 0 && viewMode === 'total')) ? allListings : zombies
                   const isEmpty = currentData.length === 0
                   
                   if (isEmpty) {
                     return (
                       <div className="p-8 text-center text-slate-500">
-                        {viewMode === 'all' 
+                        {(viewMode === 'all' || (allListings.length > 0 && viewMode === 'total')) 
                           ? "No listings found."
                           : queue.length > 0 
                             ? "All items have been moved to the queue. Apply new filters to see more candidates."
