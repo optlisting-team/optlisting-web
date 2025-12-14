@@ -127,7 +127,18 @@ function Dashboard() {
   const [error, setError] = useState(null)
   const [selectedIds, setSelectedIds] = useState([])
   const [queue, setQueue] = useState([])
-  const [viewMode, setViewMode] = useState('total') // 항상 통계 뷰로 시작 (좀비 배너가 강조됨)
+  const [viewMode, setViewModeRaw] = useState('total') // 항상 통계 뷰로 시작 (좀비 배너가 강조됨)
+  
+  // 🔥 setViewMode를 래핑해서 모든 변경 로그 찍기
+  const setViewMode = (next) => {
+    const from = viewMode
+    console.log('[setViewMode]', { 
+      from, 
+      to: next, 
+      stack: new Error().stack.split('\n').slice(1, 4).join('\n') // 상위 3개 스택만
+    })
+    setViewModeRaw(next)
+  }
   const [historyLogs, setHistoryLogs] = useState(DEMO_MODE ? [
     { id: '1', title: 'Wireless Earbuds TWS - Model X1', sku: 'B012345678', supplier: 'Amazon', price: 29.99, deleted_at: '2024-12-05T10:30:00Z', reason: 'Zero sales in 30 days' },
     { id: '2', title: 'LED Strip Lights RGB', sku: 'WM87654321', supplier: 'Walmart', price: 15.99, deleted_at: '2024-12-05T09:15:00Z', reason: 'Low impressions' },
@@ -1754,11 +1765,22 @@ function Dashboard() {
 
   // Handle URL query param for view mode
   useEffect(() => {
+    // 🔥 guard: listingsLength > 0 이면 초기화 effect가 viewMode를 변경하지 못하게 함
+    if (allListings.length > 0 || totalListings > 0) {
+      console.log('[URL PARAM] listings가 있으므로 viewMode 변경 스킵', {
+        viewParam,
+        allListingsLength: allListings.length,
+        totalListings: totalListings,
+        currentViewMode: viewMode
+      })
+      return
+    }
+    
     if (viewParam === 'history') {
       setViewMode('history')
       fetchHistory()
     }
-  }, [viewParam])
+  }, [viewParam, allListings.length, totalListings, viewMode])
 
   const handleExport = async (mode, itemsToExport = null) => {
     // Use provided items or default to full queue
@@ -2072,11 +2094,27 @@ function Dashboard() {
         )}
 
         {/* Dynamic Layout: Full Width for 'all', Split View for 'zombies' */}
-        {/* 🔥 권장 렌더 분기 4: ebayConnected && listings.length > 0 이면 무조건 ListingsTable 렌더 */}
-        {/* 조건 단순화: viewMode가 'total'/'history'가 아니거나, eBay 연결되고 데이터가 있으면 무조건 표시 */}
-        {((viewMode !== 'total' && viewMode !== 'history') || 
-          (isStoreConnected && (allListings.length > 0 || totalListings > 0)) || 
-          (allListings.length > 0 && viewMode === 'total')) && (
+        {/* 🔥 강제 단순화: ebayConnected && listingsLength > 0 이면 무조건 테이블 렌더 (임시) */}
+        {(() => {
+          const shouldRender = viewMode !== 'history' && (
+            (isStoreConnected && (allListings.length > 0 || totalListings > 0)) ||
+            viewMode === 'all' ||
+            (allListings.length > 0 && viewMode === 'total')
+          )
+          
+          console.log('[RENDER CONDITION] 테이블 렌더 조건 확인:', {
+            ebayConnected: isStoreConnected,
+            listingsLength: allListings.length,
+            totalListings: totalListings,
+            viewMode: viewMode,
+            shouldRender: shouldRender,
+            condition1: isStoreConnected && (allListings.length > 0 || totalListings > 0),
+            condition2: viewMode === 'all',
+            condition3: allListings.length > 0 && viewMode === 'total'
+          })
+          
+          return shouldRender
+        })() && (
           <div className={`flex gap-8 transition-all duration-300 ${
             viewMode === 'all' ? '' : ''
           }`}>
