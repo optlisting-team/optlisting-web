@@ -1090,12 +1090,19 @@ function Dashboard() {
           firstItem: transformedListings[0]?.title 
         })
         
+        // 🔥 데이터 설정과 동시에 뷰 모드도 즉시 설정 (동기적으로)
         setAllListings(transformedListings)
         setTotalListings(transformedListings.length)
+        // 🔥 데이터가 있으면 무조건 뷰 모드를 'all'로 설정
+        if (transformedListings.length > 0) {
+          setViewMode('all')
+          setShowFilter(true)
+        }
         
         console.log('✅ allListings 상태 업데이트 완료', { 
           count: transformedListings.length,
-          viewMode: viewMode 
+          viewMode: 'all (강제 설정)',
+          willShowProducts: true
         })
         
         // 공급처별 브레이크다운 계산
@@ -1121,16 +1128,23 @@ function Dashboard() {
           console.warn('캐시 저장 실패:', cacheErr)
         }
         
-        // 🔥 데이터 로드 완료 후 즉시 'all' 뷰 모드로 전환 (동기적으로 처리)
+        // 🔥 데이터 로드 완료 후 즉시 'all' 뷰 모드로 전환 (강제 설정)
         if (transformedListings.length > 0) {
           console.log('🔄 fetchAllListings 완료 - Active 리스팅 뷰로 즉시 전환', { 
             listingsCount: transformedListings.length,
             currentViewMode: viewMode,
             willSetViewMode: 'all'
           })
-          // 즉시 뷰 모드 설정 (setTimeout 제거)
+          // 🔥 즉시 뷰 모드 설정 (React 상태 업데이트는 비동기이지만 즉시 호출)
           setViewMode('all')
           setShowFilter(true)
+          // 🔥 추가 보장: 다음 렌더 사이클에서도 확인
+          setTimeout(() => {
+            if (viewMode !== 'all') {
+              console.log('⚠️ 뷰 모드가 여전히 "all"이 아님 - 재설정', { currentViewMode: viewMode })
+              setViewMode('all')
+            }
+          }, 100)
           console.log('✅ 뷰 모드 "all"로 설정 완료 - 제품 목록 표시 예정')
         } else {
           console.warn('⚠️ transformedListings가 비어있음 - 제품 목록 표시 불가')
