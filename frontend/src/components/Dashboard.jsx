@@ -943,13 +943,18 @@ function Dashboard() {
         setShowFilter(true)
       } else {
         // 🔥 뷰 모드를 먼저 'all'로 설정하여 제품 목록이 자동으로 표시되도록 함
+        console.log('🔄 handleStoreConnection - 뷰 모드를 "all"로 설정', { currentViewMode: viewMode })
         setViewMode('all')
         setShowFilter(true)
         // Active 리스팅 자동 조회 (완료 후에도 뷰 모드 유지)
         fetchAllListings(false).then(() => {
           // 🔥 데이터 로드 완료 후에도 'all' 뷰 모드 유지 확인
-          console.log('✅ 제품 로드 완료 - Active 리스팅 자동 표시')
-          setViewMode('all')
+          console.log('✅ 제품 로드 완료 - Active 리스팅 자동 표시', { currentViewMode: viewMode })
+          // 뷰 모드가 'all'이 아니면 강제로 설정
+          if (viewMode !== 'all') {
+            console.log('⚠️ 뷰 모드가 "all"이 아님 - 강제로 설정', { currentViewMode: viewMode })
+            setViewMode('all')
+          }
         }).catch((err) => {
           console.error('제품 로드 실패:', err)
         })
@@ -1107,13 +1112,18 @@ function Dashboard() {
         // 🔥 데이터 로드 완료 후 'all' 뷰 모드로 자동 전환 (연결 후 자동 표시를 위해)
         // isStoreConnected 체크 제거 - 데이터가 있으면 무조건 표시
         if (transformedListings.length > 0) {
-          console.log('🔄 제품 로드 완료 - Active 리스팅 뷰로 자동 전환', { 
+          console.log('🔄 fetchAllListings 완료 - Active 리스팅 뷰로 자동 전환', { 
             currentViewMode: viewMode, 
             listingsCount: transformedListings.length,
-            isStoreConnected 
+            isStoreConnected,
+            willSetViewMode: 'all'
           })
-          setViewMode('all')
-          setShowFilter(true)
+          // 뷰 모드 강제 설정 (비동기 상태 업데이트 문제 해결)
+          setTimeout(() => {
+            setViewMode('all')
+            setShowFilter(true)
+            console.log('✅ 뷰 모드 "all"로 설정 완료')
+          }, 0)
         }
         
         setError(null)
