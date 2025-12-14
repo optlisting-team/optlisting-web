@@ -1085,8 +1085,18 @@ function Dashboard() {
           }
         })
         
+        console.log('📦 제품 데이터 설정 시작', { 
+          count: transformedListings.length,
+          firstItem: transformedListings[0]?.title 
+        })
+        
         setAllListings(transformedListings)
         setTotalListings(transformedListings.length)
+        
+        console.log('✅ allListings 상태 업데이트 완료', { 
+          count: transformedListings.length,
+          viewMode: viewMode 
+        })
         
         // 공급처별 브레이크다운 계산
         const supplierBreakdown = {}
@@ -1114,12 +1124,16 @@ function Dashboard() {
         // 🔥 데이터 로드 완료 후 즉시 'all' 뷰 모드로 전환 (동기적으로 처리)
         if (transformedListings.length > 0) {
           console.log('🔄 fetchAllListings 완료 - Active 리스팅 뷰로 즉시 전환', { 
-            listingsCount: transformedListings.length
+            listingsCount: transformedListings.length,
+            currentViewMode: viewMode,
+            willSetViewMode: 'all'
           })
           // 즉시 뷰 모드 설정 (setTimeout 제거)
           setViewMode('all')
           setShowFilter(true)
-          console.log('✅ 뷰 모드 "all"로 설정 완료')
+          console.log('✅ 뷰 모드 "all"로 설정 완료 - 제품 목록 표시 예정')
+        } else {
+          console.warn('⚠️ transformedListings가 비어있음 - 제품 목록 표시 불가')
         }
         
         setError(null)
