@@ -1825,7 +1825,7 @@ function Dashboard() {
       return
     }
 
-    // 동시 요청 방지
+    // Prevent concurrent requests
     if (loading) {
       console.warn('Export already in progress')
       return
@@ -1937,7 +1937,7 @@ function Dashboard() {
       return
     }
 
-    // 동시 요청 방지
+    // Prevent concurrent requests
     if (loading) {
       console.warn('Export already in progress')
       return
@@ -1992,16 +1992,16 @@ function Dashboard() {
       link.remove()
       window.URL.revokeObjectURL(url) // Prevent memory leak
     } catch (err) {
-      let errorMessage = `CSV 추출 중 오류가 발생했습니다.`
+      let errorMessage = `An error occurred while extracting CSV.`
       
       if (err.code === 'ECONNABORTED') {
-        errorMessage = '요청 시간이 초과되었습니다. 다시 시도해주세요.'
+        errorMessage = 'Request timeout. Please try again.'
       } else if (err.response) {
-        errorMessage = `서버 오류: ${err.response.status} - ${err.response.statusText || err.response.data?.detail || '알 수 없는 오류'}`
+        errorMessage = `Server error: ${err.response.status} - ${err.response.statusText || err.response.data?.detail || 'Unknown error'}`
       } else if (err.request) {
-        errorMessage = '서버에 연결할 수 없습니다. 네트워크 연결을 확인해주세요.'
+        errorMessage = 'Unable to connect to server. Please check your network connection.'
       } else {
-        errorMessage = `CSV 추출 실패: ${err.message || '알 수 없는 오류'}`
+        errorMessage = `CSV extraction failed: ${err.message || 'Unknown error'}`
       }
       
       setError(errorMessage)
@@ -2015,7 +2015,7 @@ function Dashboard() {
 
   return (
     <div className="font-sans bg-black dark:bg-black min-h-full">
-      {/* 🔥 Debug HUD - 화면에 직접 표시 (임시) */}
+      {/* Debug HUD - Display directly on screen (temporary) */}
       {(() => {
         const forcedLen = Array.isArray(allListings) ? allListings.length : 0
         const ebayConnected = isStoreConnected
@@ -2039,7 +2039,7 @@ function Dashboard() {
               forcedLen: forcedLen,
               ebayConnected: ebayConnected,
               viewMode: viewMode,
-              selectedCard: 'N/A', // selectedCard가 없으면 N/A
+              selectedCard: 'N/A', // N/A if selectedCard is missing
               listingsLoading: loading,
               listingsLength: allListings.length,
               totalListings: totalListings,
