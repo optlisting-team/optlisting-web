@@ -834,7 +834,7 @@ function Dashboard() {
         setTotalBreakdown(supplierBreakdown)
         setPlatformBreakdown({ eBay: transformedListings.length })
         
-        // 🔥 캐시 저장
+        // Save cache
         try {
           const cacheData = {
             listings: transformedListings,
@@ -886,21 +886,21 @@ function Dashboard() {
         } catch (fallbackErr) {
           console.error('Fallback also failed:', fallbackErr)
           
-          // 크레딧 부족 에러 처리
+          // Handle insufficient credits error
           if (fallbackErr.response?.status === 402) {
             const errorDetail = fallbackErr.response?.data?.detail
             const availableCredits = errorDetail?.available_credits || 0
             const requiredCredits = errorDetail?.required_credits || 0
-            const message = errorDetail?.message || '크레딧이 부족합니다.'
+            const message = errorDetail?.message || 'Insufficient credits.'
             
-            const userMessage = `${message}\n\n필요한 크레딧: ${requiredCredits}\n보유 크레딧: ${availableCredits}\n\n크레딧을 구매하시겠습니까?`
+            const userMessage = `${message}\n\nRequired credits: ${requiredCredits}\nAvailable credits: ${availableCredits}\n\nWould you like to purchase credits?`
             
             if (confirm(userMessage)) {
-              // 크레딧 구매 페이지로 이동 (또는 모달 열기)
+              // Navigate to credit purchase page (or open modal)
               window.location.href = '/#pricing'
             }
             
-            setError(`크레딧 부족: ${requiredCredits} 크레딧이 필요하며, 현재 ${availableCredits} 크레딧만 보유하고 있습니다.`)
+            setError(`Insufficient credits: ${requiredCredits} credits required, but only ${availableCredits} credits available.`)
             return
           }
           
@@ -909,21 +909,21 @@ function Dashboard() {
       }
       
     } catch (err) {
-      // 크레딧 부족 에러 처리
+      // Handle insufficient credits error
       if (err.response?.status === 402) {
         const errorDetail = err.response?.data?.detail
         const availableCredits = errorDetail?.available_credits || 0
         const requiredCredits = errorDetail?.required_credits || 0
-        const message = errorDetail?.message || '크레딧이 부족합니다.'
+        const message = errorDetail?.message || 'Insufficient credits.'
         
-        const userMessage = `${message}\n\n필요한 크레딧: ${requiredCredits}\n보유 크레딧: ${availableCredits}\n\n크레딧을 구매하시겠습니까?`
+        const userMessage = `${message}\n\nRequired credits: ${requiredCredits}\nAvailable credits: ${availableCredits}\n\nWould you like to purchase credits?`
         
         if (confirm(userMessage)) {
-          // 크레딧 구매 페이지로 이동 (또는 모달 열기)
+          // Navigate to credit purchase page (or open modal)
           window.location.href = '/#pricing'
         }
         
-        setError(`크레딧 부족: ${requiredCredits} 크레딧이 필요하며, 현재 ${availableCredits} 크레딧만 보유하고 있습니다.`)
+        setError(`Insufficient credits: ${requiredCredits} credits required, but only ${availableCredits} credits available.`)
       } else {
         setError('Failed to fetch low interest listings')
         console.error(err)
@@ -937,19 +937,19 @@ function Dashboard() {
   const handleStoreConnection = (connected, forceLoad = false) => {
     const wasConnected = isStoreConnected
     
-    // 🔥 상태가 동일하고 강제 로드가 아니면 아무것도 하지 않음 (불필요한 재실행 방지)
+    // If status is the same and not force load, do nothing (prevent unnecessary re-execution)
     if (connected === wasConnected && !forceLoad) {
       console.log('⏭️ No eBay connection status change - skipping:', { wasConnected, connected, forceLoad })
       return
     }
     
     setIsStoreConnected(connected)
-    // 🔥 로그 최소화 - 상태 변경 시에만 출력 (반복 로그 방지)
+    // Minimize logs - only output on status change (prevent duplicate logs)
     if (wasConnected !== connected || forceLoad) {
       console.log('🔄 eBay connection status changed:', { wasConnected, connected, forceLoad })
     }
     
-    // 🔥 연결 해제 시 캐시 초기화
+    // Clear cache when disconnected
     if (!connected && wasConnected) {
       console.log('🗑️ Disconnected - clearing cache')
       try {
@@ -1169,7 +1169,7 @@ function Dashboard() {
         setTotalBreakdown(supplierBreakdown)
         setPlatformBreakdown({ eBay: transformedListings.length })
         
-        // 🔥 캐시 저장
+        // Save cache
         try {
           const cacheData = {
             listings: transformedListings,
