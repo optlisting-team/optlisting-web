@@ -1705,64 +1705,64 @@ function Dashboard() {
               setTotalListings(parsedData.totalListings || 0)
               setTotalBreakdown(parsedData.totalBreakdown || {})
               setPlatformBreakdown(parsedData.platformBreakdown || { eBay: 0 })
-              // 🔥 데이터가 있으면 무조건 뷰 모드를 'all'로 설정
+              // If data exists, always set view mode to 'all'
               setViewMode('all')
               setShowFilter(true)
-              console.log('✅ 캐시된 제품 자동 표시 완료', { 
+              console.log('✅ Cached products automatically displayed', { 
                 count: cachedListings.length,
-                viewMode: 'all (강제 설정)',
+                viewMode: 'all (forced)',
                 willShowProducts: true
               })
             }
           }
         }
       } catch (cacheErr) {
-        console.warn('초기 로드 캐시 확인 실패:', cacheErr)
+        console.warn('Initial load cache check failed:', cacheErr)
       }
       
       // Note: fetchAllListings() is called when store is connected via handleStoreConnection
-      // 캐시가 있으면 자동으로 사용됨
+      // Cache is automatically used if available
     }
     
     initializeDashboard()
     
-    // 🔥 주기적인 Health Check 제거 - 불필요한 API 호출 방지
-    // 토큰 갱신은 백그라운드 워커가 처리하므로 프론트엔드에서 주기적 확인 불필요
+    // Remove periodic Health Check - prevent unnecessary API calls
+    // Token refresh is handled by background worker, so periodic check on frontend is unnecessary
   }, [])
   
   // Fetch data when store is connected (handled by handleStoreConnection callback)
   // This useEffect is removed - connection is managed via onConnectionChange prop
 
-  // 🔥 allListings에 데이터가 있고 연결되어 있으면 무조건 'all'로 전환 (강제)
-  // 주의: 이 useEffect는 openAllListingsView()와 중복될 수 있으므로, 
-  // openAllListingsView()가 먼저 실행되도록 순서 조정 필요
+  // If allListings has data and is connected, always switch to 'all' (forced)
+  // Note: This useEffect may duplicate openAllListingsView(), so
+  // order needs to be adjusted so openAllListingsView() runs first
   useEffect(() => {
     if (allListings.length > 0 && isStoreConnected) {
-      // 🔥 데이터가 있고 연결되어 있으면 무조건 'all' 뷰 모드로 전환 (zombies, queue 제외)
-      // 단, 이미 openAllListingsView()가 실행되었으면 스킵
+      // If data exists and is connected, always switch to 'all' view mode (excluding zombies, queue)
+      // Skip if openAllListingsView() has already been executed
       if (viewMode !== 'all' && viewMode !== 'zombies' && viewMode !== 'queue' && !openedAllListingsOnceRef.current) {
-        console.log('🔄 [강제] allListings 데이터 + 연결 감지 - 뷰 모드를 "all"로 즉시 전환', {
+        console.log('🔄 [FORCED] allListings data + connection detected - immediately switching view mode to "all"', {
           listingsCount: allListings.length,
           currentViewMode: viewMode,
           isStoreConnected,
           firstItem: allListings[0]?.title
         })
-        // openAllListingsView()와 동일한 로직 사용
+        // Use same logic as openAllListingsView()
         openAllListingsView()
       }
     }
   }, [allListings.length, isStoreConnected, viewMode])
 
-  // 🔥 eBay 연결 상태를 감지하여 자동으로 listings fetch
+  // Detect eBay connection status and automatically fetch listings
   useEffect(() => {
-    // 🔥 StrictMode 중복 호출 방지
+    // Prevent duplicate calls in StrictMode
     if (listingsLoadedOnceRef.current && isStoreConnected) {
-      console.log('⏭️ [GUARD] listingsLoadedOnceRef가 이미 true - 스킵')
+      console.log('⏭️ [GUARD] listingsLoadedOnceRef is already true - skipping')
       return
     }
     
     if (isStoreConnected) {
-      console.log('[CONNECTION] eBay 연결 감지 - 자동으로 listings fetch 시작', {
+      console.log('[CONNECTION] eBay connection detected - starting automatic listings fetch', {
         isStoreConnected,
         listingsLoadedOnce: listingsLoadedOnceRef.current,
         currentAllListingsLength: allListings.length,
@@ -1770,38 +1770,38 @@ function Dashboard() {
         currentViewMode: viewMode
       })
       
-      // 🔥 ref를 먼저 설정하여 중복 실행 방지 (StrictMode 대응)
+      // Set ref first to prevent duplicate execution (StrictMode handling)
       listingsLoadedOnceRef.current = true
       
-      // 🔥 뷰 모드를 먼저 'all'로 설정하여 제품 목록이 자동으로 표시되도록 함
+      // Set view mode to 'all' first so product list is automatically displayed
       setViewMode('all')
       setShowFilter(true)
       
-      // Active listings 자동 조회
+      // Automatically fetch active listings
       fetchAllListings(false).then(() => {
-        console.log('[CONNECTION] eBay 연결 후 자동 listings fetch 완료', {
+        console.log('[CONNECTION] Automatic listings fetch completed after eBay connection', {
           allListingsLength: allListings.length,
           totalListings: totalListings,
           viewMode: viewMode
         })
       }).catch((err) => {
-        console.error('[CONNECTION] eBay 연결 후 자동 listings fetch 실패:', err)
-        listingsLoadedOnceRef.current = false // 실패 시 재시도 가능하도록
+        console.error('[CONNECTION] Automatic listings fetch failed after eBay connection:', err)
+        listingsLoadedOnceRef.current = false // Allow retry on failure
       })
     } else {
-      // 연결 해제 시 ref 초기화
+      // Initialize ref when disconnected
       if (listingsLoadedOnceRef.current) {
         listingsLoadedOnceRef.current = false
-        console.log('[CONNECTION] eBay 연결 해제 - listingsLoadedOnceRef 초기화')
+        console.log('[CONNECTION] eBay disconnected - initializing listingsLoadedOnceRef')
       }
     }
   }, [isStoreConnected])
 
   // Handle URL query param for view mode
   useEffect(() => {
-    // 🔥 guard: listingsLength > 0 이면 초기화 effect가 viewMode를 변경하지 못하게 함
+    // Guard: if listingsLength > 0, prevent initialization effect from changing viewMode
     if (allListings.length > 0 || totalListings > 0) {
-      console.log('[URL PARAM] listings가 있으므로 viewMode 변경 스킵', {
+      console.log('[URL PARAM] Skipping viewMode change because listings exist', {
         viewParam,
         allListingsLength: allListings.length,
         totalListings: totalListings,
