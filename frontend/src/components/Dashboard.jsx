@@ -1840,12 +1840,12 @@ function Dashboard() {
         await axios.post(`${API_BASE_URL}/api/log-deletion`, {
           items: items
         }, {
-          timeout: 30000 // 10초 → 30초로 증가
+          timeout: 30000 // Increased from 10s to 30s
         })
         // Refresh total deleted count
         const historyResponse = await axios.get(`${API_BASE_URL}/api/history`, {
           params: { skip: 0, limit: 1 },
-          timeout: 30000 // 10초 → 30초로 증가
+          timeout: 30000 // Increased from 10s to 30s
         })
         setTotalDeleted(historyResponse.data.total_count || 0)
       } catch (logErr) {
@@ -1863,7 +1863,7 @@ function Dashboard() {
         },
         {
           responseType: 'blob',
-          timeout: 30000 // 30초 타임아웃 추가
+          timeout: 30000 // Added 30s timeout
         }
       )
 
@@ -1873,12 +1873,12 @@ function Dashboard() {
       link.href = url
       
       // Determine filename based on supplier and mode
-      // source 필드가 있으면 사용, 없으면 supplier_name 또는 supplier 사용 (안전하게 처리)
+      // Use source field if available, otherwise use supplier_name or supplier (safely handled)
       const getSource = (item) => {
         if (!item) return "unknown"
         return item.source || item.supplier_name || item.supplier || "unknown"
       }
-      // source 변수 안전하게 정의 및 유효성 검사
+      // Safely define and validate source variable
       let source = 'all'
       if (items && items.length > 0) {
         const sourceValue = getSource(items[0])
@@ -1887,7 +1887,7 @@ function Dashboard() {
         }
       }
       
-      // source가 유효한지 확인 후 사용
+      // Verify source is valid before using
       if (!source || source === '') {
         source = 'all'
       }
@@ -1902,7 +1902,7 @@ function Dashboard() {
       document.body.appendChild(link)
       link.click()
       link.remove()
-      window.URL.revokeObjectURL(url) // 메모리 누수 방지
+      window.URL.revokeObjectURL(url) // Prevent memory leak
 
       // Step 3: Remove exported items from queue if they were in queue
       if (itemsToExport === null) {
@@ -1910,16 +1910,16 @@ function Dashboard() {
         setQueue(queue.filter(item => !exportedIds.includes(item.id)))
       }
     } catch (err) {
-      let errorMessage = 'CSV 추출 중 오류가 발생했습니다.'
+      let errorMessage = 'An error occurred while extracting CSV.'
       
       if (err.code === 'ECONNABORTED') {
-        errorMessage = '요청 시간이 초과되었습니다. 다시 시도해주세요.'
+        errorMessage = 'Request timeout. Please try again.'
       } else if (err.response) {
-        errorMessage = `서버 오류: ${err.response.status} - ${err.response.statusText || err.response.data?.detail || '알 수 없는 오류'}`
+        errorMessage = `Server error: ${err.response.status} - ${err.response.statusText || err.response.data?.detail || 'Unknown error'}`
       } else if (err.request) {
-        errorMessage = '서버에 연결할 수 없습니다. 네트워크 연결을 확인해주세요.'
+        errorMessage = 'Unable to connect to server. Please check your network connection.'
       } else {
-        errorMessage = `CSV 추출 실패: ${err.message || '알 수 없는 오류'}`
+        errorMessage = `CSV extraction failed: ${err.message || 'Unknown error'}`
       }
       
       setError(errorMessage)
@@ -1952,12 +1952,12 @@ function Dashboard() {
         await axios.post(`${API_BASE_URL}/api/log-deletion`, {
           items: items
         }, {
-          timeout: 30000 // 10초 → 30초로 증가
+          timeout: 30000 // Increased from 10s to 30s
         })
         // Refresh total deleted count
         const historyResponse = await axios.get(`${API_BASE_URL}/api/history`, {
           params: { skip: 0, limit: 1 },
-          timeout: 30000 // 10초 → 30초로 증가
+          timeout: 30000 // Increased from 10s to 30s
         })
         setTotalDeleted(historyResponse.data.total_count || 0)
       } catch (logErr) {
@@ -1975,7 +1975,7 @@ function Dashboard() {
         },
         {
           responseType: 'blob',
-          timeout: 30000 // 30초 타임아웃 추가
+          timeout: 30000 // Added 30s timeout
         }
       )
 
@@ -1990,7 +1990,7 @@ function Dashboard() {
       document.body.appendChild(link)
       link.click()
       link.remove()
-      window.URL.revokeObjectURL(url) // 메모리 누수 방지
+      window.URL.revokeObjectURL(url) // Prevent memory leak
     } catch (err) {
       let errorMessage = `CSV 추출 중 오류가 발생했습니다.`
       
