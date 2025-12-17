@@ -1227,17 +1227,17 @@ function Dashboard() {
               params: listingsParams
             })
             const fallbackListings = listingsResponse.data.listings || []
-            // 🔥 Fallback 데이터 설정과 동시에 뷰 모드도 즉시 설정
+            // Set view mode immediately along with fallback data setup
             setAllListings(fallbackListings)
             setTotalListings(fallbackListings.length)
-            // 🔥 데이터가 있으면 무조건 뷰 모드를 'all'로 설정
+            // If data exists, always set view mode to 'all'
             if (fallbackListings.length > 0) {
-              console.log('🔄 Fallback 데이터 로드 완료 - Active 리스팅 뷰로 즉시 전환', {
+              console.log('🔄 Fallback data loaded - immediately switching to Active listings view', {
                 listingsCount: fallbackListings.length
               })
               setViewMode('all')
               setShowFilter(true)
-              console.log('✅ Fallback 데이터 로드 후 뷰 모드 "all"로 설정 완료 - 제품 표시 예정')
+              console.log('✅ View mode set to "all" after fallback data load - products will be displayed')
             }
           } catch (fallbackErr) {
             console.error('Fallback also failed:', fallbackErr)
@@ -1273,16 +1273,16 @@ function Dashboard() {
     }
   }
 
-  // 🔥 All Listings View를 여는 함수 (Active 카드 클릭 시 사용, 자동 실행 시에도 사용)
+  // Function to open All Listings View (used when Active card is clicked, also used for auto-execution)
   const openAllListingsView = () => {
-    console.log('[openAllListingsView] All Listings 뷰 열기')
+    console.log('[openAllListingsView] Opening All Listings view')
     setViewMode('all')
-    setShowFilter(true) // 필터 패널 열기
-    setSelectedIds([]) // 선택 초기화
+    setShowFilter(true) // Open filter panel
+    setSelectedIds([]) // Reset selection
     
-    // 데이터가 없으면 fetch
+    // Fetch if no data
     if (allListings.length === 0 && isStoreConnected) {
-      console.log('[openAllListingsView] 데이터가 없어서 fetchAllListings 호출')
+      console.log('[openAllListingsView] No data, calling fetchAllListings')
       fetchAllListings(false)
     }
   }
@@ -1291,39 +1291,39 @@ function Dashboard() {
     setViewMode(mode)
     setSelectedIds([]) // Reset selection when switching views
     
-    // Close filter when switching to non-zombie views (단, 'all' 모드로 전환할 때는 필터 유지)
+    // Close filter when switching to non-zombie views (but keep filter when switching to 'all' mode)
     if (mode === 'queue' || mode === 'history') {
       setShowFilter(false)
     }
-    // 'all' 모드로 전환할 때는 필터를 닫지 않음 (연결 후 자동 표시 시 필터가 열려있어야 함)
+    // Don't close filter when switching to 'all' mode (filter should be open when auto-displayed after connection)
     
     if (mode === 'total') {
       // Statistical view - no data fetching needed
       return
     } else if (mode === 'all') {
-      // 🔥 'all' 모드로 전환 시 openAllListingsView와 동일한 로직 적용
+      // Apply same logic as openAllListingsView when switching to 'all' mode
       setShowFilter(true)
-      // 데이터가 없으면 fetch
+      // Fetch if no data
       if (allListings.length === 0 && isStoreConnected) {
         fetchAllListings(false)
       }
       return
     } else if (mode === 'zombies') {
-      // 🔥 좀비 카드 클릭 시: 이미 필터링된 결과가 있으면 그대로 사용 (재필터링하지 않음)
-      // 필터링된 결과가 없으면 현재 필터로 다시 필터링 (로컬 필터링만, 크레딧 차감 없음)
+      // When zombie card is clicked: use existing filtered results if available (don't re-filter)
+      // If no filtered results, filter again with current filters (local filtering only, no credit deduction)
       if (zombies.length === 0 && allListings.length > 0) {
-        console.log('🔄 좀비 카드 클릭 - 로컬 필터링 실행 (크레딧 차감 없음)')
-        fetchZombies(filters, false) // 로컬 필터링만 수행
+        console.log('🔄 Zombie card clicked - executing local filtering (no credit deduction)')
+        fetchZombies(filters, false) // Only perform local filtering
       } else {
-        console.log(`✅ 좀비 카드 클릭 - 이미 필터링된 결과 사용 (${zombies.length}개)`)
+        console.log(`✅ Zombie card clicked - using existing filtered results (${zombies.length} items)`)
       }
       return
     } else if (mode === 'all') {
-      // 🔥 Active 카드 클릭 시 openAllListingsView 사용
+      // Use openAllListingsView when Active card is clicked
       openAllListingsView()
       return
     } else if (mode === 'zombies') {
-      // Show zombie listings (filter stays open for adjustment) - 캐시 사용
+      // Show zombie listings (filter stays open for adjustment) - use cache
       fetchZombies(filters, false)
     } else if (mode === 'history') {
       fetchHistory()
@@ -1341,17 +1341,17 @@ function Dashboard() {
   }
 
   const handleApplyFilter = async (newFilters) => {
-    console.log('🔍 handleApplyFilter 호출됨 - Find Low-Performing SKUs 버튼 클릭')
-    console.log('📋 받은 필터:', newFilters)
-    console.log('📊 현재 상태:', { totalListings, allListingsLength: allListings.length })
+    console.log('🔍 handleApplyFilter called - Find Low-Performing SKUs button clicked')
+    console.log('📋 Received filters:', newFilters)
+    console.log('📊 Current state:', { totalListings, allListingsLength: allListings.length })
     
     setFilters(newFilters)
     setSelectedIds([]) // Reset selection when filters change
     
-    // 🔥 Active 카드에서 데이터가 없으면 먼저 조회
+    // If no data in Active card, fetch first
     let currentTotalListings = totalListings || allListings.length
     if (currentTotalListings === 0) {
-      console.log('⚠️ Active 카드 데이터가 없음 - 먼저 조회 필요')
+      console.log('⚠️ No data in Active card - need to fetch first')
       try {
         setLoading(true)
         const response = await axios.get(`${API_BASE_URL}/api/ebay/listings/active`, {
@@ -1365,16 +1365,16 @@ function Dashboard() {
         if (response.data.success) {
           const listings = response.data.listings || []
           currentTotalListings = listings.length
-          console.log(`✅ Active 카드 데이터 조회 완료: ${currentTotalListings}개 리스팅`)
+          console.log(`✅ Active card data fetch completed: ${currentTotalListings} listings`)
         }
       } catch (err) {
-        console.error('❌ Active 카드 데이터 조회 실패:', err)
+        console.error('❌ Active card data fetch failed:', err)
       } finally {
         setLoading(false)
       }
     }
     
-    // 🔥 DB에서 전체 리스팅 수 확인 (크레딧 차감 기준)
+    // Check total listings count from DB (for credit deduction basis)
     if (currentTotalListings === 0) {
       try {
         const dbResponse = await axios.get(`${API_BASE_URL}/api/listings`, {
