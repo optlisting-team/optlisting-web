@@ -2140,13 +2140,13 @@ function Dashboard() {
           )
         })()}
         
-        {/* 🔥 권장 렌더 분기 2: listingsLoading -> Skeleton/Loading */}
-        {/* (loading 상태는 아래 테이블 영역에서 처리) */}
+        {/* Recommended render branch 2: listingsLoading -> Skeleton/Loading */}
+        {/* (loading state is handled in table area below) */}
         
-        {/* 🔥 권장 렌더 분기 3: listings.length === 0 -> Empty state */}
-        {/* (empty 상태는 아래 테이블 영역에서 처리) */}
+        {/* Recommended render branch 3: listings.length === 0 -> Empty state */}
+        {/* (empty state is handled in table area below) */}
         
-        {/* 🔥 권장 렌더 분기 4: else -> ListingsTable/ListingsGrid 항상 렌더 */}
+        {/* Recommended render branch 4: else -> Always render ListingsTable/ListingsGrid */}
 
         {/* History View - Full Page */}
         {viewMode === 'history' && (
@@ -2157,13 +2157,13 @@ function Dashboard() {
           />
         )}
 
-        {/* 🔥 FORCE 렌더링: ebayConnected && forcedLen > 0 이면 무조건 렌더 (viewMode 무관, history만 제외) */}
+        {/* FORCE rendering: Always render if ebayConnected && forcedLen > 0 (regardless of viewMode, excluding history only) */}
         {(() => {
           const forcedLen = Array.isArray(allListings) ? allListings.length : 0
           const ebayConnected = isStoreConnected
           const shouldRender = ebayConnected && forcedLen > 0 && viewMode !== 'history'
           
-          console.log('[MAIN RENDER] 메인 렌더 조건:', {
+          console.log('[MAIN RENDER] Main render condition:', {
             ebayConnected,
             forcedLen,
             viewMode,
@@ -2185,7 +2185,7 @@ function Dashboard() {
                   : 'flex-1 min-w-0'
             }`}>
               {/* Active View - With Filter */}
-              {/* 🔥 eBay 연결되고 데이터가 있으면 항상 표시 (viewMode 무관) */}
+              {/* Always display if eBay is connected and data exists (regardless of viewMode) */}
               {(isStoreConnected && allListings.length > 0) && (
                 <div className="mt-6 space-y-4">
                   {/* Header */}
@@ -2266,11 +2266,11 @@ function Dashboard() {
                     {error}
                   </div>
                 ) : (() => {
-                  // 🔥 최대한 단순화: isStoreConnected && allListings.length > 0 이면 무조건 테이블 렌더 (viewMode 무관)
+                  // Maximize simplification: Always render table if isStoreConnected && allListings.length > 0 (regardless of viewMode)
                   const ebayConnected = isStoreConnected
                   const hasData = Array.isArray(allListings) && allListings.length > 0
                   
-                  console.log('[RENDER CHECK] 최종 체크:', {
+                  console.log('[RENDER CHECK] Final check:', {
                     ebayConnected,
                     hasData,
                     allListingsLength: allListings.length,
@@ -2278,14 +2278,14 @@ function Dashboard() {
                     shouldRenderTable: ebayConnected && hasData
                   })
                   
-                  // 🔥 강제 렌더링: ebayConnected && hasData 이면 무조건 테이블 렌더 (viewMode 무관)
+                  // Force rendering: Always render table if ebayConnected && hasData (regardless of viewMode)
                   if (ebayConnected && hasData) {
-                    // viewMode에 따라 데이터 선택 (zombies 모드가 아니면 allListings 사용)
+                    // Select data based on viewMode (use allListings if not zombies mode)
                     const tableData = (viewMode === 'zombies' && zombies.length > 0) ? zombies : allListings
                     
                     return (
                       <div className="p-6">
-                        {/* FORCE_RENDER 디버그 표시 */}
+                        {/* FORCE_RENDER debug display */}
                         <div style={{ marginBottom: 12, color: '#0f0', fontSize: 12, padding: 8, background: '#000', borderRadius: 4, border: '1px solid #0f0' }}>
                           ✅ RENDERED: ebayConnected={String(ebayConnected)} dataLength={tableData.length} viewMode={viewMode}
                         </div>
@@ -2330,8 +2330,8 @@ function Dashboard() {
                     )
                   }
                   
-                  // 🔥 ebayConnected && hasData가 아니면 메시지 표시
-                  console.log('[RENDER CHECK] 테이블 렌더 스킵:', {
+                  // Show message if not ebayConnected && hasData
+                  console.log('[RENDER CHECK] Table render skipped:', {
                     ebayConnected,
                     hasData,
                     allListingsLength: allListings.length,
