@@ -704,7 +704,7 @@ function Dashboard() {
         const allListingsFromEbay = response.data.listings || []
         console.log(`✅ Received ${allListingsFromEbay.length} listings from eBay`)
         
-        // 디버깅: 모든 리스팅의 이미지 정보 확인
+        // Debug: Check image information for all listings
         if (allListingsFromEbay.length > 0) {
           console.log('🔍 Image data check for all listings:')
           allListingsFromEbay.forEach((listing, index) => {
@@ -717,23 +717,23 @@ function Dashboard() {
           })
         }
         
-        // 리스팅 데이터 변환 및 공급처 감지
+        // Transform listing data and detect suppliers
         const transformedListings = allListingsFromEbay.map((item, index) => {
-          // 백엔드에서 이미 추출한 supplier 정보가 있으면 우선 사용, 없으면 프론트엔드에서 추출
+          // Use supplier info extracted by backend if available, otherwise extract on frontend
           let supplierInfo
           if (item.supplier_name && item.supplier_id) {
-            // 백엔드에서 이미 추출된 supplier 정보 사용
+            // Use supplier info already extracted by backend
             supplierInfo = {
               supplier_name: item.supplier_name,
               supplier_id: item.supplier_id
             }
           } else {
-            // 프론트엔드에서 supplier 정보 추출 (fallback)
+            // Extract supplier info on frontend (fallback)
             supplierInfo = extractSupplierInfo(item.title, item.sku, item.image_url || item.picture_url || item.thumbnail_url)
           }
           
-          // 디버깅: supplier 감지 결과 확인
-          if (index < 3) { // 처음 3개만 로그
+          // Debug: Check supplier detection result
+          if (index < 3) { // Log only first 3 items
             console.log(`🔍 Supplier detection for item ${index + 1}:`, {
               title: item.title?.substring(0, 50),
               sku: item.sku,
@@ -749,14 +749,14 @@ function Dashboard() {
             id: item.item_id || `ebay-${index}`,
             item_id: item.item_id || item.ebay_item_id,
             ebay_item_id: item.ebay_item_id || item.item_id,
-            sell_item_id: item.sell_item_id || item.item_id || item.ebay_item_id, // Sell Item ID 명시적으로 포함
+            sell_item_id: item.sell_item_id || item.item_id || item.ebay_item_id, // Explicitly include Sell Item ID
             title: item.title,
             price: item.price,
             sku: item.sku,
             supplier: supplierInfo.supplier_name,
             supplier_name: supplierInfo.supplier_name,
-            supplier_id: supplierInfo.supplier_id, // supplier_id 추가
-            source: item.source || supplierInfo.supplier_name, // source 필드 추가 (백엔드 응답 우선, 없으면 supplier_name 사용)
+            supplier_id: supplierInfo.supplier_id, // Add supplier_id
+            source: item.source || supplierInfo.supplier_name, // Add source field (prefer backend response, fallback to supplier_name)
             total_sales: item.quantity_sold || 0,
             quantity_sold: item.quantity_sold || 0,
             watch_count: item.watch_count || 0,
@@ -765,20 +765,20 @@ function Dashboard() {
             impressions: item.impressions || 0,
             days_listed: item.days_listed || 0,
             start_time: item.start_time,
-            picture_url: item.picture_url, // 메인 이미지 URL
-            thumbnail_url: item.thumbnail_url || item.picture_url, // 썸네일 이미지 URL (좀비 SKU 리포트용)
-            image_url: item.image_url || item.picture_url || item.thumbnail_url, // 프론트엔드 호환성을 위한 필드
-            is_zombie: false, // 아래에서 필터링으로 결정
+            picture_url: item.picture_url, // Main image URL
+            thumbnail_url: item.thumbnail_url || item.picture_url, // Thumbnail image URL (for zombie SKU report)
+            image_url: item.image_url || item.picture_url || item.thumbnail_url, // Field for frontend compatibility
+            is_zombie: false, // Determined by filtering below
             zombie_score: zombieScore,
             recommendation: zombieScore <= 20 ? 'DELETE' : zombieScore <= 40 ? 'DELETE' : zombieScore <= 60 ? 'OPTIMIZE' : 'MONITOR'
           }
         })
         
-        // 전체 리스팅 저장
+        // Save all listings
         setAllListings(transformedListings)
         setTotalListings(transformedListings.length)
         
-        // 공급처별 브레이크다운 계산
+        // Calculate supplier breakdown
         const supplierBreakdown = {}
         transformedListings.forEach(item => {
           supplierBreakdown[item.supplier] = (supplierBreakdown[item.supplier] || 0) + 1
@@ -786,7 +786,7 @@ function Dashboard() {
         setTotalBreakdown(supplierBreakdown)
         setPlatformBreakdown({ eBay: transformedListings.length })
         
-        // 좀비 필터링 적용
+        // Apply zombie filtering
         const minDays = filterParams.analytics_period_days || filterParams.min_days || 7
         const maxSales = filterParams.max_sales || 0
         const maxWatches = filterParams.max_watches || filterParams.max_watch_count || 0
@@ -797,16 +797,16 @@ function Dashboard() {
         console.log(`📊 Before filtering: ${transformedListings.length} listings`)
         
         const filteredZombies = transformedListings.filter(item => {
-          // 등록 기간 필터: minDays 이상 등록된 것만 포함 (7일 미만은 제외)
-          // 예: minDays=7이면, days_listed >= 7인 것만 포함 (7일 미만은 제외)
+          // Listing period filter: only include items listed for minDays or more (exclude items less than 7 days)
+          // Example: if minDays=7, only include items with days_listed >= 7 (exclude items less than 7 days)
           if ((item.days_listed || 0) < minDays) return false
-          // 판매 필터: maxSales 이하인 것만 (예: 0건 이하)
+          // Sales filter: only items with maxSales or less (e.g., 0 or less)
           if ((item.total_sales || item.quantity_sold || 0) > maxSales) return false
-          // 찜 필터: maxWatches 이하인 것만 (예: 0개 이하)
+          // Watch filter: only items with maxWatches or less (e.g., 0 or less)
           if ((item.watch_count || 0) > maxWatches) return false
-          // 노출 필터: maxImpressions 이하인 것만 (예: 100 이하)
+          // Impressions filter: only items with maxImpressions or less (e.g., 100 or less)
           if ((item.impressions || 0) > maxImpressions) return false
-          // 조회 필터: maxViews 이하인 것만 (예: 10 이하)
+          // Views filter: only items with maxViews or less (e.g., 10 or less)
           if ((item.view_count || item.views || 0) > maxViews) return false
           
           return true
@@ -816,7 +816,7 @@ function Dashboard() {
         
         console.log(`🧟 Found ${filteredZombies.length} zombie listings`)
         
-        // 좀비 공급처별 브레이크다운
+        // Zombie supplier breakdown
         const zombieSupplierBreakdown = {}
         filteredZombies.forEach(item => {
           zombieSupplierBreakdown[item.supplier] = (zombieSupplierBreakdown[item.supplier] || 0) + 1
@@ -826,11 +826,11 @@ function Dashboard() {
         setZombies(filteredZombies)
         setTotalZombies(filteredZombies.length)
         
-        // 🔥 전체 리스팅도 업데이트 (캐시 갱신)
+        // Update all listings (refresh cache)
         setAllListings(transformedListings)
         setTotalListings(transformedListings.length)
         
-        // 공급처별 브레이크다운은 이미 위에서 계산됨 (782번 라인)
+        // Supplier breakdown already calculated above (line 782)
         setTotalBreakdown(supplierBreakdown)
         setPlatformBreakdown({ eBay: transformedListings.length })
         
@@ -844,9 +844,9 @@ function Dashboard() {
           }
           localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData))
           localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString())
-          console.log('✅ 데이터 캐시 저장 완료')
+          console.log('✅ Data cache saved successfully')
         } catch (cacheErr) {
-          console.warn('캐시 저장 실패:', cacheErr)
+          console.warn('Cache save failed:', cacheErr)
         }
         
         setError(null)
@@ -854,7 +854,7 @@ function Dashboard() {
       } catch (ebayErr) {
         console.error('eBay API Error:', ebayErr)
         
-        // eBay 연결 안됨 - 사용자에게 연결 안내
+        // eBay not connected - guide user to connect
         if (ebayErr.response?.status === 401) {
           setError('eBay not connected. Please connect your eBay account first.')
         } else {
@@ -1069,7 +1069,7 @@ function Dashboard() {
           console.warn('Cache read failed, calling API:', cacheErr)
         }
       } else {
-        console.log('🔄 강제 새로고침 - 캐시 무시')
+        console.log('🔄 Force refresh - ignoring cache')
       }
       
       // 🚀 Production Mode: Fetch from eBay API
@@ -1091,23 +1091,23 @@ function Dashboard() {
         const allListingsFromEbay = response.data.listings || []
         console.log(`[FETCH DONE] Received ${allListingsFromEbay.length} total listings from eBay`)
         
-        // 리스팅 데이터 변환 및 공급처 감지
+        // Transform listing data and detect suppliers
         const transformedListings = allListingsFromEbay.map((item, index) => {
-          // supplier_name과 supplier_id 모두 추출
+          // Extract both supplier_name and supplier_id
           const supplierInfo = extractSupplierInfo(item.title, item.sku, item.image_url || item.picture_url || item.thumbnail_url)
           
           return {
             id: item.item_id || `ebay-${index}`,
             item_id: item.item_id || item.ebay_item_id,
             ebay_item_id: item.ebay_item_id || item.item_id,
-            sell_item_id: item.sell_item_id || item.item_id || item.ebay_item_id, // Sell Item ID 명시적으로 포함
+            sell_item_id: item.sell_item_id || item.item_id || item.ebay_item_id, // Explicitly include Sell Item ID
             title: item.title,
             price: item.price,
             sku: item.sku,
             supplier: supplierInfo.supplier_name,
             supplier_name: supplierInfo.supplier_name,
-            supplier_id: supplierInfo.supplier_id, // supplier_id 추가
-            source: item.source || supplierInfo.supplier_name, // source 필드 추가 (백엔드 응답 우선, 없으면 supplier_name 사용)
+            supplier_id: supplierInfo.supplier_id, // Add supplier_id
+            source: item.source || supplierInfo.supplier_name, // Add source field (prefer backend response, fallback to supplier_name)
             total_sales: item.quantity_sold || 0,
             quantity_sold: item.quantity_sold || 0,
             watch_count: item.watch_count || 0,
@@ -1122,32 +1122,32 @@ function Dashboard() {
           }
         })
         
-        console.log('📦 제품 데이터 설정 시작', { 
+        console.log('📦 Starting product data setup', { 
           count: transformedListings.length,
           firstItem: transformedListings[0]?.title 
         })
         
-        // 🔥 데이터 설정과 동시에 뷰 모드도 즉시 설정 (동기적으로)
+        // Set view mode immediately along with data setup (synchronously)
         if (transformedListings.length > 0) {
-          // 🔥 데이터가 있으면 무조건 뷰 모드를 'all'로 설정 (setAllListings 전에 호출)
+          // If data exists, always set view mode to 'all' (called before setAllListings)
           setViewMode('all')
           setShowFilter(true)
           setAllListings(transformedListings)
           setTotalListings(transformedListings.length)
-          setLastFetchAt(Date.now()) // 🔥 Debug HUD용: fetch 성공 시간 기록
+          setLastFetchAt(Date.now()) // Debug HUD: Record fetch success time
           
-          // 🔥 [FETCH DONE] State 동기화 확인 로그
+          // [FETCH DONE] State synchronization check log
           console.log('[FETCH DONE] listings length:', transformedListings.length)
-          console.log('[FETCH DONE] setAllListings 호출 전:', {
+          console.log('[FETCH DONE] Before setAllListings call:', {
             allListingsLength: allListings.length,
             totalListings: totalListings,
             viewMode: viewMode,
             isStoreConnected: isStoreConnected
           })
           
-          // 🔥 다음 렌더 사이클에서도 확인
+          // Check again in next render cycle
           setTimeout(() => {
-            console.log('[RENDER CHECK] State 동기화 확인:', {
+            console.log('[RENDER CHECK] State synchronization check:', {
               allListingsLength: allListings.length,
               totalListings: totalListings,
               viewMode: viewMode,
@@ -1158,10 +1158,10 @@ function Dashboard() {
         } else {
           setAllListings(transformedListings)
           setTotalListings(transformedListings.length)
-          console.warn('⚠️ transformedListings가 비어있음')
+          console.warn('⚠️ transformedListings is empty')
         }
         
-        // 공급처별 브레이크다운 계산
+        // Calculate supplier breakdown
         const supplierBreakdown = {}
         transformedListings.forEach(item => {
           supplierBreakdown[item.supplier] = (supplierBreakdown[item.supplier] || 0) + 1
@@ -1179,9 +1179,9 @@ function Dashboard() {
           }
           localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData))
           localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString())
-          console.log('✅ 데이터 캐시 저장 완료')
+          console.log('✅ Data cache saved successfully')
         } catch (cacheErr) {
-          console.warn('캐시 저장 실패:', cacheErr)
+          console.warn('Cache save failed:', cacheErr)
         }
         
         // 🔥 뷰 모드는 이미 위에서 설정했으므로 여기서는 로그만 출력
