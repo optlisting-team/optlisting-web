@@ -2107,7 +2107,7 @@ function Dashboard() {
           )}
         />
 
-        {/* 🔥 FORCE 렌더: ebayConnected && forcedLen > 0 이면 Ready to Analyze 완전히 숨김 */}
+        {/* FORCE render: Hide Ready to Analyze completely if ebayConnected && forcedLen > 0 */}
         {(() => {
           const forcedLen = Array.isArray(allListings) ? allListings.length : 0
           const ebayConnected = isStoreConnected
@@ -2119,12 +2119,12 @@ function Dashboard() {
             shouldHide: ebayConnected && forcedLen > 0
           })
           
-          // 🔥 FORCE 렌더 조건: ebayConnected && forcedLen > 0 이면 Ready to Analyze 완전히 숨김
+          // FORCE render condition: Hide Ready to Analyze completely if ebayConnected && forcedLen > 0
           if (ebayConnected && forcedLen > 0) {
-            return null // Ready to Analyze 숨김
+            return null // Hide Ready to Analyze
           }
           
-          // 🔥 ebayConnected가 false이거나 forcedLen이 0이면 Ready to Analyze 표시
+          // Show Ready to Analyze if ebayConnected is false or forcedLen is 0
           return (
             <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg p-8 mt-8 text-center">
               <p className="text-lg text-zinc-300 dark:text-zinc-300 mb-2">
