@@ -20,7 +20,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
   const [selectedStore, setSelectedStore] = useState(stores[0])
   const [connecting, setConnecting] = useState(false)
   const [checkingConnection, setCheckingConnection] = useState(false) // Changed default to false - only check on button click
-  const [ebayUserId, setEbayUserId] = useState(null) // eBay User ID 상태 추가
+  const [ebayUserId, setEbayUserId] = useState(null) // Add eBay User ID state
   const dropdownRef = useRef(null)
 
   // Ensure dropdown is closed on mount
@@ -54,32 +54,32 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
         timeout: 30000 // Increased from 5s to 30s
       })
       
-      // 유효한 토큰이 있는지 확인
+      // Check if valid token exists
       const hasValidToken = response.data?.connected === true && 
                            response.data?.token_status?.has_valid_token !== false &&
                            !response.data?.is_expired
       
-      // eBay User ID 가져오기
+      // Get eBay User ID
       const userId = response.data?.ebay_user_id || response.data?.user_id || null
       setEbayUserId(userId)
       
-      // 🔥 현재 상태와 동일하면 콜백 호출하지 않음 (불필요한 반복 방지)
+      // Do not call callback if same as current state (prevent unnecessary repetition)
       const currentConnected = selectedStore?.connected || false
       if (hasValidToken === currentConnected) {
-        // 상태가 동일하면 스킵 (로그 최소화)
+        // Skip if state is the same (minimize logs)
         setCheckingConnection(false)
         return
       }
       
-      // 🔥 상태가 변경된 경우에만 로그 출력 (반복 로그 방지)
-      console.log('🔄 eBay 연결 상태 변경:', {
+      // Output log only when state changes (prevent repeated logs)
+      console.log('🔄 eBay connection status changed:', {
         previousState: currentConnected,
         newState: hasValidToken,
         ebayUserId: userId,
         isExpired: response.data?.is_expired
       })
       
-      // eBay 스토어 연결 상태 업데이트
+      // Update eBay store connection status
       setStores(prev => prev.map(s => 
         s.platform === 'eBay' ? { ...s, connected: hasValidToken } : s
       ))
@@ -88,26 +88,26 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
         setSelectedStore(prev => ({ ...prev, connected: hasValidToken }))
       }
       
-      // 🔥 상태가 변경되었을 때만 부모 컴포넌트에 알림
+      // Notify parent component only when state changes
       if (onConnectionChange) {
         onConnectionChange(hasValidToken)
       }
     } catch (err) {
-      // 🔥 타임아웃 에러는 조용히 처리 (서버가 느릴 수 있음)
+      // Handle timeout errors quietly (server may be slow)
       const isTimeout = err.code === 'ECONNABORTED' || err.message?.includes('timeout')
       if (isTimeout) {
-        console.warn('⏱️ eBay 연결 상태 확인 타임아웃 (서버 응답 지연 가능)')
+        console.warn('⏱️ eBay connection status check timeout (server response may be delayed)')
       } else {
-        console.error('eBay 토큰 상태 확인 실패:', err)
+        console.error('Failed to check eBay token status:', err)
       }
       
-      // 🔥 에러 발생 시에도 기존 연결 상태 유지 (데이터 보존)
-      // 네트워크 에러나 서버 에러는 일시적일 수 있으므로 연결 해제하지 않음
+      // Maintain existing connection state even if error occurs (preserve data)
+      // Do not disconnect as network/server errors may be temporary
       const currentConnected = selectedStore?.connected || false
       
-      // 🔥 401 (Unauthorized) 에러만 연결 해제로 처리
+      // Only handle 401 (Unauthorized) errors as disconnection
       if (err.response?.status === 401) {
-        console.log('⚠️ 401 에러 - eBay 연결 해제 처리')
+        console.log('⚠️ 401 error - Handling eBay disconnection')
         if (currentConnected) {
           setStores(prev => prev.map(s => 
             s.platform === 'eBay' ? { ...s, connected: false } : s
@@ -121,16 +121,16 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
           }
         }
       } else {
-        // 🔥 네트워크 에러나 기타 에러는 연결 상태 유지 (데이터 보존)
-        // 타임아웃 에러는 로그를 최소화하여 콘솔 스팸 방지
+        // Maintain connection state for network/other errors (preserve data)
+        // Minimize logs for timeout errors to prevent console spam
         if (!isTimeout) {
-          console.log('⚠️ 네트워크/서버 에러 - 연결 상태 유지 (데이터 보존)', {
+          console.log('⚠️ Network/Server error - Maintaining connection state (preserve data)', {
             error: err.message,
             status: err.response?.status,
             currentConnected
           })
         }
-        // 연결 상태는 유지하고 콜백 호출하지 않음
+        // Maintain connection state and do not call callback
       }
       
       setCheckingConnection(false)
@@ -179,35 +179,35 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
 
   // Real API connect (for production)
   const handleRealConnect = (e) => {
-    // 이벤트 전파 방지
+    // Prevent event propagation
     if (e) {
       e.preventDefault()
       e.stopPropagation()
     }
     
-    // API URL 우선순위: 환경 변수 > 하드코딩된 프로덕션 URL > localhost
+    // API URL priority: Environment variable > Hardcoded production URL > localhost
     const apiUrl = import.meta.env.VITE_API_URL || 
                    'https://web-production-3dc73.up.railway.app' || 
                    'http://localhost:8000'
     const userId = 'default-user'
     const oauthUrl = `${apiUrl}/api/ebay/auth/start?user_id=${userId}`
     
-    console.log('🔗 eBay OAuth 연결 시도')
+    console.log('🔗 Attempting eBay OAuth connection')
     console.log('API URL:', apiUrl)
     console.log('OAuth URL:', oauthUrl)
     console.log('User ID:', userId)
     console.log('VITE_API_URL env:', import.meta.env.VITE_API_URL)
     
-    // 즉시 리다이렉트 (동기적으로)
-    console.log('리다이렉트 시작...')
+    // Redirect immediately (synchronously)
+    console.log('Starting redirect...')
     console.log('oauthUrl:', oauthUrl)
     
-    // window.location.replace를 직접 사용 (가장 확실)
+    // Use window.location.replace directly (most reliable)
     window.location.replace(oauthUrl)
     
-    // 만약 replace가 작동하지 않으면 href 사용
+    // If replace doesn't work, use href
     setTimeout(() => {
-      console.warn('replace가 작동하지 않음, href로 재시도')
+      console.warn('Replace not working, retrying with href')
       window.location.href = oauthUrl
     }, 100)
   }
@@ -308,12 +308,12 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
               e.preventDefault()
               e.stopPropagation()
               
-              // 🔥 연결 버튼 클릭 시 토큰 상태 확인
+              // Check token status when connect button is clicked
               await checkEbayTokenStatus()
               
-              // 🔥 이미 연결되어 있으면 제품 조회 및 표시 (OAuth 시작하지 않음)
+              // If already connected, query and display products (do not start OAuth)
               if (selectedStore?.connected) {
-                console.log('✅ 이미 eBay에 연결되어 있습니다 - 제품 조회 시작')
+                console.log('✅ Already connected to eBay - starting product query')
                 // 부모 컴포넌트에 연결 상태 알림 (강제 제품 조회 트리거)
                 if (onConnectionChange) {
                   // forceLoad 플래그를 전달할 수 없으므로, 콜백을 두 번 호출하여 강제 로드
@@ -325,7 +325,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
               
               // 연결되어 있지 않으면 OAuth 시작
               const oauthUrl = `${API_BASE_URL}/api/ebay/auth/start?user_id=${CURRENT_USER_ID}`
-              console.log('🔗 Connect 버튼 클릭 - OAuth 시작')
+              console.log('🔗 Connect button clicked - starting OAuth')
               window.location.href = oauthUrl
             }}
             className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold rounded-lg transition-all flex items-center gap-2 text-base shadow-lg hover:shadow-emerald-500/40 transform hover:scale-105 active:scale-95 cursor-pointer border-2 border-emerald-500/50"
@@ -569,7 +569,7 @@ function SummaryCard({
         <div 
           onClick={() => handleCardClick('zombies')}
           className={`opt-card p-6 cursor-pointer transition-all text-center group hover:bg-zinc-800/50 ${viewMode === 'zombies' ? 'ring-2 ring-red-500/50' : ''} ${totalZombies > 0 ? 'border-red-500/30' : ''} hover:ring-2 hover:ring-red-500/30 hover:border-red-500/20`}
-          title="현재 설정된 필터 기준으로 감지된 저성과(삭제 대상) SKU 개수입니다."
+          title="Number of low-performing (deletion target) SKUs detected based on current filter settings."
         >
           <div className={`text-4xl font-black group-hover:opacity-90 transition-opacity ${totalZombies > 0 ? 'text-red-400' : 'text-white'}`}>{totalZombies || 0}</div>
           <div className={`text-sm uppercase mt-1 group-hover:opacity-90 transition-opacity ${totalZombies > 0 ? 'text-red-400' : 'text-zinc-500'}`}>Low-Performing</div>
@@ -579,7 +579,7 @@ function SummaryCard({
         <div 
           onClick={() => handleCardClick('queue')}
           className={`opt-card p-6 cursor-pointer transition-all text-center group hover:bg-zinc-800/50 ${viewMode === 'queue' ? 'ring-2 ring-orange-500/50' : ''} hover:ring-2 hover:ring-orange-500/30 hover:border-orange-500/20`}
-          title="클릭 시, 분석된 저성과 SKU에 대한 맞춤형 근원 제거용 CSV를 다운로드합니다."
+          title="Click to download custom root-cause removal CSV for analyzed low-performing SKUs."
         >
           <div className={`text-4xl font-black group-hover:opacity-90 transition-opacity ${queueCount > 0 ? 'text-orange-400' : 'text-white'}`}>{queueCount || 0}</div>
           <div className="text-sm text-zinc-500 uppercase mt-1 group-hover:text-zinc-400 transition-colors">CSV Export</div>
