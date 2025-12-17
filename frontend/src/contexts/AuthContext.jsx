@@ -17,7 +17,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // 현재 세션 가져오기
+    // Get current session
     const getSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
@@ -26,7 +26,7 @@ export const AuthProvider = ({ children }) => {
         setSession(session)
         setUser(session?.user ?? null)
       } catch (error) {
-        console.error('세션 가져오기 실패:', error)
+        console.error('Failed to get session:', error)
       } finally {
         setLoading(false)
       }
@@ -34,7 +34,7 @@ export const AuthProvider = ({ children }) => {
 
     getSession()
 
-    // 인증 상태 변경 리스너
+    // Auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth event:', event)
@@ -49,7 +49,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, [])
 
-  // Google 로그인
+  // Google sign in
   const signInWithGoogle = async () => {
     try {
       setLoading(true)
@@ -60,11 +60,11 @@ export const AuthProvider = ({ children }) => {
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
-            // Google OAuth 동의 화면에 표시될 도메인 설정
-            // 주의: Google Cloud Console의 OAuth 동의 화면 → 승인된 도메인 순서가 우선 적용됨
-            // optlisting.com을 첫 번째로 설정하면 Google 로그인 화면에 표시됨
+            // Domain settings to display on Google OAuth consent screen
+            // Note: The order of authorized domains in Google Cloud Console OAuth consent screen takes priority
+            // If optlisting.com is set first, it will be displayed on Google login screen
           },
-          // 스코프 설정
+          // Scope settings
           scopes: 'email profile',
         },
       })
@@ -72,14 +72,14 @@ export const AuthProvider = ({ children }) => {
       if (error) throw error
       return { data, error: null }
     } catch (error) {
-      console.error('Google 로그인 실패:', error)
+      console.error('Google sign in failed:', error)
       return { data: null, error }
     } finally {
       setLoading(false)
     }
   }
 
-  // 이메일 로그인 (선택적)
+  // Email sign in (optional)
   const signInWithEmail = async (email, password) => {
     try {
       setLoading(true)
@@ -91,14 +91,14 @@ export const AuthProvider = ({ children }) => {
       if (error) throw error
       return { data, error: null }
     } catch (error) {
-      console.error('이메일 로그인 실패:', error)
+      console.error('Email sign in failed:', error)
       return { data: null, error }
     } finally {
       setLoading(false)
     }
   }
 
-  // 회원가입
+  // Sign up
   const signUp = async (email, password) => {
     try {
       setLoading(true)
@@ -113,14 +113,14 @@ export const AuthProvider = ({ children }) => {
       if (error) throw error
       return { data, error: null }
     } catch (error) {
-      console.error('회원가입 실패:', error)
+      console.error('Sign up failed:', error)
       return { data: null, error }
     } finally {
       setLoading(false)
     }
   }
 
-  // 로그아웃
+  // Sign out
   const signOut = async () => {
     try {
       setLoading(true)
@@ -130,20 +130,20 @@ export const AuthProvider = ({ children }) => {
       setUser(null)
       setSession(null)
     } catch (error) {
-      console.error('로그아웃 실패:', error)
+      console.error('Sign out failed:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  // 프로필 업데이트
+  // Update profile
   const updateProfile = async (updates) => {
     try {
       const { data, error } = await supabase.auth.updateUser(updates)
       if (error) throw error
       return { data, error: null }
     } catch (error) {
-      console.error('프로필 업데이트 실패:', error)
+      console.error('Profile update failed:', error)
       return { data: null, error }
     }
   }

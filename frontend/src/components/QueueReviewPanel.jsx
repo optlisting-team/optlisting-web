@@ -312,12 +312,12 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
         link.remove()
         window.URL.revokeObjectURL(url)
         
-        // API 실패 시 경고 메시지 표시 (하지만 CSV는 다운로드됨)
+        // Show warning message if API fails (but CSV is downloaded)
         if (apiErrorMsg) {
           console.warn(apiErrorMsg)
-          // 사용자에게 알림 (하지만 CSV는 이미 다운로드되었으므로 경고만)
+          // Notify user (but only warning since CSV is already downloaded)
           setTimeout(() => {
-            alert(`${apiErrorMsg}\n\nCSV 파일은 기본 형식으로 생성되었습니다.`)
+            alert(`${apiErrorMsg}\n\nCSV file has been generated in default format.`)
           }, 500)
         }
       }
