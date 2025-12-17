@@ -11,19 +11,19 @@ import HistoryView from './HistoryView'
 import QueueReviewPanel from './QueueReviewPanel'
 import { Button } from './ui/button'
 
-// Railway URL이 변경되었을 수 있으므로 환경 변수 우선 사용
+// Use environment variable for Railway URL, fallback to default if not set
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://web-production-3dc73.up.railway.app'
 const CURRENT_USER_ID = "default-user" // Temporary user ID for MVP phase
 
 // Demo Mode - Set to true to use dummy data (false for production with real API)
-// 🧪 테스트용: true = 더미 데이터, false = 실제 API
-// Force redeploy: 2024-12-11 - 실제 eBay 테스트를 위해 false로 변경
+// Test mode: true = dummy data, false = real API
+// Force redeploy: 2024-12-11 - Changed to false for real eBay testing
 const DEMO_MODE = false
 
-// 캐시 설정
+// Cache configuration
 const CACHE_KEY = `optlisting_listings_${CURRENT_USER_ID}`
 const CACHE_TIMESTAMP_KEY = `optlisting_listings_timestamp_${CURRENT_USER_ID}`
-const CACHE_DURATION = 5 * 60 * 1000 // 5분 (밀리초)
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes (in milliseconds)
 
 // Dummy data for demo/testing
 // Generate 100 dummy listings
@@ -76,7 +76,7 @@ const generateDummyListings = (count) => {
       recommendation: zombieScore <= 20 ? 'DELETE' : zombieScore <= 40 ? 'DELETE' : zombieScore <= 60 ? 'OPTIMIZE' : 'MONITOR',
       global_winner: Math.random() > 0.9,
       active_elsewhere: Math.random() > 0.8,
-      // Shopify 경유 정보 추가
+      // Add Shopify routing information
       management_hub: goesThroughShopify ? 'Shopify' : null,
       metrics: {
         sales,
@@ -110,12 +110,12 @@ function Dashboard() {
   const viewParam = searchParams.get('view')
   // Store connection state
   const [isStoreConnected, setIsStoreConnected] = useState(false)
-  // 🔥 중복 실행 방지를 위한 ref
+  // Ref to prevent duplicate execution
   const listingsLoadedOnceRef = useRef(false)
-  // 🔥 Debug HUD용: 마지막 fetch 시간
+  // Debug HUD: Last fetch time
   const [lastFetchAt, setLastFetchAt] = useState(null)
   
-  // DEMO_MODE 초기 데이터 설정 - 스토어 연결 전에는 0
+  // DEMO_MODE initial data setup - set to 0 before store connection
   const [zombies, setZombies] = useState([]) // Start empty, populate after filter
   const [allListings, setAllListings] = useState([]) // Start empty, populate after store connection
   const [totalZombies, setTotalZombies] = useState(0) // Start at 0, update after filter
@@ -127,15 +127,15 @@ function Dashboard() {
   const [error, setError] = useState(null)
   const [selectedIds, setSelectedIds] = useState([])
   const [queue, setQueue] = useState([])
-  const [viewMode, setViewModeRaw] = useState('total') // 항상 통계 뷰로 시작 (좀비 배너가 강조됨)
+  const [viewMode, setViewModeRaw] = useState('total') // Always start with statistics view (zombie banner emphasized)
   
-  // 🔥 setViewMode를 래핑해서 모든 변경 로그 찍기
+  // Wrap setViewMode to log all changes
   const setViewMode = (next) => {
     const from = viewMode
     console.log('[setViewMode]', { 
       from, 
       to: next, 
-      stack: new Error().stack.split('\n').slice(1, 4).join('\n') // 상위 3개 스택만
+      stack: new Error().stack.split('\n').slice(1, 4).join('\n') // Top 3 stack frames only
     })
     setViewModeRaw(next)
   }
@@ -152,7 +152,7 @@ function Dashboard() {
     { id: '10', title: 'Mouse Pad Large Gaming', sku: 'BG44556677', supplier: 'Banggood', price: 14.99, deleted_at: '2024-12-01T08:55:00Z', reason: 'Zero sales in 30 days' },
   ] : [])
   const [totalDeleted, setTotalDeleted] = useState(0) // Start at 0, updates from history
-  const [showFilter, setShowFilter] = useState(false) // 기본: 필터 접힘
+  const [showFilter, setShowFilter] = useState(false) // Default: filter collapsed
   
   // API Health Check State
   const [apiConnected, setApiConnected] = useState(false)
@@ -166,17 +166,17 @@ function Dashboard() {
   
   const [filters, setFilters] = useState({
     marketplace_filter: 'eBay',  // MVP Scope: Default to eBay (only eBay and Shopify supported)
-    analytics_period_days: 7,    // 1. 분석 기준 기간 (기본값: 7일)
+    analytics_period_days: 7,    // 1. Analysis period in days (default: 7 days)
     min_days: 7,                 // Legacy compatibility
-    max_sales: 0,                // 2. 기간 내 판매 건수 (기본값: 0건)
-    max_watches: 0,              // 3. 찜하기 (Watch) (기본값: 0건)
+    max_sales: 0,                // 2. Maximum sales count in period (default: 0)
+    max_watches: 0,              // 3. Maximum watch count (default: 0)
     max_watch_count: 0,          // Legacy compatibility
-    max_impressions: 100,        // 4. 총 노출 횟수 (기본값: 100회 미만)
-    max_views: 10,               // 5. 총 조회 횟수 (기본값: 10회 미만)
+    max_impressions: 100,        // 4. Maximum impressions (default: less than 100)
+    max_views: 10,               // 5. Maximum views (default: less than 10)
     supplier_filter: 'All'
   })
   
-  // 재시도 유틸리티 함수
+  // Retry utility function
   const retryApiCall = async (apiCall, maxRetries = 3, delay = 2000) => {
     for (let i = 0; i < maxRetries; i++) {
       try {
@@ -186,7 +186,7 @@ function Dashboard() {
         if (isLastAttempt) {
           throw err
         }
-        // 재시도 전 대기
+        // Wait before retry
         await new Promise(resolve => setTimeout(resolve, delay * (i + 1)))
       }
     }
@@ -197,7 +197,7 @@ function Dashboard() {
     try {
       const response = await retryApiCall(async () => {
         return await axios.get(`${API_BASE_URL}/api/health`, { 
-          timeout: 30000, // 10초 → 30초로 증가
+          timeout: 30000, // Increased from 10s to 30s
           headers: {
             'Content-Type': 'application/json',
           },
@@ -209,14 +209,14 @@ function Dashboard() {
         return true
       }
     } catch (err) {
-      // 502 Bad Gateway, 네트워크 에러, CORS 에러 등 모든 에러 처리
+      // Handle all errors: 502 Bad Gateway, network errors, CORS errors, etc.
       if (err.code === 'ERR_NETWORK' || err.code === 'ECONNABORTED') {
         console.warn('API Health Check failed: Server may be down or unreachable')
       } else {
         console.error('API Health Check failed:', err)
       }
       setApiConnected(false)
-      // 502 에러인 경우 더 명확한 메시지
+      // More specific message for 502 errors
       if (err.response?.status === 502) {
         setApiError('Server Error (502)')
       } else if (err.code === 'ERR_NETWORK') {
@@ -235,7 +235,7 @@ function Dashboard() {
       const response = await retryApiCall(async () => {
         return await axios.get(`${API_BASE_URL}/api/credits`, {
           params: { user_id: CURRENT_USER_ID },
-          timeout: 30000, // 10초 → 30초로 증가
+          timeout: 30000, // Increased from 10s to 30s
           headers: {
             'Content-Type': 'application/json',
           },
@@ -252,8 +252,8 @@ function Dashboard() {
     }
   }
 
-  // 공급처 자동 감지 함수 (supplier_name과 supplier_id 모두 반환)
-  // 우선순위: 자동화 툴 > 공급처
+  // Auto-detect supplier function (returns both supplier_name and supplier_id)
+  // Priority: Automation tool > Supplier
   const extractSupplierInfo = (title, sku = '', imageUrl = '') => {
     if (!title && !sku) return { supplier_name: 'Unknown', supplier_id: null }
     
@@ -262,14 +262,14 @@ function Dashboard() {
     const titleLower = (title || '').toLowerCase()
     const imageUrlLower = (imageUrl || '').toLowerCase()
     
-    // SKU를 하이픈(-) 또는 언더스코어(_)로 분리하여 분석
+    // Split SKU by hyphen(-) or underscore(_) for analysis
     const skuParts = skuUpper.split(/[-_]/)
     
     // ============================================
-    // 자동화 툴 감지 (우선순위 높음)
+    // Automation tool detection (high priority)
     // ============================================
     
-    // AutoDS 감지
+    // AutoDS detection
     if (
       skuUpper.startsWith('AUTODS') ||
       skuUpper.startsWith('ADS') ||
@@ -278,7 +278,7 @@ function Dashboard() {
       text.includes('autods') ||
       imageUrlLower.includes('autods')
     ) {
-      // AutoDS SKU에서 실제 공급처 추출 시도 (예: "AUTODS-AMZ-B08ABC1234" → "B08ABC1234")
+      // Try to extract actual supplier from AutoDS SKU (e.g., "AUTODS-AMZ-B08ABC1234" → "B08ABC1234")
       let remainingSku = null
       if (skuUpper.startsWith('AUTODS')) {
         remainingSku = skuUpper.replace('AUTODS', '').replace(/^[-_]/, '').trim()
@@ -329,7 +329,7 @@ function Dashboard() {
           supplierId = remainingParts.slice(1).join('-') || null
         }
         else {
-          // 패턴이 없으면 전체를 ID로 사용 (단, AutoDS 접두사는 제외)
+          // If no pattern found, use entire string as ID (except AutoDS prefix)
           supplierId = remainingSku || null
         }
       }
@@ -337,7 +337,7 @@ function Dashboard() {
       return { supplier_name: 'AutoDS', supplier_id: supplierId }
     }
     
-    // Yaballe 감지
+    // Yaballe detection
     if (
       skuUpper.startsWith('YABALLE') ||
       skuUpper.startsWith('YAB-') ||

@@ -4,18 +4,18 @@ import SourceBadge from './SourceBadge'
 import PlatformBadge from './PlatformBadge'
 import axios from 'axios'
 
-// Railway URL이 변경되었을 수 있으므로 환경 변수 우선 사용
+// Use environment variable for Railway URL, fallback to default if not set
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://web-production-3dc73.up.railway.app'
 
 function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, onSourceChange, onMarkDownloaded }) {
   const [downloadedGroups, setDownloadedGroups] = useState(new Set())
   const [showShopifyModal, setShowShopifyModal] = useState(false)
   const [pendingExport, setPendingExport] = useState(null) // { source, items, shopifyItems, supplierItems }
-  const [exporting, setExporting] = useState(false) // 로딩 상태 추가
-  const [exportError, setExportError] = useState(null) // 에러 상태 추가
-  const [showPreviewModal, setShowPreviewModal] = useState(false) // CSV 미리 보기 모달
+  const [exporting, setExporting] = useState(false) // Loading state
+  const [exportError, setExportError] = useState(null) // Error state
+  const [showPreviewModal, setShowPreviewModal] = useState(false) // CSV preview modal
   const [previewData, setPreviewData] = useState(null) // { source, items, exportType, targetTool }
-  const [hoveredImage, setHoveredImage] = useState(null) // 마우스오버 확대 이미지
+  const [hoveredImage, setHoveredImage] = useState(null) // Mouseover zoom image
   
   // Check if item goes through Shopify
   const isShopifyItem = (item) => {
@@ -27,7 +27,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
            (item.metrics && typeof item.metrics === 'object' && item.metrics.management_hub === 'Shopify')
   }
   
-  // Group items by supplier only (Shopify 경유와 Direct를 같은 그룹으로 묶음)
+  // Group items by supplier only (group Shopify-routed and Direct items together)
   const groupedBySource = queue.reduce((acc, item) => {
     // Safely extract supplier name, handling null, undefined, empty string, and "undefined" string
     let supplier = item.supplier_name || item.supplier || null
@@ -35,7 +35,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
       supplier = "Unknown"
     }
     
-    // 같은 공급처로 그룹화 (Shopify 경유 여부는 나중에 Export 시 분리)
+    // Group by same supplier (Shopify routing will be separated during Export)
     if (!acc[supplier]) {
       acc[supplier] = {
         supplier: supplier,
@@ -91,7 +91,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
     }
     const { shopifyItems } = separateByShopify(items)
     if (shopifyItems.length > 0) {
-      // 미리 보기 모달 표시
+      // Show preview modal
       setPreviewData({
         source: supplier,
         items: shopifyItems,
@@ -121,7 +121,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
         targetTool = 'yaballe'
       }
       
-      // 미리 보기 모달 표시
+      // Show preview modal
       setPreviewData({
         source: supplier,
         items: supplierItems,
@@ -155,7 +155,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
     
     // Shopify 경유만 있으면 Shopify CSV
     if (shopifyItems.length > 0 && supplierItems.length === 0) {
-      // 미리 보기 모달 표시
+      // Show preview modal
       setPreviewData({
         source: supplier,
         items: shopifyItems,
@@ -169,7 +169,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
     
     // Direct만 있으면 공급처 CSV
     if (supplierItems.length > 0 && shopifyItems.length === 0) {
-      // 미리 보기 모달 표시
+      // Show preview modal
       setPreviewData({
         source: supplier,
         items: supplierItems,

@@ -9,7 +9,7 @@ const INITIAL_STORES = [
   { id: 'store-3', name: 'Shopify Store', platform: 'Shopify', connected: false },
 ]
 
-// Railway URL이 변경되었을 수 있으므로 환경 변수 우선 사용
+// Use environment variable for Railway URL, fallback to default if not set
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://web-production-3dc73.up.railway.app'
 const CURRENT_USER_ID = 'default-user'
 
@@ -19,7 +19,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
   const [stores, setStores] = useState(INITIAL_STORES)
   const [selectedStore, setSelectedStore] = useState(stores[0])
   const [connecting, setConnecting] = useState(false)
-  const [checkingConnection, setCheckingConnection] = useState(false) // 🔥 초기값 false로 변경 - 버튼 클릭 시에만 확인
+  const [checkingConnection, setCheckingConnection] = useState(false) // Changed default to false - only check on button click
   const [ebayUserId, setEbayUserId] = useState(null) // eBay User ID 상태 추가
   const dropdownRef = useRef(null)
 
@@ -39,7 +39,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // 🔥 eBay 토큰 상태 확인 함수 (수동 호출만 가능)
+  // eBay token status check function (manual call only)
   const checkEbayTokenStatus = async () => {
     if (selectedStore?.platform !== 'eBay') {
       setCheckingConnection(false)
@@ -48,10 +48,10 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
 
     try {
       setCheckingConnection(true)
-      // 경량화된 토큰 상태 확인
+      // Lightweight token status check
       const response = await axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
         params: { user_id: CURRENT_USER_ID },
-        timeout: 30000 // 5초 → 30초로 증가
+        timeout: 30000 // Increased from 5s to 30s
       })
       
       // 유효한 토큰이 있는지 확인

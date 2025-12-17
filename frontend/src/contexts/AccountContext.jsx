@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 
-// Railway URL이 변경되었을 수 있으므로 환경 변수 우선 사용
+// Use environment variable for Railway URL, fallback to default if not set
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://web-production-3dc73.up.railway.app'
 
 const AccountContext = createContext({
@@ -21,12 +21,12 @@ export const AccountProvider = ({ children }) => {
   const [showPlanModal, setShowPlanModal] = useState(false)
   const [showCreditModal, setShowCreditModal] = useState(false)
 
-  // 재시도 유틸리티 함수
+  // Retry utility function
   const retryFetch = async (url, options, maxRetries = 3, delay = 2000) => {
     for (let i = 0; i < maxRetries; i++) {
       try {
         const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 30000) // 10초 → 30초로 증가
+        const timeoutId = setTimeout(() => controller.abort(), 30000) // Increased from 10s to 30s
         
         const response = await fetch(url, {
           ...options,
@@ -40,7 +40,7 @@ export const AccountProvider = ({ children }) => {
         if (isLastAttempt) {
           throw err
         }
-        // 재시도 전 대기
+        // Wait before retry
         await new Promise(resolve => setTimeout(resolve, delay * (i + 1)))
       }
     }
@@ -65,19 +65,19 @@ export const AccountProvider = ({ children }) => {
         setPlan(data.current_plan || 'FREE')
         setApiStatus('connected')
       } else {
-        // 502, 503, 504 등의 서버 에러는 'error' 상태로 설정
+        // Set 'error' status for server errors (502, 503, 504, etc.)
         setApiStatus('error')
-        // 기본값 유지 (credits는 null로 유지)
+        // Keep default values (credits remains null)
       }
     } catch (err) {
-      // 네트워크 에러, 타임아웃, CORS 에러 등 모든 에러 처리
+      // Handle all errors: network errors, timeouts, CORS errors, etc.
       if (err.name === 'AbortError') {
         console.warn('Credits fetch timeout')
       } else {
         console.error('Failed to fetch credits:', err)
       }
       setApiStatus('error')
-      // 에러 발생 시에도 기본값 유지 (앱이 계속 작동하도록)
+      // Keep default values on error (so app continues to work)
     }
   }
 
