@@ -69,7 +69,7 @@ function PageHeader() {
 
   const handleRefresh = () => {
     setIsRefreshing(true)
-    // Dashboard에 강제 새로고침 신호 전달
+    // Send force refresh signal to Dashboard
     window.dispatchEvent(new CustomEvent('forceRefresh'))
     setTimeout(() => setIsRefreshing(false), 1000)
   }

@@ -163,7 +163,7 @@ function LandingPage() {
               Instantly generate a CSV of Low-Performing Listings
             </h2>
             
-            {/* 🔥 CTA Button - 로그인 상태에 따라 조건부 렌더링 */}
+            {/* CTA Button - Conditional rendering based on login status */}
             {isAuthenticated ? (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -179,7 +179,7 @@ function LandingPage() {
                 </Link>
               </motion.div>
             ) : (
-              // 🔥 로그인하지 않은 경우 버튼 표시 안 함 (이전 요청에 따라 완전 제거)
+              // Do not display button if not logged in (completely removed per previous request)
               null
             )}
           </motion.div>

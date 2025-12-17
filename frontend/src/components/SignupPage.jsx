@@ -11,7 +11,7 @@ function SignupPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // 이미 로그인된 경우 대시보드로 리다이렉트
+  // Redirect to dashboard if already logged in
   useEffect(() => {
     if (isAuthenticated) {
       navigate('/dashboard')
@@ -25,7 +25,7 @@ function SignupPage() {
     const { error } = await signInWithGoogle()
     
     if (error) {
-      setError(error.message || 'Google 로그인에 실패했습니다.')
+      setError(error.message || 'Google login failed.')
     }
     setLoading(false)
   }

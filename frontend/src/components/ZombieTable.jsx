@@ -607,14 +607,14 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                     </div>
                   </td>
                   <td className="px-2 py-4">
-                    {/* 썸네일 이미지 (좀비 SKU 리포트용 시각적 확인) */}
+                    {/* Thumbnail image (visual confirmation for zombie SKU report) */}
                     {(zombie.image_url || zombie.picture_url || zombie.thumbnail_url) ? (
                       <img 
                         src={zombie.image_url || zombie.picture_url || zombie.thumbnail_url} 
                         alt={zombie.title || 'Product thumbnail'}
                         className="w-12 h-12 object-cover rounded border border-zinc-700"
                         onError={(e) => {
-                          // 이미지 로드 실패 시 플레이스홀더 표시
+                          // Display placeholder if image load fails
                           console.warn('Image load failed:', zombie.image_url || zombie.picture_url || zombie.thumbnail_url)
                           e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="48" height="48"%3E%3Crect width="48" height="48" fill="%23171717"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23717171" font-size="10"%3ENo Image%3C/text%3E%3C/svg%3E'
                         }}
@@ -627,7 +627,7 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                   </td>
                   <td 
                     className="px-2 py-4 text-xs font-mono text-zinc-400 group cursor-pointer hover:bg-zinc-800/50 transition-colors relative"
-                    title={`SKU: ${zombie.sku || 'N/A'}\n클릭 시 SKU가 클립보드에 복사됩니다.`}
+                    title={`SKU: ${zombie.sku || 'N/A'}\nClick to copy SKU to clipboard.`}
                     onClick={() => {
                       if (zombie.sku) {
                         navigator.clipboard.writeText(zombie.sku)

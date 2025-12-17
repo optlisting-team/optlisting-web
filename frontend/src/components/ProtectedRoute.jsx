@@ -7,7 +7,7 @@ function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth()
   const location = useLocation()
 
-  // 로딩 중일 때 로딩 화면 표시
+  // Display loading screen while loading
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 flex items-center justify-center">
@@ -19,13 +19,13 @@ function ProtectedRoute({ children }) {
     )
   }
 
-  // 인증되지 않은 경우 로그인 페이지로 리다이렉트
+  // Redirect to login page if not authenticated
   if (!isAuthenticated) {
-    // 현재 위치 저장 (로그인 후 돌아오기 위해)
+    // Save current location (to return after login)
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  // 인증된 경우 자식 컴포넌트 렌더링
+  // Render child components if authenticated
   return children
 }
 

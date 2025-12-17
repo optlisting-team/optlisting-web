@@ -270,9 +270,9 @@ function Settings() {
           {/* Expansion Info */}
           <div className="mt-4 p-4 bg-zinc-800/50 border border-zinc-700 rounded-xl">
             <p className="text-sm text-zinc-400">
-              <strong className="text-white">{userPlan}</strong> 플랜은 <strong className="text-blue-400">{planStoreLimit}개</strong>의 스토어 라이선스를 제공합니다. 
-              추가 스토어 연결은 <strong className="text-amber-400">Global Credit Limit</strong> (현재 {globalStoreLimit}개) 내에서 언제든지 가능합니다. 
-              추가 스토어 라이선스가 필요할 경우, <strong className="text-purple-400">POWER SELLER</strong> 플랜으로 업그레이드하십시오.
+              The <strong className="text-white">{userPlan}</strong> plan provides <strong className="text-blue-400">{planStoreLimit}</strong> store licenses. 
+              Additional store connections are available at any time within the <strong className="text-amber-400">Global Credit Limit</strong> (currently {globalStoreLimit}). 
+              If you need additional store licenses, please upgrade to the <strong className="text-purple-400">POWER SELLER</strong> plan.
             </p>
           </div>
         </div>
