@@ -1384,37 +1384,37 @@ function Dashboard() {
             limit: 1
           }
         })
-        // total_count가 응답에 있으면 사용, 없으면 listings 배열 길이 사용
+        // Use total_count from response if available, otherwise use listings array length
         currentTotalListings = dbResponse.data?.total_count || dbResponse.data?.listings?.length || 0
-        console.log(`✅ DB에서 전체 리스팅 수 확인: ${currentTotalListings}개`)
+        console.log(`✅ Total listings count confirmed from DB: ${currentTotalListings}`)
       } catch (err) {
-        console.warn('⚠️ DB 리스팅 수 확인 실패, 기본값 사용:', err)
-        currentTotalListings = 12 // 기본값 (최소 1 크레딧 차감)
+        console.warn('⚠️ Failed to confirm listings count from DB, using default:', err)
+        currentTotalListings = 12 // Default value (minimum 1 credit deduction)
       }
     }
     
-    // 🔥 "Find Low-Performing SKUs" 버튼 클릭 시 항상 크레딧 차감 팝업 표시
-    // Active 카드에서 이미 조회된 데이터를 사용하더라도 분석 시에는 크레딧 차감 필요
+    // When "Find Low-Performing SKUs" button is clicked, always show credit deduction popup
+    // Even if using data already queried from Active card, credit deduction is required for analysis
     try {
-      console.log('💰 크레딧 잔액 확인 시작...')
-      // 크레딧 잔액 확인
+      console.log('💰 Starting credit balance check...')
+      // Check credit balance
       const creditsResponse = await axios.get(`${API_BASE_URL}/api/credits`, {
         params: { user_id: CURRENT_USER_ID },
-        timeout: 30000 // 10초 → 30초로 증가
+        timeout: 30000 // Increased from 10s to 30s
       })
       
-      console.log('💰 크레딧 응답:', creditsResponse.data)
+      console.log('💰 Credit response:', creditsResponse.data)
       
       const availableCredits = creditsResponse.data?.available_credits || 0
-      // 🔥 전체 스캔하는 제품 수만큼 크레딧 차감
-      const requiredCredits = Math.max(1, currentTotalListings) // 최소 1 크레딧
+      // Deduct credits equal to the number of products being scanned
+      const requiredCredits = Math.max(1, currentTotalListings) // Minimum 1 credit
       
-      console.log(`💰 크레딧 정보: 보유=${availableCredits}, 필요=${requiredCredits} (전체 ${currentTotalListings}개 리스팅 스캔)`)
+      console.log(`💰 Credit info: available=${availableCredits}, required=${requiredCredits} (scanning ${currentTotalListings} total listings)`)
       
-      // 크레딧 부족 확인
+      // Check if credits are insufficient
       if (availableCredits < requiredCredits) {
-        console.log('⚠️ 크레딧 부족 - 구매 안내 팝업 표시')
-        const userMessage = `크레딧이 부족합니다.\n\n필요한 크레딧: ${requiredCredits}\n보유 크레딧: ${availableCredits}\n\n크레딧을 구매하시겠습니까?`
+        console.log('⚠️ Insufficient credits - showing purchase guide popup')
+        const userMessage = `Insufficient credits.\n\nRequired credits: ${requiredCredits}\nAvailable credits: ${availableCredits}\n\nWould you like to purchase credits?`
         
         if (window.confirm(userMessage)) {
           window.location.href = '/#pricing'
@@ -1422,36 +1422,36 @@ function Dashboard() {
         return
       }
       
-      // 크레딧 충분 - 확인 팝업 표시
-      console.log('✅ 크레딧 충분 - 확인 팝업 표시')
-      const confirmMessage = `분석을 시작하시겠습니까?\n\n필요한 크레딧: ${requiredCredits} (전체 ${currentTotalListings}개 리스팅 스캔)\n보유 크레딧: ${availableCredits}\n차감 후 잔액: ${availableCredits - requiredCredits}`
+      // Credits sufficient - show confirmation popup
+      console.log('✅ Credits sufficient - showing confirmation popup')
+      const confirmMessage = `Would you like to start the analysis?\n\nRequired credits: ${requiredCredits} (scanning ${currentTotalListings} total listings)\nAvailable credits: ${availableCredits}\nBalance after deduction: ${availableCredits - requiredCredits}`
       
-      console.log('💬 확인 팝업 메시지:', confirmMessage)
+      console.log('💬 Confirmation popup message:', confirmMessage)
       const userConfirmed = window.confirm(confirmMessage)
-      console.log(`👤 사용자 확인: ${userConfirmed}`)
+      console.log(`👤 User confirmation: ${userConfirmed}`)
       
       if (userConfirmed) {
-        // 사용자 확인 후 필터링 진행 (크레딧 차감 포함, 백엔드 API 호출)
-        console.log('🚀 사용자 확인 완료 - 분석 시작')
+        // Proceed with filtering after user confirmation (includes credit deduction, backend API call)
+        console.log('🚀 User confirmed - starting analysis')
         await fetchZombies(newFilters, true)
         setViewMode('zombies')
       } else {
-        console.log('❌ 사용자 취소 - 분석 중단')
+        console.log('❌ User cancelled - analysis aborted')
       }
     } catch (err) {
-      console.error('❌ 크레딧 확인 실패:', err)
-      console.error('❌ 에러 상세:', err.response?.data || err.message)
+      console.error('❌ Credit check failed:', err)
+      console.error('❌ Error details:', err.response?.data || err.message)
       
-      // 크레딧 확인 실패 시에도 확인 팝업 표시
-      const errorMessage = err.response?.data?.detail || err.message || '알 수 없는 오류'
-      const userMessage = `크레딧 확인에 실패했습니다.\n\n에러: ${errorMessage}\n\n계속 진행하시겠습니까? (백엔드에서 크레딧 차감이 시도됩니다)`
+      // Show confirmation popup even if credit check fails
+      const errorMessage = err.response?.data?.detail || err.message || 'Unknown error'
+      const userMessage = `Credit check failed.\n\nError: ${errorMessage}\n\nWould you like to continue? (Credit deduction will be attempted on backend)`
       
       if (window.confirm(userMessage)) {
-        console.log('🚀 사용자 확인 - 에러 발생했지만 계속 진행')
+        console.log('🚀 User confirmed - continuing despite error')
         await fetchZombies(newFilters, true)
         setViewMode('zombies')
       } else {
-        console.log('❌ 사용자 취소 - 에러 발생으로 중단')
+        console.log('❌ User cancelled - aborted due to error')
       }
     }
   }
@@ -1484,7 +1484,7 @@ function Dashboard() {
     
     const selectedItems = zombies.filter(z => selectedIds.includes(z.id)).map(item => ({
       ...item,
-      // source 필드가 없으면 supplier_name 또는 supplier로 설정
+      // Set to supplier_name or supplier if source field is missing
       source: item.source || item.supplier_name || item.supplier || 'Unknown'
     }))
     setQueue([...queue, ...selectedItems])
@@ -1493,7 +1493,7 @@ function Dashboard() {
     setSelectedIds([])
     setTotalZombies(totalZombies - selectedItems.length)
     
-    // 바로 Queue 뷰로 이동
+    // Navigate directly to Queue view
     setViewMode('queue')
     setShowFilter(false)
   }
@@ -1583,7 +1583,7 @@ function Dashboard() {
     }
   }
 
-  // OAuth 콜백 후 URL 파라미터 확인 및 연결 상태 강제 업데이트
+  // Check URL parameters after OAuth callback and force update connection status
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const ebayConnected = urlParams.get('ebay_connected')
@@ -1591,66 +1591,66 @@ function Dashboard() {
     const code = urlParams.get('code')
     const state = urlParams.get('state')
     
-    // 🔥 중요: eBay가 프론트엔드로 직접 리다이렉트한 경우 (code 파라미터가 있음)
-    // 백엔드 콜백 엔드포인트로 리다이렉트
+    // Important: If eBay redirected directly to frontend (code parameter exists)
+    // Redirect to backend callback endpoint
     if (code && !ebayConnected && !ebayError) {
-      console.log('🔄 eBay OAuth code 감지 - 백엔드로 리다이렉트')
+      console.log('🔄 eBay OAuth code detected - redirecting to backend')
       console.log('   Code:', code.substring(0, 20) + '...')
       console.log('   State:', state)
       
-      // 백엔드 콜백 엔드포인트로 리다이렉트 (모든 파라미터 전달)
+      // Redirect to backend callback endpoint (pass all parameters)
       const callbackUrl = `${API_BASE_URL}/api/ebay/auth/callback?${urlParams.toString()}`
       console.log('   Redirecting to:', callbackUrl)
       window.location.href = callbackUrl
-      return // 리다이렉트 후 실행 중단
+      return // Stop execution after redirect
     }
     
     if (ebayConnected === 'true') {
-      console.log('✅ OAuth 콜백 성공 - eBay 연결됨')
+      console.log('✅ OAuth callback successful - eBay connected')
       
-      // 즉시 연결 상태 업데이트
+      // Immediately update connection status
       setIsStoreConnected(true)
-      console.log('🔄 연결 상태를 true로 설정')
+      console.log('🔄 Setting connection status to true')
       
-      // URL 파라미터 제거 (깔끔한 URL 유지)
+      // Remove URL parameters (keep clean URL)
       window.history.replaceState({}, '', window.location.pathname)
       
-      // 제품 로드 (약간의 지연 후 - 토큰이 DB에 저장되는 시간 고려)
-      // 연결 직후이므로 강제 새로고침
+      // Load products (after slight delay - consider time for token to be saved to DB)
+      // Force refresh since just connected
       setTimeout(() => {
-        console.log('📦 OAuth 콜백 후 제품 로드 시작 (강제 새로고침)')
+        console.log('📦 Starting product load after OAuth callback (force refresh)')
         if (!DEMO_MODE) {
           fetchAllListings(true).catch(err => {
-            console.error('제품 로드 실패:', err)
+            console.error('Product load failed:', err)
           })
         }
-      }, 3000) // 3초 대기 (DB 저장 시간 고려)
+      }, 3000) // Wait 3 seconds (consider DB save time)
       
-      // 🔥 불필요한 연결 상태 재확인 제거
-      // 이미 setIsStoreConnected(true)로 연결 상태가 업데이트되었고,
-      // handleStoreConnection 콜백이 호출되어 추가 확인 불필요
+      // Remove unnecessary connection status re-check
+      // Connection status already updated with setIsStoreConnected(true),
+      // and handleStoreConnection callback is called, so additional check is unnecessary
       
     } else if (ebayError) {
-      console.error('❌ OAuth 콜백 에러:', ebayError)
-      const errorMessage = urlParams.get('message') || 'eBay 연결에 실패했습니다'
-      alert(`eBay 연결 실패: ${errorMessage}`)
-      // URL 파라미터 제거
+      console.error('❌ OAuth callback error:', ebayError)
+      const errorMessage = urlParams.get('message') || 'Failed to connect to eBay'
+      alert(`eBay connection failed: ${errorMessage}`)
+      // Remove URL parameters
       window.history.replaceState({}, '', window.location.pathname)
     }
   }, [])
   
-  // 강제 새로고침 이벤트 리스너
+  // Force refresh event listener
   useEffect(() => {
     const handleForceRefresh = () => {
-      console.log('🔄 강제 새로고침 요청')
-      // 캐시 초기화
+      console.log('🔄 Force refresh requested')
+      // Clear cache
       try {
         localStorage.removeItem(CACHE_KEY)
         localStorage.removeItem(CACHE_TIMESTAMP_KEY)
       } catch (err) {
         console.warn('Cache clear failed:', err)
       }
-      // 데이터 새로고침
+      // Refresh data
       if (isStoreConnected) {
         fetchAllListings(true)
         if (viewMode === 'zombies') {
@@ -1663,10 +1663,10 @@ function Dashboard() {
     return () => window.removeEventListener('forceRefresh', handleForceRefresh)
   }, [isStoreConnected, viewMode, filters])
 
-  // Initial Load - Check API health and fetch data (한 번만 실행)
+  // Initial Load - Check API health and fetch data (execute only once)
   useEffect(() => {
     const initializeDashboard = async () => {
-      // Step 1: Check API Health (초기 로드 시 한 번만)
+      // Step 1: Check API Health (only once on initial load)
       try {
         const isHealthy = await checkApiHealth()
         if (isHealthy) {
@@ -1680,14 +1680,14 @@ function Dashboard() {
         }
       } catch (err) {
         console.warn('API Health Check failed (non-critical):', err)
-        // Health check 실패해도 크레딧과 히스토리는 로드 시도
+        // Even if health check fails, try to load credits and history
         await fetchUserCredits()
         fetchHistory().catch(err => {
           console.error('History fetch error on mount:', err)
         })
       }
       
-      // 🔥 초기 로드 시 캐시된 데이터가 있으면 자동으로 제품 표시
+      // On initial load, automatically display products if cached data exists
       try {
         const cachedData = localStorage.getItem(CACHE_KEY)
         const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
@@ -1696,11 +1696,11 @@ function Dashboard() {
           const cacheAge = Date.now() - parseInt(cachedTimestamp, 10)
           
           if (cacheAge < CACHE_DURATION) {
-            console.log('🔄 초기 로드 - 캐시된 데이터 발견, 제품 자동 표시')
+            console.log('🔄 Initial load - cached data found, automatically displaying products')
             const parsedData = JSON.parse(cachedData)
             if (parsedData.listings?.length > 0) {
               const cachedListings = parsedData.listings || []
-              // 🔥 초기 로드 시 데이터 설정과 동시에 뷰 모드도 즉시 설정
+              // Set view mode immediately along with data setup on initial load
               setAllListings(cachedListings)
               setTotalListings(parsedData.totalListings || 0)
               setTotalBreakdown(parsedData.totalBreakdown || {})
