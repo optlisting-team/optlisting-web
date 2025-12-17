@@ -3,11 +3,11 @@ import { useAccount } from '../contexts/AccountContext'
 import { useAuth } from '../contexts/AuthContext'
 import { Check, Zap, TrendingUp, Crown } from 'lucide-react'
 
-// Lemon Squeezy Store URL (실제 스토어 URL로 변경 필요)
-// 환경 변수 또는 Lemon Squeezy Dashboard에서 확인한 실제 스토어 URL로 변경
+// Lemon Squeezy Store URL (needs to be changed to actual store URL)
+// Change to actual store URL confirmed from environment variable or Lemon Squeezy Dashboard
 const LEMON_SQUEEZY_STORE = import.meta.env.VITE_LEMON_SQUEEZY_STORE || 'https://optlisting.lemonsqueezy.com'
 
-// 크레딧 팩 정의 (LEMONSQUEEZY_SETUP.md와 동일)
+// Credit pack definition (same as LEMONSQUEEZY_SETUP.md)
 const CREDIT_PACKS = [
   { id: 'starter', name: 'Starter', price: 5, credits: 300, popular: false },
   { id: 'popular', name: 'Popular', price: 10, credits: 800, popular: true },
@@ -17,7 +17,7 @@ const CREDIT_PACKS = [
   { id: 'business', name: 'Business', price: 50, credits: 6000, popular: false },
 ]
 
-// 구독 플랜 정의
+// Subscription plan definition
 const SUBSCRIPTION_PLANS = [
   {
     id: 'pro-monthly',
@@ -25,10 +25,10 @@ const SUBSCRIPTION_PLANS = [
     price: 49,
     interval: 'month',
     features: [
-      '무제한 리스팅 분석',
-      '무제한 크레딧',
-      '우선 지원',
-      '고급 필터링',
+      'Unlimited Listing Analysis',
+      'Unlimited Credits',
+      'Priority Support',
+      'Advanced Filtering',
     ],
     icon: Zap,
     popular: true,
@@ -39,10 +39,10 @@ const SUBSCRIPTION_PLANS = [
     price: 99,
     interval: 'month',
     features: [
-      'Pro 플랜의 모든 기능',
-      '팀 멤버 관리',
-      'API 액세스',
-      '전용 지원',
+      'All Pro Plan Features',
+      'Team Member Management',
+      'API Access',
+      'Dedicated Support',
     ],
     icon: Crown,
     popular: false,
@@ -54,9 +54,9 @@ export default function Pricing() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
 
-  // Lemon Squeezy Checkout 링크 생성
+  // Generate Lemon Squeezy Checkout link
   const generateCheckoutUrl = (productId, variantId = null, isSubscription = false) => {
-    // Supabase user ID 또는 기본값 사용
+    // Use Supabase user ID or default value
     const userId = user?.id || user?.user_metadata?.user_id || 'default-user'
     const baseUrl = `${LEMON_SQUEEZY_STORE}/checkout/buy/${productId}`
     const params = new URLSearchParams({
@@ -84,19 +84,19 @@ export default function Pricing() {
         <div className="text-center mb-16">
           <h1 className="text-4xl md:text-5xl font-bold mb-4">Pricing</h1>
           <p className="text-xl text-zinc-400 max-w-2xl mx-auto">
-            크레딧 팩을 구매하거나 구독 플랜을 선택하여 OptListing을 최대한 활용하세요
+            Purchase credit packs or choose a subscription plan to make the most of OptListing
           </p>
           {credits !== null && (
             <div className="mt-6 inline-block px-6 py-3 bg-zinc-800 rounded-lg">
-              <span className="text-zinc-400">현재 크레딧: </span>
+              <span className="text-zinc-400">Current Credits: </span>
               <span className="text-2xl font-bold text-white">{credits.toLocaleString()}</span>
             </div>
           )}
         </div>
 
-        {/* 크레딧 팩 섹션 */}
+        {/* Credit Packs Section */}
         <div className="mb-20">
-          <h2 className="text-3xl font-bold mb-8 text-center">크레딧 팩</h2>
+          <h2 className="text-3xl font-bold mb-8 text-center">Credit Packs</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {CREDIT_PACKS.map((pack) => (
               <div
@@ -110,7 +110,7 @@ export default function Pricing() {
                 {pack.popular && (
                   <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                     <span className="bg-purple-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                      인기
+                      Popular
                     </span>
                   </div>
                 )}
@@ -120,7 +120,7 @@ export default function Pricing() {
                     <span className="text-4xl font-bold">${pack.price}</span>
                   </div>
                   <div className="text-zinc-400 text-sm mb-2">
-                    {pack.credits.toLocaleString()} 크레딧
+                    {pack.credits.toLocaleString()} Credits
                   </div>
                   <div className="text-zinc-500 text-xs">
                     ${(pack.price / pack.credits).toFixed(4)} per credit
@@ -135,16 +135,16 @@ export default function Pricing() {
                       : 'bg-zinc-800 hover:bg-zinc-700 text-white'
                   }`}
                 >
-                  {loading ? '처리 중...' : '구매하기'}
+                  {loading ? 'Processing...' : 'Purchase'}
                 </button>
               </div>
             ))}
           </div>
         </div>
 
-        {/* 구독 플랜 섹션 */}
+        {/* Subscription Plans Section */}
         <div>
-          <h2 className="text-3xl font-bold mb-8 text-center">구독 플랜</h2>
+          <h2 className="text-3xl font-bold mb-8 text-center">Subscription Plans</h2>
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             {SUBSCRIPTION_PLANS.map((plan) => {
               const Icon = plan.icon
@@ -160,7 +160,7 @@ export default function Pricing() {
                   {plan.popular && (
                     <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                       <span className="bg-purple-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                        인기
+                        Popular
                       </span>
                     </div>
                   )}
@@ -191,7 +191,7 @@ export default function Pricing() {
                         : 'bg-zinc-800 hover:bg-zinc-700 text-white'
                     }`}
                   >
-                    {loading ? '처리 중...' : '구독하기'}
+                    {loading ? 'Processing...' : 'Subscribe'}
                   </button>
                 </div>
               )
@@ -199,11 +199,11 @@ export default function Pricing() {
           </div>
         </div>
 
-        {/* 안내 사항 */}
+        {/* Notice */}
         <div className="mt-16 text-center text-zinc-400 text-sm">
-          <p>결제는 Lemon Squeezy를 통해 안전하게 처리됩니다.</p>
+          <p>Payments are processed securely through Lemon Squeezy.</p>
           <p className="mt-2">
-            구매 후 크레딧은 자동으로 추가되며, 구독은 즉시 활성화됩니다.
+            Credits are automatically added after purchase, and subscriptions are activated immediately.
           </p>
         </div>
       </div>
