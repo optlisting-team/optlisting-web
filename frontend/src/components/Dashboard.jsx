@@ -288,18 +288,18 @@ function Dashboard() {
         remainingSku = skuUpper.replace('AD-', '').trim()
       }
       
-      // 남은 SKU에서 실제 공급처 ID 추출 (재귀적 파싱)
+      // Extract actual supplier ID from remaining SKU (recursive parsing)
       let supplierId = null
       if (remainingSku) {
         const remainingParts = remainingSku.split(/[-_]/)
         
-        // Amazon ASIN 패턴 찾기 (B0으로 시작하는 10자리)
+        // Find Amazon ASIN pattern (10 characters starting with B0)
         const amazonAsinPattern = /B0[0-9A-Z]{8}/
         const asinMatch = remainingSku.match(amazonAsinPattern)
         if (asinMatch) {
           supplierId = asinMatch[0]
         }
-        // AMZ 접두사 제거 후 ASIN 찾기
+        // Find ASIN after removing AMZ prefix
         else if (remainingParts[0] === 'AMZ' && remainingParts.length > 1) {
           // "AMZ-B08ABC1234" → "B08ABC1234"
           for (let i = 1; i < remainingParts.length; i++) {
@@ -309,21 +309,21 @@ function Dashboard() {
             }
           }
           if (!supplierId) {
-            // ASIN 패턴이 없으면 나머지 부분을 ID로 사용
+            // If no ASIN pattern found, use remaining parts as ID
             supplierId = remainingParts.slice(1).join('-') || null
           }
         }
-        // Walmart 패턴 (WM 접두사 제거)
+        // Walmart pattern (remove WM prefix)
         else if (remainingParts[0] === 'WM' || remainingParts[0] === 'WMT' || remainingParts[0] === 'WALMART') {
           // "WM-123456" → "123456"
           supplierId = remainingParts.slice(1).join('-') || null
         }
-        // AliExpress 패턴 (AE, ALI 접두사 제거)
+        // AliExpress pattern (remove AE, ALI prefix)
         else if (remainingParts[0] === 'AE' || remainingParts[0] === 'ALI' || remainingParts[0] === 'ALIEXPRESS') {
           // "AE-789012" → "789012"
           supplierId = remainingParts.slice(1).join('-') || null
         }
-        // 다른 공급처 패턴들
+        // Other supplier patterns
         else if (['CJ', 'HD', 'WF', 'CO', 'CW', 'BG'].includes(remainingParts[0])) {
           // "CJ-345678" → "345678"
           supplierId = remainingParts.slice(1).join('-') || null
@@ -346,7 +346,7 @@ function Dashboard() {
       text.includes('yaballe') ||
       imageUrlLower.includes('yaballe')
     ) {
-      // Yaballe SKU에서 실제 공급처 추출 시도 (예: "YABALLE-AMZ-B08ABC1234" → "B08ABC1234")
+      // Try to extract actual supplier from Yaballe SKU (e.g., "YABALLE-AMZ-B08ABC1234" → "B08ABC1234")
       let remainingSku = null
       if (skuUpper.startsWith('YABALLE')) {
         remainingSku = skuUpper.replace('YABALLE', '').replace(/^[-_]/, '').trim()
@@ -360,18 +360,18 @@ function Dashboard() {
         remainingSku = skuUpper.replace('YB', '').replace(/^[-_]/, '').trim()
       }
       
-      // 남은 SKU에서 실제 공급처 ID 추출 (재귀적 파싱)
+      // Extract actual supplier ID from remaining SKU (recursive parsing)
       let supplierId = null
       if (remainingSku) {
         const remainingParts = remainingSku.split(/[-_]/)
         
-        // Amazon ASIN 패턴 찾기 (B0으로 시작하는 10자리)
+        // Find Amazon ASIN pattern (10 characters starting with B0)
         const amazonAsinPattern = /B0[0-9A-Z]{8}/
         const asinMatch = remainingSku.match(amazonAsinPattern)
         if (asinMatch) {
           supplierId = asinMatch[0]
         }
-        // AMZ 접두사 제거 후 ASIN 찾기
+        // Find ASIN after removing AMZ prefix
         else if (remainingParts[0] === 'AMZ' && remainingParts.length > 1) {
           // "AMZ-B08ABC1234" → "B08ABC1234"
           for (let i = 1; i < remainingParts.length; i++) {
@@ -381,27 +381,27 @@ function Dashboard() {
             }
           }
           if (!supplierId) {
-            // ASIN 패턴이 없으면 나머지 부분을 ID로 사용
+            // If no ASIN pattern found, use remaining parts as ID
             supplierId = remainingParts.slice(1).join('-') || null
           }
         }
-        // Walmart 패턴 (WM 접두사 제거)
+        // Walmart pattern (remove WM prefix)
         else if (remainingParts[0] === 'WM' || remainingParts[0] === 'WMT' || remainingParts[0] === 'WALMART') {
           // "WM-123456" → "123456"
           supplierId = remainingParts.slice(1).join('-') || null
         }
-        // AliExpress 패턴 (AE, ALI 접두사 제거)
+        // AliExpress pattern (remove AE, ALI prefix)
         else if (remainingParts[0] === 'AE' || remainingParts[0] === 'ALI' || remainingParts[0] === 'ALIEXPRESS') {
           // "AE-789012" → "789012"
           supplierId = remainingParts.slice(1).join('-') || null
         }
-        // 다른 공급처 패턴들
+        // Other supplier patterns
         else if (['CJ', 'HD', 'WF', 'CO', 'CW', 'BG'].includes(remainingParts[0])) {
           // "CJ-345678" → "345678"
           supplierId = remainingParts.slice(1).join('-') || null
         }
         else {
-          // 패턴이 없으면 전체를 ID로 사용 (단, Yaballe 접두사는 제외)
+          // If no pattern found, use entire string as ID (except Yaballe prefix)
           supplierId = remainingSku || null
         }
       }
@@ -409,7 +409,7 @@ function Dashboard() {
       return { supplier_name: 'Yaballe', supplier_id: supplierId }
     }
     
-    // Wholesale2B 감지
+    // Wholesale2B detection
     if (
       skuUpper.startsWith('W2B') ||
       skuUpper.startsWith('WHOLESALE2B') ||
@@ -425,27 +425,27 @@ function Dashboard() {
     }
     
     // ============================================
-    // 공급처 감지 (SKU 패턴 우선, 그 다음 제목/이미지)
+    // Supplier detection (SKU pattern first, then title/image)
     // ============================================
     
-    // Amazon 감지 (B0으로 시작하는 ASIN 패턴)
+    // Amazon detection (ASIN pattern starting with B0)
     const amazonAsinPattern = /B0[0-9A-Z]{8}/i
     if (amazonAsinPattern.test(sku) || text.includes('amazon') || text.includes('amz-') || 
         imageUrlLower.includes('amazon') || imageUrlLower.includes('ssl-images-amazon')) {
-      // ASIN 추출
+      // Extract ASIN
       const asinMatch = sku.match(amazonAsinPattern)
       const supplierId = asinMatch ? asinMatch[0] : (skuUpper.startsWith('AMZ') ? skuUpper.replace('AMZ', '').replace(/^[-_]/, '').trim() || null : null)
       return { supplier_name: 'Amazon', supplier_id: supplierId }
     }
     
-    // AliExpress 감지
+    // AliExpress detection
     if (/^ae\d/i.test(sku) || text.includes('aliexpress') || text.includes('ali-') || text.includes('alibaba') ||
         imageUrlLower.includes('alicdn') || imageUrlLower.includes('aliexpress')) {
       const supplierId = /^ae(\d+)/i.test(sku) ? sku.match(/^ae(\d+)/i)[1] : (skuUpper.startsWith('AE') ? skuUpper.replace('AE', '').replace(/^[-_]/, '').trim() || null : null)
       return { supplier_name: 'AliExpress', supplier_id: supplierId }
     }
     
-    // Walmart 감지
+    // Walmart detection
     if (skuUpper.startsWith('WM') || skuUpper.startsWith('WMT') || text.includes('walmart') || text.includes('wmt-') ||
         imageUrlLower.includes('walmartimages') || imageUrlLower.includes('walmart.com')) {
       const supplierId = (skuUpper.startsWith('WM') || skuUpper.startsWith('WMT'))
@@ -454,7 +454,7 @@ function Dashboard() {
       return { supplier_name: 'Walmart', supplier_id: supplierId }
     }
     
-    // Home Depot 감지
+    // Home Depot detection
     if (skuUpper.startsWith('HD') || text.includes('home depot') || text.includes('homedepot') || text.includes('hd-') ||
         imageUrlLower.includes('homedepot')) {
       const supplierId = skuUpper.startsWith('HD') 
@@ -463,14 +463,14 @@ function Dashboard() {
       return { supplier_name: 'Home Depot', supplier_id: supplierId }
     }
     
-    // CJ Dropshipping 감지
+    // CJ Dropshipping detection
     if (/^cj\d/i.test(sku) || text.includes('cj drop') || text.includes('cjdrop') || text.includes('cjdropshipping') ||
         imageUrlLower.includes('cjdropshipping')) {
       const supplierId = /^cj(\d+)/i.test(sku) ? sku.match(/^cj(\d+)/i)[1] : (skuUpper.startsWith('CJ') ? skuUpper.replace('CJ', '').replace(/^[-_]/, '').trim() || null : null)
       return { supplier_name: 'CJ Dropshipping', supplier_id: supplierId }
     }
     
-    // Costway 감지
+    // Costway detection
     if (skuUpper.startsWith('CW') || text.includes('costway') || imageUrlLower.includes('costway')) {
       const supplierId = skuUpper.startsWith('CW') 
         ? skuUpper.replace('CW', '').replace(/^[-_]/, '').trim() || null
@@ -478,7 +478,7 @@ function Dashboard() {
       return { supplier_name: 'Costway', supplier_id: supplierId }
     }
     
-    // Banggood 감지
+    // Banggood detection
     if (skuUpper.startsWith('BG') || text.includes('banggood') || text.includes('bg-') || imageUrlLower.includes('banggood')) {
       const supplierId = skuUpper.startsWith('BG') 
         ? skuUpper.replace('BG', '').replace(/^[-_]/, '').trim() || null
@@ -486,7 +486,7 @@ function Dashboard() {
       return { supplier_name: 'Banggood', supplier_id: supplierId }
     }
     
-    // Doba 감지
+    // Doba detection
     if (skuUpper.startsWith('DOBA') || text.includes('doba') || imageUrlLower.includes('doba')) {
       const supplierId = skuUpper.startsWith('DOBA') 
         ? skuUpper.replace('DOBA', '').replace(/^[-_]/, '').trim() || null
@@ -494,7 +494,7 @@ function Dashboard() {
       return { supplier_name: 'Doba', supplier_id: supplierId }
     }
     
-    // DSers 감지
+    // DSers detection
     if (skuUpper.startsWith('DSERS') || text.includes('dsers') || imageUrlLower.includes('dsers')) {
       const supplierId = skuUpper.startsWith('DSERS') 
         ? skuUpper.replace('DSERS', '').replace(/^[-_]/, '').trim() || null
@@ -502,7 +502,7 @@ function Dashboard() {
       return { supplier_name: 'DSers', supplier_id: supplierId }
     }
     
-    // Spocket 감지
+    // Spocket detection
     if (skuUpper.startsWith('SPK') || text.includes('spocket') || imageUrlLower.includes('spocket')) {
       const supplierId = skuUpper.startsWith('SPK') 
         ? skuUpper.replace('SPK', '').replace(/^[-_]/, '').trim() || null
@@ -510,8 +510,8 @@ function Dashboard() {
       return { supplier_name: 'Spocket', supplier_id: supplierId }
     }
     
-    // 일반적인 패턴: D로 시작하는 SKU (예: D0102HEVLYJ-KS Z1 BPNK)
-    // 이런 경우는 "Unverified"로 분류
+    // Common pattern: SKU starting with D (e.g., D0102HEVLYJ-KS Z1 BPNK)
+    // Classify these as "Unverified"
     if (skuUpper.startsWith('D') && /^D\d/.test(skuUpper)) {
       return { supplier_name: 'Unverified', supplier_id: null }
     }
@@ -519,13 +519,13 @@ function Dashboard() {
     return { supplier_name: 'Unknown', supplier_id: null }
   }
   
-  // Legacy 함수 (하위 호환성)
+  // Legacy function (backward compatibility)
   const detectSupplier = (title, sku = '') => {
     const result = extractSupplierInfo(title, sku)
     return result.supplier_name
   }
 
-  // Performance Score 계산 함수 (낮을수록 성능 낮음)
+  // Performance Score calculation function (lower score = lower performance)
   const calculateZombieScore = (listing, filterParams) => {
     let score = 100 // Start with perfect score
     const daysListed = listing.days_listed || 0
@@ -533,19 +533,19 @@ function Dashboard() {
     const watches = listing.watch_count || 0
     const views = listing.view_count || 0
     
-    // 등록 기간이 길수록 점수 감소
+    // Score decreases as listing period increases
     if (daysListed >= 60) score -= 30
     else if (daysListed >= 30) score -= 20
     else if (daysListed >= 14) score -= 10
     
-    // 판매가 없으면 점수 감소
+    // Score decreases if no sales
     if (sales === 0) score -= 30
     
-    // 찜이 없으면 점수 감소
+    // Score decreases if no watches
     if (watches === 0) score -= 20
     else if (watches <= 2) score -= 10
     
-    // 조회수가 적으면 점수 감소
+    // Score decreases if views are low
     if (views <= 5) score -= 20
     else if (views <= 10) score -= 10
     
@@ -579,12 +579,12 @@ function Dashboard() {
         return
       }
       
-      // 🔥 "Find Low-Performing SKUs" 버튼 클릭 시 항상 백엔드 API 호출하여 크레딧 차감
-      // forceRefresh가 true이면 백엔드 /api/analyze 엔드포인트 호출 (크레딧 차감 포함)
+      // When "Find Low-Performing SKUs" button is clicked, always call backend API to deduct credits
+      // If forceRefresh is true, call backend /api/analyze endpoint (includes credit deduction)
       if (forceRefresh) {
-        // 백엔드 /api/analyze 엔드포인트 호출 (크레딧 차감 포함)
+        // Call backend /api/analyze endpoint (includes credit deduction)
         try {
-          console.log('🔄 "Find Low-Performing SKUs" 버튼 클릭 - 백엔드 /api/analyze 호출 및 크레딧 차감')
+          console.log('🔄 "Find Low-Performing SKUs" button clicked - calling backend /api/analyze and deducting credits')
           const params = {
             user_id: CURRENT_USER_ID,
             store_id: selectedStore?.id,
@@ -607,72 +607,72 @@ function Dashboard() {
           setPlatformBreakdown(response.data.platform_breakdown || { eBay: 0 })
           setZombieBreakdown(response.data.zombie_breakdown || {})
           
-          // 크레딧 잔액 새로고침
+          // Refresh credit balance
           await fetchUserCredits()
           setError(null)
           setLoading(false)
           return
         } catch (analyzeErr) {
-          console.error('백엔드 /api/analyze 호출 실패:', analyzeErr)
+          console.error('Backend /api/analyze call failed:', analyzeErr)
           
-          // 크레딧 부족 에러 처리
+          // Handle insufficient credits error
           if (analyzeErr.response?.status === 402) {
             const errorDetail = analyzeErr.response?.data?.detail
             const availableCredits = errorDetail?.available_credits || 0
             const requiredCredits = errorDetail?.required_credits || 0
-            const message = errorDetail?.message || '크레딧이 부족합니다.'
+            const message = errorDetail?.message || 'Insufficient credits.'
             
-            const userMessage = `${message}\n\n필요한 크레딧: ${requiredCredits}\n보유 크레딧: ${availableCredits}\n\n크레딧을 구매하시겠습니까?`
+            const userMessage = `${message}\n\nRequired credits: ${requiredCredits}\nAvailable credits: ${availableCredits}\n\nWould you like to purchase credits?`
             
             if (confirm(userMessage)) {
               window.location.href = '/#pricing'
             }
             
-            setError(`크레딧 부족: ${requiredCredits} 크레딧이 필요하며, 현재 ${availableCredits} 크레딧만 보유하고 있습니다.`)
+            setError(`Insufficient credits: ${requiredCredits} credits required, but only ${availableCredits} credits available.`)
             setLoading(false)
             return
           }
           
-          setError(`분석 실패: ${analyzeErr.message}`)
+          setError(`Analysis failed: ${analyzeErr.message}`)
           setLoading(false)
           return
         }
       }
       
-      // 🔥 forceRefresh가 false이면 로컬 필터링만 수행 (크레딧 차감 없음 - viewMode 변경 시 등)
+      // If forceRefresh is false, only perform local filtering (no credit deduction - e.g., when viewMode changes)
       if (!forceRefresh && allListings.length > 0) {
         try {
           const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
           if (cachedTimestamp) {
             const cacheAge = Date.now() - parseInt(cachedTimestamp, 10)
             if (cacheAge < CACHE_DURATION) {
-              console.log(`✅ 로컬 데이터로 필터링 (캐시 유효: ${Math.floor(cacheAge / 1000)}초 전 조회)`)
+              console.log(`✅ Filtering with local data (cache valid: queried ${Math.floor(cacheAge / 1000)} seconds ago)`)
               
-              // 로컬 필터링만 수행 (크레딧 차감 없음)
+              // Only perform local filtering (no credit deduction)
               const minDays = filterParams.analytics_period_days || filterParams.min_days || 7
               const maxSales = filterParams.max_sales || 0
               const maxWatches = filterParams.max_watches || filterParams.max_watch_count || 0
               const maxImpressions = filterParams.max_impressions || 100
               const maxViews = filterParams.max_views || 10
               
-              console.log('🔍 로컬 필터링 적용:', { minDays, maxSales, maxWatches, maxImpressions, maxViews })
+              console.log('🔍 Applying local filtering:', { minDays, maxSales, maxWatches, maxImpressions, maxViews })
               
               const filteredZombies = allListings.filter(item => {
-                // 등록 기간 필터: minDays 이상 등록된 것만 포함 (7일 미만은 제외)
-                // 예: minDays=7이면, days_listed >= 7인 것만 포함 (7일 미만은 제외)
+                // Listing period filter: only include items listed for minDays or more (exclude items less than 7 days)
+                // Example: if minDays=7, only include items with days_listed >= 7 (exclude items less than 7 days)
                 if ((item.days_listed || 0) < minDays) return false
-                // 판매 필터: maxSales 이하인 것만 (예: 0건 이하)
+                // Sales filter: only items with maxSales or less (e.g., 0 or less)
                 if ((item.total_sales || item.quantity_sold || 0) > maxSales) return false
-                // 찜 필터: maxWatches 이하인 것만 (예: 0개 이하)
+                // Watch filter: only items with maxWatches or less (e.g., 0 or less)
                 if ((item.watch_count || 0) > maxWatches) return false
-                // 노출 필터: maxImpressions 이하인 것만 (예: 100 이하)
+                // Impressions filter: only items with maxImpressions or less (e.g., 100 or less)
                 if ((item.impressions || 0) > maxImpressions) return false
-                // 조회 필터: maxViews 이하인 것만 (예: 10 이하)
+                // Views filter: only items with maxViews or less (e.g., 10 or less)
                 if ((item.view_count || item.views || 0) > maxViews) return false
                 return true
               }).map(item => ({ ...item, is_zombie: true }))
               
-              console.log(`🧟 로컬 필터링 결과: ${filteredZombies.length}개 좀비 발견 (전체 ${allListings.length}개 중)`)
+              console.log(`🧟 Local filtering result: ${filteredZombies.length} zombies found (out of ${allListings.length} total)`)
               
               setZombies(filteredZombies)
               setTotalZombies(filteredZombies.length)
@@ -681,11 +681,11 @@ function Dashboard() {
             }
           }
         } catch (cacheErr) {
-          console.warn('캐시 확인 실패, API 호출:', cacheErr)
+          console.warn('Cache check failed, calling API:', cacheErr)
         }
       }
       
-      // 🚀 Production Mode: Fetch from eBay API (캐시가 없거나 만료된 경우)
+      // 🚀 Production Mode: Fetch from eBay API (when cache is missing or expired)
       try {
         console.log('📦 Fetching listings from eBay API...')
         
@@ -793,8 +793,8 @@ function Dashboard() {
         const maxImpressions = filterParams.max_impressions || 100
         const maxViews = filterParams.max_views || 10
         
-        console.log('🔍 필터링 파라미터:', { minDays, maxSales, maxWatches, maxImpressions, maxViews })
-        console.log(`📊 필터링 전: ${transformedListings.length}개 리스팅`)
+        console.log('🔍 Filtering parameters:', { minDays, maxSales, maxWatches, maxImpressions, maxViews })
+        console.log(`📊 Before filtering: ${transformedListings.length} listings`)
         
         const filteredZombies = transformedListings.filter(item => {
           // 등록 기간 필터: minDays 이상 등록된 것만 포함 (7일 미만은 제외)
@@ -812,7 +812,7 @@ function Dashboard() {
           return true
         }).map(item => ({ ...item, is_zombie: true }))
         
-        console.log(`🧟 필터링 후: ${filteredZombies.length}개 좀비 발견`)
+        console.log(`🧟 After filtering: ${filteredZombies.length} zombies found`)
         
         console.log(`🧟 Found ${filteredZombies.length} zombie listings`)
         
@@ -881,7 +881,7 @@ function Dashboard() {
           setPlatformBreakdown(response.data.platform_breakdown || { eBay: 0 })
           setZombieBreakdown(response.data.zombie_breakdown || {})
           
-          // 크레딧 잔액 새로고침
+          // Refresh credit balance
           await fetchUserCredits()
         } catch (fallbackErr) {
           console.error('Fallback also failed:', fallbackErr)
@@ -939,19 +939,19 @@ function Dashboard() {
     
     // 🔥 상태가 동일하고 강제 로드가 아니면 아무것도 하지 않음 (불필요한 재실행 방지)
     if (connected === wasConnected && !forceLoad) {
-      console.log('⏭️ eBay 연결 상태 변경 없음 - 스킵:', { wasConnected, connected, forceLoad })
+      console.log('⏭️ No eBay connection status change - skipping:', { wasConnected, connected, forceLoad })
       return
     }
     
     setIsStoreConnected(connected)
     // 🔥 로그 최소화 - 상태 변경 시에만 출력 (반복 로그 방지)
     if (wasConnected !== connected || forceLoad) {
-      console.log('🔄 eBay 연결 상태 변경:', { wasConnected, connected, forceLoad })
+      console.log('🔄 eBay connection status changed:', { wasConnected, connected, forceLoad })
     }
     
     // 🔥 연결 해제 시 캐시 초기화
     if (!connected && wasConnected) {
-      console.log('🗑️ 연결 해제 - 캐시 초기화')
+      console.log('🗑️ Disconnected - clearing cache')
       try {
         localStorage.removeItem(CACHE_KEY)
         localStorage.removeItem(CACHE_TIMESTAMP_KEY)
@@ -970,7 +970,7 @@ function Dashboard() {
     // 🔥 연결됨: 제품 로드는 useEffect에서 자동으로 처리됨
     // 여기서는 상태만 업데이트 (중복 실행 방지)
     if (connected && (!wasConnected || forceLoad)) {
-      console.log('✅ eBay 연결됨 - 상태 업데이트 (listings는 useEffect에서 자동 fetch)', { wasConnected, forceLoad })
+      console.log('✅ eBay connected - status updated (listings will be auto-fetched in useEffect)', { wasConnected, forceLoad })
       if (DEMO_MODE) {
         setAllListings(DUMMY_ALL_LISTINGS)
         setTotalListings(DUMMY_ALL_LISTINGS.length)
@@ -987,7 +987,7 @@ function Dashboard() {
   const fetchAllListings = async (forceRefresh = false) => {
     // 🔥 중복 실행 방지: 이미 로딩 중이면 스킵
     if (loading && !forceRefresh) {
-      console.log('⏭️ fetchAllListings 이미 실행 중 - 스킵', { loading, forceRefresh })
+      console.log('⏭️ fetchAllListings already running - skipping', { loading, forceRefresh })
       return
     }
     
@@ -999,10 +999,10 @@ function Dashboard() {
           if (cachedTimestamp) {
             const cacheAge = Date.now() - parseInt(cachedTimestamp, 10)
             if (cacheAge < CACHE_DURATION) {
-              console.log(`✅ 데이터가 이미 있고 캐시 유효 - API 호출 건너뜀 (${Math.floor(cacheAge / 1000)}초 전 조회)`)
+              console.log(`✅ Data already exists and cache is valid - skipping API call (queried ${Math.floor(cacheAge / 1000)} seconds ago)`)
               // 🔥 데이터가 있으면 무조건 뷰 모드를 'all'로 설정하여 제품 목록 표시
               if (viewMode !== 'all') {
-                console.log('🔄 기존 데이터 감지 - 뷰 모드를 "all"로 설정', { 
+                console.log('🔄 Existing data detected - setting view mode to "all"', { 
                   listingsCount: allListings.length,
                   currentViewMode: viewMode
                 })
@@ -1013,7 +1013,7 @@ function Dashboard() {
             }
           }
         } catch (err) {
-          console.warn('캐시 확인 실패:', err)
+          console.warn('Cache check failed:', err)
         }
       }
       
@@ -1040,14 +1040,14 @@ function Dashboard() {
             const cacheAge = Date.now() - parseInt(cachedTimestamp, 10)
             
             if (cacheAge < CACHE_DURATION) {
-              console.log(`✅ 캐시된 데이터 사용 (${Math.floor(cacheAge / 1000)}초 전 조회)`)
+              console.log(`✅ Using cached data (queried ${Math.floor(cacheAge / 1000)} seconds ago)`)
               const parsedData = JSON.parse(cachedData)
               const cachedListings = parsedData.listings || []
               // 🔥 데이터가 있으면 무조건 뷰 모드를 'all'로 설정 (setAllListings 전에 호출)
               if (cachedListings.length > 0) {
                 setViewMode('all')
                 setShowFilter(true)
-                console.log('🔄 캐시 데이터 로드 완료 - Active 리스팅 뷰로 즉시 전환', { 
+                console.log('🔄 Cache data loaded - immediately switching to Active listings view', { 
                   listingsCount: cachedListings.length
                 })
               }
@@ -1057,16 +1057,16 @@ function Dashboard() {
               setTotalBreakdown(parsedData.totalBreakdown || {})
               setPlatformBreakdown(parsedData.platformBreakdown || { eBay: 0 })
               if (cachedListings.length > 0) {
-                console.log('✅ 캐시 데이터 로드 후 뷰 모드 "all"로 설정 완료 - 제품 표시 예정')
+                console.log('✅ View mode set to "all" after cache data load - products will be displayed')
               }
               setLoading(false)
               return
             } else {
-              console.log(`⏰ 캐시 만료 (${Math.floor(cacheAge / 1000)}초 경과) - 새로 조회`)
+              console.log(`⏰ Cache expired (${Math.floor(cacheAge / 1000)} seconds elapsed) - fetching new data`)
             }
           }
         } catch (cacheErr) {
-          console.warn('캐시 읽기 실패, API 호출:', cacheErr)
+          console.warn('Cache read failed, calling API:', cacheErr)
         }
       } else {
         console.log('🔄 강제 새로고침 - 캐시 무시')
