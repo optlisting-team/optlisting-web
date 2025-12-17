@@ -2,27 +2,27 @@ import { useState, useEffect, useRef } from 'react'
 import { RotateCw, Info } from 'lucide-react'
 
 /**
- * OptListing 최종 좀비 분석 필터
- * 순서: 판매(Sales) → 관심(Watch) → 트래픽(Traffic)
- * eBay 셀러의 자연스러운 판단 흐름 반영
+ * OptListing Final Zombie Analysis Filter
+ * Order: Sales → Watch → Traffic
+ * Reflects eBay seller's natural decision flow
  */
 function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
-  // 1. 분석 기준 기간 (analytics_period_days)
+  // 1. Analysis period (analytics_period_days)
   const [analysisPeriod, setAnalysisPeriod] = useState(initialFilters.analytics_period_days || 7)
   
-  // 2. 기간 내 판매 건수 (max_sales)
+  // 2. Sales count within period (max_sales)
   const [maxSales, setMaxSales] = useState(initialFilters.max_sales || 0)
   
-  // 3. 찜하기 (max_watches)
+  // 3. Watch count (max_watches)
   const [maxWatches, setMaxWatches] = useState(initialFilters.max_watches || 0)
   
-  // 4. 총 노출 횟수 (max_impressions)
+  // 4. Total impressions (max_impressions)
   const [maxImpressions, setMaxImpressions] = useState(initialFilters.max_impressions || 100)
   
-  // 5. 총 조회 횟수 (max_views)
+  // 5. Total views (max_views)
   const [maxViews, setMaxViews] = useState(initialFilters.max_views || 10)
   
-  // 플랫폼 & 소스 필터
+  // Platform & source filter
   const [marketplaceFilter, setMarketplaceFilter] = useState(initialFilters.marketplace_filter || 'eBay')
   const [sourceFilter, setSourceFilter] = useState(initialFilters.source_filter || 'All')
   
@@ -63,7 +63,7 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    console.log('🔍 FilterBar handleSubmit 호출됨 - Find Low-Performing SKUs 버튼 클릭')
+    console.log('🔍 FilterBar handleSubmit called - Find Low-Performing SKUs button clicked')
     
     // Ensure values are non-negative
     const safeAnalysisPeriod = Math.max(1, parseInt(analysisPeriod) || 7)
@@ -85,13 +85,13 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
       supplier_filter: sourceFilter // Legacy compatibility
     }
     
-    console.log('📋 필터 파라미터:', filterParams)
-    console.log('🔄 onApplyFilter 호출 중...')
+    console.log('📋 Filter parameters:', filterParams)
+    console.log('🔄 Calling onApplyFilter...')
     
     if (onApplyFilter) {
       onApplyFilter(filterParams)
     } else {
-      console.error('❌ onApplyFilter가 정의되지 않음!')
+      console.error('❌ onApplyFilter is not defined!')
     }
   }
 
@@ -234,7 +234,7 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
             type="submit"
             disabled={loading}
             className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-red-600 to-orange-500 text-white text-base font-bold rounded-xl hover:from-red-500 hover:to-orange-400 disabled:opacity-50 transition-all shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 hover:-translate-y-0.5"
-            title="현재 필터 설정으로 분석을 시작합니다. 클릭 시 유통 경로 분석 결과를 확인합니다."
+            title="Start analysis with current filter settings. Click to view distribution channel analysis results."
           >
             {loading ? (
               <RotateCw className="w-5 h-5 animate-spin" />
@@ -247,7 +247,7 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
           </button>
           {/* Tooltip */}
           <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-            현재 필터 설정으로 분석을 시작합니다. 클릭 시 유통 경로 분석 결과를 확인합니다.
+            Start analysis with current filter settings. Click to view distribution channel analysis results.
           </div>
         </div>
       </form>
