@@ -139,7 +139,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
       return
     }
 
-    // 같은 공급처 내에서 Shopify 경유와 Direct를 분리
+    // Separate Shopify and Direct within same supplier
     const { shopifyItems, supplierItems } = separateByShopify(items)
     
     // Determine target tool
@@ -153,7 +153,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
       targetTool = 'yaballe'
     }
     
-    // Shopify 경유만 있으면 Shopify CSV
+    // If only Shopify items exist, export Shopify CSV
     if (shopifyItems.length > 0 && supplierItems.length === 0) {
       // Show preview modal
       setPreviewData({
@@ -167,7 +167,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
       return
     }
     
-    // Direct만 있으면 공급처 CSV
+    // If only Direct items exist, export supplier CSV
     if (supplierItems.length > 0 && shopifyItems.length === 0) {
       // Show preview modal
       setPreviewData({
@@ -181,7 +181,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
       return
     }
     
-    // 둘 다 있으면 Shopify 모달 표시 (기존 로직)
+    // If both exist, display Shopify modal (existing logic)
     setPendingExport({
       source: supplier,
       items: items,
@@ -192,7 +192,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
   }
   
   const performExport = async (source, items, exportType, groupKey) => {
-    // 동시 요청 방지
+    // Prevent concurrent requests
     if (exporting) {
       console.warn('Export already in progress')
       return
@@ -201,10 +201,10 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
     setExporting(true)
     setExportError(null)
     
-    let apiErrorMsg = null // API 에러 메시지 저장용
+    let apiErrorMsg = null // Store API error message
     
     try {
-      // source 파라미터 안전하게 정의 및 유효성 검사
+      // Safely define and validate source parameter
       let safeSource = 'Unknown'
       if (source && typeof source === 'string' && source.trim() !== '') {
         safeSource = source
@@ -213,7 +213,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
         safeSource = item.supplier_name || item.supplier || item.source || 'Unknown'
       }
       
-      // 최종 유효성 검사
+      // Final validation check
       if (!safeSource || typeof safeSource !== 'string' || safeSource.trim() === '') {
         safeSource = 'Unknown'
       }
@@ -249,7 +249,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
           },
           {
             responseType: 'blob',
-            timeout: 30000 // 30초 타임아웃 추가
+            timeout: 30000 // Added 30s timeout
           }
         )
 
@@ -267,7 +267,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
         link.remove()
         window.URL.revokeObjectURL(url)
       } catch (apiErr) {
-        // API 에러 발생 시 fallback으로 프론트엔드 CSV 생성
+        // Generate frontend CSV as fallback if API error occurs
         console.warn('API export failed, using frontend generation:', apiErr)
         
         // 에러 메시지 저장 (나중에 사용자에게 표시)
