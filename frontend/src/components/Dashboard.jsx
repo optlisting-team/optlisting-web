@@ -962,13 +962,13 @@ function Dashboard() {
         setViewMode('total')
         setShowFilter(false)
       } catch (err) {
-        console.warn('캐시 초기화 실패:', err)
+        console.warn('Cache clear failed:', err)
       }
       return
     }
     
-    // 🔥 연결됨: 제품 로드는 useEffect에서 자동으로 처리됨
-    // 여기서는 상태만 업데이트 (중복 실행 방지)
+    // Connected: Product loading is automatically handled in useEffect
+    // Here we only update status (prevent duplicate execution)
     if (connected && (!wasConnected || forceLoad)) {
       console.log('✅ eBay connected - status updated (listings will be auto-fetched in useEffect)', { wasConnected, forceLoad })
       if (DEMO_MODE) {
@@ -978,21 +978,21 @@ function Dashboard() {
         setShowFilter(true)
         listingsLoadedOnceRef.current = true
       } else {
-        // 🔥 실제 API 모드에서는 useEffect가 자동으로 fetch하므로 여기서는 ref만 초기화
-        listingsLoadedOnceRef.current = false // useEffect에서 fetch하도록 허용
+        // In real API mode, useEffect automatically fetches, so here we only initialize ref
+        listingsLoadedOnceRef.current = false // Allow useEffect to fetch
       }
     }
   }
 
   const fetchAllListings = async (forceRefresh = false) => {
-    // 🔥 중복 실행 방지: 이미 로딩 중이면 스킵
+    // Prevent duplicate execution: skip if already loading
     if (loading && !forceRefresh) {
       console.log('⏭️ fetchAllListings already running - skipping', { loading, forceRefresh })
       return
     }
     
     try {
-      // 🔥 데이터가 이미 있고 캐시가 유효하면 API 호출하지 않음 (로딩 상태도 설정하지 않음)
+      // If data already exists and cache is valid, don't call API (don't set loading state either)
       if (!forceRefresh && allListings.length > 0) {
         try {
           const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
@@ -1000,7 +1000,7 @@ function Dashboard() {
             const cacheAge = Date.now() - parseInt(cachedTimestamp, 10)
             if (cacheAge < CACHE_DURATION) {
               console.log(`✅ Data already exists and cache is valid - skipping API call (queried ${Math.floor(cacheAge / 1000)} seconds ago)`)
-              // 🔥 데이터가 있으면 무조건 뷰 모드를 'all'로 설정하여 제품 목록 표시
+              // If data exists, always set view mode to 'all' to display product list
               if (viewMode !== 'all') {
                 console.log('🔄 Existing data detected - setting view mode to "all"', { 
                   listingsCount: allListings.length,
@@ -1009,7 +1009,7 @@ function Dashboard() {
                 setViewMode('all')
                 setShowFilter(true)
               }
-              return // 데이터가 이미 있고 캐시가 유효하면 API 호출하지 않음
+              return // If data already exists and cache is valid, don't call API
             }
           }
         } catch (err) {
@@ -1023,14 +1023,14 @@ function Dashboard() {
       // Demo Mode: Use dummy data
       if (DEMO_MODE) {
         await new Promise(resolve => setTimeout(resolve, 500))
-        // 더미 데이터로 전체 리스팅 설정 (100개)
+        // Set all listings with dummy data (100 items)
         setAllListings(DUMMY_ALL_LISTINGS)
         setTotalListings(DUMMY_ALL_LISTINGS.length)
         setLoading(false)
         return
       }
       
-      // 🔥 캐시 확인: forceRefresh가 false이고 캐시가 유효하면 캐시 사용
+      // Check cache: if forceRefresh is false and cache is valid, use cache
       if (!forceRefresh) {
         try {
           const cachedData = localStorage.getItem(CACHE_KEY)
@@ -1043,7 +1043,7 @@ function Dashboard() {
               console.log(`✅ Using cached data (queried ${Math.floor(cacheAge / 1000)} seconds ago)`)
               const parsedData = JSON.parse(cachedData)
               const cachedListings = parsedData.listings || []
-              // 🔥 데이터가 있으면 무조건 뷰 모드를 'all'로 설정 (setAllListings 전에 호출)
+              // If data exists, always set view mode to 'all' (called before setAllListings)
               if (cachedListings.length > 0) {
                 setViewMode('all')
                 setShowFilter(true)
@@ -1051,7 +1051,7 @@ function Dashboard() {
                   listingsCount: cachedListings.length
                 })
               }
-              // 🔥 캐시 데이터 설정
+              // Set cache data
               setAllListings(cachedListings)
               setTotalListings(parsedData.totalListings || 0)
               setTotalBreakdown(parsedData.totalBreakdown || {})
@@ -1116,9 +1116,9 @@ function Dashboard() {
             impressions: item.impressions || 0,
             days_listed: item.days_listed || 0,
             start_time: item.start_time,
-            picture_url: item.picture_url, // 메인 이미지 URL
-            thumbnail_url: item.thumbnail_url || item.picture_url, // 썸네일 이미지 URL (좀비 SKU 리포트용)
-            image_url: item.image_url || item.picture_url || item.thumbnail_url // 프론트엔드 호환성을 위한 필드
+            picture_url: item.picture_url, // Main image URL
+            thumbnail_url: item.thumbnail_url || item.picture_url, // Thumbnail image URL (for zombie SKU report)
+            image_url: item.image_url || item.picture_url || item.thumbnail_url // Field for frontend compatibility
           }
         })
         
@@ -1184,32 +1184,32 @@ function Dashboard() {
           console.warn('Cache save failed:', cacheErr)
         }
         
-        // 🔥 뷰 모드는 이미 위에서 설정했으므로 여기서는 로그만 출력
+        // View mode already set above, so here we only output log
         if (transformedListings.length > 0) {
-          console.log('✅ fetchAllListings 완료 - 제품 목록 표시 예정', { 
+          console.log('✅ fetchAllListings completed - product list will be displayed', { 
             listingsCount: transformedListings.length
           })
         }
         
         setError(null)
-        setLoading(false) // 🔥 로딩 상태 해제
+        setLoading(false) // Clear loading state
         
       } catch (ebayErr) {
         console.error('eBay API Error:', ebayErr)
         
-        // eBay 연결 안됨 (401만 연결 해제로 처리)
+        // eBay not connected (only 401 is treated as disconnection)
         if (ebayErr.response?.status === 401) {
           setError('eBay not connected. Please connect your eBay account first.')
           setTotalListings(0)
           setAllListings([])
         } else {
-          // 🔥 네트워크 에러나 기타 에러는 기존 데이터 유지
-          console.log('⚠️ eBay API 에러 - 기존 데이터 유지', {
+          // Keep existing data for network errors or other errors
+          console.log('⚠️ eBay API error - keeping existing data', {
             error: ebayErr.message,
             status: ebayErr.response?.status,
             hasExistingData: allListings.length > 0
           })
-          // 기존 데이터는 유지하고 에러만 표시
+          // Keep existing data and only show error
           if (allListings.length === 0) {
             setError('Failed to fetch listings. Please try again.')
           }
@@ -1648,7 +1648,7 @@ function Dashboard() {
         localStorage.removeItem(CACHE_KEY)
         localStorage.removeItem(CACHE_TIMESTAMP_KEY)
       } catch (err) {
-        console.warn('캐시 초기화 실패:', err)
+        console.warn('Cache clear failed:', err)
       }
       // 데이터 새로고침
       if (isStoreConnected) {
