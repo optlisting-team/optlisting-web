@@ -830,11 +830,7 @@ function Dashboard() {
         setAllListings(transformedListings)
         setTotalListings(transformedListings.length)
         
-        // 공급처별 브레이크다운 계산
-        const supplierBreakdown = {}
-        transformedListings.forEach(item => {
-          supplierBreakdown[item.supplier] = (supplierBreakdown[item.supplier] || 0) + 1
-        })
+        // 공급처별 브레이크다운은 이미 위에서 계산됨 (782번 라인)
         setTotalBreakdown(supplierBreakdown)
         setPlatformBreakdown({ eBay: transformedListings.length })
         
@@ -2331,7 +2327,8 @@ function Dashboard() {
                         showMoveToZombies={viewMode === 'all'}
                       />
                     </div>
-                  )
+                    )
+                  }
                   
                   // 🔥 ebayConnected && hasData가 아니면 메시지 표시
                   console.log('[RENDER CHECK] 테이블 렌더 스킵:', {

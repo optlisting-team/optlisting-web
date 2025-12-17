@@ -125,6 +125,7 @@ function LandingPage() {
                   </div>
                 )}
               </div>
+              </>
             ) : (
               <Link to="/login" className="text-zinc-300 dark:text-zinc-300 hover:text-white dark:hover:text-white font-medium transition-colors">
                 Sign In

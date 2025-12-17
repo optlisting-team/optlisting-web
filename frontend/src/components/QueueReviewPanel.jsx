@@ -191,19 +191,6 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
     setShowShopifyModal(true)
   }
   
-  const handleConfirmPreview = async () => {
-    if (!previewData) return
-    
-    setShowPreviewModal(false)
-    await performExport(
-      previewData.source,
-      previewData.items,
-      previewData.exportType,
-      previewData.groupKey
-    )
-    setPreviewData(null)
-  }
-
   const performExport = async (source, items, exportType, groupKey) => {
     // 동시 요청 방지
     if (exporting) {
