@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 
 // Railway URL이 변경되었을 수 있으므로 환경 변수 우선 사용
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://optlisting-production.up.railway.app'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://web-production-3dc73.up.railway.app'
 
 const AccountContext = createContext({
   credits: null,
@@ -21,21 +21,43 @@ export const AccountProvider = ({ children }) => {
   const [showPlanModal, setShowPlanModal] = useState(false)
   const [showCreditModal, setShowCreditModal] = useState(false)
 
+  // 재시도 유틸리티 함수
+  const retryFetch = async (url, options, maxRetries = 3, delay = 2000) => {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 30000) // 10초 → 30초로 증가
+        
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+        })
+        
+        clearTimeout(timeoutId)
+        return response
+      } catch (err) {
+        const isLastAttempt = i === maxRetries - 1
+        if (isLastAttempt) {
+          throw err
+        }
+        // 재시도 전 대기
+        await new Promise(resolve => setTimeout(resolve, delay * (i + 1)))
+      }
+    }
+  }
+
   const fetchCredits = async () => {
     try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10초 타임아웃
-      
-      const response = await fetch(`${API_BASE_URL}/api/credits?user_id=default-user`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        signal: controller.signal,
-      })
-      
-      clearTimeout(timeoutId)
+      const response = await retryFetch(
+        `${API_BASE_URL}/api/credits?user_id=default-user`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+        }
+      )
       
       if (response.ok) {
         const data = await response.json()

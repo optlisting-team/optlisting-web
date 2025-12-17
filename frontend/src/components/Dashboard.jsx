@@ -12,7 +12,7 @@ import QueueReviewPanel from './QueueReviewPanel'
 import { Button } from './ui/button'
 
 // Railway URL이 변경되었을 수 있으므로 환경 변수 우선 사용
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://optlisting-production.up.railway.app'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://web-production-3dc73.up.railway.app'
 const CURRENT_USER_ID = "default-user" // Temporary user ID for MVP phase
 
 // Demo Mode - Set to true to use dummy data (false for production with real API)
@@ -176,14 +176,32 @@ function Dashboard() {
     supplier_filter: 'All'
   })
   
+  // 재시도 유틸리티 함수
+  const retryApiCall = async (apiCall, maxRetries = 3, delay = 2000) => {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        return await apiCall()
+      } catch (err) {
+        const isLastAttempt = i === maxRetries - 1
+        if (isLastAttempt) {
+          throw err
+        }
+        // 재시도 전 대기
+        await new Promise(resolve => setTimeout(resolve, delay * (i + 1)))
+      }
+    }
+  }
+
   // API Health Check - Check connection on mount
   const checkApiHealth = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/health`, { 
-        timeout: 10000,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const response = await retryApiCall(async () => {
+        return await axios.get(`${API_BASE_URL}/api/health`, { 
+          timeout: 30000, // 10초 → 30초로 증가
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
       })
       if (response.status === 200) {
         setApiConnected(true)
@@ -214,12 +232,14 @@ function Dashboard() {
   // Fetch user credits and plan info
   const fetchUserCredits = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/credits`, {
-        params: { user_id: CURRENT_USER_ID },
-        timeout: 10000,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const response = await retryApiCall(async () => {
+        return await axios.get(`${API_BASE_URL}/api/credits`, {
+          params: { user_id: CURRENT_USER_ID },
+          timeout: 30000, // 10초 → 30초로 증가
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
       })
       if (response.data) {
         setUserCredits(response.data.available_credits || 0)
@@ -1384,7 +1404,7 @@ function Dashboard() {
       // 크레딧 잔액 확인
       const creditsResponse = await axios.get(`${API_BASE_URL}/api/credits`, {
         params: { user_id: CURRENT_USER_ID },
-        timeout: 10000
+        timeout: 30000 // 10초 → 30초로 증가
       })
       
       console.log('💰 크레딧 응답:', creditsResponse.data)
@@ -1824,12 +1844,12 @@ function Dashboard() {
         await axios.post(`${API_BASE_URL}/api/log-deletion`, {
           items: items
         }, {
-          timeout: 10000 // 10초 타임아웃
+          timeout: 30000 // 10초 → 30초로 증가
         })
         // Refresh total deleted count
         const historyResponse = await axios.get(`${API_BASE_URL}/api/history`, {
           params: { skip: 0, limit: 1 },
-          timeout: 10000
+          timeout: 30000 // 10초 → 30초로 증가
         })
         setTotalDeleted(historyResponse.data.total_count || 0)
       } catch (logErr) {
@@ -1936,12 +1956,12 @@ function Dashboard() {
         await axios.post(`${API_BASE_URL}/api/log-deletion`, {
           items: items
         }, {
-          timeout: 10000 // 10초 타임아웃
+          timeout: 30000 // 10초 → 30초로 증가
         })
         // Refresh total deleted count
         const historyResponse = await axios.get(`${API_BASE_URL}/api/history`, {
           params: { skip: 0, limit: 1 },
-          timeout: 10000
+          timeout: 30000 // 10초 → 30초로 증가
         })
         setTotalDeleted(historyResponse.data.total_count || 0)
       } catch (logErr) {

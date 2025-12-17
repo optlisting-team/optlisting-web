@@ -5,7 +5,7 @@ import PlatformBadge from './PlatformBadge'
 import axios from 'axios'
 
 // Railway URL이 변경되었을 수 있으므로 환경 변수 우선 사용
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://optlisting-production.up.railway.app'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://web-production-3dc73.up.railway.app'
 
 function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, onSourceChange, onMarkDownloaded }) {
   const [downloadedGroups, setDownloadedGroups] = useState(new Set())
@@ -338,7 +338,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
       // Try to log deletion to API
       try {
         await axios.post(`${API_BASE_URL}/api/log-deletion`, { items: items }, {
-          timeout: 10000 // 10초 타임아웃 추가
+          timeout: 30000 // 10초 → 30초로 증가
         })
       } catch (logErr) {
         console.log('API log skipped:', logErr.message)

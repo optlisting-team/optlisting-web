@@ -10,7 +10,7 @@ const INITIAL_STORES = [
 ]
 
 // Railway URL이 변경되었을 수 있으므로 환경 변수 우선 사용
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://optlisting-production.up.railway.app'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://web-production-3dc73.up.railway.app'
 const CURRENT_USER_ID = 'default-user'
 
 // Store Selector Component
@@ -51,7 +51,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
       // 경량화된 토큰 상태 확인
       const response = await axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
         params: { user_id: CURRENT_USER_ID },
-        timeout: 5000
+        timeout: 30000 // 5초 → 30초로 증가
       })
       
       // 유효한 토큰이 있는지 확인
