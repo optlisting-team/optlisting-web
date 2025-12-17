@@ -270,15 +270,15 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
         // Generate frontend CSV as fallback if API error occurs
         console.warn('API export failed, using frontend generation:', apiErr)
         
-        // 에러 메시지 저장 (나중에 사용자에게 표시)
+        // Store error message (to display to user later)
         if (apiErr.code === 'ECONNABORTED') {
-          apiErrorMsg = '요청 시간이 초과되어 기본 형식으로 CSV를 생성합니다.'
+          apiErrorMsg = 'Request timeout. Generating CSV in default format.'
         } else if (apiErr.response) {
-          apiErrorMsg = `서버 오류 (${apiErr.response.status}). 기본 형식으로 CSV를 생성합니다.`
+          apiErrorMsg = `Server error (${apiErr.response.status}). Generating CSV in default format.`
         } else if (apiErr.request) {
-          apiErrorMsg = '서버 연결 실패. 기본 형식으로 CSV를 생성합니다.'
+          apiErrorMsg = 'Server connection failed. Generating CSV in default format.'
         } else {
-          apiErrorMsg = 'API를 통한 CSV 생성에 실패했습니다. 기본 형식으로 생성합니다.'
+          apiErrorMsg = 'CSV generation via API failed. Generating in default format.'
         }
         
         // Fallback to frontend CSV generation
@@ -325,11 +325,11 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
       // Try to log deletion to API
       try {
         await axios.post(`${API_BASE_URL}/api/log-deletion`, { items: items }, {
-          timeout: 30000 // 10초 → 30초로 증가
+          timeout: 30000 // Increased from 10s to 30s
         })
       } catch (logErr) {
         console.log('API log skipped:', logErr.message)
-        // 로깅 실패는 치명적이지 않으므로 계속 진행
+        // Logging failure is not critical, so continue
       }
 
       // Mark this group as downloaded
@@ -346,9 +346,9 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
       setExporting(false)
     } catch (err) {
       setExporting(false)
-      setExportError(err.message || 'CSV 추출 중 오류가 발생했습니다.')
+      setExportError(err.message || 'An error occurred while extracting CSV.')
       console.error('Export error:', err)
-      alert(`CSV 추출 실패: ${err.message || '알 수 없는 오류가 발생했습니다.'}`)
+      alert(`CSV extraction failed: ${err.message || 'An unknown error occurred.'}`)
     }
   }
 
@@ -357,7 +357,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
 
     const { source, shopifyItems, supplierItems } = pendingExport
     
-    // source가 없으면 items에서 추출
+    // Extract from items if source is missing
     const safeSource = source || pendingExport.items[0]?.supplier_name || pendingExport.items[0]?.supplier || pendingExport.items[0]?.source || 'Unknown'
     
     // Determine target tool
@@ -383,9 +383,9 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
         })
         setShowPreviewModal(true)
       }
-      // Also export supplier items if any (두 번째 항목은 첫 번째가 완료된 후 표시)
+      // Also export supplier items if any (second item displayed after first completes)
       if (supplierItems.length > 0) {
-        // 첫 번째 미리 보기 후 두 번째를 표시하기 위해 약간의 지연
+        // Slight delay to display second after first preview
         setTimeout(() => {
           setPreviewData({
             source: safeSource,
@@ -597,7 +597,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                     onClick={() => setExportError(null)}
                     className="mt-2 text-xs text-red-500 hover:text-red-700"
                   >
-                    닫기
+                    Close
                   </button>
                 </div>
               )}
@@ -640,7 +640,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                         {exporting ? (
                           <>
                             <span className="animate-spin">⏳</span>
-                            <span>생성 중...</span>
+                            <span>Generating...</span>
                           </>
                         ) : (
                           <>
@@ -657,7 +657,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                         {exporting ? (
                           <>
                             <span className="animate-spin">⏳</span>
-                            <span>생성 중...</span>
+                            <span>Generating...</span>
                           </>
                         ) : (
                           <>
@@ -676,7 +676,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                       {exporting ? (
                         <>
                           <span className="animate-spin">⏳</span>
-                          <span>CSV 생성 중...</span>
+                          <span>Generating CSV...</span>
                         </>
                       ) : (
                         <>
@@ -698,7 +698,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                       {exporting ? (
                         <>
                           <span className="animate-spin">⏳</span>
-                          <span>CSV 생성 중...</span>
+                          <span>Generating CSV...</span>
                         </>
                       ) : (
                         <>
@@ -717,7 +717,7 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                       {exporting ? (
                         <>
                           <span className="animate-spin">⏳</span>
-                          <span>CSV 생성 중...</span>
+                          <span>Generating CSV...</span>
                         </>
                       ) : (
                         <>

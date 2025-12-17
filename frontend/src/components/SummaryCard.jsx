@@ -314,16 +314,16 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
               // If already connected, query and display products (do not start OAuth)
               if (selectedStore?.connected) {
                 console.log('✅ Already connected to eBay - starting product query')
-                // 부모 컴포넌트에 연결 상태 알림 (강제 제품 조회 트리거)
+                // Notify parent component of connection status (trigger forced product query)
                 if (onConnectionChange) {
-                  // forceLoad 플래그를 전달할 수 없으므로, 콜백을 두 번 호출하여 강제 로드
-                  // 첫 번째 호출로 상태 확인, 두 번째 호출로 강제 로드
+                  // Cannot pass forceLoad flag, so call callback twice for forced load
+                  // First call to check status, second call for forced load
                   onConnectionChange(true, true) // forceLoad = true
                 }
                 return
               }
               
-              // 연결되어 있지 않으면 OAuth 시작
+              // Start OAuth if not connected
               const oauthUrl = `${API_BASE_URL}/api/ebay/auth/start?user_id=${CURRENT_USER_ID}`
               console.log('🔗 Connect button clicked - starting OAuth')
               window.location.href = oauthUrl
