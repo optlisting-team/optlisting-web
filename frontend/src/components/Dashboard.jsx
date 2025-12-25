@@ -1882,9 +1882,9 @@ function Dashboard() {
                   ? 'w-full'
                   : 'flex-1 min-w-0'
             }`}>
-              {/* Active View - Header Only */}
-              {/* Always display if eBay is connected and data exists (regardless of viewMode) */}
-              {(isStoreConnected && allListings.length > 0) && (
+              {/* Active View - Header and FilterBar - SINGLE RENDER LOCATION */}
+              {/* Only display in 'all' view mode when eBay is connected and data exists */}
+              {viewMode === 'all' && isStoreConnected && allListings.length > 0 && !loading && (
                 <div className="mt-6 space-y-4">
                   {/* Header */}
                   <div className="flex items-center justify-between">
@@ -1894,20 +1894,18 @@ function Dashboard() {
                   </div>
                   
                   {/* FilterBar - SINGLE RENDER LOCATION - Show after product fetch is complete */}
-                  {viewMode === 'all' && !loading && (
-                    <div className="mt-4">
-                      <FilterBar 
-                        key="single-filter-bar-below-listings"
-                        onApplyFilter={async (newFilters) => {
-                          await handleApplyFilter(newFilters)
-                          setViewMode('zombies')
-                        }}
-                        onSync={handleSync}
-                        loading={loading}
-                        initialFilters={filters}
-                      />
-                    </div>
-                  )}
+                  <div className="mt-4">
+                    <FilterBar 
+                      key="single-filter-bar-below-listings"
+                      onApplyFilter={async (newFilters) => {
+                        await handleApplyFilter(newFilters)
+                        setViewMode('zombies')
+                      }}
+                      onSync={handleSync}
+                      loading={loading}
+                      initialFilters={filters}
+                    />
+                  </div>
                 </div>
               )}
 
