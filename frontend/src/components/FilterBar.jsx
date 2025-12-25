@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, memo } from 'react'
 import { RotateCw, Info } from 'lucide-react'
 
 /**
@@ -6,7 +6,7 @@ import { RotateCw, Info } from 'lucide-react'
  * Order: Sales → Watch → Traffic
  * Reflects eBay seller's natural decision flow
  */
-function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
+const FilterBar = memo(function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
   // 1. Analysis period (analytics_period_days)
   const [analysisPeriod, setAnalysisPeriod] = useState(initialFilters.analytics_period_days || 7)
   
@@ -253,6 +253,8 @@ function FilterBar({ onApplyFilter, onSync, loading, initialFilters = {} }) {
       </form>
     </div>
   )
-}
+})
+
+FilterBar.displayName = 'FilterBar'
 
 export default FilterBar

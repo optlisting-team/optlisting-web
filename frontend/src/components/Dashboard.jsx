@@ -11,8 +11,10 @@ import HistoryView from './HistoryView'
 import QueueReviewPanel from './QueueReviewPanel'
 import { Button } from './ui/button'
 
-// Use environment variable for Railway URL, fallback to default if not set
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://web-production-3dc73.up.railway.app'
+// Use environment variable for Railway URL, fallback based on environment
+// Priority: VITE_API_URL env var > Development (empty for Vite proxy) > Production (Railway URL)
+const API_BASE_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? '' : 'https://optlisting-production.up.railway.app')
 const CURRENT_USER_ID = "default-user" // Temporary user ID for MVP phase
 
 // Demo Mode - Set to true to use dummy data (false for production with real API)
@@ -20,10 +22,7 @@ const CURRENT_USER_ID = "default-user" // Temporary user ID for MVP phase
 // Force redeploy: 2024-12-11 - Changed to false for real eBay testing
 const DEMO_MODE = false
 
-// Cache configuration
-const CACHE_KEY = `optlisting_listings_${CURRENT_USER_ID}`
-const CACHE_TIMESTAMP_KEY = `optlisting_listings_timestamp_${CURRENT_USER_ID}`
-const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes (in milliseconds)
+// Cache removed - fetch only when user explicitly triggers
 
 // Dummy data for demo/testing
 // Generate 100 dummy listings
@@ -112,6 +111,8 @@ function Dashboard() {
   const [isStoreConnected, setIsStoreConnected] = useState(false)
   // Ref to prevent duplicate execution
   const listingsLoadedOnceRef = useRef(false)
+  // AbortController to cancel previous fetchAllListings calls
+  const fetchAbortControllerRef = useRef(null)
   // Debug HUD: Last fetch time
   const [lastFetchAt, setLastFetchAt] = useState(null)
   
@@ -176,29 +177,12 @@ function Dashboard() {
     supplier_filter: 'All'
   })
   
-  // Retry utility function
-  const retryApiCall = async (apiCall, maxRetries = 3, delay = 2000) => {
-    for (let i = 0; i < maxRetries; i++) {
-      try {
-        return await apiCall()
-      } catch (err) {
-        const isLastAttempt = i === maxRetries - 1
-        if (isLastAttempt) {
-          throw err
-        }
-        // Wait before retry
-        await new Promise(resolve => setTimeout(resolve, delay * (i + 1)))
-      }
-    }
-  }
-
   // API Health Check - Check connection on mount
   const checkApiHealth = async () => {
     try {
-      const response = await retryApiCall(async () => {
-        return await axios.get(`${API_BASE_URL}/api/health`, { 
-          timeout: 30000, // Increased from 10s to 30s
-          headers: {
+      const response = await axios.get(`${API_BASE_URL}/api/health`, { 
+        timeout: 30000,
+        headers: {
             'Content-Type': 'application/json',
           },
         })
@@ -218,11 +202,13 @@ function Dashboard() {
       setApiConnected(false)
       // More specific message for 502 errors
       if (err.response?.status === 502) {
-        setApiError('Server Error (502)')
-      } else if (err.code === 'ERR_NETWORK') {
-        setApiError('Network Error')
+        setApiError('백엔드 서버 오류 (502) - Railway 서버를 확인하세요')
+      } else if (err.code === 'ERR_NETWORK' || err.code === 'ECONNABORTED') {
+        setApiError('네트워크 오류 - 서버에 연결할 수 없습니다')
+      } else if (err.response?.status === 0 || err.message?.includes('CORS')) {
+        setApiError('CORS 오류 - 백엔드 서버를 재배포하세요')
       } else {
-        setApiError('Connection Error')
+        setApiError(`연결 오류: ${err.message || '알 수 없는 오류'}`)
       }
       return false
     }
@@ -232,14 +218,12 @@ function Dashboard() {
   // Fetch user credits and plan info
   const fetchUserCredits = async () => {
     try {
-      const response = await retryApiCall(async () => {
-        return await axios.get(`${API_BASE_URL}/api/credits`, {
-          params: { user_id: CURRENT_USER_ID },
-          timeout: 30000, // Increased from 10s to 30s
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        })
+      const response = await axios.get(`${API_BASE_URL}/api/credits`, {
+        params: { user_id: CURRENT_USER_ID },
+        timeout: 30000,
+        headers: {
+          'Content-Type': 'application/json',
+        },
       })
       if (response.data) {
         setUserCredits(response.data.available_credits || 0)
@@ -552,15 +536,14 @@ function Dashboard() {
     return Math.max(0, Math.min(score, 100))
   }
 
-  const fetchZombies = async (filterParams = filters, forceRefresh = false) => {
+  const fetchZombies = async (filterParams = filters) => {
     try {
       setLoading(true)
       
       // Demo Mode: Use dummy data
       if (DEMO_MODE) {
-        await new Promise(resolve => setTimeout(resolve, 800)) // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 800))
         
-        // Filter dummy zombies based on filter params
         const maxSales = filterParams.max_sales || 0
         const maxWatches = filterParams.max_watches || 0
         const maxImpressions = filterParams.max_impressions || 100
@@ -579,9 +562,8 @@ function Dashboard() {
         return
       }
       
-      // When "Find Low-Performing SKUs" button is clicked, always call backend API to deduct credits
-      // If forceRefresh is true, call backend /api/analyze endpoint (includes credit deduction)
-      if (forceRefresh) {
+      // When "Find Low-Performing SKUs" button is clicked, call backend API to deduct credits
+      {
         // Call backend /api/analyze endpoint (includes credit deduction)
         try {
           console.log('🔄 "Find Low-Performing SKUs" button clicked - calling backend /api/analyze and deducting credits')
@@ -639,90 +621,33 @@ function Dashboard() {
         }
       }
       
-      // If forceRefresh is false, only perform local filtering (no credit deduction - e.g., when viewMode changes)
-      if (!forceRefresh && allListings.length > 0) {
-        try {
-          const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
-          if (cachedTimestamp) {
-            const cacheAge = Date.now() - parseInt(cachedTimestamp, 10)
-            if (cacheAge < CACHE_DURATION) {
-              console.log(`✅ Filtering with local data (cache valid: queried ${Math.floor(cacheAge / 1000)} seconds ago)`)
-              
-              // Only perform local filtering (no credit deduction)
-              const minDays = filterParams.analytics_period_days || filterParams.min_days || 7
-              const maxSales = filterParams.max_sales || 0
-              const maxWatches = filterParams.max_watches || filterParams.max_watch_count || 0
-              const maxImpressions = filterParams.max_impressions || 100
-              const maxViews = filterParams.max_views || 10
-              
-              console.log('🔍 Applying local filtering:', { minDays, maxSales, maxWatches, maxImpressions, maxViews })
-              
-              const filteredZombies = allListings.filter(item => {
-                // Listing period filter: only include items listed for minDays or more (exclude items less than 7 days)
-                // Example: if minDays=7, only include items with days_listed >= 7 (exclude items less than 7 days)
-                if ((item.days_listed || 0) < minDays) return false
-                // Sales filter: only items with maxSales or less (e.g., 0 or less)
-                if ((item.total_sales || item.quantity_sold || 0) > maxSales) return false
-                // Watch filter: only items with maxWatches or less (e.g., 0 or less)
-                if ((item.watch_count || 0) > maxWatches) return false
-                // Impressions filter: only items with maxImpressions or less (e.g., 100 or less)
-                if ((item.impressions || 0) > maxImpressions) return false
-                // Views filter: only items with maxViews or less (e.g., 10 or less)
-                if ((item.view_count || item.views || 0) > maxViews) return false
-                return true
-              }).map(item => ({ ...item, is_zombie: true }))
-              
-              console.log(`🧟 Local filtering result: ${filteredZombies.length} zombies found (out of ${allListings.length} total)`)
-              
-              setZombies(filteredZombies)
-              setTotalZombies(filteredZombies.length)
-              setLoading(false)
-              return
-            }
-          }
-        } catch (cacheErr) {
-          console.warn('Cache check failed, calling API:', cacheErr)
-        }
+      // Local filtering only (PURE function on local data)
+      if (allListings.length > 0) {
+        const minDays = filterParams.analytics_period_days || filterParams.min_days || 7
+        const maxSales = filterParams.max_sales || 0
+        const maxWatches = filterParams.max_watches || filterParams.max_watch_count || 0
+        const maxImpressions = filterParams.max_impressions || 100
+        const maxViews = filterParams.max_views || 10
+        
+        const filteredZombies = allListings.filter(item => {
+          if ((item.days_listed || 0) < minDays) return false
+          if ((item.total_sales || item.quantity_sold || 0) > maxSales) return false
+          if ((item.watch_count || 0) > maxWatches) return false
+          if ((item.impressions || 0) > maxImpressions) return false
+          if ((item.view_count || item.views || 0) > maxViews) return false
+          return true
+        }).map(item => ({ ...item, is_zombie: true }))
+        
+        setZombies(filteredZombies)
+        setTotalZombies(filteredZombies.length)
+        setLoading(false)
+        return
       }
       
-      // 🚀 Production Mode: Fetch from eBay API (when cache is missing or expired)
-      try {
-        console.log('📦 Fetching listings from eBay API...')
-        
-        const response = await axios.get(`${API_BASE_URL}/api/ebay/listings/active`, {
-          params: {
-            user_id: CURRENT_USER_ID,
-            page: 1,
-            entries_per_page: 200
-          }
-        })
-        
-        if (!response.data.success) {
-          throw new Error(response.data.error || 'Failed to fetch eBay listings')
-        }
-        
-        const allListingsFromEbay = response.data.listings || []
-        console.log(`✅ Received ${allListingsFromEbay.length} listings from eBay`)
-        
-        // Debug: Check image information for all listings
-        if (allListingsFromEbay.length > 0) {
-          console.log('🔍 Image data check for all listings:')
-          allListingsFromEbay.forEach((listing, index) => {
-            console.log(`  Listing ${index + 1} (${listing.item_id}):`, {
-              picture_url: listing.picture_url || 'MISSING',
-              thumbnail_url: listing.thumbnail_url || 'MISSING',
-              image_url: listing.image_url || 'MISSING',
-              title: listing.title?.substring(0, 30) || 'N/A'
-            })
-          })
-        }
-        
-        // Transform listing data and detect suppliers
-        const transformedListings = allListingsFromEbay.map((item, index) => {
-          // Use supplier info extracted by backend if available, otherwise extract on frontend
-          let supplierInfo
-          if (item.supplier_name && item.supplier_id) {
-            // Use supplier info already extracted by backend
+      // No data available
+      setZombies([])
+      setTotalZombies(0)
+      setLoading(false)
             supplierInfo = {
               supplier_name: item.supplier_name,
               supplier_id: item.supplier_id
@@ -834,21 +759,6 @@ function Dashboard() {
         setTotalBreakdown(supplierBreakdown)
         setPlatformBreakdown({ eBay: transformedListings.length })
         
-        // Save cache
-        try {
-          const cacheData = {
-            listings: transformedListings,
-            totalListings: transformedListings.length,
-            totalBreakdown: supplierBreakdown,
-            platformBreakdown: { eBay: transformedListings.length }
-          }
-          localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData))
-          localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString())
-          console.log('✅ Data cache saved successfully')
-        } catch (cacheErr) {
-          console.warn('Cache save failed:', cacheErr)
-        }
-        
         setError(null)
         
       } catch (ebayErr) {
@@ -949,21 +859,14 @@ function Dashboard() {
       console.log('🔄 eBay connection status changed:', { wasConnected, connected, forceLoad })
     }
     
-    // Clear cache when disconnected
+    // Clear data when disconnected
     if (!connected && wasConnected) {
-      console.log('🗑️ Disconnected - clearing cache')
-      try {
-        localStorage.removeItem(CACHE_KEY)
-        localStorage.removeItem(CACHE_TIMESTAMP_KEY)
-        setAllListings([])
-        setTotalListings(0)
-        setZombies([])
-        setTotalZombies(0)
-        setViewMode('total')
-        setShowFilter(false)
-      } catch (err) {
-        console.warn('Cache clear failed:', err)
-      }
+      setAllListings([])
+      setTotalListings(0)
+      setZombies([])
+      setTotalZombies(0)
+      setViewMode('total')
+      setShowFilter(false)
       return
     }
     
@@ -984,92 +887,37 @@ function Dashboard() {
     }
   }
 
-  const fetchAllListings = async (forceRefresh = false) => {
+  const fetchAllListings = async () => {
+    // VERIFICATION LOG: Track call count
+    console.count("fetchAllListings")
+    
+    // Cancel previous request if still in flight
+    if (fetchAbortControllerRef.current) {
+      console.log('🛑 Cancelling previous fetchAllListings request')
+      fetchAbortControllerRef.current.abort()
+      fetchAbortControllerRef.current = null
+    }
+    
     // Prevent duplicate execution: skip if already loading
-    if (loading && !forceRefresh) {
-      console.log('⏭️ fetchAllListings already running - skipping', { loading, forceRefresh })
+    if (loading) {
+      console.log('⏭️ fetchAllListings already running - skipping')
       return
     }
     
+    // Create new AbortController for this request
+    const abortController = new AbortController()
+    fetchAbortControllerRef.current = abortController
+    
     try {
-      // If data already exists and cache is valid, don't call API (don't set loading state either)
-      if (!forceRefresh && allListings.length > 0) {
-        try {
-          const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
-          if (cachedTimestamp) {
-            const cacheAge = Date.now() - parseInt(cachedTimestamp, 10)
-            if (cacheAge < CACHE_DURATION) {
-              console.log(`✅ Data already exists and cache is valid - skipping API call (queried ${Math.floor(cacheAge / 1000)} seconds ago)`)
-              // If data exists, always set view mode to 'all' to display product list
-              if (viewMode !== 'all') {
-                console.log('🔄 Existing data detected - setting view mode to "all"', { 
-                  listingsCount: allListings.length,
-                  currentViewMode: viewMode
-                })
-                setViewMode('all')
-                setShowFilter(true)
-              }
-              return // If data already exists and cache is valid, don't call API
-            }
-          }
-        } catch (err) {
-          console.warn('Cache check failed:', err)
-        }
-      }
-      
-      setLoading(true)
+      // Note: setLoading is managed by the caller
       setError(null)
       
       // Demo Mode: Use dummy data
       if (DEMO_MODE) {
         await new Promise(resolve => setTimeout(resolve, 500))
-        // Set all listings with dummy data (100 items)
         setAllListings(DUMMY_ALL_LISTINGS)
         setTotalListings(DUMMY_ALL_LISTINGS.length)
-        setLoading(false)
         return
-      }
-      
-      // Check cache: if forceRefresh is false and cache is valid, use cache
-      if (!forceRefresh) {
-        try {
-          const cachedData = localStorage.getItem(CACHE_KEY)
-          const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
-          
-          if (cachedData && cachedTimestamp) {
-            const cacheAge = Date.now() - parseInt(cachedTimestamp, 10)
-            
-            if (cacheAge < CACHE_DURATION) {
-              console.log(`✅ Using cached data (queried ${Math.floor(cacheAge / 1000)} seconds ago)`)
-              const parsedData = JSON.parse(cachedData)
-              const cachedListings = parsedData.listings || []
-              // If data exists, always set view mode to 'all' (called before setAllListings)
-              if (cachedListings.length > 0) {
-                setViewMode('all')
-                setShowFilter(true)
-                console.log('🔄 Cache data loaded - immediately switching to Active listings view', { 
-                  listingsCount: cachedListings.length
-                })
-              }
-              // Set cache data
-              setAllListings(cachedListings)
-              setTotalListings(parsedData.totalListings || 0)
-              setTotalBreakdown(parsedData.totalBreakdown || {})
-              setPlatformBreakdown(parsedData.platformBreakdown || { eBay: 0 })
-              if (cachedListings.length > 0) {
-                console.log('✅ View mode set to "all" after cache data load - products will be displayed')
-              }
-              setLoading(false)
-              return
-            } else {
-              console.log(`⏰ Cache expired (${Math.floor(cacheAge / 1000)} seconds elapsed) - fetching new data`)
-            }
-          }
-        } catch (cacheErr) {
-          console.warn('Cache read failed, calling API:', cacheErr)
-        }
-      } else {
-        console.log('🔄 Force refresh - ignoring cache')
       }
       
       // 🚀 Production Mode: Fetch from eBay API
@@ -1081,7 +929,8 @@ function Dashboard() {
             user_id: CURRENT_USER_ID,
             page: 1,
             entries_per_page: 200
-          }
+          },
+          signal: abortController.signal
         })
         
         if (!response.data.success) {
@@ -1169,21 +1018,6 @@ function Dashboard() {
         setTotalBreakdown(supplierBreakdown)
         setPlatformBreakdown({ eBay: transformedListings.length })
         
-        // Save cache
-        try {
-          const cacheData = {
-            listings: transformedListings,
-            totalListings: transformedListings.length,
-            totalBreakdown: supplierBreakdown,
-            platformBreakdown: { eBay: transformedListings.length }
-          }
-          localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData))
-          localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString())
-          console.log('✅ Data cache saved successfully')
-        } catch (cacheErr) {
-          console.warn('Cache save failed:', cacheErr)
-        }
-        
         // View mode already set above, so here we only output log
         if (transformedListings.length > 0) {
           console.log('✅ fetchAllListings completed - product list will be displayed', { 
@@ -1192,9 +1026,15 @@ function Dashboard() {
         }
         
         setError(null)
-        setLoading(false) // Clear loading state
+        // Note: setLoading(false) is managed by the caller
         
       } catch (ebayErr) {
+        // Treat AbortError as normal cancellation, not an error
+        if (ebayErr.name === 'AbortError' || ebayErr.code === 'ECONNABORTED') {
+          console.log('🛑 fetchAllListings aborted (normal cancellation)')
+          return // Exit early, finally block will handle setLoading(false)
+        }
+        
         console.error('eBay API Error:', ebayErr)
         
         // eBay not connected (only 401 is treated as disconnection)
@@ -1213,44 +1053,20 @@ function Dashboard() {
           if (allListings.length === 0) {
             setError('Failed to fetch listings. Please try again.')
           }
-          // Fallback: Try existing DB endpoint
-          try {
-            console.log('⚠️ Falling back to DB data...')
-            const listingsParams = {
-              user_id: CURRENT_USER_ID,
-              store_id: selectedStore?.id,
-              skip: 0,
-              limit: 10000
-            }
-            
-            const listingsResponse = await axios.get(`${API_BASE_URL}/api/listings`, {
-              params: listingsParams
-            })
-            const fallbackListings = listingsResponse.data.listings || []
-            // Set view mode immediately along with fallback data setup
-            setAllListings(fallbackListings)
-            setTotalListings(fallbackListings.length)
-            // If data exists, always set view mode to 'all'
-            if (fallbackListings.length > 0) {
-              console.log('🔄 Fallback data loaded - immediately switching to Active listings view', {
-                listingsCount: fallbackListings.length
-              })
-              setViewMode('all')
-              setShowFilter(true)
-              console.log('✅ View mode set to "all" after fallback data load - products will be displayed')
-            }
-          } catch (fallbackErr) {
-            console.error('Fallback also failed:', fallbackErr)
-            setError('Failed to fetch listings')
-          }
         }
       }
       
     } catch (err) {
+      // Treat AbortError as normal cancellation
+      if (err.name === 'AbortError' || err.code === 'ECONNABORTED') {
+        return // Exit early, caller's finally block will handle setLoading(false)
+      }
       setError('Failed to fetch all listings')
       console.error('fetchAllListings error:', err)
     } finally {
-      setLoading(false)
+      // Always clear abort controller ref
+      // Note: setLoading(false) is managed by the caller
+      fetchAbortControllerRef.current = null
     }
   }
 
@@ -1280,11 +1096,8 @@ function Dashboard() {
     setShowFilter(true) // Open filter panel
     setSelectedIds([]) // Reset selection
     
-    // Fetch if no data
-    if (allListings.length === 0 && isStoreConnected) {
-      console.log('[openAllListingsView] No data, calling fetchAllListings')
-      fetchAllListings(false)
-    }
+    // Note: fetchAllListings() is only called from handleSync() or OAuth callback
+    // Do not auto-fetch here to prevent duplicate calls
   }
 
   const handleViewModeChange = (mode) => {
@@ -1303,10 +1116,8 @@ function Dashboard() {
     } else if (mode === 'all') {
       // Apply same logic as openAllListingsView when switching to 'all' mode
       setShowFilter(true)
-      // Fetch if no data
-      if (allListings.length === 0 && isStoreConnected) {
-        fetchAllListings(false)
-      }
+      // Note: fetchAllListings() is only called from handleSync() or OAuth callback
+      // Do not auto-fetch here to prevent duplicate calls
       return
     } else if (mode === 'zombies') {
       // When zombie card is clicked: use existing filtered results if available (don't re-filter)
@@ -1349,30 +1160,9 @@ function Dashboard() {
     setSelectedIds([]) // Reset selection when filters change
     
     // If no data in Active card, fetch first
+    // Note: fetchAllListings() is ONLY called after OAuth success
+    // Do not fetch here - use existing allListings data
     let currentTotalListings = totalListings || allListings.length
-    if (currentTotalListings === 0) {
-      console.log('⚠️ No data in Active card - need to fetch first')
-      try {
-        setLoading(true)
-        const response = await axios.get(`${API_BASE_URL}/api/ebay/listings/active`, {
-          params: {
-            user_id: CURRENT_USER_ID,
-            page: 1,
-            entries_per_page: 200
-          }
-        })
-        
-        if (response.data.success) {
-          const listings = response.data.listings || []
-          currentTotalListings = listings.length
-          console.log(`✅ Active card data fetch completed: ${currentTotalListings} listings`)
-        }
-      } catch (err) {
-        console.error('❌ Active card data fetch failed:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
     
     // Check total listings count from DB (for credit deduction basis)
     if (currentTotalListings === 0) {
@@ -1433,7 +1223,7 @@ function Dashboard() {
       if (userConfirmed) {
         // Proceed with filtering after user confirmation (includes credit deduction, backend API call)
         console.log('🚀 User confirmed - starting analysis')
-        await fetchZombies(newFilters, true)
+        await fetchZombies(newFilters)
         setViewMode('zombies')
       } else {
         console.log('❌ User cancelled - analysis aborted')
@@ -1448,7 +1238,7 @@ function Dashboard() {
       
       if (window.confirm(userMessage)) {
         console.log('🚀 User confirmed - continuing despite error')
-        await fetchZombies(newFilters, true)
+        await fetchZombies(newFilters)
         setViewMode('zombies')
       } else {
         console.log('❌ User cancelled - aborted due to error')
@@ -1541,12 +1331,21 @@ function Dashboard() {
   }
 
   const handleSync = async () => {
-    // Refresh all data
-    await Promise.all([
-      fetchZombies(),
-      fetchAllListings(),
-      fetchHistory().catch(err => console.error('History fetch error:', err))
-    ])
+    // Refresh zombies and history only - fetchAllListings() is ONLY called after OAuth success
+    try {
+      setLoading(true)
+      await Promise.all([
+        fetchZombies(),
+        fetchHistory().catch(err => console.error('History fetch error:', err))
+      ])
+    } catch (err) {
+      // AbortError is normal cancellation, ignore it
+      if (err.name !== 'AbortError' && err.code !== 'ECONNABORTED') {
+        console.error('Sync failed:', err)
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleSourceChange = async (itemId, newSupplier) => {
@@ -1608,27 +1407,38 @@ function Dashboard() {
     if (ebayConnected === 'true') {
       console.log('✅ OAuth callback successful - eBay connected')
       
+      // Remove URL parameters (keep clean URL) - do this first
+      window.history.replaceState({}, '', window.location.pathname)
+      
       // Immediately update connection status
       setIsStoreConnected(true)
       console.log('🔄 Setting connection status to true')
       
-      // Remove URL parameters (keep clean URL)
-      window.history.replaceState({}, '', window.location.pathname)
+      // Call handleStoreConnection callback to trigger data fetch and update SummaryCard
+      // Use setTimeout to ensure setIsStoreConnected state update is processed first
+      setTimeout(() => {
+        console.log('🔄 Triggering store connection callback after OAuth')
+        handleStoreConnection(true, true) // connected=true, forceLoad=true
+      }, 100)
       
       // Load products (after slight delay - consider time for token to be saved to DB)
-      // Force refresh since just connected
-      setTimeout(() => {
+      // Force refresh since just connected - this is ONE of the two allowed call sites for fetchAllListings()
+      setTimeout(async () => {
         console.log('📦 Starting product load after OAuth callback (force refresh)')
         if (!DEMO_MODE) {
-          fetchAllListings(true).catch(err => {
-            console.error('Product load failed:', err)
-          })
+          try {
+            setLoading(true)
+            await fetchAllListings()
+          } catch (err) {
+            // AbortError is normal cancellation, ignore it
+            if (err.name !== 'AbortError' && err.code !== 'ECONNABORTED') {
+              console.error('Product load failed:', err)
+            }
+          } finally {
+            setLoading(false)
+          }
         }
-      }, 3000) // Wait 3 seconds (consider DB save time)
-      
-      // Remove unnecessary connection status re-check
-      // Connection status already updated with setIsStoreConnected(true),
-      // and handleStoreConnection callback is called, so additional check is unnecessary
+      }, 2000) // Reduced from 3s to 2s
       
     } else if (ebayError) {
       console.error('❌ OAuth callback error:', ebayError)
@@ -1637,31 +1447,10 @@ function Dashboard() {
       // Remove URL parameters
       window.history.replaceState({}, '', window.location.pathname)
     }
-  }, [])
+  }, []) // Keep empty dependency array - only run on mount
   
   // Force refresh event listener
-  useEffect(() => {
-    const handleForceRefresh = () => {
-      console.log('🔄 Force refresh requested')
-      // Clear cache
-      try {
-        localStorage.removeItem(CACHE_KEY)
-        localStorage.removeItem(CACHE_TIMESTAMP_KEY)
-      } catch (err) {
-        console.warn('Cache clear failed:', err)
-      }
-      // Refresh data
-      if (isStoreConnected) {
-        fetchAllListings(true)
-        if (viewMode === 'zombies') {
-          fetchZombies(filters, true)
-        }
-      }
-    }
-    
-    window.addEventListener('forceRefresh', handleForceRefresh)
-    return () => window.removeEventListener('forceRefresh', handleForceRefresh)
-  }, [isStoreConnected, viewMode, filters])
+  // Note: No force refresh event listener - fetch only when user explicitly triggers
 
   // Initial Load - Check API health and fetch data (execute only once)
   useEffect(() => {
@@ -1687,41 +1476,8 @@ function Dashboard() {
         })
       }
       
-      // On initial load, automatically display products if cached data exists
-      try {
-        const cachedData = localStorage.getItem(CACHE_KEY)
-        const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
-        
-        if (cachedData && cachedTimestamp) {
-          const cacheAge = Date.now() - parseInt(cachedTimestamp, 10)
-          
-          if (cacheAge < CACHE_DURATION) {
-            console.log('🔄 Initial load - cached data found, automatically displaying products')
-            const parsedData = JSON.parse(cachedData)
-            if (parsedData.listings?.length > 0) {
-              const cachedListings = parsedData.listings || []
-              // Set view mode immediately along with data setup on initial load
-              setAllListings(cachedListings)
-              setTotalListings(parsedData.totalListings || 0)
-              setTotalBreakdown(parsedData.totalBreakdown || {})
-              setPlatformBreakdown(parsedData.platformBreakdown || { eBay: 0 })
-              // If data exists, always set view mode to 'all'
-              setViewMode('all')
-              setShowFilter(true)
-              console.log('✅ Cached products automatically displayed', { 
-                count: cachedListings.length,
-                viewMode: 'all (forced)',
-                willShowProducts: true
-              })
-            }
-          }
-        }
-      } catch (cacheErr) {
-        console.warn('Initial load cache check failed:', cacheErr)
-      }
-      
-      // Note: fetchAllListings() is called when store is connected via handleStoreConnection
-      // Cache is automatically used if available
+      // Note: fetchAllListings() is ONLY called from OAuth callback or handleSync()
+      // No cache - fetch only when user explicitly triggers
     }
     
     initializeDashboard()
@@ -1753,49 +1509,13 @@ function Dashboard() {
     }
   }, [allListings.length, isStoreConnected, viewMode])
 
-  // Detect eBay connection status and automatically fetch listings
+  // VERIFICATION LOG: Track loading state transitions
   useEffect(() => {
-    // Prevent duplicate calls in StrictMode
-    if (listingsLoadedOnceRef.current && isStoreConnected) {
-      console.log('⏭️ [GUARD] listingsLoadedOnceRef is already true - skipping')
-      return
-    }
-    
-    if (isStoreConnected) {
-      console.log('[CONNECTION] eBay connection detected - starting automatic listings fetch', {
-        isStoreConnected,
-        listingsLoadedOnce: listingsLoadedOnceRef.current,
-        currentAllListingsLength: allListings.length,
-        currentTotalListings: totalListings,
-        currentViewMode: viewMode
-      })
-      
-      // Set ref first to prevent duplicate execution (StrictMode handling)
-      listingsLoadedOnceRef.current = true
-      
-      // Set view mode to 'all' first so product list is automatically displayed
-      setViewMode('all')
-      setShowFilter(true)
-      
-      // Automatically fetch active listings
-      fetchAllListings(false).then(() => {
-        console.log('[CONNECTION] Automatic listings fetch completed after eBay connection', {
-          allListingsLength: allListings.length,
-          totalListings: totalListings,
-          viewMode: viewMode
-        })
-      }).catch((err) => {
-        console.error('[CONNECTION] Automatic listings fetch failed after eBay connection:', err)
-        listingsLoadedOnceRef.current = false // Allow retry on failure
-      })
-    } else {
-      // Initialize ref when disconnected
-      if (listingsLoadedOnceRef.current) {
-        listingsLoadedOnceRef.current = false
-        console.log('[CONNECTION] eBay disconnected - initializing listingsLoadedOnceRef')
-      }
-    }
-  }, [isStoreConnected])
+    console.log("loading:", loading)
+  }, [loading])
+
+  // Note: fetchAllListings() is ONLY called from OAuth callback or handleSync()
+  // No automatic fetching on connection change
 
   // Handle URL query param for view mode
   useEffect(() => {
@@ -2053,6 +1773,7 @@ function Dashboard() {
       <div className="px-6">
         {/* Summary Card */}
         <SummaryCard 
+          key="summary-card"
           totalListings={totalListings}
           totalBreakdown={totalBreakdown}
           platformBreakdown={platformBreakdown}
@@ -2081,30 +1802,7 @@ function Dashboard() {
           onConnectionChange={handleStoreConnection}
           // Supplier export callback
           onSupplierExport={handleSupplierExport}
-          filterContent={showFilter && (
-            <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3 mt-6 animate-fade-in-up">
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-zinc-500">🔍 Filter:</span>
-                <div className="flex-1">
-              <FilterBar 
-                onApplyFilter={async (newFilters) => {
-                  await handleApplyFilter(newFilters)
-                  setViewMode('zombies')
-                }}
-                onSync={handleSync}
-                loading={loading}
-                initialFilters={filters}
-              />
-                </div>
-                <button 
-                  onClick={() => setShowFilter(false)}
-                  className="text-zinc-500 hover:text-white transition-colors text-sm"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-          )}
+          filterContent={null}
         />
 
         {/* FORCE render: Hide Ready to Analyze completely if ebayConnected && forcedLen > 0 */}
@@ -2184,7 +1882,7 @@ function Dashboard() {
                   ? 'w-full'
                   : 'flex-1 min-w-0'
             }`}>
-              {/* Active View - With Filter */}
+              {/* Active View - Header Only */}
               {/* Always display if eBay is connected and data exists (regardless of viewMode) */}
               {(isStoreConnected && allListings.length > 0) && (
                 <div className="mt-6 space-y-4">
@@ -2195,17 +1893,21 @@ function Dashboard() {
                     </p>
                   </div>
                   
-                  {/* Inline Filter for Active View */}
-                  <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3">
-                <FilterBar 
-                      onApplyFilter={async (newFilters) => {
-                        await handleApplyFilter(newFilters)
-                        setViewMode('zombies')
-                      }}
-                  loading={loading}
-                  initialFilters={filters}
-                />
-                  </div>
+                  {/* FilterBar - SINGLE RENDER LOCATION - Show after product fetch is complete */}
+                  {viewMode === 'all' && !loading && (
+                    <div className="mt-4">
+                      <FilterBar 
+                        key="single-filter-bar-below-listings"
+                        onApplyFilter={async (newFilters) => {
+                          await handleApplyFilter(newFilters)
+                          setViewMode('zombies')
+                        }}
+                        onSync={handleSync}
+                        loading={loading}
+                        initialFilters={filters}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2220,7 +1922,8 @@ function Dashboard() {
                 <button
                   onClick={() => {
                     setViewMode('all')
-                    fetchAllListings()
+                    // Note: fetchAllListings() is only called from handleSync() or OAuth callback
+                    // Do not auto-fetch here to prevent duplicate calls
                   }}
                   className="text-xs text-zinc-500 hover:text-white transition-colors"
                 >

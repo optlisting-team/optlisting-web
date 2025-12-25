@@ -112,6 +112,12 @@ vercel_regex = r"https://.*\.vercel\.app"
 # CORS configuration for Railway + Vercel deployment
 # CRITICAL: Ensure all Vercel domains are explicitly allowed
 # Add CORS middleware FIRST, before any routes
+
+# Log CORS configuration for debugging
+logging.info(f"🌐 CORS Configuration:")
+logging.info(f"   Allowed origins: {allowed_origins}")
+logging.info(f"   Vercel regex: {vercel_regex}")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,  # Explicit production and local URLs

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { ChevronDown, Plus, Check, Unplug } from 'lucide-react'
+import { ChevronDown, Plus, Check, Unplug, Loader2, RefreshCw } from 'lucide-react'
 import axios from 'axios'
 
 // Demo stores for testing - initial state
@@ -9,8 +9,11 @@ const INITIAL_STORES = [
   { id: 'store-3', name: 'Shopify Store', platform: 'Shopify', connected: false },
 ]
 
-// Use environment variable for Railway URL, fallback to default if not set
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://web-production-3dc73.up.railway.app'
+// Use environment variable for Railway URL, fallback based on environment
+// In local development, use empty string to leverage Vite proxy (localhost:8000)
+// In production, use Railway URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? '' : 'https://optlisting-production.up.railway.app')
 const CURRENT_USER_ID = 'default-user'
 
 // Store Selector Component
@@ -185,10 +188,11 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
       e.stopPropagation()
     }
     
-    // API URL priority: Environment variable > Hardcoded production URL > localhost
+    // API URL priority: Environment variable > Environment-based fallback
+    // In local development, use empty string to leverage Vite proxy (localhost:8000)
+    // In production, use Railway URL
     const apiUrl = import.meta.env.VITE_API_URL || 
-                   'https://web-production-3dc73.up.railway.app' || 
-                   'http://localhost:8000'
+      (import.meta.env.DEV ? '' : 'https://optlisting-production.up.railway.app')
     const userId = 'default-user'
     const oauthUrl = `${apiUrl}/api/ebay/auth/start?user_id=${userId}`
     
@@ -292,8 +296,16 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
           )}
         </div>
 
-        {/* Connect / Disconnect Button */}
-        {selectedStore?.connected ? (
+        {/* Connect / Disconnect / Connecting Button */}
+        {checkingConnection ? (
+          <button 
+            disabled
+            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold rounded-lg border-2 border-blue-500/50 transition-all flex items-center gap-2 text-base shadow-lg animate-pulse cursor-not-allowed"
+          >
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span>Connecting...</span>
+          </button>
+        ) : selectedStore?.connected ? (
           <button 
             onClick={handleDisconnect}
             className="px-5 py-2.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 font-bold rounded-lg border-2 border-red-600/30 transition-all flex items-center gap-2 text-base shadow-lg hover:shadow-red-500/20"

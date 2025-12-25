@@ -4,8 +4,11 @@ import SourceBadge from './SourceBadge'
 import PlatformBadge from './PlatformBadge'
 import axios from 'axios'
 
-// Use environment variable for Railway URL, fallback to default if not set
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://web-production-3dc73.up.railway.app'
+// Use environment variable for Railway URL, fallback based on environment
+// In local development, use empty string to leverage Vite proxy (localhost:8000)
+// In production, use Railway URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? '' : 'https://optlisting-production.up.railway.app')
 
 function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, onSourceChange, onMarkDownloaded }) {
   const [downloadedGroups, setDownloadedGroups] = useState(new Set())

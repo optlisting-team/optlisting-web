@@ -14,9 +14,10 @@ import Pricing from './components/Pricing'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
-  // Apply dark mode class to root element
+  // Apply dark mode class to root element and set page title
   React.useEffect(() => {
     document.documentElement.classList.add('dark')
+    document.title = 'OptListing'
   }, [])
 
   return (

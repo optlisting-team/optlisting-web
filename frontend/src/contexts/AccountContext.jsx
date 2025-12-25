@@ -1,7 +1,10 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 
-// Use environment variable for Railway URL, fallback to default if not set
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://web-production-3dc73.up.railway.app'
+// Use environment variable for Railway URL, fallback based on environment
+// In local development, use empty string to leverage Vite proxy (localhost:8000)
+// In production, use Railway URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? '' : 'https://optlisting-production.up.railway.app')
 
 const AccountContext = createContext({
   credits: null,
