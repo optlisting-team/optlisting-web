@@ -194,37 +194,37 @@ const FilterBar = memo(function FilterBar({ onApplyFilter, onSync, loading, init
           </div>
         </div>
         
-        {/* Filters Row - Stepper Layout */}
-        <div className="space-y-4 mb-4">
+        {/* Filters Row - Single Row Layout */}
+        <div className="flex items-end gap-3 mb-4 flex-wrap">
           {/* DAYS Filter with Presets */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
+          <div className="flex-shrink-0">
+            <div className="flex items-center gap-2 mb-1.5">
               <span className="text-sm">📅</span>
               <span className="text-xs text-zinc-500 uppercase font-medium">Days</span>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               {/* Preset Buttons */}
-              <div className="flex gap-1.5">
+              <div className="flex gap-1">
                 {DAYS_PRESETS.map((preset) => (
                   <button
                     key={preset}
                     type="button"
                     onClick={() => setAnalysisPeriod(preset)}
                     className={`
-                      px-3 py-1.5 text-xs font-medium rounded-lg border transition-all
+                      px-2 py-1 text-xs font-medium rounded border transition-all
                       ${analysisPeriod === preset
                         ? 'bg-zinc-800 border-zinc-600 text-white'
                         : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
                       }
                     `}
                   >
-                    {preset}일
+                    {preset}d
                   </button>
                 ))}
               </div>
               
               {/* Stepper */}
-              <div className="flex-1 min-w-[200px] max-w-xs">
+              <div className="w-[140px]">
                 <StepperNumberField
                   label=""
                   value={analysisPeriod}
@@ -238,14 +238,13 @@ const FilterBar = memo(function FilterBar({ onApplyFilter, onSync, loading, init
             </div>
           </div>
 
-          {/* Other Filters - Grid Layout */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {/* SALES */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-sm">💰</span>
-                <span className="text-xs text-zinc-500 uppercase font-medium">Sales</span>
-              </div>
+          {/* SALES */}
+          <div className="flex-shrink-0">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-sm">💰</span>
+              <span className="text-xs text-zinc-500 uppercase font-medium">Sales</span>
+            </div>
+            <div className="w-[120px]">
               <StepperNumberField
                 label=""
                 value={maxSales}
@@ -255,13 +254,15 @@ const FilterBar = memo(function FilterBar({ onApplyFilter, onSync, loading, init
                 bigStep={10}
               />
             </div>
+          </div>
 
-            {/* WATCH */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-sm">❤️</span>
-                <span className="text-xs text-zinc-500 uppercase font-medium">Watch</span>
-              </div>
+          {/* WATCH */}
+          <div className="flex-shrink-0">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-sm">❤️</span>
+              <span className="text-xs text-zinc-500 uppercase font-medium">Watch</span>
+            </div>
+            <div className="w-[120px]">
               <StepperNumberField
                 label=""
                 value={maxWatches}
@@ -271,13 +272,15 @@ const FilterBar = memo(function FilterBar({ onApplyFilter, onSync, loading, init
                 bigStep={10}
               />
             </div>
+          </div>
 
-            {/* IMP */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-sm">👁️</span>
-                <span className="text-xs text-zinc-500 uppercase font-medium">Imp</span>
-              </div>
+          {/* IMP */}
+          <div className="flex-shrink-0">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-sm">👁️</span>
+              <span className="text-xs text-zinc-500 uppercase font-medium">Imp</span>
+            </div>
+            <div className="w-[120px]">
               <StepperNumberField
                 label=""
                 value={maxImpressions}
@@ -287,13 +290,15 @@ const FilterBar = memo(function FilterBar({ onApplyFilter, onSync, loading, init
                 bigStep={100}
               />
             </div>
+          </div>
 
-            {/* VIEWS */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-sm">📊</span>
-                <span className="text-xs text-zinc-500 uppercase font-medium">Views</span>
-              </div>
+          {/* VIEWS */}
+          <div className="flex-shrink-0">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-sm">📊</span>
+              <span className="text-xs text-zinc-500 uppercase font-medium">Views</span>
+            </div>
+            <div className="w-[120px]">
               <StepperNumberField
                 label=""
                 value={maxViews}
@@ -306,12 +311,12 @@ const FilterBar = memo(function FilterBar({ onApplyFilter, onSync, loading, init
           </div>
 
           {/* Reset Button */}
-          <div className="flex justify-end">
+          <div className="flex-shrink-0 flex items-end">
             <button
               type="button"
               onClick={handleReset}
               disabled={loading}
-              className="px-3 py-1.5 text-xs text-zinc-400 hover:text-white transition-all whitespace-nowrap"
+              className="px-3 py-1.5 text-xs text-zinc-400 hover:text-white transition-all whitespace-nowrap mb-0.5"
             >
               Reset
             </button>
