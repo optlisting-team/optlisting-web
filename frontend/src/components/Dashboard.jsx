@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { createPortal } from 'react-dom'
 import axios from 'axios'
 import { useStore } from '../contexts/StoreContext'
 import SummaryCard from './SummaryCard'
@@ -10,6 +11,7 @@ import HistoryTable from './HistoryTable'
 import HistoryView from './HistoryView'
 import QueueReviewPanel from './QueueReviewPanel'
 import { Button } from './ui/button'
+import { AlertCircle, X } from 'lucide-react'
 
 // Use environment variable for Railway URL, fallback based on environment
 // Priority: VITE_API_URL env var > Development (empty for Vite proxy) > Production (Railway URL)
@@ -136,6 +138,10 @@ function Dashboard() {
   // API Health Check State
   const [apiConnected, setApiConnected] = useState(false)
   const [apiError, setApiError] = useState(null)
+  
+  // Error Modal State
+  const [showErrorModal, setShowErrorModal] = useState(false)
+  const [errorModalMessage, setErrorModalMessage] = useState('')
   
   // User Credits & Plan State (from API)
   const [userCredits, setUserCredits] = useState(0)
@@ -666,17 +672,29 @@ function Dashboard() {
     } catch (err) {
       console.error('fetchAllListings error:', err)
       
+      let errorMessage = ''
+      
       if (err.response?.status === 401) {
-        setError('eBay not connected. Please connect your eBay account first.')
+        errorMessage = 'eBay 계정이 연결되지 않았습니다. eBay 계정을 먼저 연결해주세요.'
+        setError(errorMessage)
         setAllListings([])
       } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
-        setError('요청 시간이 초과되었습니다. 서버가 응답하지 않거나 네트워크가 느릴 수 있습니다. 잠시 후 다시 시도해주세요.')
+        errorMessage = '요청 시간이 초과되었습니다. 서버가 응답하지 않거나 네트워크가 느릴 수 있습니다. 잠시 후 다시 시도해주세요.'
+        setError(errorMessage)
         // Don't clear existing listings on timeout - keep what we have
       } else if (allListings.length === 0) {
-        setError(`제품 목록을 가져오는데 실패했습니다: ${err.message || '알 수 없는 오류'}. 다시 시도해주세요.`)
+        errorMessage = `제품 목록을 가져오는데 실패했습니다: ${err.message || '알 수 없는 오류'}. 다시 시도해주세요.`
+        setError(errorMessage)
       } else {
         // If we have existing listings, just log the error but don't show it prominently
         console.warn('Failed to refresh listings, but keeping existing data:', err)
+        errorMessage = `제품 목록을 새로고침하는데 실패했습니다: ${err.message || '알 수 없는 오류'}. 기존 데이터는 유지됩니다.`
+      }
+      
+      // Show error modal if there's an error message
+      if (errorMessage) {
+        setErrorModalMessage(errorMessage)
+        setShowErrorModal(true)
       }
     } finally {
       setLoading(false)
@@ -1376,6 +1394,61 @@ function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Error Modal */}
+      {showErrorModal && createPortal(
+        <div 
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowErrorModal(false)}
+        >
+          <div 
+            className="bg-zinc-900 border border-red-500/50 rounded-lg max-w-md w-full shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-6 border-b border-zinc-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="w-6 h-6 text-red-400" />
+                  <h3 className="text-xl font-bold text-white">제품 업로드 실패</h3>
+                </div>
+                <button
+                  onClick={() => setShowErrorModal(false)}
+                  className="text-zinc-400 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            
+            {/* Content */}
+            <div className="p-6">
+              <p className="text-sm text-zinc-300 mb-6 leading-relaxed">
+                {errorModalMessage}
+              </p>
+              
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowErrorModal(false)}
+                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors text-sm font-medium"
+                >
+                  닫기
+                </button>
+                <button
+                  onClick={() => {
+                    setShowErrorModal(false)
+                    fetchAllListings()
+                  }}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium"
+                >
+                  다시 시도
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }
