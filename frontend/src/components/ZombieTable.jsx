@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import SourceBadge from './SourceBadge'
 import PlatformBadge from './PlatformBadge'
 import { AlertTriangle, TrendingDown, Trash2, Eye, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Info } from 'lucide-react'
+import { normalizeImageUrl, getImageUrlFromListing } from '../utils/imageUtils'
 
 // Calculate Performance Score based on metrics
 // Lower score = Lower performance (Zombie)
@@ -163,7 +164,17 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
     })
   }, [zombies])
 
-  // Filter zombies based on search query
+  // Image statistics tracking
+  const imageStatsRef = useRef({
+    total: 0,
+    withImageUrl: 0,
+    withoutImageUrl: 0,
+    loadFailed: 0,
+    loadSuccess: 0,
+    failedUrls: []
+  })
+
+  // Filter zombies based on search query and normalize image URLs
   const filteredZombies = useMemo(() => {
     let filtered = processedZombies
     
@@ -177,6 +188,49 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
         
         return title.includes(query) || sku.includes(query) || itemId.includes(query)
       })
+    }
+    
+    // Normalize image URLs and collect statistics
+    const stats = {
+      total: filtered.length,
+      withImageUrl: 0,
+      withoutImageUrl: 0
+    }
+    
+    filtered = filtered.map(zombie => {
+      const normalizedUrl = getImageUrlFromListing(zombie)
+      if (normalizedUrl) {
+        stats.withImageUrl++
+      } else {
+        stats.withoutImageUrl++
+      }
+      
+      return {
+        ...zombie,
+        _normalizedImageUrl: normalizedUrl, // Store normalized URL for rendering
+        _originalImageUrl: zombie.image_url || zombie.picture_url || zombie.thumbnail_url // Keep original for debugging
+      }
+    })
+    
+    // Log statistics
+    if (stats.total > 0) {
+      console.log('📊 Image URL Statistics:', {
+        total: stats.total,
+        withImageUrl: stats.withImageUrl,
+        withoutImageUrl: stats.withoutImageUrl,
+        percentageWithImage: ((stats.withImageUrl / stats.total) * 100).toFixed(1) + '%'
+      })
+    }
+    
+    // Update ref for error tracking
+    imageStatsRef.current = {
+      ...imageStatsRef.current,
+      total: stats.total,
+      withImageUrl: stats.withImageUrl,
+      withoutImageUrl: stats.withoutImageUrl,
+      loadFailed: 0, // Reset on new render
+      loadSuccess: 0,
+      failedUrls: []
     }
     
     // Apply sorting
@@ -608,20 +662,76 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                   </td>
                   <td className="px-2 py-4">
                     {/* Thumbnail image (visual confirmation for zombie SKU report) */}
-                    {(zombie.image_url || zombie.picture_url || zombie.thumbnail_url) ? (
-                      <img 
-                        src={zombie.image_url || zombie.picture_url || zombie.thumbnail_url} 
-                        alt={zombie.title || 'Product thumbnail'}
-                        className="w-12 h-12 object-cover rounded border border-zinc-700"
-                        onError={(e) => {
-                          // Display placeholder if image load fails
-                          console.warn('Image load failed:', zombie.image_url || zombie.picture_url || zombie.thumbnail_url)
-                          e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="48" height="48"%3E%3Crect width="48" height="48" fill="%23171717"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23717171" font-size="10"%3ENo Image%3C/text%3E%3C/svg%3E'
-                        }}
-                      />
+                    {zombie._normalizedImageUrl ? (
+                      <div className="relative group">
+                        <img 
+                          src={zombie._normalizedImageUrl} 
+                          alt={zombie.title || 'Product thumbnail'}
+                          className="w-12 h-12 object-cover rounded border border-zinc-700"
+                          onError={(e) => {
+                            // Track failed image load
+                            imageStatsRef.current.loadFailed++
+                            imageStatsRef.current.failedUrls.push({
+                              itemId: zombie.ebay_item_id || zombie.item_id || 'N/A',
+                              sku: zombie.sku || 'N/A',
+                              title: zombie.title?.substring(0, 50) || 'N/A',
+                              originalUrl: zombie._originalImageUrl,
+                              normalizedUrl: zombie._normalizedImageUrl,
+                              errorType: 'load_failed'
+                            })
+                            
+                            // Log detailed error
+                            console.error('❌ Image load failed:', {
+                              itemId: zombie.ebay_item_id || zombie.item_id,
+                              sku: zombie.sku,
+                              title: zombie.title?.substring(0, 50),
+                              originalUrl: zombie._originalImageUrl,
+                              normalizedUrl: zombie._normalizedImageUrl,
+                              errorType: 'load_failed'
+                            })
+                            
+                            // Display placeholder
+                            e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="48" height="48"%3E%3Crect width="48" height="48" fill="%23171717"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23717171" font-size="10"%3ENo Image%3C/text%3E%3C/svg%3E'
+                            
+                            // Log summary after a delay to allow all errors to accumulate
+                            setTimeout(() => {
+                              if (imageStatsRef.current.loadFailed > 0) {
+                                console.log('📊 Image Load Summary:', {
+                                  total: imageStatsRef.current.total,
+                                  withImageUrl: imageStatsRef.current.withImageUrl,
+                                  withoutImageUrl: imageStatsRef.current.withoutImageUrl,
+                                  loadFailed: imageStatsRef.current.loadFailed,
+                                  loadSuccess: imageStatsRef.current.loadSuccess,
+                                  failedUrls: imageStatsRef.current.failedUrls.slice(0, 5) // Show first 5 failures
+                                })
+                              }
+                            }, 1000)
+                          }}
+                          onLoad={() => {
+                            imageStatsRef.current.loadSuccess++
+                          }}
+                          data-debug-url={import.meta.env.DEV ? zombie._normalizedImageUrl : undefined}
+                        />
+                        {/* Debug tooltip in dev mode */}
+                        {import.meta.env.DEV && (
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 max-w-xs truncate">
+                            {zombie._normalizedImageUrl}
+                          </div>
+                        )}
+                      </div>
                     ) : (
-                      <div className="w-12 h-12 bg-zinc-800 border border-zinc-700 rounded flex items-center justify-center">
+                      <div className="w-12 h-12 bg-zinc-800 border border-zinc-700 rounded flex items-center justify-center relative group">
                         <span className="text-[8px] text-zinc-500">No Image</span>
+                        {/* Badge for no image */}
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+                          <span className="text-[6px] text-white">!</span>
+                        </div>
+                        {/* Debug tooltip in dev mode */}
+                        {import.meta.env.DEV && zombie._originalImageUrl && (
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 max-w-xs truncate">
+                            Original (invalid): {zombie._originalImageUrl}
+                          </div>
+                        )}
                       </div>
                     )}
                   </td>
