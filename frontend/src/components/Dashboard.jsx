@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import { useStore } from '../contexts/StoreContext'
@@ -107,39 +107,17 @@ function Dashboard() {
   const { selectedStore } = useStore()
   const [searchParams] = useSearchParams()
   const viewParam = searchParams.get('view')
-  // Store connection state
+  // Client state only
   const [isStoreConnected, setIsStoreConnected] = useState(false)
-  // Ref to prevent duplicate execution
-  const listingsLoadedOnceRef = useRef(false)
-  // AbortController to cancel previous fetchAllListings calls
-  const fetchAbortControllerRef = useRef(null)
-  // Debug HUD: Last fetch time
-  const [lastFetchAt, setLastFetchAt] = useState(null)
-  
-  // DEMO_MODE initial data setup - set to 0 before store connection
-  const [zombies, setZombies] = useState([]) // Start empty, populate after filter
-  const [allListings, setAllListings] = useState([]) // Start empty, populate after store connection
-  const [totalZombies, setTotalZombies] = useState(0) // Start at 0, update after filter
-  const [totalListings, setTotalListings] = useState(0) // Start at 0, update after store connection
-  const [totalBreakdown, setTotalBreakdown] = useState(DEMO_MODE ? { Amazon: 30, Walmart: 20, 'Home Depot': 15, AliExpress: 15, Costway: 10, 'CJ Dropshipping': 5, Banggood: 5 } : { Amazon: 0, Walmart: 0, Unknown: 0 })
-  const [platformBreakdown, setPlatformBreakdown] = useState(DEMO_MODE ? { eBay: 100 } : { eBay: 0, Amazon: 0, Shopify: 0, Walmart: 0 })
-  const [zombieBreakdown, setZombieBreakdown] = useState(DEMO_MODE ? { Amazon: 5, Walmart: 3, 'Home Depot': 1, AliExpress: 1, Costway: 1, Unknown: 1 } : {})
+  const [allListings, setAllListings] = useState([])
+  const [zombies, setZombies] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [selectedIds, setSelectedIds] = useState([])
   const [queue, setQueue] = useState([])
-  const [viewMode, setViewModeRaw] = useState('total') // Always start with statistics view (zombie banner emphasized)
+  const [viewMode, setViewModeRaw] = useState('total')
   
-  // Wrap setViewMode to log all changes
-  const setViewMode = (next) => {
-    const from = viewMode
-    console.log('[setViewMode]', { 
-      from, 
-      to: next, 
-      stack: new Error().stack.split('\n').slice(1, 4).join('\n') // Top 3 stack frames only
-    })
-    setViewModeRaw(next)
-  }
+  const setViewMode = setViewModeRaw
   const [historyLogs, setHistoryLogs] = useState(DEMO_MODE ? [
     { id: '1', title: 'Wireless Earbuds TWS - Model X1', sku: 'B012345678', supplier: 'Amazon', price: 29.99, deleted_at: '2024-12-05T10:30:00Z', reason: 'Zero sales in 30 days' },
     { id: '2', title: 'LED Strip Lights RGB', sku: 'WM87654321', supplier: 'Walmart', price: 15.99, deleted_at: '2024-12-05T09:15:00Z', reason: 'Low impressions' },
@@ -166,16 +144,46 @@ function Dashboard() {
   const [connectedStoresCount, setConnectedStoresCount] = useState(1)
   
   const [filters, setFilters] = useState({
-    marketplace_filter: 'eBay',  // MVP Scope: Default to eBay (only eBay and Shopify supported)
-    analytics_period_days: 7,    // 1. Analysis period in days (default: 7 days)
-    min_days: 7,                 // Legacy compatibility
-    max_sales: 0,                // 2. Maximum sales count in period (default: 0)
-    max_watches: 0,              // 3. Maximum watch count (default: 0)
-    max_watch_count: 0,          // Legacy compatibility
-    max_impressions: 100,        // 4. Maximum impressions (default: less than 100)
-    max_views: 10,               // 5. Maximum views (default: less than 10)
+    marketplace_filter: 'eBay',
+    analytics_period_days: 7,
+    min_days: 7,
+    max_sales: 0,
+    max_watches: 0,
+    max_watch_count: 0,
+    max_impressions: 100,
+    max_views: 10,
     supplier_filter: 'All'
   })
+
+  // Derived values only (no duplicate state)
+  const totalListings = useMemo(() => allListings.length, [allListings])
+  const totalZombies = useMemo(() => zombies.length, [zombies])
+  
+  const totalBreakdown = useMemo(() => {
+    const breakdown = {}
+    allListings.forEach(item => {
+      const supplier = item.supplier || item.supplier_name || 'Unknown'
+      breakdown[supplier] = (breakdown[supplier] || 0) + 1
+    })
+    return breakdown
+  }, [allListings])
+  
+  const platformBreakdown = useMemo(() => ({ eBay: allListings.length }), [allListings])
+  
+  const zombieBreakdown = useMemo(() => {
+    const breakdown = {}
+    zombies.forEach(item => {
+      const supplier = item.supplier || item.supplier_name || 'Unknown'
+      breakdown[supplier] = (breakdown[supplier] || 0) + 1
+    })
+    return breakdown
+  }, [zombies])
+
+  // Derived: filtered listings (100% local)
+  const filteredListings = useMemo(() => {
+    if (viewMode !== 'zombies' || zombies.length === 0) return allListings
+    return zombies
+  }, [viewMode, allListings, zombies])
   
   // API Health Check - Check connection on mount
   const checkApiHealth = async () => {
@@ -186,7 +194,6 @@ function Dashboard() {
             'Content-Type': 'application/json',
           },
         })
-      })
       if (response.status === 200) {
         setApiConnected(true)
         setApiError(null)
@@ -536,537 +543,124 @@ function Dashboard() {
     return Math.max(0, Math.min(score, 100))
   }
 
-  const fetchZombies = async (filterParams = filters) => {
-    try {
-      setLoading(true)
-      
-      // Demo Mode: Use dummy data
-      if (DEMO_MODE) {
-        await new Promise(resolve => setTimeout(resolve, 800))
-        
-        const maxSales = filterParams.max_sales || 0
-        const maxWatches = filterParams.max_watches || 0
-        const maxImpressions = filterParams.max_impressions || 100
-        const maxViews = filterParams.max_views || 10
-        
-        const filteredZombies = DUMMY_ZOMBIES.filter(z => 
-          z.total_sales <= maxSales &&
-          z.watch_count <= maxWatches &&
-          z.impressions < maxImpressions &&
-          z.views < maxViews
-        )
-        
-        setZombies(filteredZombies)
-        setTotalZombies(filteredZombies.length)
-        setLoading(false)
-        return
-      }
-      
-      // When "Find Low-Performing SKUs" button is clicked, call backend API to deduct credits
-      {
-        // Call backend /api/analyze endpoint (includes credit deduction)
-        try {
-          console.log('🔄 "Find Low-Performing SKUs" button clicked - calling backend /api/analyze and deducting credits')
-          const params = {
-            user_id: CURRENT_USER_ID,
-            store_id: selectedStore?.id,
-            marketplace: 'eBay',
-            analytics_period_days: filterParams.analytics_period_days || filterParams.min_days || 7,
-            min_days: filterParams.analytics_period_days || filterParams.min_days || 7,
-            max_sales: filterParams.max_sales || 0,
-            max_watches: filterParams.max_watches || filterParams.max_watch_count || 0,
-            max_watch_count: filterParams.max_watches || filterParams.max_watch_count || 0,
-            max_impressions: filterParams.max_impressions || 100,
-            max_views: filterParams.max_views || 10,
-            supplier_filter: filterParams.supplier_filter || 'All'
-          }
-          
-          const response = await axios.get(`${API_BASE_URL}/api/analyze`, { params })
-          setZombies(response.data.zombies || [])
-          setTotalZombies(response.data.zombie_count || 0)
-          setTotalListings(response.data.total_count || 0)
-          setTotalBreakdown(response.data.total_breakdown || {})
-          setPlatformBreakdown(response.data.platform_breakdown || { eBay: 0 })
-          setZombieBreakdown(response.data.zombie_breakdown || {})
-          
-          // Refresh credit balance
-          await fetchUserCredits()
-          setError(null)
-          setLoading(false)
-          return
-        } catch (analyzeErr) {
-          console.error('Backend /api/analyze call failed:', analyzeErr)
-          
-          // Handle insufficient credits error
-          if (analyzeErr.response?.status === 402) {
-            const errorDetail = analyzeErr.response?.data?.detail
-            const availableCredits = errorDetail?.available_credits || 0
-            const requiredCredits = errorDetail?.required_credits || 0
-            const message = errorDetail?.message || 'Insufficient credits.'
-            
-            const userMessage = `${message}\n\nRequired credits: ${requiredCredits}\nAvailable credits: ${availableCredits}\n\nWould you like to purchase credits?`
-            
-            if (confirm(userMessage)) {
-              window.location.href = '/#pricing'
-            }
-            
-            setError(`Insufficient credits: ${requiredCredits} credits required, but only ${availableCredits} credits available.`)
-            setLoading(false)
-            return
-          }
-          
-          setError(`Analysis failed: ${analyzeErr.message}`)
-          setLoading(false)
-          return
-        }
-      }
-      
-      // Local filtering only (PURE function on local data)
-      if (allListings.length > 0) {
-        const minDays = filterParams.analytics_period_days || filterParams.min_days || 7
-        const maxSales = filterParams.max_sales || 0
-        const maxWatches = filterParams.max_watches || filterParams.max_watch_count || 0
-        const maxImpressions = filterParams.max_impressions || 100
-        const maxViews = filterParams.max_views || 10
-        
-        const filteredZombies = allListings.filter(item => {
-          if ((item.days_listed || 0) < minDays) return false
-          if ((item.total_sales || item.quantity_sold || 0) > maxSales) return false
-          if ((item.watch_count || 0) > maxWatches) return false
-          if ((item.impressions || 0) > maxImpressions) return false
-          if ((item.view_count || item.views || 0) > maxViews) return false
-          return true
-        }).map(item => ({ ...item, is_zombie: true }))
-        
-        setZombies(filteredZombies)
-        setTotalZombies(filteredZombies.length)
-        setLoading(false)
-        return
-      }
-      
-      // No data available
+  // 100% local filtering - no network calls
+  const applyLocalFilter = (filterParams = filters) => {
+    if (allListings.length === 0) {
       setZombies([])
-      setTotalZombies(0)
-      setLoading(false)
-            supplierInfo = {
-              supplier_name: item.supplier_name,
-              supplier_id: item.supplier_id
-            }
-          } else {
-            // Extract supplier info on frontend (fallback)
-            supplierInfo = extractSupplierInfo(item.title, item.sku, item.image_url || item.picture_url || item.thumbnail_url)
-          }
-          
-          // Debug: Check supplier detection result
-          if (index < 3) { // Log only first 3 items
-            console.log(`🔍 Supplier detection for item ${index + 1}:`, {
-              title: item.title?.substring(0, 50),
-              sku: item.sku,
-              detected_supplier: supplierInfo.supplier_name,
-              detected_supplier_id: supplierInfo.supplier_id,
-              source: item.supplier_name ? 'backend' : 'frontend'
-            })
-          }
-          
-          const zombieScore = calculateZombieScore(item, filterParams)
-          
-          return {
-            id: item.item_id || `ebay-${index}`,
-            item_id: item.item_id || item.ebay_item_id,
-            ebay_item_id: item.ebay_item_id || item.item_id,
-            sell_item_id: item.sell_item_id || item.item_id || item.ebay_item_id, // Explicitly include Sell Item ID
-            title: item.title,
-            price: item.price,
-            sku: item.sku,
-            supplier: supplierInfo.supplier_name,
-            supplier_name: supplierInfo.supplier_name,
-            supplier_id: supplierInfo.supplier_id, // Add supplier_id
-            source: item.source || supplierInfo.supplier_name, // Add source field (prefer backend response, fallback to supplier_name)
-            total_sales: item.quantity_sold || 0,
-            quantity_sold: item.quantity_sold || 0,
-            watch_count: item.watch_count || 0,
-            view_count: item.view_count || 0,
-            views: item.view_count || 0,
-            impressions: item.impressions || 0,
-            days_listed: item.days_listed || 0,
-            start_time: item.start_time,
-            picture_url: item.picture_url, // Main image URL
-            thumbnail_url: item.thumbnail_url || item.picture_url, // Thumbnail image URL (for zombie SKU report)
-            image_url: item.image_url || item.picture_url || item.thumbnail_url, // Field for frontend compatibility
-            is_zombie: false, // Determined by filtering below
-            zombie_score: zombieScore,
-            recommendation: zombieScore <= 20 ? 'DELETE' : zombieScore <= 40 ? 'DELETE' : zombieScore <= 60 ? 'OPTIMIZE' : 'MONITOR'
-          }
-        })
-        
-        // Save all listings
-        setAllListings(transformedListings)
-        setTotalListings(transformedListings.length)
-        
-        // Calculate supplier breakdown
-        const supplierBreakdown = {}
-        transformedListings.forEach(item => {
-          supplierBreakdown[item.supplier] = (supplierBreakdown[item.supplier] || 0) + 1
-        })
-        setTotalBreakdown(supplierBreakdown)
-        setPlatformBreakdown({ eBay: transformedListings.length })
-        
-        // Apply zombie filtering
-        const minDays = filterParams.analytics_period_days || filterParams.min_days || 7
-        const maxSales = filterParams.max_sales || 0
-        const maxWatches = filterParams.max_watches || filterParams.max_watch_count || 0
-        const maxImpressions = filterParams.max_impressions || 100
-        const maxViews = filterParams.max_views || 10
-        
-        console.log('🔍 Filtering parameters:', { minDays, maxSales, maxWatches, maxImpressions, maxViews })
-        console.log(`📊 Before filtering: ${transformedListings.length} listings`)
-        
-        const filteredZombies = transformedListings.filter(item => {
-          // Listing period filter: only include items listed for minDays or more (exclude items less than 7 days)
-          // Example: if minDays=7, only include items with days_listed >= 7 (exclude items less than 7 days)
-          if ((item.days_listed || 0) < minDays) return false
-          // Sales filter: only items with maxSales or less (e.g., 0 or less)
-          if ((item.total_sales || item.quantity_sold || 0) > maxSales) return false
-          // Watch filter: only items with maxWatches or less (e.g., 0 or less)
-          if ((item.watch_count || 0) > maxWatches) return false
-          // Impressions filter: only items with maxImpressions or less (e.g., 100 or less)
-          if ((item.impressions || 0) > maxImpressions) return false
-          // Views filter: only items with maxViews or less (e.g., 10 or less)
-          if ((item.view_count || item.views || 0) > maxViews) return false
-          
-          return true
-        }).map(item => ({ ...item, is_zombie: true }))
-        
-        console.log(`🧟 After filtering: ${filteredZombies.length} zombies found`)
-        
-        console.log(`🧟 Found ${filteredZombies.length} zombie listings`)
-        
-        // Zombie supplier breakdown
-        const zombieSupplierBreakdown = {}
-        filteredZombies.forEach(item => {
-          zombieSupplierBreakdown[item.supplier] = (zombieSupplierBreakdown[item.supplier] || 0) + 1
-        })
-        setZombieBreakdown(zombieSupplierBreakdown)
-        
-        setZombies(filteredZombies)
-        setTotalZombies(filteredZombies.length)
-        
-        // Update all listings (refresh cache)
-        setAllListings(transformedListings)
-        setTotalListings(transformedListings.length)
-        
-        // Supplier breakdown already calculated above (line 782)
-        setTotalBreakdown(supplierBreakdown)
-        setPlatformBreakdown({ eBay: transformedListings.length })
-        
-        setError(null)
-        
-      } catch (ebayErr) {
-        console.error('eBay API Error:', ebayErr)
-        
-        // eBay not connected - guide user to connect
-        if (ebayErr.response?.status === 401) {
-          setError('eBay not connected. Please connect your eBay account first.')
-        } else {
-          setError(`Failed to fetch eBay listings: ${ebayErr.message}`)
-        }
-        
-        // Fallback: Try existing analyze endpoint (DB data)
-        try {
-          console.log('⚠️ Falling back to DB data...')
-      const params = {
-        user_id: CURRENT_USER_ID,
-            store_id: selectedStore?.id,
-            marketplace: 'eBay',
-            min_days: filterParams.analytics_period_days || filterParams.min_days || 7,
-        max_sales: filterParams.max_sales || 0,
-            max_watch_count: filterParams.max_watches || filterParams.max_watch_count || 0
-      }
-      
-      const response = await axios.get(`${API_BASE_URL}/api/analyze`, { params })
-          setZombies(response.data.zombies || [])
-          setTotalZombies(response.data.zombie_count || 0)
-      setTotalListings(response.data.total_count || 0)
-          setTotalBreakdown(response.data.total_breakdown || {})
-          setPlatformBreakdown(response.data.platform_breakdown || { eBay: 0 })
-          setZombieBreakdown(response.data.zombie_breakdown || {})
-          
-          // Refresh credit balance
-          await fetchUserCredits()
-        } catch (fallbackErr) {
-          console.error('Fallback also failed:', fallbackErr)
-          
-          // Handle insufficient credits error
-          if (fallbackErr.response?.status === 402) {
-            const errorDetail = fallbackErr.response?.data?.detail
-            const availableCredits = errorDetail?.available_credits || 0
-            const requiredCredits = errorDetail?.required_credits || 0
-            const message = errorDetail?.message || 'Insufficient credits.'
-            
-            const userMessage = `${message}\n\nRequired credits: ${requiredCredits}\nAvailable credits: ${availableCredits}\n\nWould you like to purchase credits?`
-            
-            if (confirm(userMessage)) {
-              // Navigate to credit purchase page (or open modal)
-              window.location.href = '/#pricing'
-            }
-            
-            setError(`Insufficient credits: ${requiredCredits} credits required, but only ${availableCredits} credits available.`)
-            return
-          }
-          
-          setError(`Failed to analyze listings: ${fallbackErr.message}`)
-        }
-      }
-      
-    } catch (err) {
-      // Handle insufficient credits error
-      if (err.response?.status === 402) {
-        const errorDetail = err.response?.data?.detail
-        const availableCredits = errorDetail?.available_credits || 0
-        const requiredCredits = errorDetail?.required_credits || 0
-        const message = errorDetail?.message || 'Insufficient credits.'
-        
-        const userMessage = `${message}\n\nRequired credits: ${requiredCredits}\nAvailable credits: ${availableCredits}\n\nWould you like to purchase credits?`
-        
-        if (confirm(userMessage)) {
-          // Navigate to credit purchase page (or open modal)
-          window.location.href = '/#pricing'
-        }
-        
-        setError(`Insufficient credits: ${requiredCredits} credits required, but only ${availableCredits} credits available.`)
-      } else {
-        setError('Failed to fetch low interest listings')
-        console.error(err)
-      }
-    } finally {
-      setLoading(false)
+      return
     }
+
+    const minDays = filterParams.analytics_period_days || filterParams.min_days || 7
+    const maxSales = filterParams.max_sales || 0
+    const maxWatches = filterParams.max_watches || filterParams.max_watch_count || 0
+    const maxImpressions = filterParams.max_impressions || 100
+    const maxViews = filterParams.max_views || 10
+    
+    const filteredZombies = allListings.filter(item => {
+      if ((item.days_listed || 0) < minDays) return false
+      if ((item.total_sales || item.quantity_sold || 0) > maxSales) return false
+      if ((item.watch_count || 0) > maxWatches) return false
+      if ((item.impressions || 0) > maxImpressions) return false
+      if ((item.view_count || item.views || 0) > maxViews) return false
+      return true
+    }).map(item => ({ ...item, is_zombie: true }))
+    
+    setZombies(filteredZombies)
   }
 
   // Handle store connection change
-  const handleStoreConnection = (connected, forceLoad = false) => {
-    const wasConnected = isStoreConnected
-    
-    // If status is the same and not force load, do nothing (prevent unnecessary re-execution)
-    if (connected === wasConnected && !forceLoad) {
-      console.log('⏭️ No eBay connection status change - skipping:', { wasConnected, connected, forceLoad })
-      return
-    }
-    
+  const handleStoreConnection = (connected) => {
     setIsStoreConnected(connected)
-    // Minimize logs - only output on status change (prevent duplicate logs)
-    if (wasConnected !== connected || forceLoad) {
-      console.log('🔄 eBay connection status changed:', { wasConnected, connected, forceLoad })
-    }
     
     // Clear data when disconnected
-    if (!connected && wasConnected) {
+    if (!connected) {
       setAllListings([])
-      setTotalListings(0)
       setZombies([])
-      setTotalZombies(0)
       setViewMode('total')
       setShowFilter(false)
-      return
-    }
-    
-    // Connected: Product loading is automatically handled in useEffect
-    // Here we only update status (prevent duplicate execution)
-    if (connected && (!wasConnected || forceLoad)) {
-      console.log('✅ eBay connected - status updated (listings will be auto-fetched in useEffect)', { wasConnected, forceLoad })
-      if (DEMO_MODE) {
-        setAllListings(DUMMY_ALL_LISTINGS)
-        setTotalListings(DUMMY_ALL_LISTINGS.length)
-        setViewMode('all')
-        setShowFilter(true)
-        listingsLoadedOnceRef.current = true
-      } else {
-        // In real API mode, useEffect automatically fetches, so here we only initialize ref
-        listingsLoadedOnceRef.current = false // Allow useEffect to fetch
-      }
+    } else if (DEMO_MODE) {
+      setAllListings(DUMMY_ALL_LISTINGS)
+      setViewMode('all')
+      setShowFilter(true)
     }
   }
 
+  // Called ONLY from: (1) OAuth success OR (2) handleSync
   const fetchAllListings = async () => {
-    // VERIFICATION LOG: Track call count
-    console.count("fetchAllListings")
-    
-    // Cancel previous request if still in flight
-    if (fetchAbortControllerRef.current) {
-      console.log('🛑 Cancelling previous fetchAllListings request')
-      fetchAbortControllerRef.current.abort()
-      fetchAbortControllerRef.current = null
-    }
-    
-    // Prevent duplicate execution: skip if already loading
-    if (loading) {
-      console.log('⏭️ fetchAllListings already running - skipping')
-      return
-    }
-    
-    // Create new AbortController for this request
-    const abortController = new AbortController()
-    fetchAbortControllerRef.current = abortController
-    
     try {
-      // Note: setLoading is managed by the caller
+      setLoading(true)
       setError(null)
       
-      // Demo Mode: Use dummy data
       if (DEMO_MODE) {
-        await new Promise(resolve => setTimeout(resolve, 500))
         setAllListings(DUMMY_ALL_LISTINGS)
-        setTotalListings(DUMMY_ALL_LISTINGS.length)
+        setViewMode('all')
+        setShowFilter(true)
         return
       }
       
-      // 🚀 Production Mode: Fetch from eBay API
-      try {
-        console.log('📦 Fetching all listings from eBay API...')
-        
-        const response = await axios.get(`${API_BASE_URL}/api/ebay/listings/active`, {
-          params: {
-            user_id: CURRENT_USER_ID,
-            page: 1,
-            entries_per_page: 200
-          },
-          signal: abortController.signal
-        })
-        
-        if (!response.data.success) {
-          throw new Error(response.data.error || 'Failed to fetch eBay listings')
-        }
-        
-        const allListingsFromEbay = response.data.listings || []
-        console.log(`[FETCH DONE] Received ${allListingsFromEbay.length} total listings from eBay`)
-        
-        // Transform listing data and detect suppliers
-        const transformedListings = allListingsFromEbay.map((item, index) => {
-          // Extract both supplier_name and supplier_id
-          const supplierInfo = extractSupplierInfo(item.title, item.sku, item.image_url || item.picture_url || item.thumbnail_url)
-          
-          return {
-            id: item.item_id || `ebay-${index}`,
-            item_id: item.item_id || item.ebay_item_id,
-            ebay_item_id: item.ebay_item_id || item.item_id,
-            sell_item_id: item.sell_item_id || item.item_id || item.ebay_item_id, // Explicitly include Sell Item ID
-            title: item.title,
-            price: item.price,
-            sku: item.sku,
-            supplier: supplierInfo.supplier_name,
-            supplier_name: supplierInfo.supplier_name,
-            supplier_id: supplierInfo.supplier_id, // Add supplier_id
-            source: item.source || supplierInfo.supplier_name, // Add source field (prefer backend response, fallback to supplier_name)
-            total_sales: item.quantity_sold || 0,
-            quantity_sold: item.quantity_sold || 0,
-            watch_count: item.watch_count || 0,
-            view_count: item.view_count || 0,
-            views: item.view_count || 0,
-            impressions: item.impressions || 0,
-            days_listed: item.days_listed || 0,
-            start_time: item.start_time,
-            picture_url: item.picture_url, // Main image URL
-            thumbnail_url: item.thumbnail_url || item.picture_url, // Thumbnail image URL (for zombie SKU report)
-            image_url: item.image_url || item.picture_url || item.thumbnail_url // Field for frontend compatibility
-          }
-        })
-        
-        console.log('📦 Starting product data setup', { 
-          count: transformedListings.length,
-          firstItem: transformedListings[0]?.title 
-        })
-        
-        // Set view mode immediately along with data setup (synchronously)
-        if (transformedListings.length > 0) {
-          // If data exists, always set view mode to 'all' (called before setAllListings)
-          setViewMode('all')
-          setShowFilter(true)
-          setAllListings(transformedListings)
-          setTotalListings(transformedListings.length)
-          setLastFetchAt(Date.now()) // Debug HUD: Record fetch success time
-          
-          // [FETCH DONE] State synchronization check log
-          console.log('[FETCH DONE] listings length:', transformedListings.length)
-          console.log('[FETCH DONE] Before setAllListings call:', {
-            allListingsLength: allListings.length,
-            totalListings: totalListings,
-            viewMode: viewMode,
-            isStoreConnected: isStoreConnected
-          })
-          
-          // Check again in next render cycle
-          setTimeout(() => {
-            console.log('[RENDER CHECK] State synchronization check:', {
-              allListingsLength: allListings.length,
-              totalListings: totalListings,
-              viewMode: viewMode,
-              isStoreConnected: isStoreConnected,
-              shouldShowProducts: viewMode === 'all' || (isStoreConnected && (allListings.length > 0 || totalListings > 0))
-            })
-          }, 100)
-        } else {
-          setAllListings(transformedListings)
-          setTotalListings(transformedListings.length)
-          console.warn('⚠️ transformedListings is empty')
-        }
-        
-        // Calculate supplier breakdown
-        const supplierBreakdown = {}
-        transformedListings.forEach(item => {
-          supplierBreakdown[item.supplier] = (supplierBreakdown[item.supplier] || 0) + 1
-        })
-        setTotalBreakdown(supplierBreakdown)
-        setPlatformBreakdown({ eBay: transformedListings.length })
-        
-        // View mode already set above, so here we only output log
-        if (transformedListings.length > 0) {
-          console.log('✅ fetchAllListings completed - product list will be displayed', { 
-            listingsCount: transformedListings.length
-          })
-        }
-        
-        setError(null)
-        // Note: setLoading(false) is managed by the caller
-        
-      } catch (ebayErr) {
-        // Treat AbortError as normal cancellation, not an error
-        if (ebayErr.name === 'AbortError' || ebayErr.code === 'ECONNABORTED') {
-          console.log('🛑 fetchAllListings aborted (normal cancellation)')
-          return // Exit early, finally block will handle setLoading(false)
-        }
-        
-        console.error('eBay API Error:', ebayErr)
-        
-        // eBay not connected (only 401 is treated as disconnection)
-        if (ebayErr.response?.status === 401) {
-          setError('eBay not connected. Please connect your eBay account first.')
-          setTotalListings(0)
-          setAllListings([])
-        } else {
-          // Keep existing data for network errors or other errors
-          console.log('⚠️ eBay API error - keeping existing data', {
-            error: ebayErr.message,
-            status: ebayErr.response?.status,
-            hasExistingData: allListings.length > 0
-          })
-          // Keep existing data and only show error
-          if (allListings.length === 0) {
-            setError('Failed to fetch listings. Please try again.')
-          }
-        }
+      const response = await axios.get(`${API_BASE_URL}/api/ebay/listings/active`, {
+        params: {
+          user_id: CURRENT_USER_ID,
+          page: 1,
+          entries_per_page: 200
+        },
+        timeout: 30000
+      })
+      
+      if (!response.data.success) {
+        throw new Error(response.data.error || 'Failed to fetch eBay listings')
       }
       
-    } catch (err) {
-      // Treat AbortError as normal cancellation
-      if (err.name === 'AbortError' || err.code === 'ECONNABORTED') {
-        return // Exit early, caller's finally block will handle setLoading(false)
+      const allListingsFromEbay = response.data.listings || []
+      
+      // Transform listing data and detect suppliers
+      const transformedListings = allListingsFromEbay.map((item, index) => {
+        const supplierInfo = extractSupplierInfo(item.title, item.sku, item.image_url || item.picture_url || item.thumbnail_url)
+        
+        return {
+          id: item.item_id || `ebay-${index}`,
+          item_id: item.item_id || item.ebay_item_id,
+          ebay_item_id: item.ebay_item_id || item.item_id,
+          sell_item_id: item.sell_item_id || item.item_id || item.ebay_item_id,
+          title: item.title,
+          price: item.price,
+          sku: item.sku,
+          supplier: supplierInfo.supplier_name,
+          supplier_name: supplierInfo.supplier_name,
+          supplier_id: supplierInfo.supplier_id,
+          source: item.source || supplierInfo.supplier_name,
+          total_sales: item.quantity_sold || 0,
+          quantity_sold: item.quantity_sold || 0,
+          watch_count: item.watch_count || 0,
+          view_count: item.view_count || 0,
+          views: item.view_count || 0,
+          impressions: item.impressions || 0,
+          days_listed: item.days_listed || 0,
+          start_time: item.start_time,
+          picture_url: item.picture_url,
+          thumbnail_url: item.thumbnail_url || item.picture_url,
+          image_url: item.image_url || item.picture_url || item.thumbnail_url
+        }
+      })
+      
+      if (transformedListings.length > 0) {
+        setViewMode('all')
+        setShowFilter(true)
       }
-      setError('Failed to fetch all listings')
+      
+      setAllListings(transformedListings)
+      setError(null)
+      
+    } catch (err) {
+      if (err.response?.status === 401) {
+        setError('eBay not connected. Please connect your eBay account first.')
+        setAllListings([])
+      } else if (allListings.length === 0) {
+        setError('Failed to fetch listings. Please try again.')
+      }
       console.error('fetchAllListings error:', err)
     } finally {
-      // Always clear abort controller ref
-      // Note: setLoading(false) is managed by the caller
-      fetchAbortControllerRef.current = null
+      setLoading(false)
     }
   }
 
@@ -1089,15 +683,10 @@ function Dashboard() {
     }
   }
 
-  // Function to open All Listings View (used when Active card is clicked, also used for auto-execution)
   const openAllListingsView = () => {
-    console.log('[openAllListingsView] Opening All Listings view')
     setViewMode('all')
-    setShowFilter(true) // Open filter panel
-    setSelectedIds([]) // Reset selection
-    
-    // Note: fetchAllListings() is only called from handleSync() or OAuth callback
-    // Do not auto-fetch here to prevent duplicate calls
+    setShowFilter(true)
+    setSelectedIds([])
   }
 
   const handleViewModeChange = (mode) => {
@@ -1114,28 +703,14 @@ function Dashboard() {
       // Statistical view - no data fetching needed
       return
     } else if (mode === 'all') {
-      // Apply same logic as openAllListingsView when switching to 'all' mode
       setShowFilter(true)
-      // Note: fetchAllListings() is only called from handleSync() or OAuth callback
-      // Do not auto-fetch here to prevent duplicate calls
       return
     } else if (mode === 'zombies') {
-      // When zombie card is clicked: use existing filtered results if available (don't re-filter)
-      // If no filtered results, filter again with current filters (local filtering only, no credit deduction)
+      // When zombie card is clicked: filter if needed
       if (zombies.length === 0 && allListings.length > 0) {
-        console.log('🔄 Zombie card clicked - executing local filtering (no credit deduction)')
-        fetchZombies(filters, false) // Only perform local filtering
-      } else {
-        console.log(`✅ Zombie card clicked - using existing filtered results (${zombies.length} items)`)
+        applyLocalFilter(filters)
       }
       return
-    } else if (mode === 'all') {
-      // Use openAllListingsView when Active card is clicked
-      openAllListingsView()
-      return
-    } else if (mode === 'zombies') {
-      // Show zombie listings (filter stays open for adjustment) - use cache
-      fetchZombies(filters, false)
     } else if (mode === 'history') {
       fetchHistory()
     }
@@ -1147,103 +722,16 @@ function Dashboard() {
   }
 
   const handleAnalyze = () => {
-    fetchZombies(filters)
+    applyLocalFilter(filters)
     setViewMode('zombies')
   }
 
-  const handleApplyFilter = async (newFilters) => {
-    console.log('🔍 handleApplyFilter called - Find Low-Performing SKUs button clicked')
-    console.log('📋 Received filters:', newFilters)
-    console.log('📊 Current state:', { totalListings, allListingsLength: allListings.length })
-    
+  // 100% local filter - no network calls
+  const handleApplyFilter = (newFilters) => {
     setFilters(newFilters)
-    setSelectedIds([]) // Reset selection when filters change
-    
-    // If no data in Active card, fetch first
-    // Note: fetchAllListings() is ONLY called after OAuth success
-    // Do not fetch here - use existing allListings data
-    let currentTotalListings = totalListings || allListings.length
-    
-    // Check total listings count from DB (for credit deduction basis)
-    if (currentTotalListings === 0) {
-      try {
-        const dbResponse = await axios.get(`${API_BASE_URL}/api/listings`, {
-          params: {
-            user_id: CURRENT_USER_ID,
-            skip: 0,
-            limit: 1
-          }
-        })
-        // Use total_count from response if available, otherwise use listings array length
-        currentTotalListings = dbResponse.data?.total_count || dbResponse.data?.listings?.length || 0
-        console.log(`✅ Total listings count confirmed from DB: ${currentTotalListings}`)
-      } catch (err) {
-        console.warn('⚠️ Failed to confirm listings count from DB, using default:', err)
-        currentTotalListings = 12 // Default value (minimum 1 credit deduction)
-      }
-    }
-    
-    // When "Find Low-Performing SKUs" button is clicked, always show credit deduction popup
-    // Even if using data already queried from Active card, credit deduction is required for analysis
-    try {
-      console.log('💰 Starting credit balance check...')
-      // Check credit balance
-      const creditsResponse = await axios.get(`${API_BASE_URL}/api/credits`, {
-        params: { user_id: CURRENT_USER_ID },
-        timeout: 30000 // Increased from 10s to 30s
-      })
-      
-      console.log('💰 Credit response:', creditsResponse.data)
-      
-      const availableCredits = creditsResponse.data?.available_credits || 0
-      // Deduct credits equal to the number of products being scanned
-      const requiredCredits = Math.max(1, currentTotalListings) // Minimum 1 credit
-      
-      console.log(`💰 Credit info: available=${availableCredits}, required=${requiredCredits} (scanning ${currentTotalListings} total listings)`)
-      
-      // Check if credits are insufficient
-      if (availableCredits < requiredCredits) {
-        console.log('⚠️ Insufficient credits - showing purchase guide popup')
-        const userMessage = `Insufficient credits.\n\nRequired credits: ${requiredCredits}\nAvailable credits: ${availableCredits}\n\nWould you like to purchase credits?`
-        
-        if (window.confirm(userMessage)) {
-          window.location.href = '/#pricing'
-        }
-        return
-      }
-      
-      // Credits sufficient - show confirmation popup
-      console.log('✅ Credits sufficient - showing confirmation popup')
-      const confirmMessage = `Would you like to start the analysis?\n\nRequired credits: ${requiredCredits} (scanning ${currentTotalListings} total listings)\nAvailable credits: ${availableCredits}\nBalance after deduction: ${availableCredits - requiredCredits}`
-      
-      console.log('💬 Confirmation popup message:', confirmMessage)
-      const userConfirmed = window.confirm(confirmMessage)
-      console.log(`👤 User confirmation: ${userConfirmed}`)
-      
-      if (userConfirmed) {
-        // Proceed with filtering after user confirmation (includes credit deduction, backend API call)
-        console.log('🚀 User confirmed - starting analysis')
-        await fetchZombies(newFilters)
-        setViewMode('zombies')
-      } else {
-        console.log('❌ User cancelled - analysis aborted')
-      }
-    } catch (err) {
-      console.error('❌ Credit check failed:', err)
-      console.error('❌ Error details:', err.response?.data || err.message)
-      
-      // Show confirmation popup even if credit check fails
-      const errorMessage = err.response?.data?.detail || err.message || 'Unknown error'
-      const userMessage = `Credit check failed.\n\nError: ${errorMessage}\n\nWould you like to continue? (Credit deduction will be attempted on backend)`
-      
-      if (window.confirm(userMessage)) {
-        console.log('🚀 User confirmed - continuing despite error')
-        await fetchZombies(newFilters)
-        setViewMode('zombies')
-      } else {
-        console.log('❌ User cancelled - aborted due to error')
-      }
-    }
+    setSelectedIds([])
+    applyLocalFilter(newFilters)
+    setViewMode('zombies')
   }
 
   const handleSelect = (id, checked) => {
@@ -1281,7 +769,6 @@ function Dashboard() {
     // Remove selected items from candidates (visually)
     setZombies(zombies.filter(z => !selectedIds.includes(z.id)))
     setSelectedIds([])
-    setTotalZombies(totalZombies - selectedItems.length)
     
     // Navigate directly to Queue view
     setViewMode('queue')
@@ -1299,11 +786,9 @@ function Dashboard() {
     
     // Add to zombies list
     setZombies([...zombies, ...markedItems])
-    setTotalZombies(totalZombies + markedItems.length)
     
     // Remove from all listings
     setAllListings(allListings.filter(item => !idsToMove.includes(item.id)))
-    setTotalListings(totalListings - markedItems.length)
     
     // Only clear selection if bulk action (not single item click)
     if (!itemIds) {
@@ -1323,26 +808,22 @@ function Dashboard() {
     // Remove from queue
     setQueue(queue.filter(q => !selectedIds.includes(q.id)))
     setSelectedIds([])
-    setTotalZombies(totalZombies + selectedItems.length)
   }
 
   const handleRemoveFromQueue = (id) => {
     setQueue(queue.filter(item => item.id !== id))
   }
 
+  // Sync: fetchAllListings + history (only network calls)
   const handleSync = async () => {
-    // Refresh zombies and history only - fetchAllListings() is ONLY called after OAuth success
     try {
       setLoading(true)
       await Promise.all([
-        fetchZombies(),
+        fetchAllListings(),
         fetchHistory().catch(err => console.error('History fetch error:', err))
       ])
     } catch (err) {
-      // AbortError is normal cancellation, ignore it
-      if (err.name !== 'AbortError' && err.code !== 'ECONNABORTED') {
-        console.error('Sync failed:', err)
-      }
+      console.error('Sync failed:', err)
     } finally {
       setLoading(false)
     }
@@ -1405,41 +886,16 @@ function Dashboard() {
     }
     
     if (ebayConnected === 'true') {
-      console.log('✅ OAuth callback successful - eBay connected')
-      
-      // Remove URL parameters (keep clean URL) - do this first
       window.history.replaceState({}, '', window.location.pathname)
-      
-      // Immediately update connection status
       setIsStoreConnected(true)
-      console.log('🔄 Setting connection status to true')
+      handleStoreConnection(true)
       
-      // Call handleStoreConnection callback to trigger data fetch and update SummaryCard
-      // Use setTimeout to ensure setIsStoreConnected state update is processed first
-      setTimeout(() => {
-        console.log('🔄 Triggering store connection callback after OAuth')
-        handleStoreConnection(true, true) // connected=true, forceLoad=true
-      }, 100)
-      
-      // Load products (after slight delay - consider time for token to be saved to DB)
-      // Force refresh since just connected - this is ONE of the two allowed call sites for fetchAllListings()
-      setTimeout(async () => {
-        console.log('📦 Starting product load after OAuth callback (force refresh)')
-        if (!DEMO_MODE) {
-          try {
-            setLoading(true)
-            await fetchAllListings()
-          } catch (err) {
-            // AbortError is normal cancellation, ignore it
-            if (err.name !== 'AbortError' && err.code !== 'ECONNABORTED') {
-              console.error('Product load failed:', err)
-            }
-          } finally {
-            setLoading(false)
-          }
-        }
-      }, 2000) // Reduced from 3s to 2s
-      
+      // Fetch listings after OAuth success (ONE of two call sites)
+      if (!DEMO_MODE) {
+        fetchAllListings().catch(err => {
+          console.error('Product load failed:', err)
+        })
+      }
     } else if (ebayError) {
       console.error('❌ OAuth callback error:', ebayError)
       const errorMessage = urlParams.get('message') || 'Failed to connect to eBay'
@@ -1449,92 +905,38 @@ function Dashboard() {
     }
   }, []) // Keep empty dependency array - only run on mount
   
-  // Force refresh event listener
-  // Note: No force refresh event listener - fetch only when user explicitly triggers
-
   // Initial Load - Check API health and fetch data (execute only once)
   useEffect(() => {
     const initializeDashboard = async () => {
-      // Step 1: Check API Health (only once on initial load)
       try {
         const isHealthy = await checkApiHealth()
         if (isHealthy) {
-          // Step 2: Fetch user credits
           await fetchUserCredits()
-          
-          // Step 3: Fetch history only (listings require store connection)
           fetchHistory().catch(err => {
             console.error('History fetch error on mount:', err)
           })
         }
       } catch (err) {
         console.warn('API Health Check failed (non-critical):', err)
-        // Even if health check fails, try to load credits and history
         await fetchUserCredits()
         fetchHistory().catch(err => {
           console.error('History fetch error on mount:', err)
         })
       }
-      
-      // Note: fetchAllListings() is ONLY called from OAuth callback or handleSync()
-      // No cache - fetch only when user explicitly triggers
     }
     
     initializeDashboard()
-    
-    // Remove periodic Health Check - prevent unnecessary API calls
-    // Token refresh is handled by background worker, so periodic check on frontend is unnecessary
   }, [])
   
-  // Fetch data when store is connected (handled by handleStoreConnection callback)
-  // This useEffect is removed - connection is managed via onConnectionChange prop
-
-  // If allListings has data and is connected, always switch to 'all' (forced)
-  // Note: This useEffect may duplicate openAllListingsView(), so
-  // order needs to be adjusted so openAllListingsView() runs first
-  useEffect(() => {
-    if (allListings.length > 0 && isStoreConnected) {
-      // If data exists and is connected, always switch to 'all' view mode (excluding zombies, queue)
-      // Skip if openAllListingsView() has already been executed
-      if (viewMode !== 'all' && viewMode !== 'zombies' && viewMode !== 'queue' && !openedAllListingsOnceRef.current) {
-        console.log('🔄 [FORCED] allListings data + connection detected - immediately switching view mode to "all"', {
-          listingsCount: allListings.length,
-          currentViewMode: viewMode,
-          isStoreConnected,
-          firstItem: allListings[0]?.title
-        })
-        // Use same logic as openAllListingsView()
-        openAllListingsView()
-      }
-    }
-  }, [allListings.length, isStoreConnected, viewMode])
-
-  // VERIFICATION LOG: Track loading state transitions
-  useEffect(() => {
-    console.log("loading:", loading)
-  }, [loading])
-
-  // Note: fetchAllListings() is ONLY called from OAuth callback or handleSync()
-  // No automatic fetching on connection change
-
   // Handle URL query param for view mode
   useEffect(() => {
-    // Guard: if listingsLength > 0, prevent initialization effect from changing viewMode
-    if (allListings.length > 0 || totalListings > 0) {
-      console.log('[URL PARAM] Skipping viewMode change because listings exist', {
-        viewParam,
-        allListingsLength: allListings.length,
-        totalListings: totalListings,
-        currentViewMode: viewMode
-      })
-      return
-    }
+    if (allListings.length > 0) return
     
     if (viewParam === 'history') {
       setViewMode('history')
       fetchHistory()
     }
-  }, [viewParam, allListings.length, totalListings, viewMode])
+  }, [viewParam, allListings.length])
 
   const handleExport = async (mode, itemsToExport = null) => {
     // Use provided items or default to full queue
@@ -1735,41 +1137,6 @@ function Dashboard() {
 
   return (
     <div className="font-sans bg-black dark:bg-black min-h-full">
-      {/* Debug HUD - Display directly on screen (temporary) */}
-      {(() => {
-        const forcedLen = Array.isArray(allListings) ? allListings.length : 0
-        const ebayConnected = isStoreConnected
-        return (
-          <pre style={{
-            position: 'fixed',
-            bottom: 12,
-            right: 12,
-            zIndex: 9999,
-            background: '#000',
-            color: '#0f0',
-            padding: 12,
-            fontSize: 12,
-            border: '1px solid #0f0',
-            borderRadius: 4,
-            maxWidth: 350,
-            overflow: 'auto',
-            maxHeight: 250
-          }}>
-            {JSON.stringify({
-              forcedLen: forcedLen,
-              ebayConnected: ebayConnected,
-              viewMode: viewMode,
-              selectedCard: 'N/A', // N/A if selectedCard is missing
-              listingsLoading: loading,
-              listingsLength: allListings.length,
-              totalListings: totalListings,
-              lastFetchAt: lastFetchAt ? new Date(lastFetchAt).toLocaleTimeString() : null,
-              shouldRenderTable: ebayConnected && forcedLen > 0
-            }, null, 2)}
-          </pre>
-        )
-      })()}
-      
       <div className="px-6">
         {/* Summary Card */}
         <SummaryCard 
@@ -1805,46 +1172,20 @@ function Dashboard() {
           filterContent={null}
         />
 
-        {/* FORCE render: Hide Ready to Analyze completely if ebayConnected && forcedLen > 0 */}
-        {(() => {
-          const forcedLen = Array.isArray(allListings) ? allListings.length : 0
-          const ebayConnected = isStoreConnected
-          
-          console.log('[READY TO ANALYZE CHECK]', {
-            ebayConnected,
-            forcedLen,
-            viewMode,
-            shouldHide: ebayConnected && forcedLen > 0
-          })
-          
-          // FORCE render condition: Hide Ready to Analyze completely if ebayConnected && forcedLen > 0
-          if (ebayConnected && forcedLen > 0) {
-            return null // Hide Ready to Analyze
-          }
-          
-          // Show Ready to Analyze if ebayConnected is false or forcedLen is 0
-          return (
-            <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg p-8 mt-8 text-center">
-              <p className="text-lg text-zinc-300 dark:text-zinc-300 mb-2">
-                📊 <strong className="text-white">Ready to Analyze</strong>
-              </p>
-              <p className="text-sm text-zinc-400 dark:text-zinc-400 mb-4">
-                {!ebayConnected 
-                  ? "Connect your eBay account to start analyzing your listings."
-                  : "No listings found. Please sync from eBay or check your connection."
-                }
-              </p>
-            </div>
-          )
-        })()}
-        
-        {/* Recommended render branch 2: listingsLoading -> Skeleton/Loading */}
-        {/* (loading state is handled in table area below) */}
-        
-        {/* Recommended render branch 3: listings.length === 0 -> Empty state */}
-        {/* (empty state is handled in table area below) */}
-        
-        {/* Recommended render branch 4: else -> Always render ListingsTable/ListingsGrid */}
+        {/* Empty state when not connected or no data */}
+        {!isStoreConnected || allListings.length === 0 ? (
+          <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg p-8 mt-8 text-center">
+            <p className="text-lg text-zinc-300 dark:text-zinc-300 mb-2">
+              📊 <strong className="text-white">Ready to Analyze</strong>
+            </p>
+            <p className="text-sm text-zinc-400 dark:text-zinc-400 mb-4">
+              {!isStoreConnected 
+                ? "Connect your eBay account to start analyzing your listings."
+                : "No listings found. Please sync from eBay or check your connection."
+              }
+            </p>
+          </div>
+        ) : null}
 
         {/* History View - Full Page */}
         {viewMode === 'history' && (
@@ -1855,22 +1196,8 @@ function Dashboard() {
           />
         )}
 
-        {/* FORCE rendering: Always render if ebayConnected && forcedLen > 0 (regardless of viewMode, excluding history only) */}
-        {(() => {
-          const forcedLen = Array.isArray(allListings) ? allListings.length : 0
-          const ebayConnected = isStoreConnected
-          const shouldRender = ebayConnected && forcedLen > 0 && viewMode !== 'history'
-          
-          console.log('[MAIN RENDER] Main render condition:', {
-            ebayConnected,
-            forcedLen,
-            viewMode,
-            shouldRender,
-            reason: !ebayConnected ? 'not connected' : forcedLen === 0 ? 'no data' : viewMode === 'history' ? 'history mode' : 'should render'
-          })
-          
-          return shouldRender
-        })() && (
+        {/* Main content - render if connected and has data (excluding history) */}
+        {isStoreConnected && allListings.length > 0 && viewMode !== 'history' && (
           <div className={`flex gap-8 transition-all duration-300 ${
             viewMode === 'all' ? '' : ''
           }`}>
@@ -1918,11 +1245,7 @@ function Dashboard() {
                   </span>
                 </div>
                 <button
-                  onClick={() => {
-                    setViewMode('all')
-                    // Note: fetchAllListings() is only called from handleSync() or OAuth callback
-                    // Do not auto-fetch here to prevent duplicate calls
-                  }}
+                  onClick={() => setViewMode('all')}
                   className="text-xs text-zinc-500 hover:text-white transition-colors"
                 >
                   ← Back to All Listings
@@ -1967,85 +1290,49 @@ function Dashboard() {
                     {error}
                   </div>
                 ) : (() => {
-                  // Maximize simplification: Always render table if isStoreConnected && allListings.length > 0 (regardless of viewMode)
-                  const ebayConnected = isStoreConnected
-                  const hasData = Array.isArray(allListings) && allListings.length > 0
-                  
-                  console.log('[RENDER CHECK] Final check:', {
-                    ebayConnected,
-                    hasData,
-                    allListingsLength: allListings.length,
-                    viewMode,
-                    shouldRenderTable: ebayConnected && hasData
-                  })
-                  
-                  // Force rendering: Always render table if ebayConnected && hasData (regardless of viewMode)
-                  if (ebayConnected && hasData) {
-                    // Select data based on viewMode (use allListings if not zombies mode)
-                    const tableData = (viewMode === 'zombies' && zombies.length > 0) ? zombies : allListings
+                  if (isStoreConnected && allListings.length > 0) {
+                    const tableData = filteredListings
                     
                     return (
                       <div className="p-6">
-                        {/* FORCE_RENDER debug display */}
-                        <div style={{ marginBottom: 12, color: '#0f0', fontSize: 12, padding: 8, background: '#000', borderRadius: 4, border: '1px solid #0f0' }}>
-                          ✅ RENDERED: ebayConnected={String(ebayConnected)} dataLength={tableData.length} viewMode={viewMode}
-                        </div>
-                        
-                        {/* Filter Summary Banner - Only show for zombies view */}
                         {viewMode === 'zombies' && tableData.length > 0 && (
-                        <div className="mb-6 p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg">
-                          <p className="text-base text-zinc-300">
-                            Low-Performing SKUs filtered by: No sales in the past{' '}
-                            <span className="font-bold text-white text-lg">{filters.analytics_period_days || filters.min_days || 7} days</span>
-                            {filters.max_views !== undefined && filters.max_views !== null && (
-                              <>
-                                , views ≤ <span className="font-bold text-white text-lg">{filters.max_views}</span>
-                              </>
-                            )}
-                            {filters.max_watches !== undefined && filters.max_watches !== null && (
-                              <>
-                                , watches ≤ <span className="font-bold text-white text-lg">{filters.max_watches}</span>
-                              </>
-                            )}
-                            {filters.max_impressions !== undefined && filters.max_impressions !== null && (
-                              <>
-                                , impressions ≤ <span className="font-bold text-white text-lg">{filters.max_impressions}</span>
-                              </>
-                            )}
-                            .
-                          </p>
-                        </div>
-                      )}
-                      <ZombieTable 
-                        zombies={tableData}
-                        selectedIds={selectedIds}
-                        onSelect={handleSelect}
-                        onSelectAll={handleSelectAll}
-                        onSourceChange={handleSourceChange}
-                        onAddToQueue={viewMode === 'zombies' ? handleAddToQueue : null}
-                        showAddToQueue={viewMode === 'zombies'}
-                        onMoveToZombies={viewMode === 'all' ? handleMoveToZombies : null}
-                        showMoveToZombies={viewMode === 'all'}
-                      />
-                    </div>
+                          <div className="mb-6 p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+                            <p className="text-base text-zinc-300">
+                              Low-Performing SKUs filtered by: No sales in the past{' '}
+                              <span className="font-bold text-white text-lg">{filters.analytics_period_days || filters.min_days || 7} days</span>
+                              {filters.max_views !== undefined && filters.max_views !== null && (
+                                <>, views ≤ <span className="font-bold text-white text-lg">{filters.max_views}</span></>
+                              )}
+                              {filters.max_watches !== undefined && filters.max_watches !== null && (
+                                <>, watches ≤ <span className="font-bold text-white text-lg">{filters.max_watches}</span></>
+                              )}
+                              {filters.max_impressions !== undefined && filters.max_impressions !== null && (
+                                <>, impressions ≤ <span className="font-bold text-white text-lg">{filters.max_impressions}</span></>
+                              )}
+                              .
+                            </p>
+                          </div>
+                        )}
+                        <ZombieTable 
+                          zombies={tableData}
+                          selectedIds={selectedIds}
+                          onSelect={handleSelect}
+                          onSelectAll={handleSelectAll}
+                          onSourceChange={handleSourceChange}
+                          onAddToQueue={viewMode === 'zombies' ? handleAddToQueue : null}
+                          showAddToQueue={viewMode === 'zombies'}
+                          onMoveToZombies={viewMode === 'all' ? handleMoveToZombies : null}
+                          showMoveToZombies={viewMode === 'all'}
+                        />
+                      </div>
                     )
                   }
                   
-                  // Show message if not ebayConnected && hasData
-                  console.log('[RENDER CHECK] Table render skipped:', {
-                    ebayConnected,
-                    hasData,
-                    allListingsLength: allListings.length,
-                    reason: !ebayConnected ? 'not connected' : !hasData ? 'no data' : 'unknown'
-                  })
-                  
                   return (
                     <div className="p-8 text-center text-slate-500">
-                      {!ebayConnected 
+                      {!isStoreConnected 
                         ? "Connect your eBay account to start analyzing your listings."
-                        : !hasData
-                          ? "No listings found. Please sync from eBay or check your connection."
-                          : "Loading listings..."
+                        : "No listings found. Please sync from eBay or check your connection."
                       }
                     </div>
                   )
