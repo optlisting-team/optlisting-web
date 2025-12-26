@@ -641,6 +641,19 @@ function Dashboard() {
           item_id: firstItem.item_id,
           title: firstItem.title?.substring(0, 50)
         })
+        
+        // Check if image URLs are valid
+        const imageUrl = firstItem.image_url || firstItem.picture_url || firstItem.thumbnail_url
+        if (imageUrl) {
+          console.log('🔗 First item image URL (raw):', imageUrl)
+          // Try to create an image element to test if URL is valid
+          const testImg = new Image()
+          testImg.onload = () => console.log('✅ First item image URL is valid and loadable')
+          testImg.onerror = () => console.error('❌ First item image URL failed to load:', imageUrl)
+          testImg.src = imageUrl
+        } else {
+          console.warn('⚠️ First item has no image URL')
+        }
       }
       
       // Transform listing data and detect suppliers

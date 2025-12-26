@@ -33,11 +33,16 @@ export function normalizeImageUrl(url) {
 
   // Validate URL format
   try {
-    new URL(normalized)
+    const urlObj = new URL(normalized)
+    // Additional validation: check if it's a valid HTTP/HTTPS URL
+    if (!['http:', 'https:'].includes(urlObj.protocol)) {
+      console.warn('Invalid image URL protocol:', normalized)
+      return null
+    }
     return normalized
   } catch (e) {
     // Invalid URL format
-    console.warn('Invalid image URL format:', url)
+    console.warn('Invalid image URL format:', url, 'Error:', e.message)
     return null
   }
 }

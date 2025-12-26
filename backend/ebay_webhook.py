@@ -1460,8 +1460,9 @@ async def get_active_listings_trading_api(
         
         logger.info(f"✅ Retrieved {len(listings)} active listings (Page {page}/{total_pages})")
         
-        # 이미지가 없는 아이템들을 GetMultipleItems API로 배치 가져오기
-        listings_without_images = [l for l in listings if not (l.get("picture_url") or l.get("thumbnail_url") or l.get("image_url"))]
+        # 모든 아이템에 대해 GetMultipleItems API로 이미지 정보 가져오기
+        # GetMyeBaySelling은 이미지 정보를 포함하지 않으므로 모든 아이템에 대해 GetMultipleItems 호출
+        listings_without_images = listings  # 모든 아이템에 대해 이미지 가져오기
         
         if listings_without_images:
             logger.info(f"📷 Fetching images for {len(listings_without_images)} items without images using GetMultipleItems API...")
@@ -1545,7 +1546,7 @@ async def get_active_listings_trading_api(
                                     listing["picture_url"] = picture_url
                                     listing["thumbnail_url"] = thumbnail_url
                                     listing["image_url"] = picture_url or thumbnail_url
-                                    logger.info(f"   ✅ Image found for item {item_id}: {picture_url[:50]}...")
+                                    logger.info(f"   ✅ Image found for item {item_id}: {picture_url}")
                         else:
                             logger.warning(f"   ⚠️ GetMultipleItems API returned error for batch")
                     else:
