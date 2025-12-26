@@ -43,10 +43,11 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, loadi
   }, [])
 
   // eBay token status check function (manual call only)
+  // Returns: { isConnected: boolean, userId: string | null }
   const checkEbayTokenStatus = async () => {
     if (selectedStore?.platform !== 'eBay') {
       setCheckingConnection(false)
-      return
+      return { isConnected: false, userId: null }
     }
 
     try {
@@ -71,7 +72,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, loadi
       if (hasValidToken === currentConnected) {
         // Skip if state is the same (minimize logs)
         setCheckingConnection(false)
-        return
+        return { isConnected: hasValidToken, userId }
       }
       
       // Output log only when state changes (prevent repeated logs)
@@ -95,6 +96,9 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, loadi
       if (onConnectionChange) {
         onConnectionChange(hasValidToken)
       }
+      
+      setCheckingConnection(false)
+      return { isConnected: hasValidToken, userId }
     } catch (err) {
       // Handle timeout errors
       const isTimeout = err.code === 'ECONNABORTED' || err.message?.includes('timeout')
@@ -146,6 +150,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, loadi
       }
       
       setCheckingConnection(false)
+      return { isConnected: false, userId: null }
     }
   }
 
@@ -333,23 +338,23 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, loadi
               setCheckingConnection(true)
               
               // Check token status when connect button is clicked
-              await checkEbayTokenStatus()
+              const statusResult = await checkEbayTokenStatus()
               
-              // If already connected, query and display products (do not start OAuth)
-              if (selectedStore?.connected) {
+              // Use the result from API call instead of state (which may not be updated yet)
+              if (statusResult?.isConnected) {
                 console.log('✅ Already connected to eBay - starting product query')
                 // Notify parent component of connection status (trigger forced product query)
                 if (onConnectionChange) {
-                  // Cannot pass forceLoad flag, so call callback twice for forced load
-                  // First call to check status, second call for forced load
                   onConnectionChange(true, true) // forceLoad = true
                 }
+                setCheckingConnection(false)
                 return
               }
               
               // Start OAuth if not connected
               const oauthUrl = `${API_BASE_URL}/api/ebay/auth/start?user_id=${CURRENT_USER_ID}`
               console.log('🔗 Connect button clicked - starting OAuth')
+              // OAuth redirect will cause page reload, which is expected behavior
               window.location.href = oauthUrl
             }}
             className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold rounded-lg transition-all flex items-center gap-2 text-base shadow-lg hover:shadow-emerald-500/40 transform hover:scale-105 active:scale-95 cursor-pointer border-2 border-emerald-500/50"
