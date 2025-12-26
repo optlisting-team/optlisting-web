@@ -1460,16 +1460,103 @@ async def get_active_listings_trading_api(
         
         logger.info(f"✅ Retrieved {len(listings)} active listings (Page {page}/{total_pages})")
         
-        # 디버깅: 이미지 URL 통계
-        listings_with_images = sum(1 for l in listings if l.get("picture_url") or l.get("thumbnail_url") or l.get("image_url"))
-        listings_without_images = len(listings) - listings_with_images
-        logger.info(f"📊 Image statistics: {listings_with_images} with images, {listings_without_images} without images")
+        # 이미지가 없는 아이템들을 GetMultipleItems API로 배치 가져오기
+        listings_without_images = [l for l in listings if not (l.get("picture_url") or l.get("thumbnail_url") or l.get("image_url"))]
         
-        # 디버깅: 이미지가 없는 첫 번째 아이템 상세 로그
-        if listings_without_images > 0:
-            first_no_image = next((l for l in listings if not (l.get("picture_url") or l.get("thumbnail_url") or l.get("image_url"))), None)
-            if first_no_image:
-                logger.warning(f"⚠️ Sample item without image: ItemID={first_no_image.get('item_id')}, Title={first_no_image.get('title', '')[:50]}")
+        if listings_without_images:
+            logger.info(f"📷 Fetching images for {len(listings_without_images)} items without images using GetMultipleItems API...")
+            
+            # GetMultipleItems API는 최대 20개 아이템을 한 번에 가져올 수 있음
+            batch_size = 20
+            item_ids_to_fetch = [l["item_id"] for l in listings_without_images]
+            
+            for i in range(0, len(item_ids_to_fetch), batch_size):
+                batch_item_ids = item_ids_to_fetch[i:i + batch_size]
+                logger.info(f"   Fetching images for batch {i//batch_size + 1} ({len(batch_item_ids)} items)...")
+                
+                try:
+                    # GetMultipleItems XML Request
+                    item_ids_xml = "".join([f"<ItemID>{item_id}</ItemID>" for item_id in batch_item_ids])
+                    get_multiple_xml = f"""<?xml version="1.0" encoding="utf-8"?>
+<GetMultipleItemsRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+    <RequesterCredentials>
+        <eBayAuthToken>{access_token}</eBayAuthToken>
+    </RequesterCredentials>
+    {item_ids_xml}
+    <DetailLevel>ReturnAll</DetailLevel>
+    <IncludeItemSpecifics>true</IncludeItemSpecifics>
+</GetMultipleItemsRequest>"""
+                    
+                    get_multiple_headers = {
+                        "X-EBAY-API-SITEID": "0",
+                        "X-EBAY-API-COMPATIBILITY-LEVEL": "1225",
+                        "X-EBAY-API-CALL-NAME": "GetMultipleItems",
+                        "X-EBAY-API-IAF-TOKEN": access_token,
+                        "Content-Type": "text/xml"
+                    }
+                    
+                    get_multiple_response = requests.post(trading_url, headers=get_multiple_headers, data=get_multiple_xml, timeout=30)
+                    
+                    if get_multiple_response.status_code == 200:
+                        get_multiple_root = ET.fromstring(get_multiple_response.text)
+                        get_multiple_ns = {"ebay": "urn:ebay:apis:eBLBaseComponents"}
+                        
+                        # 에러 체크
+                        ack = get_multiple_root.find(".//ebay:Ack", get_multiple_ns)
+                        if ack is not None and ack.text == "Success":
+                            # 각 아이템의 이미지 정보 추출
+                            items = get_multiple_root.findall(".//ebay:Item", get_multiple_ns)
+                            
+                            for item in items:
+                                item_id = item.findtext("ebay:ItemID", "", get_multiple_ns)
+                                if not item_id:
+                                    continue
+                                
+                                # 해당 아이템 찾기
+                                listing = next((l for l in listings if l["item_id"] == item_id), None)
+                                if not listing:
+                                    continue
+                                
+                                # 이미지 URL 추출
+                                picture_url = ""
+                                thumbnail_url = ""
+                                
+                                # PictureDetails에서 PictureURL 찾기
+                                picture_details = item.find("ebay:PictureDetails", get_multiple_ns)
+                                if picture_details is not None:
+                                    picture_urls = picture_details.findall("ebay:PictureURL", get_multiple_ns)
+                                    if picture_urls and len(picture_urls) > 0:
+                                        picture_url = picture_urls[0].text.strip() if picture_urls[0].text else ""
+                                        thumbnail_url = picture_url
+                                        # 썸네일 크기로 변환
+                                        if "s-l" in thumbnail_url:
+                                            import re
+                                            thumbnail_url = re.sub(r's-l\d+', 's-l225', thumbnail_url)
+                                
+                                # GalleryURL 시도
+                                if not picture_url:
+                                    gallery_url = item.findtext("ebay:GalleryURL", "", get_multiple_ns)
+                                    if gallery_url and gallery_url.strip():
+                                        picture_url = gallery_url.strip()
+                                        thumbnail_url = gallery_url.strip()
+                                
+                                # 이미지 URL 업데이트
+                                if picture_url:
+                                    listing["picture_url"] = picture_url
+                                    listing["thumbnail_url"] = thumbnail_url
+                                    listing["image_url"] = picture_url or thumbnail_url
+                                    logger.info(f"   ✅ Image found for item {item_id}: {picture_url[:50]}...")
+                        else:
+                            logger.warning(f"   ⚠️ GetMultipleItems API returned error for batch")
+                    else:
+                        logger.warning(f"   ⚠️ GetMultipleItems API call failed: {get_multiple_response.status_code}")
+                except Exception as batch_err:
+                    logger.warning(f"   ⚠️ Error fetching images for batch: {batch_err}")
+        
+        # 디버깅: 이미지 URL 통계 (최종)
+        listings_with_images = sum(1 for l in listings if l.get("picture_url") or l.get("thumbnail_url") or l.get("image_url"))
+        listings_without_images_final = len(listings) - listings_with_images
+        logger.info(f"📊 Final image statistics: {listings_with_images} with images, {listings_without_images_final} without images")
         
         # 첫 번째 리스팅의 이미지 정보 로깅
         if listings and len(listings) > 0:
