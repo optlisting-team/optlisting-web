@@ -96,12 +96,21 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, loadi
         onConnectionChange(hasValidToken)
       }
     } catch (err) {
-      // Handle timeout errors quietly (server may be slow)
+      // Handle timeout errors
       const isTimeout = err.code === 'ECONNABORTED' || err.message?.includes('timeout')
       if (isTimeout) {
         console.warn('⏱️ eBay connection status check timeout (server response may be delayed)')
+        alert('서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요.')
       } else {
         console.error('Failed to check eBay token status:', err)
+        // Show user-friendly error message
+        if (err.response?.status === 0 || err.code === 'ERR_NETWORK') {
+          alert('네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.')
+        } else if (err.response?.status >= 500) {
+          alert('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
+        } else {
+          alert('연결 확인 중 오류가 발생했습니다. 다시 시도해주세요.')
+        }
       }
       
       // Maintain existing connection state even if error occurs (preserve data)

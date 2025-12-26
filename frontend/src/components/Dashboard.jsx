@@ -569,7 +569,7 @@ function Dashboard() {
   }
 
   // Handle store connection change
-  const handleStoreConnection = (connected) => {
+  const handleStoreConnection = (connected, forceLoad = false) => {
     setIsStoreConnected(connected)
     
     // Clear data when disconnected
@@ -578,10 +578,18 @@ function Dashboard() {
       setZombies([])
       setViewMode('total')
       setShowFilter(false)
-    } else if (DEMO_MODE) {
-      setAllListings(DUMMY_ALL_LISTINGS)
-      setViewMode('all')
-      setShowFilter(true)
+    } else {
+      // When connected, fetch listings if in demo mode or if forceLoad is true
+      if (DEMO_MODE) {
+        setAllListings(DUMMY_ALL_LISTINGS)
+        setViewMode('all')
+        setShowFilter(true)
+      } else if (forceLoad) {
+        // Fetch listings when connection is confirmed and forceLoad is true
+        fetchAllListings().catch(err => {
+          console.error('Failed to fetch listings after connection:', err)
+        })
+      }
     }
   }
 
