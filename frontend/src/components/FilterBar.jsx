@@ -194,10 +194,10 @@ const FilterBar = memo(function FilterBar({ onApplyFilter, onSync, loading, init
           </div>
         </div>
         
-        {/* Filters Row - Single Row Layout */}
-        <div className="flex items-end gap-3 mb-4 flex-wrap">
+        {/* Filters Row - Single Row Layout (Evenly Distributed) */}
+        <div className="flex items-end gap-4 mb-4 justify-between">
           {/* DAYS Filter with Presets */}
-          <div className="flex-shrink-0">
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1.5">
               <span className="text-sm">📅</span>
               <span className="text-xs text-zinc-500 uppercase font-medium">Days</span>
@@ -224,7 +224,7 @@ const FilterBar = memo(function FilterBar({ onApplyFilter, onSync, loading, init
               </div>
               
               {/* Stepper */}
-              <div className="w-[140px]">
+              <div className="flex-1 min-w-[140px]">
                 <StepperNumberField
                   label=""
                   value={analysisPeriod}
@@ -239,12 +239,12 @@ const FilterBar = memo(function FilterBar({ onApplyFilter, onSync, loading, init
           </div>
 
           {/* SALES */}
-          <div className="flex-shrink-0">
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1.5">
               <span className="text-sm">💰</span>
               <span className="text-xs text-zinc-500 uppercase font-medium">Sales</span>
             </div>
-            <div className="w-[120px]">
+            <div className="w-full max-w-[140px]">
               <StepperNumberField
                 label=""
                 value={maxSales}
@@ -257,12 +257,12 @@ const FilterBar = memo(function FilterBar({ onApplyFilter, onSync, loading, init
           </div>
 
           {/* WATCH */}
-          <div className="flex-shrink-0">
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1.5">
               <span className="text-sm">❤️</span>
               <span className="text-xs text-zinc-500 uppercase font-medium">Watch</span>
             </div>
-            <div className="w-[120px]">
+            <div className="w-full max-w-[140px]">
               <StepperNumberField
                 label=""
                 value={maxWatches}
@@ -275,12 +275,12 @@ const FilterBar = memo(function FilterBar({ onApplyFilter, onSync, loading, init
           </div>
 
           {/* IMP */}
-          <div className="flex-shrink-0">
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1.5">
               <span className="text-sm">👁️</span>
               <span className="text-xs text-zinc-500 uppercase font-medium">Imp</span>
             </div>
-            <div className="w-[120px]">
+            <div className="w-full max-w-[140px]">
               <StepperNumberField
                 label=""
                 value={maxImpressions}
@@ -293,12 +293,12 @@ const FilterBar = memo(function FilterBar({ onApplyFilter, onSync, loading, init
           </div>
 
           {/* VIEWS */}
-          <div className="flex-shrink-0">
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1.5">
               <span className="text-sm">📊</span>
               <span className="text-xs text-zinc-500 uppercase font-medium">Views</span>
             </div>
-            <div className="w-[120px]">
+            <div className="w-full max-w-[140px]">
               <StepperNumberField
                 label=""
                 value={maxViews}
