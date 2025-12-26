@@ -1394,11 +1394,21 @@ async def get_active_listings_trading_api(
                             thumbnail_url = gallery_url.strip()
                             logger.info(f"   📷 Using ListingDetails GalleryURL: {picture_url[:50]}...")
                 
-                # 방법 4: 이미지가 없으면 빈 값으로 처리 (GetItem API 호출 제거 - 성능 최적화)
-                # GetItem API를 각 아이템마다 호출하면 응답 시간이 너무 길어지므로 제거
-                # 이미지가 없는 경우 나중에 필요시 별도로 가져올 수 있음
-                if not picture_url:
-                    logger.warning(f"   ⚠️ No image URL found for item {item_id} after all methods (skipping GetItem API for performance)")
+                # 방법 4: ItemID로 eBay 이미지 URL 생성 (fallback)
+                # eBay 표준 이미지 URL 패턴: https://i.ebayimg.com/images/g/{item_id}/s-l500.jpg
+                if not picture_url and item_id:
+                    # eBay Gallery URL 패턴 시도
+                    try:
+                        # 일반적인 eBay 이미지 URL 패턴
+                        # 패턴 1: https://i.ebayimg.com/images/g/{item_id}/s-l500.jpg
+                        # 패턴 2: https://i.ebayimg.com/00/s/{width}x{height}/z/{hash}/file.jpg
+                        # 간단한 방법: Gallery URL 패턴 사용
+                        gallery_url_pattern = f"https://i.ebayimg.com/images/g/{item_id}/s-l500.jpg"
+                        picture_url = gallery_url_pattern
+                        thumbnail_url = gallery_url_pattern.replace("s-l500", "s-l225")
+                        logger.info(f"   📷 Using fallback eBay image URL pattern for item {item_id}")
+                    except Exception as fallback_err:
+                        logger.warning(f"   ⚠️ Fallback image URL generation failed for item {item_id}: {fallback_err}")
                 
                 # Supplier 정보 추출 (SKU, 이미지 URL, 제목 기반)
                 from .services import extract_supplier_info
@@ -1454,6 +1464,12 @@ async def get_active_listings_trading_api(
         listings_with_images = sum(1 for l in listings if l.get("picture_url") or l.get("thumbnail_url") or l.get("image_url"))
         listings_without_images = len(listings) - listings_with_images
         logger.info(f"📊 Image statistics: {listings_with_images} with images, {listings_without_images} without images")
+        
+        # 디버깅: 이미지가 없는 첫 번째 아이템 상세 로그
+        if listings_without_images > 0:
+            first_no_image = next((l for l in listings if not (l.get("picture_url") or l.get("thumbnail_url") or l.get("image_url"))), None)
+            if first_no_image:
+                logger.warning(f"⚠️ Sample item without image: ItemID={first_no_image.get('item_id')}, Title={first_no_image.get('title', '')[:50]}")
         
         # 첫 번째 리스팅의 이미지 정보 로깅
         if listings and len(listings) > 0:

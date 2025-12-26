@@ -631,6 +631,18 @@ function Dashboard() {
       const allListingsFromEbay = response.data.listings || []
       console.log(`✅ fetchAllListings: Successfully fetched ${allListingsFromEbay.length} listings`)
       
+      // Debug: Check first item's image URLs
+      if (allListingsFromEbay.length > 0) {
+        const firstItem = allListingsFromEbay[0]
+        console.log('🔍 First item image URLs:', {
+          image_url: firstItem.image_url,
+          picture_url: firstItem.picture_url,
+          thumbnail_url: firstItem.thumbnail_url,
+          item_id: firstItem.item_id,
+          title: firstItem.title?.substring(0, 50)
+        })
+      }
+      
       // Transform listing data and detect suppliers
       const transformedListings = allListingsFromEbay.map((item, index) => {
         const supplierInfo = extractSupplierInfo(item.title, item.sku, item.image_url || item.picture_url || item.thumbnail_url)
@@ -660,6 +672,22 @@ function Dashboard() {
           image_url: item.image_url || item.picture_url || item.thumbnail_url
         }
       })
+      
+      // Debug: Check image URLs in transformed listings
+      const listingsWithImages = transformedListings.filter(l => l.image_url || l.picture_url || l.thumbnail_url).length
+      const listingsWithoutImages = transformedListings.length - listingsWithImages
+      console.log(`📊 Image statistics: ${listingsWithImages} with images, ${listingsWithoutImages} without images`)
+      
+      if (listingsWithoutImages > 0) {
+        const firstNoImage = transformedListings.find(l => !(l.image_url || l.picture_url || l.thumbnail_url))
+        if (firstNoImage) {
+          console.warn('⚠️ Sample item without image:', {
+            item_id: firstNoImage.item_id,
+            title: firstNoImage.title?.substring(0, 50),
+            raw_data: allListingsFromEbay.find(item => item.item_id === firstNoImage.item_id)
+          })
+        }
+      }
       
       if (transformedListings.length > 0) {
         setViewMode('all')
