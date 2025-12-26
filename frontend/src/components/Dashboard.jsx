@@ -791,12 +791,32 @@ function Dashboard() {
     setViewMode('zombies')
   }
 
-  // 100% local filter - no network calls
-  const handleApplyFilter = (newFilters) => {
-    setFilters(newFilters)
-    setSelectedIds([])
-    applyLocalFilter(newFilters)
-    setViewMode('zombies')
+  // Apply filter with API refresh - fetch latest data before filtering
+  const handleApplyFilter = async (newFilters) => {
+    try {
+      console.log('🔍 handleApplyFilter: Fetching latest listings before applying filter...')
+      setLoading(true)
+      
+      // Fetch latest listings from API first
+      if (!DEMO_MODE && isStoreConnected) {
+        await fetchAllListings()
+      }
+      
+      // Then apply filter
+      setFilters(newFilters)
+      setSelectedIds([])
+      applyLocalFilter(newFilters)
+      setViewMode('zombies')
+    } catch (err) {
+      console.error('Failed to refresh listings before filtering:', err)
+      // Still apply filter even if refresh fails
+      setFilters(newFilters)
+      setSelectedIds([])
+      applyLocalFilter(newFilters)
+      setViewMode('zombies')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleSelect = (id, checked) => {
@@ -882,13 +902,15 @@ function Dashboard() {
   // Sync: fetchAllListings + history (only network calls)
   const handleSync = async () => {
     try {
+      console.log('🔄 handleSync: Refreshing listings from eBay API...')
       setLoading(true)
       await Promise.all([
         fetchAllListings(),
         fetchHistory().catch(err => console.error('History fetch error:', err))
       ])
+      console.log('✅ handleSync: Successfully refreshed listings')
     } catch (err) {
-      console.error('Sync failed:', err)
+      console.error('❌ Sync failed:', err)
     } finally {
       setLoading(false)
     }
