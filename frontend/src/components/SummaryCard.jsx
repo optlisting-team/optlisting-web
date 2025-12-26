@@ -92,10 +92,8 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, loadi
         setSelectedStore(prev => ({ ...prev, connected: hasValidToken }))
       }
       
-      // Notify parent component only when state changes
-      if (onConnectionChange) {
-        onConnectionChange(hasValidToken)
-      }
+      // Don't call onConnectionChange here - let the caller decide when to notify parent
+      // This prevents duplicate calls and allows caller to pass forceLoad flag
       
       setCheckingConnection(false)
       return { isConnected: hasValidToken, userId }
