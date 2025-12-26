@@ -586,6 +586,7 @@ function Dashboard() {
         setShowFilter(true)
       } else if (forceLoad) {
         // Fetch listings when connection is confirmed and forceLoad is true
+        console.log('🔄 handleStoreConnection: forceLoad=true, calling fetchAllListings()')
         fetchAllListings().catch(err => {
           console.error('Failed to fetch listings after connection:', err)
         })
@@ -593,9 +594,10 @@ function Dashboard() {
     }
   }
 
-  // Called ONLY from: (1) OAuth success OR (2) handleSync
+  // Called ONLY from: (1) OAuth success OR (2) handleSync OR (3) handleStoreConnection with forceLoad
   const fetchAllListings = async () => {
     try {
+      console.log('📦 fetchAllListings: Starting to fetch eBay listings...')
       setLoading(true)
       setError(null)
       
@@ -606,6 +608,7 @@ function Dashboard() {
         return
       }
       
+      console.log('📡 fetchAllListings: Calling API:', `${API_BASE_URL}/api/ebay/listings/active`)
       const response = await axios.get(`${API_BASE_URL}/api/ebay/listings/active`, {
         params: {
           user_id: CURRENT_USER_ID,
@@ -620,6 +623,7 @@ function Dashboard() {
       }
       
       const allListingsFromEbay = response.data.listings || []
+      console.log(`✅ fetchAllListings: Successfully fetched ${allListingsFromEbay.length} listings`)
       
       // Transform listing data and detect suppliers
       const transformedListings = allListingsFromEbay.map((item, index) => {
@@ -660,13 +664,20 @@ function Dashboard() {
       setError(null)
       
     } catch (err) {
+      console.error('fetchAllListings error:', err)
+      
       if (err.response?.status === 401) {
         setError('eBay not connected. Please connect your eBay account first.')
         setAllListings([])
+      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        setError('요청 시간이 초과되었습니다. 서버가 응답하지 않거나 네트워크가 느릴 수 있습니다. 잠시 후 다시 시도해주세요.')
+        // Don't clear existing listings on timeout - keep what we have
       } else if (allListings.length === 0) {
-        setError('Failed to fetch listings. Please try again.')
+        setError(`제품 목록을 가져오는데 실패했습니다: ${err.message || '알 수 없는 오류'}. 다시 시도해주세요.`)
+      } else {
+        // If we have existing listings, just log the error but don't show it prominently
+        console.warn('Failed to refresh listings, but keeping existing data:', err)
       }
-      console.error('fetchAllListings error:', err)
     } finally {
       setLoading(false)
     }
