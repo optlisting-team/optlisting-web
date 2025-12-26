@@ -17,7 +17,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL ||
 const CURRENT_USER_ID = 'default-user'
 
 // Store Selector Component
-function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
+function StoreSelector({ connectedStore, apiConnected, onConnectionChange, loading = false }) {
   const [isOpen, setIsOpen] = useState(false)
   const [stores, setStores] = useState(INITIAL_STORES)
   const [selectedStore, setSelectedStore] = useState(stores[0])
@@ -297,13 +297,13 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
         </div>
 
         {/* Connect / Disconnect / Connecting Button */}
-        {checkingConnection ? (
+        {checkingConnection || loading ? (
           <button 
             disabled
             className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold rounded-lg border-2 border-blue-500/50 transition-all flex items-center gap-2 text-base shadow-lg animate-pulse cursor-not-allowed"
           >
             <Loader2 className="w-5 h-5 animate-spin" />
-            <span>Connecting...</span>
+            <span>{loading ? 'Loading...' : 'Connecting...'}</span>
           </button>
         ) : selectedStore?.connected ? (
           <button 
@@ -319,6 +319,9 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange }) {
             onClick={async (e) => {
               e.preventDefault()
               e.stopPropagation()
+              
+              // Set loading state immediately when button is clicked
+              setCheckingConnection(true)
               
               // Check token status when connect button is clicked
               await checkEbayTokenStatus()
@@ -552,6 +555,7 @@ function SummaryCard({
         connectedStore={connectedStore}
         apiConnected={apiConnected}
         onConnectionChange={onConnectionChange}
+        loading={loading}
       />
 
       {/* Stats Row - 3 Columns: Flow visualization */}
