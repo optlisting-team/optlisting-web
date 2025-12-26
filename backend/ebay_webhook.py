@@ -1394,62 +1394,11 @@ async def get_active_listings_trading_api(
                             thumbnail_url = gallery_url.strip()
                             logger.info(f"   📷 Using ListingDetails GalleryURL: {picture_url[:50]}...")
                 
-                # 방법 4: ItemID로 eBay 이미지 URL 생성 (최후의 수단)
-                if not picture_url and item_id:
-                    # eBay 표준 이미지 URL 패턴: https://i.ebayimg.com/images/g/{item_id}/s-l500.jpg
-                    # 또는: https://i.ebayimg.com/00/s/{item_id}/z/{hash}/file.jpg
-                    # 간단한 방법: eBay Gallery URL 패턴 사용
-                    try:
-                        # eBay는 일반적으로 ItemID를 사용하여 이미지 URL을 생성할 수 있음
-                        # GetItem API를 호출하거나, 직접 URL 패턴 사용
-                        # 여기서는 GetItem API를 사용하여 이미지 정보 가져오기
-                        logger.info(f"   🔄 Attempting to fetch image via GetItem API for item {item_id}")
-                        
-                        # GetItem API 호출 (이미지 정보 포함)
-                        get_item_xml = f"""<?xml version="1.0" encoding="utf-8"?>
-<GetItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
-    <RequesterCredentials>
-        <eBayAuthToken>{access_token}</eBayAuthToken>
-    </RequesterCredentials>
-    <ItemID>{item_id}</ItemID>
-    <DetailLevel>ReturnAll</DetailLevel>
-    <IncludeItemSpecifics>true</IncludeItemSpecifics>
-</GetItemRequest>"""
-                        
-                        get_item_headers = {
-                            "X-EBAY-API-SITEID": "0",
-                            "X-EBAY-API-COMPATIBILITY-LEVEL": "1225",
-                            "X-EBAY-API-CALL-NAME": "GetItem",
-                            "X-EBAY-API-IAF-TOKEN": access_token,
-                            "Content-Type": "text/xml"
-                        }
-                        
-                        get_item_response = requests.post(trading_url, headers=get_item_headers, data=get_item_xml, timeout=30)
-                        
-                        if get_item_response.status_code == 200:
-                            get_item_root = ET.fromstring(get_item_response.text)
-                            get_item_ns = {"ebay": "urn:ebay:apis:eBLBaseComponents"}
-                            
-                            # GetItem 응답에서 이미지 추출
-                            get_item_picture_details = get_item_root.find(".//ebay:PictureDetails", get_item_ns)
-                            if get_item_picture_details is not None:
-                                get_item_picture_urls = get_item_picture_details.findall(".//ebay:PictureURL", get_item_ns)
-                                if get_item_picture_urls and len(get_item_picture_urls) > 0:
-                                    picture_url = get_item_picture_urls[0].text.strip()
-                                    thumbnail_url = picture_url
-                                    logger.info(f"   📷 Image found via GetItem API: {picture_url[:50]}...")
-                                else:
-                                    # GalleryURL 시도
-                                    get_item_gallery = get_item_root.findtext(".//ebay:GalleryURL", "", get_item_ns)
-                                    if get_item_gallery:
-                                        picture_url = get_item_gallery.strip()
-                                        thumbnail_url = get_item_gallery.strip()
-                                        logger.info(f"   📷 GalleryURL found via GetItem API: {picture_url[:50]}...")
-                    except Exception as get_item_err:
-                        logger.warning(f"   ⚠️ GetItem API call failed: {get_item_err}")
-                        # 최후의 수단: eBay 표준 이미지 URL 패턴 시도 (신뢰도 낮음)
-                        # 이 방법은 작동하지 않을 수 있지만 시도해봅니다
-                        logger.warning(f"   ⚠️ No image URL found for item {item_id} after all methods")
+                # 방법 4: 이미지가 없으면 빈 값으로 처리 (GetItem API 호출 제거 - 성능 최적화)
+                # GetItem API를 각 아이템마다 호출하면 응답 시간이 너무 길어지므로 제거
+                # 이미지가 없는 경우 나중에 필요시 별도로 가져올 수 있음
+                if not picture_url:
+                    logger.warning(f"   ⚠️ No image URL found for item {item_id} after all methods (skipping GetItem API for performance)")
                 
                 # Supplier 정보 추출 (SKU, 이미지 URL, 제목 기반)
                 from .services import extract_supplier_info

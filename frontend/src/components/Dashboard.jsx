@@ -615,7 +615,7 @@ function Dashboard() {
           page: 1,
           entries_per_page: 200
         },
-        timeout: 30000
+        timeout: 120000 // 120초로 증가 (백엔드가 여러 API 호출을 순차 처리하므로 시간이 필요)
       })
       
       if (!response.data.success) {
