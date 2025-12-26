@@ -598,9 +598,6 @@ function SummaryCard({
             </div>
           </div>
 
-
-      {/* Filter Panel Slot */}
-      {filterContent}
     </div>
   )
 }
