@@ -1,13 +1,13 @@
 import { useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { Bell, Search, RefreshCw, User, ChevronDown, Zap, CreditCard, ChevronRight } from 'lucide-react'
+import { Bell, Search, RefreshCw, User, ChevronDown, Zap } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useAccount } from '../contexts/AccountContext'
 
 function PageHeader() {
   const location = useLocation()
   const { user, isAuthenticated, signOut } = useAuth()
-  const { credits, plan, setShowPlanModal, setShowCreditModal } = useAccount()
+  const { credits, setShowCreditModal } = useAccount()
   const [currentTime, setCurrentTime] = useState(new Date())
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [showAuthMenu, setShowAuthMenu] = useState(false)
