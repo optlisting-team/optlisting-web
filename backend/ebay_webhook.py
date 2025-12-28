@@ -697,25 +697,40 @@ async def ebay_auth_callback(
             profile = db.query(Profile).filter(Profile.user_id == user_id).first()
             
             if not profile:
-                # 새 프로필 생성
-                profile = Profile(
-                    user_id=user_id,
-                    ebay_access_token=access_token,
-                    ebay_refresh_token=refresh_token,
-                    ebay_token_expires_at=token_expires_at,
-                    ebay_token_updated_at=token_updated_at,
-                    ebay_user_id=ebay_user_id  # eBay User ID 저장
-                )
-                db.add(profile)
+                # 새 프로필 생성 (free_tier_count 컬럼이 없어도 동작하도록 raw SQL 사용)
+                insert_query = text("""
+                    INSERT INTO profiles (user_id, ebay_access_token, ebay_refresh_token, 
+                                          ebay_token_expires_at, ebay_token_updated_at, ebay_user_id)
+                    VALUES (:user_id, :access_token, :refresh_token, :expires_at, :updated_at, :ebay_user_id)
+                """)
+                db.execute(insert_query, {
+                    "user_id": user_id,
+                    "access_token": access_token,
+                    "refresh_token": refresh_token,
+                    "expires_at": token_expires_at,
+                    "updated_at": token_updated_at,
+                    "ebay_user_id": ebay_user_id
+                })
                 logger.info(f"📝 Creating new profile for user: {user_id} (eBay User ID: {ebay_user_id})")
             else:
-                # 기존 프로필 업데이트
-                profile.ebay_access_token = access_token
-                profile.ebay_refresh_token = refresh_token
-                profile.ebay_token_expires_at = token_expires_at
-                profile.ebay_token_updated_at = token_updated_at
-                if ebay_user_id:  # eBay User ID가 있으면 업데이트
-                    profile.ebay_user_id = ebay_user_id
+                # 기존 프로필 업데이트 (free_tier_count 컬럼이 없어도 동작하도록 raw SQL 사용)
+                update_query = text("""
+                    UPDATE profiles
+                    SET ebay_access_token = :access_token,
+                        ebay_refresh_token = :refresh_token,
+                        ebay_token_expires_at = :expires_at,
+                        ebay_token_updated_at = :updated_at,
+                        ebay_user_id = :ebay_user_id
+                    WHERE user_id = :user_id
+                """)
+                db.execute(update_query, {
+                    "access_token": access_token,
+                    "refresh_token": refresh_token,
+                    "expires_at": token_expires_at,
+                    "updated_at": token_updated_at,
+                    "ebay_user_id": ebay_user_id,
+                    "user_id": user_id
+                })
                 logger.info(f"📝 Updating existing profile for user: {user_id} (eBay User ID: {ebay_user_id})")
             
             # 트랜잭션 커밋
@@ -729,9 +744,41 @@ async def ebay_auth_callback(
             db.close()
             db = None
             
-            # 새 세션으로 검증
+            # 새 세션으로 검증 (free_tier_count 컬럼이 없을 수 있으므로 안전하게 처리)
             db_verify = next(get_db())
-            profile_verify = db_verify.query(Profile).filter(Profile.user_id == user_id).first()
+            
+            # SQLAlchemy ORM 대신 필요한 컬럼만 선택하여 조회 (free_tier_count 없어도 동작)
+            from sqlalchemy import text, inspect
+            try:
+                # 먼저 ORM으로 시도 (컬럼이 있으면 정상 동작)
+                profile_verify = db_verify.query(Profile).filter(Profile.user_id == user_id).first()
+            except Exception as orm_err:
+                # ORM 실패 시 (free_tier_count 컬럼이 없을 수 있음) raw SQL 사용
+                logger.warning(f"⚠️ ORM query failed (possibly missing free_tier_count column), using raw SQL: {orm_err}")
+                query = text("""
+                    SELECT 
+                        id, user_id, ebay_access_token, ebay_refresh_token, 
+                        ebay_token_expires_at, ebay_token_updated_at, ebay_user_id
+                    FROM profiles
+                    WHERE user_id = :user_id
+                    LIMIT 1
+                """)
+                result = db_verify.execute(query, {"user_id": user_id})
+                row = result.fetchone()
+                if row:
+                    # Raw SQL 결과를 객체처럼 사용하기 위해 간단한 클래스 생성
+                    class ProfileVerify:
+                        def __init__(self, row):
+                            self.id = row[0]
+                            self.user_id = row[1]
+                            self.ebay_access_token = row[2]
+                            self.ebay_refresh_token = row[3]
+                            self.ebay_token_expires_at = row[4]
+                            self.ebay_token_updated_at = row[5]
+                            self.ebay_user_id = row[6] if len(row) > 6 else None
+                    profile_verify = ProfileVerify(row)
+                else:
+                    profile_verify = None
             
             if profile_verify and profile_verify.ebay_access_token:
                 logger.info(f"✅ Token verification: Access token exists in DB")
