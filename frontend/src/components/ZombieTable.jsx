@@ -2,98 +2,6 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import SourceBadge from './SourceBadge'
 import PlatformBadge from './PlatformBadge'
 import { AlertTriangle, TrendingDown, Trash2, Eye, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Info } from 'lucide-react'
-import { normalizeImageUrl, getImageUrlFromListing } from '../utils/imageUtils'
-
-// Image component with retry logic and loading state
-function ImageWithRetry({ src, alt, originalUrl, itemId, sku, title, onLoad, onError }) {
-  const [imageSrc, setImageSrc] = useState(src)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
-  const [retryCount, setRetryCount] = useState(0)
-  const imgRef = useRef(null)
-  const maxRetries = 2
-  
-  // Reset state when src changes
-  useEffect(() => {
-    setImageSrc(src)
-    setLoading(true)
-    setError(false)
-    setRetryCount(0)
-  }, [src])
-  
-  const placeholderSvg = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="48" height="48"%3E%3Crect width="48" height="48" fill="%23171717"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23717171" font-size="10"%3ENo Image%3C/text%3E%3C/svg%3E'
-  
-  const handleLoad = (e) => {
-    setLoading(false)
-    setError(false)
-    if (onLoad) onLoad()
-  }
-  
-  const handleError = (e) => {
-    setLoading(false)
-    
-    if (retryCount < maxRetries) {
-      // Retry with original URL (eBay images don't need cache busting)
-      setTimeout(() => {
-        setImageSrc(src) // Use original URL for retry
-        setRetryCount(prev => prev + 1)
-        setLoading(true)
-      }, 1000 * (retryCount + 1)) // 1s, 2s delays for retries
-    } else {
-      // Max retries reached, show placeholder
-      setError(true)
-      e.target.src = placeholderSvg
-      
-      if (onError) {
-        onError({
-          itemId: itemId || 'N/A',
-          sku: sku || 'N/A',
-          title: title?.substring(0, 50) || 'N/A',
-          originalUrl: originalUrl,
-          normalizedUrl: src,
-          errorType: 'load_failed_after_retries',
-          retryCount
-        })
-      }
-      
-      console.error('❌ Image load failed after retries:', {
-        itemId,
-        sku,
-        title: title?.substring(0, 50),
-        originalUrl,
-        normalizedUrl: src,
-        retryCount
-      })
-    }
-  }
-  
-  return (
-    <>
-      {loading && !error && (
-        <div className="w-12 h-12 bg-zinc-800 border border-zinc-700 rounded flex items-center justify-center absolute inset-0">
-          <div className="w-4 h-4 border-2 border-zinc-600 border-t-transparent rounded-full animate-spin" />
-        </div>
-      )}
-      <img 
-        ref={imgRef}
-        src={imageSrc}
-        alt={alt}
-        className={`w-12 h-12 object-cover rounded border border-zinc-700 ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-200`}
-        onLoad={handleLoad}
-        onError={handleError}
-        loading="eager"
-        data-debug-url={import.meta.env.DEV ? imageSrc : undefined}
-      />
-      {/* Debug tooltip in dev mode */}
-      {import.meta.env.DEV && !error && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 max-w-xs truncate">
-          {imageSrc}
-        </div>
-      )}
-    </>
-  )
-}
-
 // Calculate Performance Score based on metrics
 // Lower score = Lower performance (Zombie)
 // Higher score = Higher performance (Good)
@@ -272,17 +180,7 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
     })
   }, [zombies])
 
-  // Image statistics tracking
-  const imageStatsRef = useRef({
-    total: 0,
-    withImageUrl: 0,
-    withoutImageUrl: 0,
-    loadFailed: 0,
-    loadSuccess: 0,
-    failedUrls: []
-  })
-
-  // Filter zombies based on search query and normalize image URLs
+  // Filter zombies based on search query
   const filteredZombies = useMemo(() => {
     let filtered = processedZombies
     
@@ -593,9 +491,6 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                     <span>Platform</span>
                     {getSortIcon('platform')}
                   </div>
-                </th>
-                <th className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider w-16">
-                  <span>Image</span>
                 </th>
                 <th 
                   className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-24"
