@@ -531,15 +531,15 @@ function LandingPage() {
               transition={{ delay: 0.2 }}
               className="flex justify-center"
             >
-              {/* Credit Packs Only - Centered */}
-              <div className="max-w-md border-2 border-dashed border-amber-500/30 rounded-3xl p-6 bg-amber-500/5">
+              {/* Credit Packs Only - Centered, Larger Size */}
+              <div className="w-full max-w-2xl border-2 border-dashed border-amber-500/30 rounded-3xl p-8 md:p-10 bg-amber-500/5">
                   {/* Credit Pack Header */}
-                  <div className="text-center mb-4">
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-500/20 rounded-full">
-                      <span className="text-sm">💰</span>
-                      <span className="text-sm font-bold text-amber-400">CREDIT PACKS</span>
+                  <div className="text-center mb-6">
+                    <div className="inline-flex items-center gap-2 px-5 py-2 bg-amber-500/20 rounded-full">
+                      <span className="text-base">💰</span>
+                      <span className="text-base font-bold text-amber-400">CREDIT PACKS</span>
                     </div>
-                    <p className="text-zinc-400 text-xs mt-2">No subscription • Pay as you go</p>
+                    <p className="text-zinc-400 text-sm mt-3">No subscription • Pay as you go</p>
                   </div>
 
                   <motion.div
@@ -547,19 +547,19 @@ function LandingPage() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ delay: 0.25 }}
-                    className="max-w-xs mx-auto"
+                    className="max-w-lg mx-auto"
                   >
-                    <div className="bg-gradient-to-b from-amber-500/10 to-zinc-800/80 border-2 border-amber-500/40 rounded-2xl p-5 shadow-xl shadow-amber-500/10">
+                    <div className="bg-gradient-to-b from-amber-500/10 to-zinc-800/80 border-2 border-amber-500/40 rounded-2xl p-8 shadow-xl shadow-amber-500/10">
                     {/* Dropdown Selector */}
-                    <div className="mb-4">
+                    <div className="mb-6">
                       <div className="relative">
                         <button
                           onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                          className="w-full flex items-center justify-center gap-2 px-3 py-3 bg-zinc-900/80 border border-amber-500/30 rounded-xl text-white font-bold hover:border-amber-500/50 transition-all"
+                          className="w-full flex items-center justify-center gap-3 px-4 py-4 bg-zinc-900/80 border border-amber-500/30 rounded-xl text-white font-bold hover:border-amber-500/50 transition-all"
                         >
-                          <span className="text-lg font-black text-amber-400">${selectedPack.price}</span>
-                          <span className="text-sm text-zinc-300">({selectedPack.credits.toLocaleString()})</span>
-                          <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                          <span className="text-2xl font-black text-amber-400">${selectedPack.price}</span>
+                          <span className="text-base text-zinc-300">({selectedPack.credits.toLocaleString()})</span>
+                          <ChevronDown className={`w-5 h-5 text-zinc-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
                         </button>
 
                         {/* Dropdown Menu */}
@@ -590,31 +590,31 @@ function LandingPage() {
                       </div>
                     </div>
 
-                    {/* Selected Pack Display - Compact */}
-                    <div className="text-center mb-3 p-2 bg-amber-500/10 rounded-lg">
-                      <div className="flex items-center justify-center gap-2">
-                        <span className="text-2xl font-black text-white">{selectedPack.credits.toLocaleString()}</span>
-                        <span className="text-xs text-zinc-400">Credits</span>
+                    {/* Selected Pack Display */}
+                    <div className="text-center mb-5 p-4 bg-amber-500/10 rounded-lg">
+                      <div className="flex items-center justify-center gap-3">
+                        <span className="text-4xl font-black text-white">{selectedPack.credits.toLocaleString()}</span>
+                        <span className="text-base text-zinc-400">Credits</span>
                         {selectedPack.discount > 0 && (
-                          <span className="text-emerald-400 text-xs font-bold">-{selectedPack.discount}%</span>
+                          <span className="text-emerald-400 text-sm font-bold">-{selectedPack.discount}%</span>
                         )}
                       </div>
                     </div>
 
                     {/* 1 Credit = 1 Scan Notice */}
-                    <div className="text-center mb-3 py-1.5 px-2 bg-zinc-800/50 rounded-lg border border-zinc-700/50 whitespace-nowrap">
-                      <span className="text-xs text-zinc-400">💡</span>
-                      <span className="text-xs font-semibold text-amber-400"> 1 Credit = 1 Scan</span>
+                    <div className="text-center mb-5 py-3 px-4 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
+                      <span className="text-base text-zinc-400">💡</span>
+                      <span className="text-base font-semibold text-amber-400"> 1 Credit = 1 Scan</span>
                     </div>
 
                     {/* Features */}
-                    <div className="space-y-1.5 mb-3 text-xs">
-                      <div className="flex items-center gap-2">
-                        <Check className="w-3 h-3 text-amber-400" />
+                    <div className="space-y-3 mb-6 text-sm">
+                      <div className="flex items-center gap-3">
+                        <Check className="w-5 h-5 text-amber-400 flex-shrink-0" />
                         <span className="text-zinc-300">All Stores (We Support)</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Check className="w-3 h-3 text-emerald-400" />
+                      <div className="flex items-center gap-3">
+                        <Check className="w-5 h-5 text-emerald-400 flex-shrink-0" />
                         <span className="text-emerald-300">Never Expires ✨</span>
                       </div>
                     </div>
@@ -622,7 +622,7 @@ function LandingPage() {
                     {/* Purchase Button */}
                     <a
                       href={`https://optlisting.lemonsqueezy.com/checkout/${selectedPack.id}`}
-                      className="block w-full py-2.5 bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-white font-bold rounded-xl text-center text-sm transition-all"
+                      className="block w-full py-4 bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-white font-bold rounded-xl text-center text-base transition-all shadow-lg shadow-amber-500/20"
                     >
                       Get Credits — ${selectedPack.price}
                     </a>
