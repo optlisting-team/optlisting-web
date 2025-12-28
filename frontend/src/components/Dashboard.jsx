@@ -148,6 +148,7 @@ function Dashboard() {
   // Filtering Modal State
   const [showFilteringModal, setShowFilteringModal] = useState(false)
   const [isFiltering, setIsFiltering] = useState(false)
+  const [pendingFilters, setPendingFilters] = useState(null)
   
   // User Credits & Plan State (from API)
   const [userCredits, setUserCredits] = useState(0)
@@ -825,31 +826,26 @@ function Dashboard() {
     setViewMode('zombies')
   }
 
-  // Apply filter with API refresh - fetch latest data before filtering
-  const handleApplyFilter = async (newFilters) => {
+  // Handle filter confirmation from modal
+  const handleConfirmFiltering = async () => {
+    if (!pendingFilters) return
+    
     try {
-      console.log('🔍 handleApplyFilter: Starting filter analysis...')
-      
-      // Show filtering modal
-      setShowFilteringModal(true)
+      console.log('🔍 handleConfirmFiltering: Starting filter analysis...')
       setIsFiltering(true)
-      
-      // Calculate credits required (1 credit per listing)
-      const listingCount = allListings.length
-      const creditsRequired = listingCount
       
       // Fetch latest listings from API first (if needed)
       if (!DEMO_MODE && isStoreConnected && allListings.length === 0) {
         await fetchAllListings()
       }
       
-      // Small delay to show the modal
+      // Small delay to show the filtering state
       await new Promise(resolve => setTimeout(resolve, 500))
       
       // Apply filter
-      setFilters(newFilters)
+      setFilters(pendingFilters)
       setSelectedIds([])
-      applyLocalFilter(newFilters)
+      applyLocalFilter(pendingFilters)
       setViewMode('zombies')
       
       // Small delay before closing modal
@@ -858,14 +854,27 @@ function Dashboard() {
     } catch (err) {
       console.error('Failed to apply filter:', err)
       // Still apply filter even if refresh fails
-      setFilters(newFilters)
+      setFilters(pendingFilters)
       setSelectedIds([])
-      applyLocalFilter(newFilters)
+      applyLocalFilter(pendingFilters)
       setViewMode('zombies')
     } finally {
       setIsFiltering(false)
       setShowFilteringModal(false)
+      setPendingFilters(null)
     }
+  }
+
+  // Apply filter with API refresh - fetch latest data before filtering
+  const handleApplyFilter = async (newFilters) => {
+    console.log('🔍 handleApplyFilter: Showing confirmation modal...')
+    
+    // Store filters for confirmation
+    setPendingFilters(newFilters)
+    
+    // Show filtering modal for user confirmation
+    setShowFilteringModal(true)
+    setIsFiltering(false)
   }
 
   const handleSelect = (id, checked) => {
@@ -1520,11 +1529,14 @@ function Dashboard() {
           // Don't allow closing during filtering
           if (!isFiltering) {
             setShowFilteringModal(false)
+            setPendingFilters(null)
           }
         }}
+        onConfirm={handleConfirmFiltering}
         creditsRequired={allListings.length}
         currentCredits={userCredits}
         listingCount={allListings.length}
+        isFiltering={isFiltering}
       />
 
       {/* Error Modal */}
