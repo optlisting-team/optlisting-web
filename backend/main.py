@@ -129,35 +129,60 @@ app.add_middleware(
     max_age=3600,  # Cache preflight requests for 1 hour
 )
 
+# Helper function to get CORS headers based on request origin
+def get_cors_headers(request: Request):
+    """Get CORS headers based on request origin"""
+    origin = request.headers.get("origin")
+    
+    # If origin matches allowed origins or regex, use it
+    if origin:
+        # Check if origin is in allowed_origins
+        if origin in allowed_origins:
+            return {
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH",
+                "Access-Control-Allow-Headers": "*",
+            }
+        # Check if origin matches Vercel regex
+        import re
+        if re.match(vercel_regex, origin):
+            return {
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH",
+                "Access-Control-Allow-Headers": "*",
+            }
+    
+    # Fallback: don't set origin header (let CORS middleware handle it)
+    return {
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH",
+        "Access-Control-Allow-Headers": "*",
+    }
+
 # Exception handlers to ensure CORS headers are always present
 @app.exception_handler(StarletteHTTPException)
-async def http_exception_handler(request, exc):
+async def http_exception_handler(request: Request, exc):
     """Handle HTTP exceptions with CORS headers"""
+    cors_headers = get_cors_headers(request)
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH",
-            "Access-Control-Allow-Headers": "*",
-        }
+        headers=cors_headers
     )
 
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request, exc):
+async def validation_exception_handler(request: Request, exc):
     """Handle validation errors with CORS headers"""
+    cors_headers = get_cors_headers(request)
     return JSONResponse(
         status_code=422,
         content={"detail": exc.errors()},
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH",
-            "Access-Control-Allow-Headers": "*",
-        }
+        headers=cors_headers
     )
 
 @app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
+async def global_exception_handler(request: Request, exc):
     """Handle all other exceptions and ensure CORS headers are present"""
     import traceback
     import logging
@@ -171,6 +196,8 @@ async def global_exception_handler(request, exc):
     logger.error(f"   Request method: {request.method}")
     logger.error(f"   Error traceback:\n{error_traceback}")
     
+    cors_headers = get_cors_headers(request)
+    
     # Return error response with CORS headers
     return JSONResponse(
         status_code=500,
@@ -179,11 +206,7 @@ async def global_exception_handler(request, exc):
             "error_type": type(exc).__name__,
             "error_message": str(exc) if not isinstance(exc, Exception) else str(exc)
         },
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH",
-            "Access-Control-Allow-Headers": "*",
-        }
+        headers=cors_headers
     )
 
 # Initialize database on startup
