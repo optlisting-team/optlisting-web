@@ -635,9 +635,6 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                       )}
                     </div>
                   </td>
-                  <td className="px-2 py-4">
-                    <ZombieScoreBadge score={zombie.zombieScore} />
-                  </td>
                   {/* Filter order: Days (Age) → Sales → Watches → Impressions → Views */}
                   <td className="px-2 py-4 text-sm text-zinc-400 text-center">
                     {zombie.days_listed || 'N/A'}d
