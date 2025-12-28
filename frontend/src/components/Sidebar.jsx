@@ -476,8 +476,25 @@ function Sidebar() {
                       })
                       
                       if (!response.ok) {
-                        const errorData = await response.json().catch(() => ({}))
-                        throw new Error(errorData.detail?.message || errorData.detail || `HTTP ${response.status}`)
+                        let errorMessage = `HTTP ${response.status}`
+                        try {
+                          const errorData = await response.json()
+                          console.error('Checkout API error:', errorData)
+                          
+                          // Handle different error formats
+                          if (errorData.detail) {
+                            if (typeof errorData.detail === 'string') {
+                              errorMessage = errorData.detail
+                            } else if (errorData.detail.message) {
+                              errorMessage = errorData.detail.message
+                            } else if (errorData.detail.error) {
+                              errorMessage = errorData.detail.error
+                            }
+                          }
+                        } catch (e) {
+                          console.error('Failed to parse error response:', e)
+                        }
+                        throw new Error(errorMessage)
                       }
                       
                       const data = await response.json()
@@ -491,7 +508,8 @@ function Sidebar() {
                       }
                     } catch (error) {
                       console.error('Failed to create checkout:', error)
-                      alert(`Failed to create checkout: ${error.message}\n\nPlease check if Lemon Squeezy API keys are configured in Railway.`)
+                      const errorMsg = error.message || 'Unknown error'
+                      alert(`Failed to create checkout: ${errorMsg}\n\nPlease check if Lemon Squeezy API keys are configured in Railway.`)
                     } finally {
                       setIsCreatingCheckout(false)
                     }
