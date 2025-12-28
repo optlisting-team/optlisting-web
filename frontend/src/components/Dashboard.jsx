@@ -576,6 +576,13 @@ function Dashboard() {
 
   // Handle store connection change
   const handleStoreConnection = (connected, forceLoad = false) => {
+    // Prevent duplicate calls - check if state is already set
+    if (connected === isStoreConnected && !forceLoad) {
+      console.log('⚠️ handleStoreConnection: State already matches, skipping')
+      return
+    }
+    
+    console.log('🔄 handleStoreConnection:', { connected, forceLoad, currentState: isStoreConnected })
     setIsStoreConnected(connected)
     
     // Clear data when disconnected
@@ -592,10 +599,13 @@ function Dashboard() {
         setShowFilter(true)
       } else if (forceLoad) {
         // Fetch listings when connection is confirmed and forceLoad is true
-        console.log('🔄 handleStoreConnection: forceLoad=true, calling fetchAllListings()')
-        fetchAllListings().catch(err => {
-          console.error('Failed to fetch listings after connection:', err)
-        })
+        console.log('📦 handleStoreConnection: forceLoad=true, calling fetchAllListings()')
+        // Use setTimeout to ensure state is updated before fetching
+        setTimeout(() => {
+          fetchAllListings().catch(err => {
+            console.error('Failed to fetch listings after connection:', err)
+          })
+        }, 100)
       }
     }
   }
@@ -971,12 +981,22 @@ function Dashboard() {
     const code = urlParams.get('code')
     const state = urlParams.get('state')
     
+    // Prevent multiple executions - check if already processed
+    const processedKey = 'ebay_oauth_processed'
+    if (sessionStorage.getItem(processedKey)) {
+      // Already processed in this session, skip
+      return
+    }
+    
     // Important: If eBay redirected directly to frontend (code parameter exists)
     // Redirect to backend callback endpoint
     if (code && !ebayConnected && !ebayError) {
       console.log('🔄 eBay OAuth code detected - redirecting to backend')
       console.log('   Code:', code.substring(0, 20) + '...')
       console.log('   State:', state)
+      
+      // Mark as processing to prevent multiple redirects
+      sessionStorage.setItem(processedKey, 'redirecting')
       
       // Redirect to backend callback endpoint (pass all parameters)
       const callbackUrl = `${API_BASE_URL}/api/ebay/auth/callback?${urlParams.toString()}`
@@ -986,22 +1006,31 @@ function Dashboard() {
     }
     
     if (ebayConnected === 'true') {
-      window.history.replaceState({}, '', window.location.pathname)
-      setIsStoreConnected(true)
-      handleStoreConnection(true)
+      // Mark as processed immediately to prevent re-execution
+      sessionStorage.setItem(processedKey, 'connected')
       
-      // Fetch listings after OAuth success (ONE of two call sites)
-      if (!DEMO_MODE) {
-        fetchAllListings().catch(err => {
-          console.error('Product load failed:', err)
-        })
-      }
+      // Clean URL first to prevent re-triggering
+      window.history.replaceState({}, '', window.location.pathname)
+      
+      console.log('✅ OAuth callback success - connecting and loading products')
+      setIsStoreConnected(true)
+      
+      // Use handleStoreConnection with forceLoad=true to fetch products
+      // This will call fetchAllListings internally, so no need to call it separately
+      handleStoreConnection(true, true) // connected=true, forceLoad=true
+      
+      // Clear the processed flag after a delay to allow for future connections
+      setTimeout(() => {
+        sessionStorage.removeItem(processedKey)
+      }, 2000)
     } else if (ebayError) {
       console.error('❌ OAuth callback error:', ebayError)
       const errorMessage = urlParams.get('message') || 'Failed to connect to eBay'
       alert(`eBay connection failed: ${errorMessage}`)
       // Remove URL parameters
       window.history.replaceState({}, '', window.location.pathname)
+      // Clear the processed flag
+      sessionStorage.removeItem(processedKey)
     }
   }, []) // Keep empty dependency array - only run on mount
   
