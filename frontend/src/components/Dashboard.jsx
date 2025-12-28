@@ -1045,15 +1045,16 @@ function Dashboard() {
       currentUrl: window.location.href
     })
     
-    if (processed === 'connected' || processed === 'redirecting') {
-      // Already processed in this session, skip to prevent infinite loops
-      console.log('⚠️ OAuth callback already processed, skipping')
-      // Clean URL if needed
-      if (window.location.search) {
-        window.history.replaceState({}, '', window.location.pathname)
-      }
+    // If we have ebay_connected=true or ebay_error, we should process it
+    // Only skip if we're in the middle of redirecting (to prevent loops)
+    if (processed === 'redirecting' && !ebayConnected && !ebayError && code) {
+      // We're already redirecting, skip to prevent infinite loops
+      console.log('⚠️ Already redirecting to backend, skipping duplicate redirect')
       return
     }
+    
+    // If we have success or error flags, we should process them even if marked as processed
+    // But if we have a code and no success/error yet, we need to redirect to backend
     
     // Important: If eBay redirected directly to frontend (code parameter exists)
     // Redirect to backend callback endpoint
@@ -1117,7 +1118,13 @@ function Dashboard() {
       alert(`eBay connection failed: ${errorMessage}`)
       // Remove URL parameters
       window.history.replaceState({}, '', window.location.pathname)
-      // Clear the processed flag
+      // Clear the processed flag and set connection state
+      sessionStorage.removeItem(processedKey)
+      setIsStoreConnected(false)
+    } else if (!code && !ebayConnected && !ebayError && processed === 'connected') {
+      // If we're marked as connected but URL doesn't show it, clear the flag
+      // This can happen if connection failed but flag wasn't cleared
+      console.log('⚠️ Session marked as connected but URL shows disconnected, clearing flag')
       sessionStorage.removeItem(processedKey)
     }
   }, []) // Keep empty dependency array - only run on mount
