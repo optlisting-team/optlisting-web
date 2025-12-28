@@ -462,8 +462,13 @@ function Sidebar() {
                     
                     // Lemon Squeezy checkout URL with user_id in custom_data
                     // Format: https://[store].lemonsqueezy.com/checkout/buy/[variant_id]?checkout[custom][user_id]=[user_id]
-                    const checkoutUrl = `${storeUrl}/checkout/buy/${variantId}?checkout%5Bcustom%5D%5Buser_id%5D=${encodeURIComponent(userId)}`
+                    // Note: Using URLSearchParams to properly encode query parameters
+                    const params = new URLSearchParams()
+                    params.append('checkout[custom][user_id]', userId)
+                    const checkoutUrl = `${storeUrl}/checkout/buy/${variantId}?${params.toString()}`
                     console.log('Lemon Squeezy checkout URL:', checkoutUrl)
+                    console.log('Variant ID:', variantId)
+                    console.log('User ID:', userId)
                     return checkoutUrl
                   })()}
                   target="_blank"
