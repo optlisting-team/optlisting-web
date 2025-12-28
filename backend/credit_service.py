@@ -602,9 +602,10 @@ def get_credit_summary(db: Session, user_id: str) -> Dict[str, Any]:
         # Use raw SQL to safely check if column exists and get data
         from sqlalchemy import inspect
         from sqlalchemy import text
+        from .models import engine
         
         # Check if free_tier_count column exists
-        inspector = inspect(db.bind)
+        inspector = inspect(engine)
         columns = [col['name'] for col in inspector.get_columns('profiles')]
         has_free_tier_column = 'free_tier_count' in columns
         
