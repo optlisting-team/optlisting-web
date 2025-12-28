@@ -1245,7 +1245,9 @@ def get_credit_balance(
         purchased_credits=summary["purchased_credits"],
         consumed_credits=summary["consumed_credits"],
         available_credits=summary["available_credits"],
-        current_plan=summary["current_plan"]
+        current_plan=summary["current_plan"],
+        free_tier_count=summary.get("free_tier_count", 0),
+        free_tier_remaining=summary.get("free_tier_remaining", 3)
     )
 
 
