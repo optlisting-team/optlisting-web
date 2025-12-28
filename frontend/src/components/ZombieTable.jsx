@@ -106,24 +106,6 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
   const [showScoreTooltip, setShowScoreTooltip] = useState(false)
   const scoreTooltipRef = useRef(null)
   
-  // Log image load summary after images have had time to load
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (imageStatsRef.current.total > 0) {
-        console.log('📊 Image Load Summary (after 3s):', {
-          total: imageStatsRef.current.total,
-          withImageUrl: imageStatsRef.current.withImageUrl,
-          withoutImageUrl: imageStatsRef.current.withoutImageUrl,
-          loadFailed: imageStatsRef.current.loadFailed,
-          loadSuccess: imageStatsRef.current.loadSuccess,
-          failedUrls: imageStatsRef.current.failedUrls.slice(0, 5) // Show first 5 failures
-        })
-      }
-    }, 3000) // Wait 3 seconds for images to load
-    
-    return () => clearTimeout(timer)
-  }, [zombies]) // Re-run when zombies change
-  
   // Close tooltip when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -194,48 +176,6 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
         
         return title.includes(query) || sku.includes(query) || itemId.includes(query)
       })
-    }
-    
-    // Normalize image URLs and collect statistics
-    const stats = {
-      total: filtered.length,
-      withImageUrl: 0,
-      withoutImageUrl: 0
-    }
-    
-    filtered = filtered.map(zombie => {
-      const normalizedUrl = getImageUrlFromListing(zombie)
-      if (normalizedUrl) {
-        stats.withImageUrl++
-      } else {
-        stats.withoutImageUrl++
-      }
-      
-      return {
-        ...zombie,
-        _normalizedImageUrl: normalizedUrl, // Store normalized URL for rendering
-        _originalImageUrl: zombie.image_url || zombie.picture_url || zombie.thumbnail_url // Keep original for debugging
-      }
-    })
-    
-    // Log statistics
-    if (stats.total > 0) {
-      console.log('📊 Image URL Statistics:', {
-        total: stats.total,
-        withImageUrl: stats.withImageUrl,
-        withoutImageUrl: stats.withoutImageUrl,
-        percentageWithImage: ((stats.withImageUrl / stats.total) * 100).toFixed(1) + '%'
-      })
-    }
-    
-    // Update ref for error tracking (preserve load stats across renders)
-    imageStatsRef.current = {
-      total: stats.total,
-      withImageUrl: stats.withImageUrl,
-      withoutImageUrl: stats.withoutImageUrl,
-      loadFailed: imageStatsRef.current.loadFailed || 0,
-      loadSuccess: imageStatsRef.current.loadSuccess || 0,
-      failedUrls: imageStatsRef.current.failedUrls || []
     }
     
     // Apply sorting
@@ -661,42 +601,6 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                         {getManagementHubTooltip(zombie)}
                       </div>
                     </div>
-                  </td>
-                  <td className="px-2 py-4">
-                    {/* Thumbnail image (visual confirmation for zombie SKU report) */}
-                    {zombie._normalizedImageUrl ? (
-                      <div className="relative group">
-                        <ImageWithRetry
-                          src={zombie._normalizedImageUrl}
-                          alt={zombie.title || 'Product thumbnail'}
-                          originalUrl={zombie._originalImageUrl}
-                          itemId={zombie.ebay_item_id || zombie.item_id}
-                          sku={zombie.sku}
-                          title={zombie.title}
-                          onLoad={() => {
-                            imageStatsRef.current.loadSuccess++
-                          }}
-                          onError={(errorInfo) => {
-                            imageStatsRef.current.loadFailed++
-                            imageStatsRef.current.failedUrls.push(errorInfo)
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-12 h-12 bg-zinc-800 border border-zinc-700 rounded flex items-center justify-center relative group">
-                        <span className="text-[8px] text-zinc-500">No Image</span>
-                        {/* Badge for no image */}
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
-                          <span className="text-[6px] text-white">!</span>
-                        </div>
-                        {/* Debug tooltip in dev mode */}
-                        {import.meta.env.DEV && zombie._originalImageUrl && (
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 max-w-xs truncate">
-                            Original (invalid): {zombie._originalImageUrl}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </td>
                   <td 
                     className="px-2 py-4 text-xs font-mono text-zinc-400 group cursor-pointer hover:bg-zinc-800/50 transition-colors relative"
