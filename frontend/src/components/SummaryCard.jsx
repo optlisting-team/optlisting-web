@@ -335,25 +335,33 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, loadi
               // Set loading state immediately when button is clicked
               setCheckingConnection(true)
               
-              // Check token status when connect button is clicked
-              const statusResult = await checkEbayTokenStatus()
-              
-              // Use the result from API call instead of state (which may not be updated yet)
-              if (statusResult?.isConnected) {
-                console.log('✅ Already connected to eBay - starting product query')
-                // Notify parent component of connection status (trigger forced product query)
-                if (onConnectionChange) {
-                  onConnectionChange(true, true) // forceLoad = true
+              try {
+                // Check token status when connect button is clicked
+                const statusResult = await checkEbayTokenStatus()
+                
+                // Use the result from API call instead of state (which may not be updated yet)
+                if (statusResult?.isConnected) {
+                  console.log('✅ Already connected to eBay - starting product query')
+                  // Notify parent component of connection status (trigger forced product query)
+                  if (onConnectionChange) {
+                    onConnectionChange(true, true) // forceLoad = true
+                  }
+                  setCheckingConnection(false)
+                  return
                 }
+                
+                // Start OAuth if not connected
+                const oauthUrl = `${API_BASE_URL}/api/ebay/auth/start?user_id=${CURRENT_USER_ID}`
+                console.log('🔗 Connect button clicked - starting OAuth (will redirect to eBay)')
+                
+                // Use window.location.replace to avoid adding to history
+                // This prevents back button issues
+                window.location.replace(oauthUrl)
+              } catch (err) {
+                console.error('Error in connect button handler:', err)
                 setCheckingConnection(false)
-                return
+                // Don't redirect if there's an error checking status
               }
-              
-              // Start OAuth if not connected
-              const oauthUrl = `${API_BASE_URL}/api/ebay/auth/start?user_id=${CURRENT_USER_ID}`
-              console.log('🔗 Connect button clicked - starting OAuth')
-              // OAuth redirect will cause page reload, which is expected behavior
-              window.location.href = oauthUrl
             }}
             className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold rounded-lg transition-all flex items-center gap-2 text-base shadow-lg hover:shadow-emerald-500/40 transform hover:scale-105 active:scale-95 cursor-pointer border-2 border-emerald-500/50"
           >
