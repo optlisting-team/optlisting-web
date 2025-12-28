@@ -115,19 +115,13 @@ function FilteringModal({
           </div>
         )}
 
-        {/* Action Buttons */}
+        {/* Action Button */}
         {!isFiltering && (
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors font-medium"
-            >
-              Cancel
-            </button>
+          <div className="flex justify-center">
             <button
               onClick={handleConfirm}
               disabled={currentCredits < creditsRequired}
-              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-zinc-700 disabled:to-zinc-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2"
+              className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-zinc-700 disabled:to-zinc-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2"
             >
               <CheckCircle className="w-5 h-5" />
               Start Analysis
