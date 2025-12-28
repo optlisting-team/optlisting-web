@@ -145,6 +145,10 @@ function Dashboard() {
   const [showErrorModal, setShowErrorModal] = useState(false)
   const [errorModalMessage, setErrorModalMessage] = useState('')
   
+  // Filtering Modal State
+  const [showFilteringModal, setShowFilteringModal] = useState(false)
+  const [isFiltering, setIsFiltering] = useState(false)
+  
   // User Credits & Plan State (from API)
   const [userCredits, setUserCredits] = useState(0)
   const [usedCredits, setUsedCredits] = useState(0)
