@@ -18,6 +18,7 @@ const CREDIT_PACKS = [
 function Sidebar() {
   const location = useLocation()
   const { credits, showPlanModal, setShowPlanModal, showCreditModal, setShowCreditModal, refreshCredits } = useAccount()
+  const { user } = useAuth()
   const [selectedPack, setSelectedPack] = useState(CREDIT_PACKS[0])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const planModalRef = useRef(null)
@@ -428,9 +429,60 @@ function Sidebar() {
                 </div>
 
                 {/* Purchase Button */}
+                {/* TODO: Replace VARIANT_ID with actual Lemon Squeezy Variant IDs from Dashboard */}
+                {/* 
+                  Lemon Squeezy Variant IDs should be set in environment variables or config:
+                  - VITE_LS_VARIANT_CREDIT_5 (Starter)
+                  - VITE_LS_VARIANT_CREDIT_10 (Popular)
+                  - VITE_LS_VARIANT_CREDIT_15 (Value)
+                  - VITE_LS_VARIANT_CREDIT_20 (Best)
+                  - VITE_LS_VARIANT_CREDIT_25 (Pro)
+                  - VITE_LS_VARIANT_CREDIT_50 (Business)
+                  
+                  Get Variant IDs from: Lemon Squeezy Dashboard → Products → Select Product → Variants → Copy Variant ID
+                */}
                 <a
-                  href={`https://optlisting.lemonsqueezy.com/checkout/${selectedPack.id}`}
+                  href={(() => {
+                    // Get user_id (default to 'default-user' for MVP testing)
+                    const userId = user?.id || 'default-user'
+                    
+                    // TODO: Replace with actual Variant IDs from environment variables
+                    // Example: const variantId = import.meta.env.VITE_LS_VARIANT_CREDIT_5
+                    // For now, using placeholder - needs to be configured in Lemon Squeezy Dashboard
+                    const variantIdMap = {
+                      'credit-5': 'VARIANT_ID_PLACEHOLDER_5',
+                      'credit-10': 'VARIANT_ID_PLACEHOLDER_10',
+                      'credit-15': 'VARIANT_ID_PLACEHOLDER_15',
+                      'credit-20': 'VARIANT_ID_PLACEHOLDER_20',
+                      'credit-25': 'VARIANT_ID_PLACEHOLDER_25',
+                      'credit-50': 'VARIANT_ID_PLACEHOLDER_50',
+                    }
+                    
+                    const variantId = variantIdMap[selectedPack.id] || variantIdMap['credit-5']
+                    const storeUrl = import.meta.env.VITE_LEMON_SQUEEZY_STORE || 'https://optlisting.lemonsqueezy.com'
+                    
+                    // Lemon Squeezy checkout URL with user_id in custom_data
+                    return `${storeUrl}/checkout/buy/${variantId}?checkout[custom][user_id]=${encodeURIComponent(userId)}`
+                  })()}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className={`block w-full py-3 bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-white font-bold rounded-xl text-center text-sm transition-all shadow-lg shadow-amber-500/30`}
+                  onClick={(e) => {
+                    // Warn if variant ID is placeholder
+                    const variantIdMap = {
+                      'credit-5': 'VARIANT_ID_PLACEHOLDER_5',
+                      'credit-10': 'VARIANT_ID_PLACEHOLDER_10',
+                      'credit-15': 'VARIANT_ID_PLACEHOLDER_15',
+                      'credit-20': 'VARIANT_ID_PLACEHOLDER_20',
+                      'credit-25': 'VARIANT_ID_PLACEHOLDER_25',
+                      'credit-50': 'VARIANT_ID_PLACEHOLDER_50',
+                    }
+                    const variantId = variantIdMap[selectedPack.id]
+                    if (variantId && variantId.includes('PLACEHOLDER')) {
+                      e.preventDefault()
+                      alert('⚠️ Lemon Squeezy Variant IDs need to be configured!\n\nPlease set up Variant IDs in the Sidebar.jsx file or environment variables.\n\nSee LEMONSQUEEZY_SETUP.md for instructions.')
+                    }
+                  }}
                 >
                   Get Credits — ${selectedPack.price}
                 </a>
