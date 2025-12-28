@@ -1607,6 +1607,7 @@ async def create_checkout(
     API 키가 설정되지 않으면 404 에러를 안내합니다.
     """
     import requests
+    logger = logging.getLogger(__name__)
     variant_id = request.variant_id
     user_id = request.user_id
     
