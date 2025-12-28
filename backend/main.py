@@ -30,7 +30,7 @@ from .credit_service import (
     PlanType,
 )
 
-app = FastAPI(title="OptListing API", version="1.3.16")
+app = FastAPI(title="OptListing API", version="1.3.17")
 
 # eBay Webhook Router 등록
 app.include_router(ebay_webhook_router)
@@ -1587,6 +1587,218 @@ async def lemonsqueezy_webhook(request: Request, db: Session = Depends(get_db)):
             status_code=200,
             content={"status": "error", "message": "Request processing failed (logged)"}
         )
+
+
+# ============================================================
+# Lemon Squeezy Checkout API
+# ============================================================
+
+@app.post("/api/lemonsqueezy/create-checkout")
+async def create_checkout(
+    variant_id: str,
+    user_id: str = "default-user",  # User ID for custom data
+    db: Session = Depends(get_db)
+):
+    """
+    Lemon Squeezy Checkout API를 사용하여 checkout 생성
+    API 키가 설정되지 않으면 404 에러를 안내합니다.
+    """
+    import requests
+    
+    LS_API_KEY = os.getenv("LEMON_SQUEEZY_API_KEY")
+    LS_STORE_ID = os.getenv("LEMON_SQUEEZY_STORE_ID")
+    FRONTEND_URL = os.getenv("FRONTEND_URL", "https://optlisting.vercel.app")
+    
+    if not LS_API_KEY or not LS_STORE_ID:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Lemon Squeezy API not configured",
+                "message": "Please set LEMON_SQUEEZY_API_KEY and LEMON_SQUEEZY_STORE_ID environment variables in Railway.",
+                "setup_required": True
+            }
+        )
+    
+    try:
+        response = requests.post(
+            "https://api.lemonsqueezy.com/v1/checkouts",
+            headers={
+                "Authorization": f"Bearer {LS_API_KEY}",
+                "Accept": "application/vnd.api+json",
+                "Content-Type": "application/vnd.api+json",
+            },
+            json={
+                "data": {
+                    "type": "checkouts",
+                    "attributes": {
+                        "custom_price": None,
+                        "product_options": {
+                            "enabled_variants": [variant_id],
+                            "redirect_url": f"{FRONTEND_URL}/dashboard?payment=success",
+                            "receipt_link_url": f"{FRONTEND_URL}/dashboard",
+                            "receipt_button_text": "Return to Dashboard",
+                            "receipt_thank_you_note": "Thank you for your purchase!",
+                        },
+                        "checkout_options": {
+                            "embed": False,
+                            "media": False,
+                            "logo": True,
+                        },
+                        "checkout_data": {
+                            "custom": {
+                                "user_id": user_id,
+                            },
+                        },
+                        "expires_at": None,
+                    },
+                    "relationships": {
+                        "store": {
+                            "data": {
+                                "type": "stores",
+                                "id": LS_STORE_ID,
+                            },
+                        },
+                        "variant": {
+                            "data": {
+                                "type": "variants",
+                                "id": variant_id,
+                            },
+                        },
+                    },
+                },
+            },
+            timeout=10,
+        )
+        
+        if response.status_code != 201:
+            error_detail = response.text
+            logger.error(f"Lemon Squeezy API error: {response.status_code} - {error_detail}")
+            raise HTTPException(
+                status_code=response.status_code,
+                detail={
+                    "error": "Failed to create checkout",
+                    "message": f"Lemon Squeezy API returned {response.status_code}",
+                    "details": error_detail[:500]  # Limit error message length
+                }
+            )
+        
+        checkout_data = response.json()
+        checkout_url = checkout_data["data"]["attributes"]["url"]
+        
+        logger.info(f"Checkout created successfully for variant {variant_id}, user {user_id}")
+        return {"checkout_url": checkout_url}
+        
+    except requests.exceptions.Timeout:
+        raise HTTPException(status_code=504, detail="Lemon Squeezy API timeout")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Lemon Squeezy API request error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error creating checkout: {str(e)}")
+
+
+# ============================================================
+# Lemon Squeezy Checkout API
+# ============================================================
+
+@app.post("/api/lemonsqueezy/create-checkout")
+async def create_checkout(
+    variant_id: str,
+    user_id: str = "default-user",  # User ID for custom data
+    db: Session = Depends(get_db)
+):
+    """
+    Lemon Squeezy Checkout API를 사용하여 checkout 생성
+    API 키가 설정되지 않으면 에러 메시지를 반환합니다.
+    """
+    import requests
+    
+    LS_API_KEY = os.getenv("LEMON_SQUEEZY_API_KEY")
+    LS_STORE_ID = os.getenv("LEMON_SQUEEZY_STORE_ID")
+    FRONTEND_URL = os.getenv("FRONTEND_URL", "https://optlisting.vercel.app")
+    
+    if not LS_API_KEY or not LS_STORE_ID:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Lemon Squeezy API not configured",
+                "message": "Please set LEMON_SQUEEZY_API_KEY and LEMON_SQUEEZY_STORE_ID environment variables in Railway.",
+                "setup_required": True
+            }
+        )
+    
+    try:
+        response = requests.post(
+            "https://api.lemonsqueezy.com/v1/checkouts",
+            headers={
+                "Authorization": f"Bearer {LS_API_KEY}",
+                "Accept": "application/vnd.api+json",
+                "Content-Type": "application/vnd.api+json",
+            },
+            json={
+                "data": {
+                    "type": "checkouts",
+                    "attributes": {
+                        "custom_price": None,
+                        "product_options": {
+                            "enabled_variants": [variant_id],
+                            "redirect_url": f"{FRONTEND_URL}/dashboard?payment=success",
+                            "receipt_link_url": f"{FRONTEND_URL}/dashboard",
+                            "receipt_button_text": "Return to Dashboard",
+                            "receipt_thank_you_note": "Thank you for your purchase!",
+                        },
+                        "checkout_options": {
+                            "embed": False,
+                            "media": False,
+                            "logo": True,
+                        },
+                        "checkout_data": {
+                            "custom": {
+                                "user_id": user_id,
+                            },
+                        },
+                        "expires_at": None,
+                    },
+                    "relationships": {
+                        "store": {
+                            "data": {
+                                "type": "stores",
+                                "id": LS_STORE_ID,
+                            },
+                        },
+                        "variant": {
+                            "data": {
+                                "type": "variants",
+                                "id": variant_id,
+                            },
+                        },
+                    },
+                },
+            },
+            timeout=10,
+        )
+        
+        if response.status_code != 201:
+            error_detail = response.text
+            logger.error(f"Lemon Squeezy API error: {response.status_code} - {error_detail}")
+            raise HTTPException(
+                status_code=response.status_code,
+                detail={
+                    "error": "Failed to create checkout",
+                    "message": f"Lemon Squeezy API returned {response.status_code}",
+                    "details": error_detail[:500]  # Limit error message length
+                }
+            )
+        
+        checkout_data = response.json()
+        checkout_url = checkout_data["data"]["attributes"]["url"]
+        
+        logger.info(f"Checkout created successfully for variant {variant_id}, user {user_id}")
+        return {"checkout_url": checkout_url}
+        
+    except requests.exceptions.Timeout:
+        raise HTTPException(status_code=504, detail="Lemon Squeezy API timeout")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Lemon Squeezy API request error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error creating checkout: {str(e)}")
 
 
 # ============================================================

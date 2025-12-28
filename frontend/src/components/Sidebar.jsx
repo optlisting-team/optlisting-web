@@ -5,6 +5,10 @@ import { useAuth } from '../contexts/AuthContext'
 import { useAccount } from '../contexts/AccountContext'
 import { LayoutDashboard, List, History, Settings, X, Check, ChevronDown, ChevronRight } from 'lucide-react'
 
+// Use environment variable for Railway URL, fallback based on environment
+const API_BASE_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? '' : 'https://optlisting-production.up.railway.app')
+
 // Credit Pack Options
 const CREDIT_PACKS = [
   { id: 'credit-5', price: 5, credits: 1000, perScan: 0.005, discount: 0, label: 'Starter' },
@@ -21,6 +25,7 @@ function Sidebar() {
   const { user } = useAuth()
   const [selectedPack, setSelectedPack] = useState(CREDIT_PACKS[0])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [isCreatingCheckout, setIsCreatingCheckout] = useState(false)
   const planModalRef = useRef(null)
   const creditModalRef = useRef(null)
 
@@ -429,25 +434,15 @@ function Sidebar() {
                 </div>
 
                 {/* Purchase Button */}
-                {/* TODO: Replace VARIANT_ID with actual Lemon Squeezy Variant IDs from Dashboard */}
-                {/* 
-                  Lemon Squeezy Variant IDs should be set in environment variables or config:
-                  - VITE_LS_VARIANT_CREDIT_5 (Starter)
-                  - VITE_LS_VARIANT_CREDIT_10 (Popular)
-                  - VITE_LS_VARIANT_CREDIT_15 (Value)
-                  - VITE_LS_VARIANT_CREDIT_20 (Best)
-                  - VITE_LS_VARIANT_CREDIT_25 (Pro)
-                  - VITE_LS_VARIANT_CREDIT_50 (Business)
-                  
-                  Get Variant IDs from: Lemon Squeezy Dashboard → Products → Select Product → Variants → Copy Variant ID
-                */}
-                <a
-                  href={(() => {
+                {/* Using Lemon Squeezy Checkout API to create checkout dynamically */}
+                <button
+                  onClick={async (e) => {
+                    e.preventDefault()
+                    
                     // Get user_id (default to 'default-user' for MVP testing)
                     const userId = user?.id || 'default-user'
                     
                     // Lemon Squeezy Variant IDs
-                    // Credit Pack Variants (configured in Lemon Squeezy Dashboard)
                     const variantIdMap = {
                       'credit-5': '1150506',  // Credit Pack 1000 - $5.00 (Starter)
                       'credit-10': 'VARIANT_ID_PLACEHOLDER_10',
@@ -458,44 +453,54 @@ function Sidebar() {
                     }
                     
                     const variantId = variantIdMap[selectedPack.id] || variantIdMap['credit-5']
-                    // Lemon Squeezy store URL - should be your store's subdomain (e.g., optlisting.lemonsqueezy.com)
-                    const storeUrl = import.meta.env.VITE_LEMON_SQUEEZY_STORE || 'https://optlisting.lemonsqueezy.com'
                     
-                    // Lemon Squeezy checkout URL format (from official docs)
-                    // Format: https://[store].lemonsqueezy.com/checkout/buy/[variant_id]
-                    // Custom data: ?checkout[custom][user_id]=[user_id]
-                    const baseUrl = `${storeUrl}/checkout/buy/${variantId}`
-                    const checkoutUrl = userId 
-                      ? `${baseUrl}?checkout[custom][user_id]=${encodeURIComponent(userId)}`
-                      : baseUrl
-                    console.log('🔗 Lemon Squeezy checkout URL:', checkoutUrl)
-                    console.log('   Variant ID:', variantId)
-                    console.log('   Store URL:', storeUrl)
-                    console.log('   User ID:', userId)
-                    return checkoutUrl
-                  })()}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`block w-full py-3 bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-white font-bold rounded-xl text-center text-sm transition-all shadow-lg shadow-amber-500/30`}
-                  onClick={(e) => {
                     // Warn if variant ID is placeholder
-                    const variantIdMap = {
-                      'credit-5': '1150506',  // Credit Pack 1000 - $5.00 (Starter)
-                      'credit-10': 'VARIANT_ID_PLACEHOLDER_10',
-                      'credit-15': 'VARIANT_ID_PLACEHOLDER_15',
-                      'credit-20': 'VARIANT_ID_PLACEHOLDER_20',
-                      'credit-25': 'VARIANT_ID_PLACEHOLDER_25',
-                      'credit-50': 'VARIANT_ID_PLACEHOLDER_50',
-                    }
-                    const variantId = variantIdMap[selectedPack.id]
-                    if (variantId && variantId.includes('PLACEHOLDER')) {
-                      e.preventDefault()
+                    if (variantId.includes('PLACEHOLDER')) {
                       alert('⚠️ Lemon Squeezy Variant IDs need to be configured!\n\nPlease set up Variant IDs in the Sidebar.jsx file or environment variables.\n\nSee LEMONSQUEEZY_SETUP.md for instructions.')
+                      return
+                    }
+                    
+                    setIsCreatingCheckout(true)
+                    
+                    try {
+                      // Call backend API to create checkout
+                      const response = await fetch(`${API_BASE_URL}/api/lemonsqueezy/create-checkout`, {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          variant_id: variantId,
+                          user_id: userId,
+                        }),
+                      })
+                      
+                      if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({}))
+                        throw new Error(errorData.detail?.message || errorData.detail || `HTTP ${response.status}`)
+                      }
+                      
+                      const data = await response.json()
+                      const checkoutUrl = data.checkout_url
+                      
+                      if (checkoutUrl) {
+                        // Open checkout URL in new tab
+                        window.open(checkoutUrl, '_blank')
+                      } else {
+                        throw new Error('No checkout URL returned from API')
+                      }
+                    } catch (error) {
+                      console.error('Failed to create checkout:', error)
+                      alert(`Failed to create checkout: ${error.message}\n\nPlease check if Lemon Squeezy API keys are configured in Railway.`)
+                    } finally {
+                      setIsCreatingCheckout(false)
                     }
                   }}
+                  disabled={isCreatingCheckout}
+                  className={`block w-full py-3 bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-white font-bold rounded-xl text-center text-sm transition-all shadow-lg shadow-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
-                  Get Credits — ${selectedPack.price}
-                </a>
+                  {isCreatingCheckout ? 'Creating Checkout...' : `Get Credits — $${selectedPack.price}`}
+                </button>
               </div>
             </div>
           </div>
