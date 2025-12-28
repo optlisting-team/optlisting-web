@@ -336,8 +336,14 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, loadi
               setCheckingConnection(true)
               
               try {
+                console.log('🔘 Connect eBay button clicked')
+                console.log('   API_BASE_URL:', API_BASE_URL)
+                console.log('   CURRENT_USER_ID:', CURRENT_USER_ID)
+                
                 // Check token status when connect button is clicked
+                console.log('   Checking eBay connection status...')
                 const statusResult = await checkEbayTokenStatus()
+                console.log('   Status check result:', statusResult)
                 
                 // Use the result from API call instead of state (which may not be updated yet)
                 if (statusResult?.isConnected) {
@@ -352,15 +358,24 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, loadi
                 
                 // Start OAuth if not connected
                 const oauthUrl = `${API_BASE_URL}/api/ebay/auth/start?user_id=${CURRENT_USER_ID}`
-                console.log('🔗 Connect button clicked - starting OAuth (will redirect to eBay)')
+                console.log('🔗 Starting OAuth flow...')
+                console.log('   OAuth URL:', oauthUrl)
+                console.log('   Redirecting to eBay login page...')
                 
                 // Use window.location.replace to avoid adding to history
                 // This prevents back button issues
                 window.location.replace(oauthUrl)
               } catch (err) {
-                console.error('Error in connect button handler:', err)
+                console.error('❌ Error in connect button handler:', err)
+                console.error('   Error details:', {
+                  message: err.message,
+                  status: err.response?.status,
+                  data: err.response?.data
+                })
                 setCheckingConnection(false)
-                // Don't redirect if there's an error checking status
+                
+                // Show user-friendly error
+                alert(`연결 확인 중 오류가 발생했습니다: ${err.message || '알 수 없는 오류'}\n\n다시 시도해주세요.`)
               }
             }}
             className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold rounded-lg transition-all flex items-center gap-2 text-base shadow-lg hover:shadow-emerald-500/40 transform hover:scale-105 active:scale-95 cursor-pointer border-2 border-emerald-500/50"
