@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAccount } from '../contexts/AccountContext'
 import { useAuth } from '../contexts/AuthContext'
-import { Check, Zap, TrendingUp, Crown } from 'lucide-react'
+import { Check } from 'lucide-react'
 
 // Lemon Squeezy Store URL (needs to be changed to actual store URL)
 // Change to actual store URL confirmed from environment variable or Lemon Squeezy Dashboard
@@ -17,37 +17,7 @@ const CREDIT_PACKS = [
   { id: 'business', name: 'Business', price: 50, credits: 6000, popular: false },
 ]
 
-// Subscription plan definition
-const SUBSCRIPTION_PLANS = [
-  {
-    id: 'pro-monthly',
-    name: 'Pro Monthly',
-    price: 49,
-    interval: 'month',
-    features: [
-      'Unlimited Listing Analysis',
-      'Unlimited Credits',
-      'Priority Support',
-      'Advanced Filtering',
-    ],
-    icon: Zap,
-    popular: true,
-  },
-  {
-    id: 'business-monthly',
-    name: 'Business Monthly',
-    price: 99,
-    interval: 'month',
-    features: [
-      'All Pro Plan Features',
-      'Team Member Management',
-      'API Access',
-      'Dedicated Support',
-    ],
-    icon: Crown,
-    popular: false,
-  },
-]
+// MVP: Subscriptions removed - Credit packs only
 
 export default function Pricing() {
   const { credits } = useAccount()
@@ -84,7 +54,7 @@ export default function Pricing() {
         <div className="text-center mb-16">
           <h1 className="text-4xl md:text-5xl font-bold mb-4">Pricing</h1>
           <p className="text-xl text-zinc-400 max-w-2xl mx-auto">
-            Purchase credit packs or choose a subscription plan to make the most of OptListing
+            Purchase credit packs to get started with OptListing
           </p>
           {credits !== null && (
             <div className="mt-6 inline-block px-6 py-3 bg-zinc-800 rounded-lg">
@@ -142,68 +112,11 @@ export default function Pricing() {
           </div>
         </div>
 
-        {/* Subscription Plans Section */}
-        <div>
-          <h2 className="text-3xl font-bold mb-8 text-center">Subscription Plans</h2>
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {SUBSCRIPTION_PLANS.map((plan) => {
-              const Icon = plan.icon
-              return (
-                <div
-                  key={plan.id}
-                  className={`relative bg-zinc-900 border rounded-xl p-8 ${
-                    plan.popular
-                      ? 'border-purple-500 shadow-lg shadow-purple-500/20 scale-105'
-                      : 'border-zinc-800'
-                  }`}
-                >
-                  {plan.popular && (
-                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                      <span className="bg-purple-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                        Popular
-                      </span>
-                    </div>
-                  )}
-                  <div className="text-center mb-6">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-zinc-800 rounded-full mb-4">
-                      <Icon className="w-8 h-8 text-purple-500" />
-                    </div>
-                    <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
-                    <div className="mb-4">
-                      <span className="text-5xl font-bold">${plan.price}</span>
-                      <span className="text-zinc-400 text-lg">/{plan.interval}</span>
-                    </div>
-                  </div>
-                  <ul className="space-y-3 mb-8">
-                    {plan.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-                        <span className="text-zinc-300">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <button
-                    onClick={() => handlePurchase(`subscription-${plan.id}`, null, true)}
-                    disabled={loading}
-                    className={`w-full py-3 rounded-lg font-semibold transition-colors ${
-                      plan.popular
-                        ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                        : 'bg-zinc-800 hover:bg-zinc-700 text-white'
-                    }`}
-                  >
-                    {loading ? 'Processing...' : 'Subscribe'}
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
         {/* Notice */}
         <div className="mt-16 text-center text-zinc-400 text-sm">
           <p>Payments are processed securely through Lemon Squeezy.</p>
           <p className="mt-2">
-            Credits are automatically added after purchase, and subscriptions are activated immediately.
+            Credits are automatically added after purchase.
           </p>
         </div>
       </div>

@@ -513,7 +513,7 @@ function LandingPage() {
               <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
                 1 Hour → 5 Minutes
               </h2>
-              <p className="text-xl text-zinc-400 max-w-4xl mx-auto whitespace-nowrap">
+              <p className="text-xl text-zinc-400 max-w-4xl mx-auto">
                 Time is money for sellers. Dramatically reduce your product cleanup time.
               </p>
             </div>
@@ -522,19 +522,17 @@ function LandingPage() {
             {/* P1: Credit Pack Section (Pay-Per-Scan) - Volume Discount */}
             {/* ═══════════════════════════════════════════════════════════════════ */}
             {/* ═══════════════════════════════════════════════════════════════════ */}
-            {/* All Pricing Options - 4 Column Grid */}
+            {/* MVP: Credit Packs Only - Centered Layout */}
             {/* ═══════════════════════════════════════════════════════════════════ */}
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.2 }}
+              className="flex justify-center"
             >
-              {/* 2-Section Pricing Layout - 1:3 ratio */}
-              <div className="grid md:grid-cols-4 gap-6">
-                
-                {/* Section 1: Credit Packs - 1 column */}
-                <div className="md:col-span-1 border-2 border-dashed border-amber-500/30 rounded-3xl p-6 bg-amber-500/5">
+              {/* Credit Packs Only - Centered */}
+              <div className="max-w-md border-2 border-dashed border-amber-500/30 rounded-3xl p-6 bg-amber-500/5">
                   {/* Credit Pack Header */}
                   <div className="text-center mb-4">
                     <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-500/20 rounded-full">
@@ -631,171 +629,6 @@ function LandingPage() {
                     </div>
                   </motion.div>
                 </div>
-
-                {/* Section 2: Subscriptions - 3 columns */}
-                <div className="md:col-span-3 border-2 border-dashed border-blue-500/30 rounded-3xl p-6 bg-blue-500/5">
-                  {/* Subscription Header */}
-                  <div className="text-center mb-4">
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-500/20 rounded-full">
-                      <span className="text-sm">🏆</span>
-                      <span className="text-sm font-bold text-blue-400">SUBSCRIPTIONS</span>
-                    </div>
-                    <p className="text-zinc-400 text-xs mt-2">For continuous management</p>
-                  </div>
-
-                  {/* Subscription Cards Grid */}
-                  <div className="grid grid-cols-3 gap-3">
-                    {/* BASIC Plan - $19 */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.32 }}
-                  className="relative"
-                >
-                  <div className="bg-zinc-800/50 border border-zinc-700 rounded-2xl p-5 hover:border-cyan-500/30 transition-all h-full">
-                    <div className="mb-3">
-                      <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Starter</span>
-                      <h4 className="text-xl font-bold text-white mt-1">BASIC</h4>
-                    </div>
-                    
-                    <div className="mb-4">
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-3xl font-black text-white">$19</span>
-                        <span className="text-zinc-400 text-sm">/mo</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 mb-4 text-xs">
-                      <div className="flex items-center gap-2">
-                        <Check className="w-3 h-3 text-cyan-400" />
-                        <span className="text-zinc-300">5,000 listings</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check className="w-3 h-3 text-cyan-400" />
-                        <span className="text-zinc-300">1 Store</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check className="w-3 h-3 text-cyan-400" />
-                        <span className="text-zinc-300">CSV Export</span>
-                      </div>
-                    </div>
-
-                    <a
-                      href="https://optlisting.lemonsqueezy.com/checkout/basic"
-                      className="block w-full py-2.5 bg-zinc-700 hover:bg-cyan-600 text-white font-bold rounded-xl text-center text-sm transition-all"
-                    >
-                      Get Started
-                    </a>
-                  </div>
-                </motion.div>
-
-                {/* PRO Plan (RECOMMENDED) - With Subscription Label */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.35 }}
-                  className="relative"
-                >
-                  <div className="bg-gradient-to-b from-blue-600/20 to-zinc-800/80 border-2 border-blue-500/50 rounded-2xl p-5 shadow-2xl shadow-blue-500/10 h-full relative">
-                    {/* RECOMMENDED Badge */}
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                      <span className="px-3 py-1 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-bold rounded-full shadow-lg shadow-blue-500/30">
-                        ⭐ BEST
-                      </span>
-                    </div>
-
-                    <div className="mb-3 mt-2">
-                      <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">Popular</span>
-                      <h4 className="text-xl font-bold text-white mt-1">PRO</h4>
-                    </div>
-                    
-                    <div className="mb-4">
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-3xl font-black text-white">$49</span>
-                        <span className="text-zinc-400 text-sm">/mo</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 mb-4 text-xs">
-                      <div className="flex items-center gap-2">
-                        <Check className="w-3 h-3 text-blue-400" />
-                        <span className="text-zinc-300">30,000 listings</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check className="w-3 h-3 text-blue-400" />
-                        <span className="text-zinc-300">3 Stores</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check className="w-3 h-3 text-blue-400" />
-                        <span className="text-zinc-300">CSV Export</span>
-                      </div>
-                    </div>
-
-                    <a
-                      href="https://optlisting.lemonsqueezy.com/checkout/pro"
-                      className="block w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold rounded-xl text-center text-sm transition-all shadow-lg shadow-blue-500/30"
-                    >
-                      Best Value →
-                    </a>
-                  </div>
-                </motion.div>
-
-                {/* POWER SELLER Plan */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.4 }}
-                  className="relative"
-                >
-                  <div className="bg-gradient-to-b from-purple-600/15 to-zinc-800/80 border border-purple-500/30 rounded-2xl p-5 hover:border-purple-500/50 transition-all h-full relative">
-                    {/* Enterprise Badge */}
-                    <div className="absolute -top-3 right-3">
-                      <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs font-bold rounded-full border border-purple-500/30">
-                        🚀
-                      </span>
-                    </div>
-
-                    <div className="mb-3">
-                      <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">Enterprise</span>
-                      <h4 className="text-xl font-bold text-white mt-1">POWER</h4>
-                    </div>
-                    
-                    <div className="mb-4">
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-3xl font-black text-white">$99</span>
-                        <span className="text-zinc-400 text-sm">/mo</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 mb-4 text-xs">
-                      <div className="flex items-center gap-2">
-                        <Check className="w-3 h-3 text-purple-400" />
-                        <span className="text-zinc-300">100,000 listings</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check className="w-3 h-3 text-purple-400" />
-                        <span className="text-zinc-300">10 Stores</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check className="w-3 h-3 text-purple-400" />
-                        <span className="text-zinc-300">CSV Export</span>
-                      </div>
-                    </div>
-
-                    <a
-                      href="https://optlisting.lemonsqueezy.com/checkout/power-seller"
-                      className="block w-full py-2.5 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white font-bold rounded-xl text-center text-sm transition-all shadow-lg shadow-purple-500/20"
-                    >
-                      Get Started
-                    </a>
-                  </div>
-                </motion.div>
-                  </div>
-                </div>
-              </div>
             </motion.div>
 
             {/* FAQ / Trust Elements */}
