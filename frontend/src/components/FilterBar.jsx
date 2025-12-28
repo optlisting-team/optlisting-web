@@ -323,6 +323,18 @@ const FilterBar = memo(function FilterBar({ onApplyFilter, onSync, loading, init
           </div>
         </div>
 
+        {/* Filter Description - Dynamic text based on current filter values */}
+        <div className="mb-4 px-2 py-3 bg-zinc-800/50 border border-zinc-700/50 rounded-lg">
+          <p className="text-sm text-zinc-300 text-center leading-relaxed">
+            This filter identifies products with{' '}
+            <span className="font-semibold text-white">{maxSales}</span> sales,{' '}
+            <span className="font-semibold text-white">{maxWatches}</span> watches, under{' '}
+            <span className="font-semibold text-white">{maxImpressions.toLocaleString()}</span> impressions, and under{' '}
+            <span className="font-semibold text-white">{maxViews}</span> views in the last{' '}
+            <span className="font-semibold text-white">{analysisPeriod}</span> days.
+          </p>
+        </div>
+
         {/* Find Low-Interest Items Button - Large, Below */}
         <div className="relative group">
           <button
