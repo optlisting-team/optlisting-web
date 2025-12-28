@@ -50,6 +50,9 @@ PLAN_DEFAULT_CREDITS = {
     PlanType.ENTERPRISE: 10000,
 }
 
+# 무료티어 설정
+FREE_TIER_MAX_COUNT = 3  # 최대 무료 사용 횟수
+
 
 # =============================================
 # 응답 데이터 클래스
@@ -147,6 +150,9 @@ def deduct_credits_atomic(
     """
     원자적 크레딧 차감 (동시성 안전)
     
+    무료티어가 남아있으면 크레딧 차감 없이 진행하고 무료티어 카운트 증가
+    무료티어가 모두 사용되면 일반 크레딧 차감 로직 사용
+    
     PostgreSQL의 원자적 UPDATE를 사용하여 Race Condition 방지
     
     Args:
@@ -157,7 +163,7 @@ def deduct_credits_atomic(
         reference_id: 참조 ID (분석 작업 ID 등)
         
     Returns:
-        CreditDeductResult: 차감 결과
+        CreditDeductResult: 차감 결과 (무료티어 사용 시 deducted_amount=0)
     """
     if amount <= 0:
         return CreditDeductResult(
@@ -168,6 +174,61 @@ def deduct_credits_atomic(
         )
     
     try:
+        # 무료티어 확인 및 사용 (원자적 UPDATE)
+        # free_tier_count < FREE_TIER_MAX_COUNT인 경우 증가
+        free_tier_result = db.execute(
+            text("""
+                UPDATE profiles
+                SET free_tier_count = free_tier_count + 1,
+                    updated_at = NOW()
+                WHERE user_id = :user_id
+                  AND free_tier_count < :max_free_tier
+                RETURNING 
+                    free_tier_count,
+                    purchased_credits,
+                    consumed_credits,
+                    (purchased_credits - consumed_credits) as remaining
+            """),
+            {"user_id": user_id, "max_free_tier": FREE_TIER_MAX_COUNT}
+        )
+        
+        free_tier_row = free_tier_result.fetchone()
+        
+        if free_tier_row is not None:
+            # 무료티어 사용 성공 - 크레딧 차감 없이 진행
+            remaining_credits = free_tier_row.remaining
+            free_tier_used = free_tier_row.free_tier_count
+            
+            # 트랜잭션 이력 기록 (무료티어 사용으로 기록)
+            try:
+                db.execute(
+                    text("""
+                        INSERT INTO credit_transactions 
+                        (user_id, transaction_type, amount, balance_after, description, reference_id)
+                        VALUES (:user_id, 'consume', :amount, :balance, :description, :reference_id)
+                    """),
+                    {
+                        "user_id": user_id,
+                        "amount": 0,  # 무료티어는 0 크레딧
+                        "balance": remaining_credits,
+                        "description": description or f"Free tier usage ({free_tier_used}/{FREE_TIER_MAX_COUNT})",
+                        "reference_id": reference_id or str(uuid.uuid4())
+                    }
+                )
+            except SQLAlchemyError:
+                pass
+            
+            db.commit()
+            
+            return CreditDeductResult(
+                success=True,
+                remaining_credits=remaining_credits,
+                deducted_amount=0,  # 무료티어는 차감 없음
+                message=f"Free tier used ({free_tier_used}/{FREE_TIER_MAX_COUNT})",
+                transaction_id=str(uuid.uuid4())
+            )
+        
+        # 무료티어가 모두 사용됨 - 일반 크레딧 차감 로직 진행
         # ✅ 원자적 UPDATE (동시성 안전)
         # WHERE 절에서 잔액 검사를 함께 수행하여 Race Condition 방지
         result = db.execute(

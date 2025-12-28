@@ -80,6 +80,7 @@ class Profile(Base):
     purchased_credits = Column(Integer, default=0, nullable=False)  # 총 구매/부여 크레딧
     consumed_credits = Column(Integer, default=0, nullable=False)   # 총 사용 크레딧
     current_plan = Column(String, default='free')  # 'free', 'starter', 'pro', 'enterprise'
+    free_tier_count = Column(Integer, default=0, nullable=False)  # 무료티어 사용 횟수 (최대 3회)
     
     # eBay OAuth 토큰
     ebay_access_token = Column(String, nullable=True)  # eBay Access Token (2시간 만료)
