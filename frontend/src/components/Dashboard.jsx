@@ -1509,6 +1509,20 @@ function Dashboard() {
         )}
       </div>
 
+      {/* Filtering Modal */}
+      <FilteringModal
+        isOpen={showFilteringModal}
+        onClose={() => {
+          // Don't allow closing during filtering
+          if (!isFiltering) {
+            setShowFilteringModal(false)
+          }
+        }}
+        creditsRequired={allListings.length}
+        currentCredits={userCredits}
+        listingCount={allListings.length}
+      />
+
       {/* Error Modal */}
       {showErrorModal && createPortal(
         <div 
