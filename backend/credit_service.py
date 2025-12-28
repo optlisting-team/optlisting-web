@@ -612,7 +612,14 @@ def get_credit_summary(db: Session, user_id: str) -> Dict[str, Any]:
             "exists": False
         }
     
-    free_tier_count = getattr(profile, 'free_tier_count', 0) or 0
+    # Safely get free_tier_count with fallback for missing column
+    try:
+        free_tier_count = getattr(profile, 'free_tier_count', 0) or 0
+        if free_tier_count is None:
+            free_tier_count = 0
+    except (AttributeError, KeyError):
+        free_tier_count = 0
+    
     free_tier_remaining = max(0, FREE_TIER_MAX_COUNT - free_tier_count)
     
     return {

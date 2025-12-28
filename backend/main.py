@@ -1265,14 +1265,22 @@ def get_credit_balance(
         result = initialize_user_credits(db, user_id, PlanType.FREE)
         summary = get_credit_summary(db, user_id)
     
+    # Safely get free tier fields with defaults
+    free_tier_count = summary.get("free_tier_count", 0) or 0
+    free_tier_remaining = summary.get("free_tier_remaining", 3)
+    
+    # Ensure free_tier_remaining is calculated correctly if not provided
+    if free_tier_remaining == 3 and free_tier_count > 0:
+        free_tier_remaining = max(0, 3 - free_tier_count)
+    
     return CreditBalanceResponse(
         user_id=user_id,
         purchased_credits=summary["purchased_credits"],
         consumed_credits=summary["consumed_credits"],
         available_credits=summary["available_credits"],
         current_plan=summary["current_plan"],
-        free_tier_count=summary.get("free_tier_count", 0),
-        free_tier_remaining=summary.get("free_tier_remaining", 3)
+        free_tier_count=free_tier_count,
+        free_tier_remaining=free_tier_remaining
     )
 
 
