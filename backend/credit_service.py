@@ -598,9 +598,86 @@ def get_credit_summary(db: Session, user_id: str) -> Dict[str, Any]:
     Returns:
         dict: 크레딧 요약 정보
     """
-    profile = db.query(Profile).filter(Profile.user_id == user_id).first()
-    
-    if not profile:
+    try:
+        # Use raw SQL to safely check if column exists and get data
+        from sqlalchemy import inspect
+        from sqlalchemy import text
+        
+        # Check if free_tier_count column exists
+        inspector = inspect(db.bind)
+        columns = [col['name'] for col in inspector.get_columns('profiles')]
+        has_free_tier_column = 'free_tier_count' in columns
+        
+        if has_free_tier_column:
+            # Column exists, use normal query
+            profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+        else:
+            # Column doesn't exist, use raw SQL to get other columns
+            result = db.execute(
+                text("""
+                    SELECT user_id, purchased_credits, consumed_credits, current_plan
+                    FROM profiles
+                    WHERE user_id = :user_id
+                    LIMIT 1
+                """),
+                {"user_id": user_id}
+            ).first()
+            
+            if not result:
+                profile = None
+            else:
+                # Create a simple object-like structure
+                class SimpleProfile:
+                    def __init__(self, user_id, purchased_credits, consumed_credits, current_plan):
+                        self.user_id = user_id
+                        self.purchased_credits = purchased_credits
+                        self.consumed_credits = consumed_credits
+                        self.current_plan = current_plan
+                
+                profile = SimpleProfile(
+                    result[0], result[1], result[2], result[3] if result[3] else 'free'
+                )
+        
+        if not profile:
+            return {
+                "user_id": user_id,
+                "purchased_credits": 0,
+                "consumed_credits": 0,
+                "available_credits": 0,
+                "current_plan": "free",
+                "free_tier_count": 0,
+                "free_tier_remaining": FREE_TIER_MAX_COUNT,
+                "exists": False
+            }
+        
+        # Get free_tier_count safely
+        if has_free_tier_column:
+            try:
+                free_tier_count = getattr(profile, 'free_tier_count', 0) or 0
+            except (AttributeError, KeyError):
+                free_tier_count = 0
+        else:
+            free_tier_count = 0
+        
+        free_tier_remaining = max(0, FREE_TIER_MAX_COUNT - free_tier_count)
+        
+        return {
+            "user_id": user_id,
+            "purchased_credits": profile.purchased_credits,
+            "consumed_credits": profile.consumed_credits,
+            "available_credits": profile.purchased_credits - profile.consumed_credits,
+            "current_plan": profile.current_plan or "free",
+            "free_tier_count": free_tier_count,
+            "free_tier_remaining": free_tier_remaining,
+            "exists": True
+        }
+    except Exception as e:
+        # Fallback: return default values if anything fails
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in get_credit_summary: {str(e)}")
+        logger.exception(e)
+        
         return {
             "user_id": user_id,
             "purchased_credits": 0,
@@ -611,27 +688,6 @@ def get_credit_summary(db: Session, user_id: str) -> Dict[str, Any]:
             "free_tier_remaining": FREE_TIER_MAX_COUNT,
             "exists": False
         }
-    
-    # Safely get free_tier_count with fallback for missing column
-    try:
-        free_tier_count = getattr(profile, 'free_tier_count', 0) or 0
-        if free_tier_count is None:
-            free_tier_count = 0
-    except (AttributeError, KeyError):
-        free_tier_count = 0
-    
-    free_tier_remaining = max(0, FREE_TIER_MAX_COUNT - free_tier_count)
-    
-    return {
-        "user_id": user_id,
-        "purchased_credits": profile.purchased_credits,
-        "consumed_credits": profile.consumed_credits,
-        "available_credits": profile.purchased_credits - profile.consumed_credits,
-        "current_plan": profile.current_plan or "free",
-        "free_tier_count": free_tier_count,
-        "free_tier_remaining": free_tier_remaining,
-        "exists": True
-    }
 
 
 def refund_credits(
