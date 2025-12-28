@@ -10,6 +10,7 @@ import DeleteQueue from './DeleteQueue'
 import HistoryTable from './HistoryTable'
 import HistoryView from './HistoryView'
 import QueueReviewPanel from './QueueReviewPanel'
+import FilteringModal from './FilteringModal'
 import { Button } from './ui/button'
 import { AlertCircle, X } from 'lucide-react'
 import { getImageUrlFromListing, normalizeImageUrl } from '../utils/imageUtils'
@@ -823,28 +824,43 @@ function Dashboard() {
   // Apply filter with API refresh - fetch latest data before filtering
   const handleApplyFilter = async (newFilters) => {
     try {
-      console.log('🔍 handleApplyFilter: Fetching latest listings before applying filter...')
-      setLoading(true)
+      console.log('🔍 handleApplyFilter: Starting filter analysis...')
       
-      // Fetch latest listings from API first
-      if (!DEMO_MODE && isStoreConnected) {
+      // Show filtering modal
+      setShowFilteringModal(true)
+      setIsFiltering(true)
+      
+      // Calculate credits required (1 credit per listing)
+      const listingCount = allListings.length
+      const creditsRequired = listingCount
+      
+      // Fetch latest listings from API first (if needed)
+      if (!DEMO_MODE && isStoreConnected && allListings.length === 0) {
         await fetchAllListings()
       }
       
-      // Then apply filter
+      // Small delay to show the modal
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Apply filter
       setFilters(newFilters)
       setSelectedIds([])
       applyLocalFilter(newFilters)
       setViewMode('zombies')
+      
+      // Small delay before closing modal
+      await new Promise(resolve => setTimeout(resolve, 800))
+      
     } catch (err) {
-      console.error('Failed to refresh listings before filtering:', err)
+      console.error('Failed to apply filter:', err)
       // Still apply filter even if refresh fails
       setFilters(newFilters)
       setSelectedIds([])
       applyLocalFilter(newFilters)
       setViewMode('zombies')
     } finally {
-      setLoading(false)
+      setIsFiltering(false)
+      setShowFilteringModal(false)
     }
   }
 
