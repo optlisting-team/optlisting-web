@@ -332,6 +332,10 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, loadi
               e.preventDefault()
               e.stopPropagation()
               
+              // Clear any stale sessionStorage flags to ensure clean OAuth flow
+              const processedKey = 'ebay_oauth_processed'
+              sessionStorage.removeItem(processedKey)
+              
               // Set loading state immediately when button is clicked
               setCheckingConnection(true)
               
@@ -339,6 +343,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, loadi
                 console.log('🔘 Connect eBay button clicked')
                 console.log('   API_BASE_URL:', API_BASE_URL)
                 console.log('   CURRENT_USER_ID:', CURRENT_USER_ID)
+                console.log('   Cleared sessionStorage flag for fresh OAuth flow')
                 
                 // Check token status when connect button is clicked
                 console.log('   Checking eBay connection status...')

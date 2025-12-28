@@ -1059,7 +1059,7 @@ function Dashboard() {
     // Important: If eBay redirected directly to frontend (code parameter exists)
     // Redirect to backend callback endpoint
     if (code && !ebayConnected && !ebayError) {
-      // Check if we're already processing this redirect
+      // Check if we're already processing this redirect (only check for 'redirecting', not 'connected')
       const redirecting = sessionStorage.getItem(processedKey)
       if (redirecting === 'redirecting') {
         console.log('⚠️ Already redirecting to backend, skipping duplicate redirect')
@@ -1082,36 +1082,70 @@ function Dashboard() {
       return // Stop execution after redirect
     }
     
+    // If we have ebay_connected=true, process it (even if previously marked as processed)
+    // This ensures successful connections are handled even after page reload
+    
     if (ebayConnected === 'true') {
-      // Mark as processed immediately to prevent re-execution
-      sessionStorage.setItem(processedKey, 'connected')
+      console.log('✅ OAuth callback success detected - verifying and connecting')
       
       // Clean URL first to prevent re-triggering
       window.history.replaceState({}, '', window.location.pathname)
       
-      console.log('✅ OAuth callback success - connecting and loading products')
-      setIsStoreConnected(true)
-      
-      // Small delay to ensure state is updated before fetching
-      setTimeout(() => {
-        // Use handleStoreConnection with forceLoad=true to fetch products
-        // This will call fetchAllListings internally, so no need to call it separately
-        console.log('🔄 Calling handleStoreConnection(true, true) to fetch listings...')
-        handleStoreConnection(true, true) // connected=true, forceLoad=true
+      // Verify connection status from backend before proceeding
+      console.log('🔍 Verifying connection status from backend...')
+      axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
+        params: { user_id: CURRENT_USER_ID },
+        timeout: 30000
+      }).then(response => {
+        const isConnected = response.data?.connected === true && 
+                           response.data?.token_status?.has_valid_token !== false &&
+                           !response.data?.is_expired
         
-        // Also directly call fetchAllListings as a backup
-        setTimeout(() => {
-          console.log('🔄 Directly calling fetchAllListings as backup...')
-          fetchAllListings().catch(err => {
-            console.error('Failed to fetch listings after OAuth:', err)
-          })
-        }, 500)
-      }, 100)
+        console.log('📊 Backend connection status:', {
+          connected: response.data?.connected,
+          hasValidToken: response.data?.token_status?.has_valid_token,
+          isExpired: response.data?.is_expired,
+          finalDecision: isConnected
+        })
+        
+        if (isConnected) {
+          console.log('✅ Connection verified - setting state and fetching listings')
+          // Mark as processed AFTER verification
+          sessionStorage.setItem(processedKey, 'connected')
+          setIsStoreConnected(true)
+          
+          // Small delay to ensure state is updated before fetching
+          setTimeout(() => {
+            // Use handleStoreConnection with forceLoad=true to fetch products
+            console.log('🔄 Calling handleStoreConnection(true, true) to fetch listings...')
+            handleStoreConnection(true, true) // connected=true, forceLoad=true
+            
+            // Also directly call fetchAllListings as a backup
+            setTimeout(() => {
+              console.log('🔄 Directly calling fetchAllListings as backup...')
+              fetchAllListings().catch(err => {
+                console.error('Failed to fetch listings after OAuth:', err)
+              })
+            }, 500)
+          }, 100)
+        } else {
+          console.warn('⚠️ Backend reports not connected, clearing session storage and showing error')
+          sessionStorage.removeItem(processedKey)
+          alert('연결 확인에 실패했습니다. 다시 시도해주세요.')
+        }
+      }).catch(err => {
+        console.error('❌ Failed to verify connection status:', err)
+        // Still try to connect if URL says so (might be network issue)
+        console.log('⚠️ Verification failed, but URL indicates success - proceeding with connection')
+        sessionStorage.setItem(processedKey, 'connected')
+        setIsStoreConnected(true)
+        handleStoreConnection(true, true)
+      })
       
       // Clear the processed flag after a delay to allow for future connections
       setTimeout(() => {
         sessionStorage.removeItem(processedKey)
-      }, 5000)
+      }, 10000) // Increased to 10 seconds
     } else if (ebayError) {
       console.error('❌ OAuth callback error:', ebayError)
       const errorMessage = urlParams.get('message') || 'Failed to connect to eBay'
