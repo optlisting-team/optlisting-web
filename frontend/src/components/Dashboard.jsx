@@ -733,7 +733,15 @@ function Dashboard() {
       setError(null)
       
     } catch (err) {
-      console.error('fetchAllListings error:', err)
+      console.error('❌ fetchAllListings error:', err)
+      console.error('   Error details:', {
+        message: err.message,
+        code: err.code,
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+        url: err.config?.url
+      })
       
       let errorMessage = ''
       
@@ -741,16 +749,24 @@ function Dashboard() {
         errorMessage = 'eBay 계정이 연결되지 않았습니다. eBay 계정을 먼저 연결해주세요.'
         setError(errorMessage)
         setAllListings([])
+      } else if (err.response?.status === 500) {
+        const serverError = err.response?.data?.detail || err.response?.data?.error_message || '서버 오류'
+        errorMessage = `서버 오류가 발생했습니다: ${serverError}. 잠시 후 다시 시도해주세요.`
+        setError(errorMessage)
+        console.error('   Server error details:', err.response?.data)
       } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
         errorMessage = '요청 시간이 초과되었습니다. 서버가 응답하지 않거나 네트워크가 느릴 수 있습니다. 잠시 후 다시 시도해주세요.'
         setError(errorMessage)
         // Don't clear existing listings on timeout - keep what we have
+      } else if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
+        errorMessage = '네트워크 연결에 실패했습니다. 인터넷 연결을 확인하고 다시 시도해주세요.'
+        setError(errorMessage)
       } else if (allListings.length === 0) {
         errorMessage = `제품 목록을 가져오는데 실패했습니다: ${err.message || '알 수 없는 오류'}. 다시 시도해주세요.`
         setError(errorMessage)
       } else {
         // If we have existing listings, just log the error but don't show it prominently
-        console.warn('Failed to refresh listings, but keeping existing data:', err)
+        console.warn('⚠️ Failed to refresh listings, but keeping existing data:', err)
         errorMessage = `제품 목록을 새로고침하는데 실패했습니다: ${err.message || '알 수 없는 오류'}. 기존 데이터는 유지됩니다.`
       }
       
