@@ -103,25 +103,6 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
   const [rowsPerPage, setRowsPerPage] = useState(50)
   const [sortColumn, setSortColumn] = useState(null)
   const [sortDirection, setSortDirection] = useState('asc') // 'asc' or 'desc'
-  const [showScoreTooltip, setShowScoreTooltip] = useState(false)
-  const scoreTooltipRef = useRef(null)
-  
-  // Close tooltip when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (scoreTooltipRef.current && !scoreTooltipRef.current.contains(event.target)) {
-        setShowScoreTooltip(false)
-      }
-    }
-    
-    if (showScoreTooltip) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-    
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [showScoreTooltip])
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A'
@@ -200,17 +181,9 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
             aValue = (a.title || '').toLowerCase()
             bValue = (b.title || '').toLowerCase()
             break
-          case 'performanceScore':
-            aValue = a.zombieScore ?? 0
-            bValue = b.zombieScore ?? 0
-            break
           case 'recommendation':
             aValue = (a.recommendation?.text || '').toLowerCase()
             bValue = (b.recommendation?.text || '').toLowerCase()
-            break
-          case 'supplier':
-            aValue = (a.supplier_name || a.supplier || '').toLowerCase()
-            bValue = (b.supplier_name || b.supplier || '').toLowerCase()
             break
           case 'price':
             aValue = parseFloat(a.price || 0)
@@ -459,55 +432,6 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                     {getSortIcon('title')}
                   </div>
                 </th>
-                <th 
-                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-32"
-                  onClick={() => handleSort('performanceScore')}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <div className="relative" ref={scoreTooltipRef}>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setShowScoreTooltip(!showScoreTooltip)
-                        }}
-                        className="text-zinc-500 hover:text-zinc-300 transition-colors"
-                      >
-                        <Info className="w-3.5 h-3.5" />
-                      </button>
-                      
-                      {/* Tooltip */}
-                      {showScoreTooltip && (
-                        <div className="absolute left-0 top-full mt-2 w-64 bg-zinc-800 border border-zinc-700 rounded-lg p-3 shadow-xl z-50">
-                          <h4 className="text-xs font-bold text-white mb-2">Performance Score</h4>
-                          <div className="text-xs text-zinc-400 space-y-1.5">
-                            <p className="text-zinc-300 font-medium">Lower score = Lower performance</p>
-                            <div className="space-y-1">
-                              <div className="flex justify-between">
-                                <span>0-20:</span>
-                                <span className="text-red-400">Delete</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>21-40:</span>
-                                <span className="text-orange-400">Recommend Delete</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>41-60:</span>
-                                <span className="text-yellow-400">Optimize</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>61-100:</span>
-                                <span className="text-blue-400">Monitor</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <span className="text-red-400">Score</span>
-                    {getSortIcon('performanceScore')}
-                  </div>
-                </th>
                 {/* Filter order: Days (Age) → Sales → Watches → Impressions → Views */}
                 <th 
                   className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-16"
@@ -553,18 +477,6 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                     <span title="Page Views">Views</span>
                     {getSortIcon('views')}
                   </div>
-                </th>
-                <th 
-                  className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-24"
-                  onClick={() => handleSort('supplier')}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span>Supplier</span>
-                    {getSortIcon('supplier')}
-                  </div>
-                </th>
-                <th className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider w-24">
-                  <span>VIA</span>
                 </th>
                 <th 
                   className="px-2 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-800/50 transition-colors w-24"
@@ -650,43 +562,6 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                   </td>
                   <td className="px-2 py-4 text-sm text-zinc-400 data-value text-center">
                     {zombie.views || 0}
-                  </td>
-                  <td className="px-2 py-4">
-                    <div 
-                      className="group relative inline-block"
-                      title={zombie.supplier_name || zombie.supplier || "Unknown"}
-                    >
-                      <SourceBadge 
-                        source={zombie.supplier_name || zombie.supplier || "Unknown"} 
-                        editable={!!onSourceChange}
-                        onSourceChange={onSourceChange}
-                        itemId={zombie.id}
-                      />
-                      {/* Tooltip */}
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                        {zombie.supplier_name || zombie.supplier || "Unknown"}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-2 py-4 w-24">
-                    {(() => {
-                      // Check multiple possible fields for Shopify indication
-                      const isShopify = 
-                        zombie.management_hub === 'Shopify' || 
-                        zombie.marketplace === 'Shopify' ||
-                        zombie.platform === 'Shopify' ||
-                        (zombie.raw_data && typeof zombie.raw_data === 'object' && zombie.raw_data.management_hub === 'Shopify') ||
-                        (zombie.analysis_meta && typeof zombie.analysis_meta === 'object' && zombie.analysis_meta.management_hub === 'Shopify') ||
-                        (zombie.metrics && typeof zombie.metrics === 'object' && zombie.metrics.management_hub === 'Shopify')
-                      
-                      return isShopify ? (
-                        <span className="inline-block px-2 py-0.5 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded text-[10px] font-medium whitespace-nowrap">
-                          Shopify
-                        </span>
-                      ) : (
-                        <span className="text-zinc-500 text-[10px]">—</span>
-                      )
-                    })()}
                   </td>
                   <td className="px-2 py-4 text-xs text-white data-value w-24 whitespace-nowrap">
                     {formatPrice(zombie.price)}
