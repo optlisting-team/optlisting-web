@@ -461,11 +461,13 @@ function Sidebar() {
                     // Lemon Squeezy store URL - should be your store's subdomain (e.g., optlisting.lemonsqueezy.com)
                     const storeUrl = import.meta.env.VITE_LEMON_SQUEEZY_STORE || 'https://optlisting.lemonsqueezy.com'
                     
-                    // Lemon Squeezy checkout URL format
-                    // Basic format: https://[store].lemonsqueezy.com/checkout/buy/[variant_id]
-                    // With custom data: https://[store].lemonsqueezy.com/checkout/buy/[variant_id]?checkout[custom][user_id]=[user_id]
-                    // Note: Custom data parameters must use bracket notation in the URL
-                    const checkoutUrl = `${storeUrl}/checkout/buy/${variantId}?checkout[custom][user_id]=${encodeURIComponent(userId)}`
+                    // Lemon Squeezy checkout URL format (from official docs)
+                    // Format: https://[store].lemonsqueezy.com/checkout/buy/[variant_id]
+                    // Custom data: ?checkout[custom][user_id]=[user_id]
+                    const baseUrl = `${storeUrl}/checkout/buy/${variantId}`
+                    const checkoutUrl = userId 
+                      ? `${baseUrl}?checkout[custom][user_id]=${encodeURIComponent(userId)}`
+                      : baseUrl
                     console.log('🔗 Lemon Squeezy checkout URL:', checkoutUrl)
                     console.log('   Variant ID:', variantId)
                     console.log('   Store URL:', storeUrl)
