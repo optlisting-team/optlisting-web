@@ -1209,6 +1209,8 @@ class CreditBalanceResponse(BaseModel):
     consumed_credits: int
     available_credits: int
     current_plan: str
+    free_tier_count: int = 0
+    free_tier_remaining: int = 3
 
 
 class AddCreditsRequest(BaseModel):

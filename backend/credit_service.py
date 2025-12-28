@@ -607,8 +607,13 @@ def get_credit_summary(db: Session, user_id: str) -> Dict[str, Any]:
             "consumed_credits": 0,
             "available_credits": 0,
             "current_plan": "free",
+            "free_tier_count": 0,
+            "free_tier_remaining": FREE_TIER_MAX_COUNT,
             "exists": False
         }
+    
+    free_tier_count = getattr(profile, 'free_tier_count', 0) or 0
+    free_tier_remaining = max(0, FREE_TIER_MAX_COUNT - free_tier_count)
     
     return {
         "user_id": user_id,
@@ -616,6 +621,8 @@ def get_credit_summary(db: Session, user_id: str) -> Dict[str, Any]:
         "consumed_credits": profile.consumed_credits,
         "available_credits": profile.purchased_credits - profile.consumed_credits,
         "current_plan": profile.current_plan or "free",
+        "free_tier_count": free_tier_count,
+        "free_tier_remaining": free_tier_remaining,
         "exists": True
     }
 
