@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
-import { RotateCw, Zap, X, CheckCircle } from 'lucide-react'
+import { RotateCw, Zap, X, CheckCircle, CreditCard } from 'lucide-react'
 import { createPortal } from 'react-dom'
+import { useAccount } from '../contexts/AccountContext'
 
 function FilteringModal({ 
   isOpen, 
@@ -11,6 +12,12 @@ function FilteringModal({
   listingCount = 0,
   isFiltering = false
 }) {
+  const { setShowCreditModal } = useAccount()
+  
+  const handleGetCredits = () => {
+    onClose() // Close filtering modal
+    setShowCreditModal(true) // Open credit purchase modal
+  }
   useEffect(() => {
     if (isOpen) {
       // Prevent body scroll when modal is open
@@ -115,17 +122,29 @@ function FilteringModal({
           </div>
         )}
 
-        {/* Action Button */}
+        {/* Action Buttons */}
         {!isFiltering && (
-          <div className="flex justify-center">
+          <div className="flex flex-col gap-3">
+            {/* Start Analysis Button */}
             <button
               onClick={handleConfirm}
               disabled={currentCredits < creditsRequired}
-              className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-zinc-700 disabled:to-zinc-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2"
+              className="w-full px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-zinc-700 disabled:to-zinc-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2"
             >
               <CheckCircle className="w-5 h-5" />
               Start Analysis
             </button>
+            
+            {/* Get Credits Button - Show when credits are insufficient */}
+            {currentCredits < creditsRequired && (
+              <button
+                onClick={handleGetCredits}
+                className="w-full px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2"
+              >
+                <CreditCard className="w-5 h-5" />
+                Get Credits
+              </button>
+            )}
           </div>
         )}
       </div>
