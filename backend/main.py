@@ -1593,10 +1593,13 @@ async def lemonsqueezy_webhook(request: Request, db: Session = Depends(get_db)):
 # Lemon Squeezy Checkout API
 # ============================================================
 
+class CreateCheckoutRequest(BaseModel):
+    variant_id: str
+    user_id: str = "default-user"
+
 @app.post("/api/lemonsqueezy/create-checkout")
 async def create_checkout(
-    variant_id: str,
-    user_id: str = "default-user",  # User ID for custom data
+    request: CreateCheckoutRequest,
     db: Session = Depends(get_db)
 ):
     """
@@ -1604,6 +1607,8 @@ async def create_checkout(
     API 키가 설정되지 않으면 404 에러를 안내합니다.
     """
     import requests
+    variant_id = request.variant_id
+    user_id = request.user_id
     
     LS_API_KEY = os.getenv("LEMON_SQUEEZY_API_KEY")
     LS_STORE_ID = os.getenv("LEMON_SQUEEZY_STORE_ID")
