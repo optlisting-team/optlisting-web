@@ -446,11 +446,10 @@ function Sidebar() {
                     // Get user_id (default to 'default-user' for MVP testing)
                     const userId = user?.id || 'default-user'
                     
-                    // TODO: Replace with actual Variant IDs from environment variables
-                    // Example: const variantId = import.meta.env.VITE_LS_VARIANT_CREDIT_5
-                    // For now, using placeholder - needs to be configured in Lemon Squeezy Dashboard
+                    // Lemon Squeezy Variant IDs
+                    // Credit Pack Variants (configured in Lemon Squeezy Dashboard)
                     const variantIdMap = {
-                      'credit-5': 'VARIANT_ID_PLACEHOLDER_5',
+                      'credit-5': '1150506',  // Credit Pack 1000 - $5.00 (Starter)
                       'credit-10': 'VARIANT_ID_PLACEHOLDER_10',
                       'credit-15': 'VARIANT_ID_PLACEHOLDER_15',
                       'credit-20': 'VARIANT_ID_PLACEHOLDER_20',
@@ -470,7 +469,7 @@ function Sidebar() {
                   onClick={(e) => {
                     // Warn if variant ID is placeholder
                     const variantIdMap = {
-                      'credit-5': 'VARIANT_ID_PLACEHOLDER_5',
+                      'credit-5': '1150506',  // Credit Pack 1000 - $5.00 (Starter)
                       'credit-10': 'VARIANT_ID_PLACEHOLDER_10',
                       'credit-15': 'VARIANT_ID_PLACEHOLDER_15',
                       'credit-20': 'VARIANT_ID_PLACEHOLDER_20',
