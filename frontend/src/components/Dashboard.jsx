@@ -12,6 +12,7 @@ import HistoryView from './HistoryView'
 import QueueReviewPanel from './QueueReviewPanel'
 import { Button } from './ui/button'
 import { AlertCircle, X } from 'lucide-react'
+import { getImageUrlFromListing, normalizeImageUrl } from '../utils/imageUtils'
 
 // Use environment variable for Railway URL, fallback based on environment
 // Priority: VITE_API_URL env var > Development (empty for Vite proxy) > Production (Railway URL)
@@ -670,6 +671,10 @@ function Dashboard() {
       const transformedListings = allListingsFromEbay.map((item, index) => {
         const supplierInfo = extractSupplierInfo(item.title, item.sku, item.image_url || item.picture_url || item.thumbnail_url)
         
+        // Normalize image URL immediately
+        const rawImageUrl = item.image_url || item.picture_url || item.thumbnail_url
+        const normalizedImageUrl = normalizeImageUrl(rawImageUrl)
+        
         return {
           id: item.item_id || `ebay-${index}`,
           item_id: item.item_id || item.ebay_item_id,
@@ -692,7 +697,8 @@ function Dashboard() {
           start_time: item.start_time,
           picture_url: item.picture_url,
           thumbnail_url: item.thumbnail_url || item.picture_url,
-          image_url: item.image_url || item.picture_url || item.thumbnail_url
+          // Use normalized image URL (prioritize normalized, fallback to raw)
+          image_url: normalizedImageUrl || rawImageUrl
         }
       })
       

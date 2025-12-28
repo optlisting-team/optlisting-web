@@ -4,6 +4,96 @@ import PlatformBadge from './PlatformBadge'
 import { AlertTriangle, TrendingDown, Trash2, Eye, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Info } from 'lucide-react'
 import { normalizeImageUrl, getImageUrlFromListing } from '../utils/imageUtils'
 
+// Image component with retry logic and loading state
+function ImageWithRetry({ src, alt, originalUrl, itemId, sku, title, onLoad, onError }) {
+  const [imageSrc, setImageSrc] = useState(src)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
+  const imgRef = useRef(null)
+  const maxRetries = 2
+  
+  // Reset state when src changes
+  useEffect(() => {
+    setImageSrc(src)
+    setLoading(true)
+    setError(false)
+    setRetryCount(0)
+  }, [src])
+  
+  const placeholderSvg = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="48" height="48"%3E%3Crect width="48" height="48" fill="%23171717"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23717171" font-size="10"%3ENo Image%3C/text%3E%3C/svg%3E'
+  
+  const handleLoad = (e) => {
+    setLoading(false)
+    setError(false)
+    if (onLoad) onLoad()
+  }
+  
+  const handleError = (e) => {
+    setLoading(false)
+    
+    if (retryCount < maxRetries) {
+      // Retry with original URL (eBay images don't need cache busting)
+      setTimeout(() => {
+        setImageSrc(src) // Use original URL for retry
+        setRetryCount(prev => prev + 1)
+        setLoading(true)
+      }, 1000 * (retryCount + 1)) // 1s, 2s delays for retries
+    } else {
+      // Max retries reached, show placeholder
+      setError(true)
+      e.target.src = placeholderSvg
+      
+      if (onError) {
+        onError({
+          itemId: itemId || 'N/A',
+          sku: sku || 'N/A',
+          title: title?.substring(0, 50) || 'N/A',
+          originalUrl: originalUrl,
+          normalizedUrl: src,
+          errorType: 'load_failed_after_retries',
+          retryCount
+        })
+      }
+      
+      console.error('❌ Image load failed after retries:', {
+        itemId,
+        sku,
+        title: title?.substring(0, 50),
+        originalUrl,
+        normalizedUrl: src,
+        retryCount
+      })
+    }
+  }
+  
+  return (
+    <>
+      {loading && !error && (
+        <div className="w-12 h-12 bg-zinc-800 border border-zinc-700 rounded flex items-center justify-center absolute inset-0">
+          <div className="w-4 h-4 border-2 border-zinc-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+      <img 
+        ref={imgRef}
+        src={imageSrc}
+        alt={alt}
+        className={`w-12 h-12 object-cover rounded border border-zinc-700 ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-200`}
+        onLoad={handleLoad}
+        onError={handleError}
+        loading="eager"
+        data-debug-url={import.meta.env.DEV ? imageSrc : undefined}
+      />
+      {/* Debug tooltip in dev mode */}
+      {import.meta.env.DEV && !error && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 max-w-xs truncate">
+          {imageSrc}
+        </div>
+      )}
+    </>
+  )
+}
+
 // Calculate Performance Score based on metrics
 // Lower score = Lower performance (Zombie)
 // Higher score = Higher performance (Good)
@@ -107,6 +197,24 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
   const [sortDirection, setSortDirection] = useState('asc') // 'asc' or 'desc'
   const [showScoreTooltip, setShowScoreTooltip] = useState(false)
   const scoreTooltipRef = useRef(null)
+  
+  // Log image load summary after images have had time to load
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (imageStatsRef.current.total > 0) {
+        console.log('📊 Image Load Summary (after 3s):', {
+          total: imageStatsRef.current.total,
+          withImageUrl: imageStatsRef.current.withImageUrl,
+          withoutImageUrl: imageStatsRef.current.withoutImageUrl,
+          loadFailed: imageStatsRef.current.loadFailed,
+          loadSuccess: imageStatsRef.current.loadSuccess,
+          failedUrls: imageStatsRef.current.failedUrls.slice(0, 5) // Show first 5 failures
+        })
+      }
+    }, 3000) // Wait 3 seconds for images to load
+    
+    return () => clearTimeout(timer)
+  }, [zombies]) // Re-run when zombies change
   
   // Close tooltip when clicking outside
   useEffect(() => {
@@ -222,15 +330,14 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
       })
     }
     
-    // Update ref for error tracking
+    // Update ref for error tracking (preserve load stats across renders)
     imageStatsRef.current = {
-      ...imageStatsRef.current,
       total: stats.total,
       withImageUrl: stats.withImageUrl,
       withoutImageUrl: stats.withoutImageUrl,
-      loadFailed: 0, // Reset on new render
-      loadSuccess: 0,
-      failedUrls: []
+      loadFailed: imageStatsRef.current.loadFailed || 0,
+      loadSuccess: imageStatsRef.current.loadSuccess || 0,
+      failedUrls: imageStatsRef.current.failedUrls || []
     }
     
     // Apply sorting
@@ -664,60 +771,21 @@ function ZombieTable({ zombies, selectedIds, onSelect, onSelectAll, onSourceChan
                     {/* Thumbnail image (visual confirmation for zombie SKU report) */}
                     {zombie._normalizedImageUrl ? (
                       <div className="relative group">
-                        <img 
-                          src={zombie._normalizedImageUrl} 
+                        <ImageWithRetry
+                          src={zombie._normalizedImageUrl}
                           alt={zombie.title || 'Product thumbnail'}
-                          className="w-12 h-12 object-cover rounded border border-zinc-700"
-                          onError={(e) => {
-                            // Track failed image load
-                            imageStatsRef.current.loadFailed++
-                            imageStatsRef.current.failedUrls.push({
-                              itemId: zombie.ebay_item_id || zombie.item_id || 'N/A',
-                              sku: zombie.sku || 'N/A',
-                              title: zombie.title?.substring(0, 50) || 'N/A',
-                              originalUrl: zombie._originalImageUrl,
-                              normalizedUrl: zombie._normalizedImageUrl,
-                              errorType: 'load_failed'
-                            })
-                            
-                            // Log detailed error
-                            console.error('❌ Image load failed:', {
-                              itemId: zombie.ebay_item_id || zombie.item_id,
-                              sku: zombie.sku,
-                              title: zombie.title?.substring(0, 50),
-                              originalUrl: zombie._originalImageUrl,
-                              normalizedUrl: zombie._normalizedImageUrl,
-                              errorType: 'load_failed'
-                            })
-                            
-                            // Display placeholder
-                            e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="48" height="48"%3E%3Crect width="48" height="48" fill="%23171717"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23717171" font-size="10"%3ENo Image%3C/text%3E%3C/svg%3E'
-                            
-                            // Log summary after a delay to allow all errors to accumulate
-                            setTimeout(() => {
-                              if (imageStatsRef.current.loadFailed > 0) {
-                                console.log('📊 Image Load Summary:', {
-                                  total: imageStatsRef.current.total,
-                                  withImageUrl: imageStatsRef.current.withImageUrl,
-                                  withoutImageUrl: imageStatsRef.current.withoutImageUrl,
-                                  loadFailed: imageStatsRef.current.loadFailed,
-                                  loadSuccess: imageStatsRef.current.loadSuccess,
-                                  failedUrls: imageStatsRef.current.failedUrls.slice(0, 5) // Show first 5 failures
-                                })
-                              }
-                            }, 1000)
-                          }}
+                          originalUrl={zombie._originalImageUrl}
+                          itemId={zombie.ebay_item_id || zombie.item_id}
+                          sku={zombie.sku}
+                          title={zombie.title}
                           onLoad={() => {
                             imageStatsRef.current.loadSuccess++
                           }}
-                          data-debug-url={import.meta.env.DEV ? zombie._normalizedImageUrl : undefined}
+                          onError={(errorInfo) => {
+                            imageStatsRef.current.loadFailed++
+                            imageStatsRef.current.failedUrls.push(errorInfo)
+                          }}
                         />
-                        {/* Debug tooltip in dev mode */}
-                        {import.meta.env.DEV && (
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 max-w-xs truncate">
-                            {zombie._normalizedImageUrl}
-                          </div>
-                        )}
                       </div>
                     ) : (
                       <div className="w-12 h-12 bg-zinc-800 border border-zinc-700 rounded flex items-center justify-center relative group">
