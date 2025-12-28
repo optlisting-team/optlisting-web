@@ -1034,8 +1034,24 @@ function Dashboard() {
     
     // Prevent multiple executions - check if already processed
     const processedKey = 'ebay_oauth_processed'
-    if (sessionStorage.getItem(processedKey)) {
-      // Already processed in this session, skip
+    const processed = sessionStorage.getItem(processedKey)
+    
+    // Log current state for debugging
+    console.log('🔍 OAuth callback handler:', {
+      hasCode: !!code,
+      ebayConnected,
+      ebayError,
+      processed,
+      currentUrl: window.location.href
+    })
+    
+    if (processed === 'connected' || processed === 'redirecting') {
+      // Already processed in this session, skip to prevent infinite loops
+      console.log('⚠️ OAuth callback already processed, skipping')
+      // Clean URL if needed
+      if (window.location.search) {
+        window.history.replaceState({}, '', window.location.pathname)
+      }
       return
     }
     
