@@ -461,7 +461,10 @@ function Sidebar() {
                     const storeUrl = import.meta.env.VITE_LEMON_SQUEEZY_STORE || 'https://optlisting.lemonsqueezy.com'
                     
                     // Lemon Squeezy checkout URL with user_id in custom_data
-                    return `${storeUrl}/checkout/buy/${variantId}?checkout[custom][user_id]=${encodeURIComponent(userId)}`
+                    // Format: https://[store].lemonsqueezy.com/checkout/buy/[variant_id]?checkout[custom][user_id]=[user_id]
+                    const checkoutUrl = `${storeUrl}/checkout/buy/${variantId}?checkout%5Bcustom%5D%5Buser_id%5D=${encodeURIComponent(userId)}`
+                    console.log('Lemon Squeezy checkout URL:', checkoutUrl)
+                    return checkoutUrl
                   })()}
                   target="_blank"
                   rel="noopener noreferrer"
