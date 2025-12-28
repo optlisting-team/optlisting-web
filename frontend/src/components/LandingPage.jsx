@@ -475,12 +475,11 @@ function LandingPage() {
           >
             <h3 className="text-lg font-semibold text-zinc-300 dark:text-zinc-300 mb-6 text-center">Suppliers</h3>
             <div className="flex flex-wrap justify-center items-center gap-6 md:gap-10">
-              {/* AutoDS */}
+              {/* Shopify */}
               <div className="flex flex-col items-center gap-2">
-                <div className="h-12 w-28 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center p-2 shadow-lg">
-                  <span className="text-white font-bold text-xs">AutoDS</span>
+                <div className="h-14 w-32 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center p-2 shadow-lg">
+                  <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/shopify.svg" alt="Shopify" className="h-8 w-auto" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class="text-white font-bold text-sm">Shopify</span>'; }} />
                 </div>
-                <span className="text-xs text-zinc-400 text-center max-w-[100px]">All-in-one automation</span>
               </div>
             </div>
           </motion.div>
