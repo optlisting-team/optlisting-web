@@ -1042,6 +1042,13 @@ function Dashboard() {
     // Important: If eBay redirected directly to frontend (code parameter exists)
     // Redirect to backend callback endpoint
     if (code && !ebayConnected && !ebayError) {
+      // Check if we're already processing this redirect
+      const redirecting = sessionStorage.getItem(processedKey)
+      if (redirecting === 'redirecting') {
+        console.log('⚠️ Already redirecting to backend, skipping duplicate redirect')
+        return
+      }
+      
       console.log('🔄 eBay OAuth code detected - redirecting to backend')
       console.log('   Code:', code.substring(0, 20) + '...')
       console.log('   State:', state)
@@ -1051,8 +1058,10 @@ function Dashboard() {
       
       // Redirect to backend callback endpoint (pass all parameters)
       const callbackUrl = `${API_BASE_URL}/api/ebay/auth/callback?${urlParams.toString()}`
-      console.log('   Redirecting to:', callbackUrl)
-      window.location.href = callbackUrl
+      console.log('   Redirecting to backend callback:', callbackUrl)
+      
+      // Use replace instead of href to prevent back button issues
+      window.location.replace(callbackUrl)
       return // Stop execution after redirect
     }
     
