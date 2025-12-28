@@ -1085,7 +1085,7 @@ function Dashboard() {
     }
   }, []) // Keep empty dependency array - only run on mount
   
-  // Initial Load - Check API health and fetch data (execute only once)
+  // Initial Load - Check API health, eBay connection status, and fetch data (execute only once)
   useEffect(() => {
     const initializeDashboard = async () => {
       try {
@@ -1095,6 +1095,32 @@ function Dashboard() {
           fetchHistory().catch(err => {
             console.error('History fetch error on mount:', err)
           })
+          
+          // Check eBay connection status on mount
+          try {
+            console.log('🔍 Checking eBay connection status on mount...')
+            const response = await axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
+              params: { user_id: CURRENT_USER_ID },
+              timeout: 30000
+            })
+            
+            const isConnected = response.data?.connected === true && 
+                               response.data?.token_status?.has_valid_token !== false &&
+                               !response.data?.is_expired
+            
+            if (isConnected) {
+              console.log('✅ eBay is already connected - fetching listings...')
+              setIsStoreConnected(true)
+              // Fetch listings if already connected
+              handleStoreConnection(true, true) // connected=true, forceLoad=true
+            } else {
+              console.log('ℹ️ eBay is not connected yet')
+              setIsStoreConnected(false)
+            }
+          } catch (ebayStatusErr) {
+            console.warn('Failed to check eBay connection status on mount:', ebayStatusErr)
+            // Don't set connection state on error - let user manually connect
+          }
         }
       } catch (err) {
         console.warn('API Health Check failed (non-critical):', err)
