@@ -1066,14 +1066,26 @@ function Dashboard() {
       console.log('✅ OAuth callback success - connecting and loading products')
       setIsStoreConnected(true)
       
-      // Use handleStoreConnection with forceLoad=true to fetch products
-      // This will call fetchAllListings internally, so no need to call it separately
-      handleStoreConnection(true, true) // connected=true, forceLoad=true
+      // Small delay to ensure state is updated before fetching
+      setTimeout(() => {
+        // Use handleStoreConnection with forceLoad=true to fetch products
+        // This will call fetchAllListings internally, so no need to call it separately
+        console.log('🔄 Calling handleStoreConnection(true, true) to fetch listings...')
+        handleStoreConnection(true, true) // connected=true, forceLoad=true
+        
+        // Also directly call fetchAllListings as a backup
+        setTimeout(() => {
+          console.log('🔄 Directly calling fetchAllListings as backup...')
+          fetchAllListings().catch(err => {
+            console.error('Failed to fetch listings after OAuth:', err)
+          })
+        }, 500)
+      }, 100)
       
       // Clear the processed flag after a delay to allow for future connections
       setTimeout(() => {
         sessionStorage.removeItem(processedKey)
-      }, 2000)
+      }, 5000)
     } else if (ebayError) {
       console.error('❌ OAuth callback error:', ebayError)
       const errorMessage = urlParams.get('message') || 'Failed to connect to eBay'
