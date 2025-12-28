@@ -170,37 +170,6 @@ function PageHeader() {
               </button>
             )}
 
-            {/* My Plan */}
-            {isAuthenticated && (
-              <button
-                onClick={() => setShowPlanModal(true)}
-                className={`flex items-center gap-2 px-3 py-2 border rounded-xl hover:scale-[1.02] transition-all hidden md:flex ${
-                  plan === 'PRO' 
-                    ? 'bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/20 hover:border-amber-500/40' 
-                    : plan === 'BUSINESS'
-                      ? 'bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/20 hover:border-purple-500/40'
-                      : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'
-                }`}
-              >
-                <span className="text-lg">
-                  {plan === 'PRO' ? '👑' : plan === 'BUSINESS' ? '🚀' : '📦'}
-                </span>
-                <div className="text-left">
-                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider">My Plan</div>
-                  <div className={`text-sm font-bold ${
-                    plan === 'PRO' 
-                      ? 'text-amber-400' 
-                      : plan === 'BUSINESS'
-                        ? 'text-purple-400'
-                        : 'text-zinc-300'
-                  }`}>
-                    {plan}
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-zinc-500" />
-              </button>
-            )}
-
             {/* User Menu */}
             {isAuthenticated && (
               <div className="relative">
