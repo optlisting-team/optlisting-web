@@ -1843,8 +1843,9 @@ async def create_checkout(
                         "custom_price": None,
                         "product_options": {
                             "enabled_variants": [variant_id],
-                            "redirect_url": f"{FRONTEND_URL}/dashboard?payment=success",
-                            "receipt_link_url": f"{FRONTEND_URL}/dashboard",
+                            "redirect_url": f"{APP_URL}/dashboard?payment=success",
+                            "cancel_url": f"{APP_URL}/dashboard?payment=cancel",
+                            "receipt_link_url": f"{APP_URL}/dashboard",
                             "receipt_button_text": "Return to Dashboard",
                             "receipt_thank_you_note": "Thank you for your purchase!",
                         },
