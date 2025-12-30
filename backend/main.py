@@ -1883,7 +1883,7 @@ async def create_checkout(
                                 "id": LS_STORE_ID,
                             },
                         },
-                        "variants": {
+                        "variant": {
                             "data": [
                                 {
                                     "type": "variants",
