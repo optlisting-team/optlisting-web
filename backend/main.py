@@ -1744,7 +1744,9 @@ async def create_checkout(
             },
         }
         
-        logger.info(f"[DEBUG] Checkout request payload: {json.dumps(request_payload, indent=2)}")
+        # Log exact JSON payload being sent
+        payload_json = json.dumps(request_payload, indent=2)
+        logger.info(f"[DEBUG] Checkout request payload (exact JSON):\n{payload_json}")
         
         response = requests.post(
             "https://api.lemonsqueezy.com/v1/checkouts",
@@ -1762,18 +1764,29 @@ async def create_checkout(
         if response.status_code != 201:
             error_detail = response.text
             logger.error(f"[DEBUG] Lemon Squeezy API error: {response.status_code}")
-            logger.error(f"[DEBUG] Error details: {error_detail}")
+            logger.error(f"[DEBUG] Error details (full): {error_detail}")
             
             # Try to parse error response for better error message
             try:
                 error_json = response.json()
                 error_message = "Unknown error"
+                field_name = None
                 if "errors" in error_json and isinstance(error_json["errors"], list) and len(error_json["errors"]) > 0:
                     first_error = error_json["errors"][0]
                     error_message = first_error.get("detail", first_error.get("title", "Unknown error"))
+                    # Extract field name from error message if it contains "must be an array"
+                    if "must be an array" in error_message.lower():
+                        # Try to extract field name from source pointer or detail
+                        source = first_error.get("source", {})
+                        pointer = source.get("pointer", "")
+                        if pointer:
+                            # Extract field name from JSON pointer (e.g., "/data/attributes/product_options/enabled_variants")
+                            field_name = pointer.split("/")[-1]
+                        logger.error(f"[DEBUG] Field that must be an array: {field_name} (from pointer: {pointer})")
                     logger.error(f"[DEBUG] Parsed error: {error_message}")
-            except:
+            except Exception as e:
                 error_message = error_detail[:200] if error_detail else f"HTTP {response.status_code}"
+                logger.error(f"[DEBUG] Failed to parse error JSON: {e}")
             
             raise HTTPException(
                 status_code=500,
