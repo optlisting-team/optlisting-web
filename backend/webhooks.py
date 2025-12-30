@@ -292,9 +292,58 @@ def handle_subscription_cancelled(db: Session, event_data: Dict) -> bool:
         return False
 
 
+def find_user_id_recursive(data: Dict, key: str = "user_id", max_depth: int = 10, current_depth: int = 0) -> Optional[str]:
+    """
+    재귀적으로 딕셔너리에서 user_id 찾기
+    
+    Args:
+        data: 검색할 딕셔너리
+        key: 찾을 키 이름
+        max_depth: 최대 재귀 깊이
+        current_depth: 현재 깊이
+    
+    Returns:
+        찾은 user_id 값 또는 None
+    """
+    if current_depth >= max_depth or not isinstance(data, dict):
+        return None
+    
+    # 현재 레벨에서 직접 확인
+    if key in data and data[key]:
+        return str(data[key])
+    
+    # 모든 값에 대해 재귀 검색
+    for value in data.values():
+        if isinstance(value, dict):
+            result = find_user_id_recursive(value, key, max_depth, current_depth + 1)
+            if result:
+                return result
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    result = find_user_id_recursive(item, key, max_depth, current_depth + 1)
+                    if result:
+                        return result
+    
+    return None
+
+
+def parse_custom_data(custom_data) -> Dict:
+    """custom_data를 딕셔너리로 파싱"""
+    if isinstance(custom_data, dict):
+        return custom_data
+    elif isinstance(custom_data, str):
+        try:
+            return json.loads(custom_data)
+        except:
+            return {}
+    return {}
+
+
 def handle_order_created(db: Session, event_data: Dict) -> bool:
     """
     order_created 이벤트 처리 (크레딧 팩 구매)
+    결제 성공 확인 후 크레딧 적립
     
     Args:
         db: 데이터베이스 세션
@@ -303,81 +352,185 @@ def handle_order_created(db: Session, event_data: Dict) -> bool:
     Returns:
         처리 성공 여부
     """
+    from .credit_service import add_credits, TransactionType
+    import requests
+    
     try:
-        order = event_data.get('data', {}).get('attributes', {})
-        order_id = event_data.get('data', {}).get('id')
+        order_data = event_data.get('data', {})
+        order_id = str(order_data.get('id', ''))
         
-        # user_id 추출 (custom_data에서)
-        custom_data = order.get('custom_data', {}) or {}
+        logger.info(f"[WEBHOOK] order_created: Processing order_id={order_id}")
         
-        # custom_data가 문자열이면 JSON 파싱 시도
-        if isinstance(custom_data, str):
-            try:
-                import json
-                custom_data = json.loads(custom_data)
-            except:
-                custom_data = {}
+        # Idempotency check: Check if order_id already processed
+        try:
+            existing = db.execute(
+                text("""
+                    SELECT reference_id FROM credit_transactions 
+                    WHERE reference_id = :order_id AND transaction_type = 'purchase'
+                """),
+                {"order_id": order_id}
+            ).fetchone()
+            
+            if existing:
+                logger.info(f"[WEBHOOK] order_created: Order {order_id} already processed, skipping (idempotency)")
+                return True  # Already processed, return success
+        except Exception as e:
+            logger.warning(f"[WEBHOOK] order_created: Idempotency check failed: {e}, continuing...")
         
-        user_id = custom_data.get('user_id')
+        order_attributes = order_data.get('attributes', {})
+        meta_data = event_data.get('meta', {})
+        
+        # user_id 추출 - 여러 경로 시도
+        user_id = None
+        extraction_paths = []
+        
+        # 경로 1: event_data["data"]["attributes"]["custom_data"]["user_id"]
+        custom_data_1 = order_attributes.get('custom_data', {})
+        custom_data_1 = parse_custom_data(custom_data_1)
+        if custom_data_1.get('user_id'):
+            user_id = str(custom_data_1['user_id'])
+            extraction_paths.append("data.attributes.custom_data.user_id")
+        
+        # 경로 2: event_data["meta"]["custom_data"]["user_id"]
+        if not user_id:
+            custom_data_2 = meta_data.get('custom_data', {})
+            custom_data_2 = parse_custom_data(custom_data_2)
+            if custom_data_2.get('user_id'):
+                user_id = str(custom_data_2['user_id'])
+                extraction_paths.append("meta.custom_data.user_id")
+        
+        # 경로 3: event_data["data"]["attributes"]["first_order_item"]["custom_data"]["user_id"]
+        if not user_id:
+            first_order_item = order_attributes.get('first_order_item', {})
+            if first_order_item:
+                item_custom_data = first_order_item.get('custom_data', {})
+                item_custom_data = parse_custom_data(item_custom_data)
+                if item_custom_data.get('user_id'):
+                    user_id = str(item_custom_data['user_id'])
+                    extraction_paths.append("data.attributes.first_order_item.custom_data.user_id")
+        
+        # 경로 4: 재귀 탐색
+        if not user_id:
+            user_id = find_user_id_recursive(event_data)
+            if user_id:
+                extraction_paths.append("recursive_search")
         
         if not user_id:
-            # first_order_item에서 추출 시도
-            first_order_item = order.get('first_order_item', {}) or {}
-            user_id = first_order_item.get('custom_data', {}).get('user_id') if isinstance(first_order_item.get('custom_data'), dict) else None
-        
-        if not user_id:
-            logger.error(f"order_created: user_id를 찾을 수 없습니다. order_id={order_id}")
+            # 실패 시 payload 일부를 로그에 남기기
+            payload_sample = json.dumps(event_data, indent=2)[:2000]  # 처음 2000자만
+            logger.error(f"[WEBHOOK] order_created: user_id를 찾을 수 없습니다. order_id={order_id}")
+            logger.error(f"[WEBHOOK] order_created: Tried paths: data.attributes.custom_data, meta.custom_data, first_order_item.custom_data, recursive_search")
+            logger.error(f"[WEBHOOK] order_created: Payload sample:\n{payload_sample}")
             return False
         
-        # 결제 금액에서 크레딧 수 계산 (cents → credits)
-        total_cents = order.get('total', 0)  # 총 결제 금액 (cents)
+        logger.info(f"[WEBHOOK] order_created: user_id found via {extraction_paths[0] if extraction_paths else 'unknown'}: user_id={user_id}")
         
-        # Variant ID로 먼저 확인
-        first_order_item = order.get('first_order_item', {}) or {}
-        variant_id = str(first_order_item.get('variant_id', ''))
+        # variant_id 추출
+        first_order_item = order_attributes.get('first_order_item', {})
+        variant_id = str(first_order_item.get('variant_id', '')) if first_order_item else ''
         
-        credits_to_add = 0
+        # variant_id가 없으면 Lemon Squeezy API로 주문 상세 조회
+        if not variant_id:
+            logger.info(f"[WEBHOOK] order_created: variant_id not in payload, fetching from API...")
+            LS_API_KEY = os.getenv("LEMON_SQUEEZY_API_KEY")
+            if LS_API_KEY:
+                try:
+                    response = requests.get(
+                        f"https://api.lemonsqueezy.com/v1/orders/{order_id}",
+                        headers={
+                            "Authorization": f"Bearer {LS_API_KEY}",
+                            "Accept": "application/vnd.api+json",
+                        },
+                        timeout=10,
+                    )
+                    if response.status_code == 200:
+                        api_order_data = response.json()
+                        api_first_item = api_order_data.get('data', {}).get('attributes', {}).get('first_order_item', {})
+                        variant_id = str(api_first_item.get('variant_id', '')) if api_first_item else ''
+                        logger.info(f"[WEBHOOK] order_created: variant_id from API: {variant_id}")
+                except Exception as e:
+                    logger.warning(f"[WEBHOOK] order_created: Failed to fetch order from API: {e}")
         
-        # 1. Variant ID 매핑 확인
-        if variant_id and variant_id in VARIANT_CREDITS:
-            credits_to_add = VARIANT_CREDITS[variant_id]
-        # 2. 가격 기반 매핑 확인
-        elif total_cents in CREDIT_PACKS:
-            credits_to_add = CREDIT_PACKS[total_cents]
-        # 3. 근사값으로 매핑 (오차 범위 ±50 cents)
+        if not variant_id:
+            logger.error(f"[WEBHOOK] order_created: variant_id를 찾을 수 없습니다. order_id={order_id}")
+            return False
+        
+        logger.info(f"[WEBHOOK] order_created: order_id={order_id}, variant_id={variant_id}, user_id={user_id}")
+        
+        # 결제 성공(유료) 확정
+        is_paid = False
+        
+        # 방법 1: payload에서 status 확인
+        order_status = order_attributes.get('status', '').lower()
+        if order_status == 'paid':
+            is_paid = True
+            logger.info(f"[WEBHOOK] order_created: Order status is 'paid' from payload")
         else:
-            for price_cents, credits in CREDIT_PACKS.items():
-                if abs(total_cents - price_cents) <= 50:
-                    credits_to_add = credits
-                    break
+            # 방법 2: Lemon Squeezy API로 주문 상태 확인
+            logger.info(f"[WEBHOOK] order_created: Order status not 'paid' in payload, checking via API...")
+            LS_API_KEY = os.getenv("LEMON_SQUEEZY_API_KEY")
+            if LS_API_KEY:
+                try:
+                    response = requests.get(
+                        f"https://api.lemonsqueezy.com/v1/orders/{order_id}",
+                        headers={
+                            "Authorization": f"Bearer {LS_API_KEY}",
+                            "Accept": "application/vnd.api+json",
+                        },
+                        timeout=10,
+                    )
+                    if response.status_code == 200:
+                        api_order_data = response.json()
+                        api_status = api_order_data.get('data', {}).get('attributes', {}).get('status', '').lower()
+                        if api_status == 'paid':
+                            is_paid = True
+                            logger.info(f"[WEBHOOK] order_created: Order status confirmed as 'paid' via API")
+                        else:
+                            logger.info(f"[WEBHOOK] order_created: Order status is '{api_status}', skipping credit addition")
+                    else:
+                        logger.warning(f"[WEBHOOK] order_created: API returned {response.status_code}, assuming not paid")
+                except Exception as e:
+                    logger.warning(f"[WEBHOOK] order_created: Failed to verify payment status via API: {e}, assuming not paid")
+        
+        if not is_paid:
+            logger.info(f"[WEBHOOK] order_created: Order {order_id} is not paid, skipping credit addition")
+            return True  # Not paid, but return success to prevent retries
+        
+        # Determine credits to add based on variant_id
+        credits_to_add = 0
+        if variant_id in VARIANT_CREDITS:
+            credits_to_add = VARIANT_CREDITS[variant_id]
+        else:
+            logger.warning(f"[WEBHOOK] order_created: Unknown variant_id {variant_id}, skipping credit addition")
+            return False
         
         if credits_to_add <= 0:
-            logger.warning(f"order_created: 알 수 없는 크레딧 팩. order_id={order_id}, total={total_cents}")
-            # 안전을 위해 기본값 설정 (최소 팩)
-            credits_to_add = 300
+            logger.warning(f"[WEBHOOK] order_created: Invalid credits amount {credits_to_add} for variant {variant_id}")
+            return False
         
-        # 프로필 조회 또는 생성
-        profile = get_or_create_profile(db, user_id)
+        # Add credits atomically
+        result = add_credits(
+            db=db,
+            user_id=user_id,
+            amount=credits_to_add,
+            transaction_type=TransactionType.PURCHASE,
+            description=f"Lemon Squeezy purchase: variant {variant_id}",
+            reference_id=order_id  # Use order_id for idempotency
+        )
         
-        # 크레딧 추가
-        profile.purchased_credits = (profile.purchased_credits or 0) + credits_to_add
-        
-        # LS 고객 ID 저장 (없는 경우)
-        customer_id = order.get('customer_id')
-        if customer_id and not profile.ls_customer_id:
-            profile.ls_customer_id = str(customer_id)
-        
-        db.commit()
-        
-        logger.info(f"크레딧 팩 구매 완료: user_id={user_id}, credits={credits_to_add}, order_id={order_id}")
-        return True
-        
+        if result.success:
+            logger.info(f"[WEBHOOK] order_created: Successfully added {credits_to_add} credits to user {user_id}. order_id={order_id}, variant_id={variant_id}, new_balance={result.total_credits}")
+            return True
+        else:
+            logger.error(f"[WEBHOOK] order_created: Failed to add credits: {result.message}")
+            return False
+            
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"order_created 처리 중 DB 오류: {e}")
+        logger.error(f"[WEBHOOK] order_created: Database error: {e}")
         return False
     except Exception as e:
-        logger.error(f"order_created 처리 중 예상치 못한 오류: {e}")
+        logger.error(f"[WEBHOOK] order_created: Unexpected error: {e}", exc_info=True)
         return False
 
 
