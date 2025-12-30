@@ -40,6 +40,7 @@ CREDIT_PACKS = {
 
 # Variant ID 기준 매핑 (Lemon Squeezy 설정 후 업데이트 필요)
 VARIANT_CREDITS = {
+    "1150506": 1000,  # Credit Pack_1000 - $5.00 → 1,000 크레딧
     # "variant_id": credits
     # 예: "12345": 300,
 }

@@ -1517,7 +1517,7 @@ def initialize_credits(
 # Lemon Squeezy Webhook
 # ============================================================
 
-@app.post("/webhooks/lemonsqueezy")
+@app.post("/api/lemonsqueezy/webhook")
 async def lemonsqueezy_webhook(request: Request, db: Session = Depends(get_db)):
     """
     Lemon Squeezy 웹훅 엔드포인트
