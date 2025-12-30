@@ -380,6 +380,115 @@ def handle_order_created(db: Session, event_data: Dict) -> bool:
         return False
 
 
+def handle_order_paid(db: Session, event_data: Dict) -> bool:
+    """
+    order_paid 이벤트 처리 (크레딧 충전)
+    
+    Args:
+        db: 데이터베이스 세션
+        event_data: 웹훅 이벤트 데이터
+    
+    Returns:
+        처리 성공 여부
+    """
+    from .credit_service import add_credits, TransactionType
+    from sqlalchemy import text
+    
+    try:
+        order_data = event_data.get('data', {})
+        order_attributes = order_data.get('attributes', {})
+        order_id = str(order_data.get('id', ''))
+        
+        logger.info(f"[WEBHOOK] order_paid received: order_id={order_id}")
+        
+        # Idempotency check: Check if order_id already processed
+        try:
+            existing = db.execute(
+                text("""
+                    SELECT reference_id FROM credit_transactions 
+                    WHERE reference_id = :order_id AND transaction_type = 'purchase'
+                """),
+                {"order_id": order_id}
+            ).fetchone()
+            
+            if existing:
+                logger.info(f"[WEBHOOK] Order {order_id} already processed, skipping (idempotency)")
+                return True  # Already processed, return success
+        except Exception as e:
+            logger.warning(f"[WEBHOOK] Idempotency check failed: {e}, continuing...")
+        
+        # Extract variant_id from first_order_item
+        first_order_item = order_attributes.get('first_order_item', {})
+        variant_id = str(first_order_item.get('variant_id', ''))
+        
+        logger.info(f"[WEBHOOK] order_paid: order_id={order_id}, variant_id={variant_id}")
+        
+        # Extract user_id from custom_data
+        custom_data = order_attributes.get('custom_data', {})
+        if isinstance(custom_data, str):
+            try:
+                import json
+                custom_data = json.loads(custom_data)
+            except:
+                custom_data = {}
+        
+        user_id = custom_data.get('user_id')
+        
+        # If not in order custom_data, try first_order_item
+        if not user_id:
+            item_custom_data = first_order_item.get('custom_data', {})
+            if isinstance(item_custom_data, str):
+                try:
+                    import json
+                    item_custom_data = json.loads(item_custom_data)
+                except:
+                    item_custom_data = {}
+            user_id = item_custom_data.get('user_id')
+        
+        if not user_id:
+            logger.error(f"[WEBHOOK] order_paid: user_id not found in custom_data. order_id={order_id}")
+            return False
+        
+        logger.info(f"[WEBHOOK] order_paid: order_id={order_id}, variant_id={variant_id}, user_id={user_id}")
+        
+        # Determine credits to add based on variant_id
+        credits_to_add = 0
+        if variant_id in VARIANT_CREDITS:
+            credits_to_add = VARIANT_CREDITS[variant_id]
+        else:
+            logger.warning(f"[WEBHOOK] order_paid: Unknown variant_id {variant_id}, skipping credit addition")
+            return False
+        
+        if credits_to_add <= 0:
+            logger.warning(f"[WEBHOOK] order_paid: Invalid credits amount {credits_to_add} for variant {variant_id}")
+            return False
+        
+        # Add credits atomically
+        result = add_credits(
+            db=db,
+            user_id=user_id,
+            amount=credits_to_add,
+            transaction_type=TransactionType.PURCHASE,
+            description=f"Lemon Squeezy purchase: variant {variant_id}",
+            reference_id=order_id  # Use order_id for idempotency
+        )
+        
+        if result.success:
+            logger.info(f"[WEBHOOK] order_paid: Successfully added {credits_to_add} credits to user {user_id}. order_id={order_id}, variant_id={variant_id}, new_balance={result.total_credits}")
+            return True
+        else:
+            logger.error(f"[WEBHOOK] order_paid: Failed to add credits: {result.message}")
+            return False
+            
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"[WEBHOOK] order_paid: Database error: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"[WEBHOOK] order_paid: Unexpected error: {e}", exc_info=True)
+        return False
+
+
 def process_webhook_event(db: Session, event_data: Dict) -> bool:
     """
     웹훅 이벤트 처리 라우터
@@ -404,6 +513,8 @@ def process_webhook_event(db: Session, event_data: Dict) -> bool:
             return handle_subscription_cancelled(db, event_data)
         elif event_name == 'order_created':
             return handle_order_created(db, event_data)
+        elif event_name == 'order_paid':
+            return handle_order_paid(db, event_data)
         else:
             logger.warning(f"처리되지 않은 이벤트: {event_name}")
             return True  # 알 수 없는 이벤트는 성공으로 처리 (200 OK 반환)
