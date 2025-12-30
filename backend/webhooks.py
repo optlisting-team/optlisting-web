@@ -10,6 +10,7 @@ import logging
 from typing import Dict, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import text
 from .models import Profile
 
 # 로깅 설정
@@ -17,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # 환경 변수
-LS_WEBHOOK_SECRET = os.getenv("LS_WEBHOOK_SECRET", "")
+LS_WEBHOOK_SECRET = os.getenv("LEMON_SQUEEZY_WEBHOOK_SECRET") or os.getenv("LS_WEBHOOK_SECRET", "")
 
 # 플랜별 리스팅 제한
 PLAN_LIMITS = {
