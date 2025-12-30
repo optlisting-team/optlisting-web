@@ -1883,11 +1883,13 @@ async def create_checkout(
                                 "id": LS_STORE_ID,
                             },
                         },
-                        "variant": {
-                            "data": {
-                                "type": "variants",
-                                "id": variant_id,
-                            },
+                        "variants": {
+                            "data": [
+                                {
+                                    "type": "variants",
+                                    "id": variant_id,
+                                }
+                            ],
                         },
                     },
                 },
