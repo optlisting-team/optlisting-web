@@ -1613,7 +1613,7 @@ async def create_checkout(
     
     LS_API_KEY = os.getenv("LEMON_SQUEEZY_API_KEY")
     LS_STORE_ID = os.getenv("LEMON_SQUEEZY_STORE_ID")
-    FRONTEND_URL = os.getenv("FRONTEND_URL", "https://optlisting.vercel.app")
+    APP_URL = os.getenv("APP_URL", "https://optlisting.com")
     
     if not LS_API_KEY or not LS_STORE_ID:
         raise HTTPException(
@@ -1709,8 +1709,9 @@ async def create_checkout(
                     "custom_price": None,
                     "product_options": {
                         "enabled_variants": [variant_id_str],
-                        "redirect_url": f"{FRONTEND_URL}/dashboard?payment=success",
-                        "receipt_link_url": f"{FRONTEND_URL}/dashboard",
+                        "redirect_url": f"{APP_URL}/dashboard?payment=success",
+                        "cancel_url": f"{APP_URL}/dashboard?payment=cancel",
+                        "receipt_link_url": f"{APP_URL}/dashboard",
                         "receipt_button_text": "Return to Dashboard",
                         "receipt_thank_you_note": "Thank you for your purchase!",
                     },
@@ -1815,7 +1816,7 @@ async def create_checkout(
     
     LS_API_KEY = os.getenv("LEMON_SQUEEZY_API_KEY")
     LS_STORE_ID = os.getenv("LEMON_SQUEEZY_STORE_ID")
-    FRONTEND_URL = os.getenv("FRONTEND_URL", "https://optlisting.vercel.app")
+    APP_URL = os.getenv("APP_URL", "https://optlisting.com")
     
     if not LS_API_KEY or not LS_STORE_ID:
         raise HTTPException(

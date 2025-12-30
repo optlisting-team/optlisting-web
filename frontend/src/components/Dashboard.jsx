@@ -1027,6 +1027,23 @@ function Dashboard() {
   // Check URL parameters after OAuth callback and force update connection status
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
+    const paymentStatus = urlParams.get('payment')
+    
+    // Handle payment success/cancel redirects
+    if (paymentStatus === 'success') {
+      // Refetch credits to show updated balance
+      fetchUserCredits()
+      // Clean up URL parameter
+      urlParams.delete('payment')
+      const newUrl = window.location.pathname + (urlParams.toString() ? `?${urlParams.toString()}` : '')
+      window.history.replaceState({}, '', newUrl)
+    } else if (paymentStatus === 'cancel') {
+      // User cancelled payment, just clean up URL
+      urlParams.delete('payment')
+      const newUrl = window.location.pathname + (urlParams.toString() ? `?${urlParams.toString()}` : '')
+      window.history.replaceState({}, '', newUrl)
+    }
+    
     const ebayConnected = urlParams.get('ebay_connected')
     const ebayError = urlParams.get('ebay_error')
     const code = urlParams.get('code')
