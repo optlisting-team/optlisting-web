@@ -1626,6 +1626,55 @@ async def create_checkout(
         )
     
     try:
+        # Ensure variant_id and store_id are strings (Lemon Squeezy API requirement)
+        variant_id_str = str(variant_id)
+        store_id_str = str(LS_STORE_ID)
+        
+        logger.info(f"Creating checkout: variant_id={variant_id_str}, user_id={user_id}, store_id={store_id_str}")
+        
+        request_payload = {
+            "data": {
+                "type": "checkouts",
+                "attributes": {
+                    "custom_price": None,
+                    "product_options": {
+                        "enabled_variants": [variant_id_str],
+                        "redirect_url": f"{FRONTEND_URL}/dashboard?payment=success",
+                        "receipt_link_url": f"{FRONTEND_URL}/dashboard",
+                        "receipt_button_text": "Return to Dashboard",
+                        "receipt_thank_you_note": "Thank you for your purchase!",
+                    },
+                    "checkout_options": {
+                        "embed": False,
+                        "media": False,
+                        "logo": True,
+                    },
+                    "checkout_data": {
+                        "custom": {
+                            "user_id": user_id,
+                        },
+                    },
+                    "expires_at": None,
+                },
+                "relationships": {
+                    "store": {
+                        "data": {
+                            "type": "stores",
+                            "id": store_id_str,
+                        },
+                    },
+                    "variant": {
+                        "data": {
+                            "type": "variants",
+                            "id": variant_id_str,
+                        },
+                    },
+                },
+            },
+        }
+        
+        logger.info(f"Lemon Squeezy request payload: {json.dumps(request_payload, indent=2)}")
+        
         response = requests.post(
             "https://api.lemonsqueezy.com/v1/checkouts",
             headers={
@@ -1633,65 +1682,42 @@ async def create_checkout(
                 "Accept": "application/vnd.api+json",
                 "Content-Type": "application/vnd.api+json",
             },
-            json={
-                "data": {
-                    "type": "checkouts",
-                    "attributes": {
-                        "custom_price": None,
-                        "product_options": {
-                            "enabled_variants": [variant_id],
-                            "redirect_url": f"{FRONTEND_URL}/dashboard?payment=success",
-                            "receipt_link_url": f"{FRONTEND_URL}/dashboard",
-                            "receipt_button_text": "Return to Dashboard",
-                            "receipt_thank_you_note": "Thank you for your purchase!",
-                        },
-                        "checkout_options": {
-                            "embed": False,
-                            "media": False,
-                            "logo": True,
-                        },
-                        "checkout_data": {
-                            "custom": {
-                                "user_id": user_id,
-                            },
-                        },
-                        "expires_at": None,
-                    },
-                    "relationships": {
-                        "store": {
-                            "data": {
-                                "type": "stores",
-                                "id": LS_STORE_ID,
-                            },
-                        },
-                        "variant": {
-                            "data": {
-                                "type": "variants",
-                                "id": variant_id,
-                            },
-                        },
-                    },
-                },
-            },
+            json=request_payload,
             timeout=10,
         )
         
+        logger.info(f"Lemon Squeezy API response: status={response.status_code}, body={response.text[:500]}")
+        
         if response.status_code != 201:
             error_detail = response.text
-            logger.error(f"Lemon Squeezy API error: {response.status_code} - {error_detail}")
+            logger.error(f"Lemon Squeezy API error: {response.status_code}")
+            logger.error(f"Error details: {error_detail}")
+            
+            # Try to parse error response for better error message
+            try:
+                error_json = response.json()
+                error_message = "Unknown error"
+                if "errors" in error_json and isinstance(error_json["errors"], list) and len(error_json["errors"]) > 0:
+                    first_error = error_json["errors"][0]
+                    error_message = first_error.get("detail", first_error.get("title", "Unknown error"))
+                    logger.error(f"Parsed error: {error_message}")
+            except:
+                error_message = error_detail[:200] if error_detail else f"HTTP {response.status_code}"
+            
             raise HTTPException(
-                status_code=response.status_code,
+                status_code=500,
                 detail={
                     "error": "Failed to create checkout",
-                    "message": f"Lemon Squeezy API returned {response.status_code}",
-                    "details": error_detail[:500]  # Limit error message length
+                    "message": f"Lemon Squeezy API returned {response.status_code}: {error_message}",
+                    "lemon_squeezy_status": response.status_code,
+                    "details": error_detail[:1000] if error_detail else None
                 }
             )
         
         checkout_data = response.json()
         checkout_url = checkout_data["data"]["attributes"]["url"]
         
-        logger.info(f"Checkout created successfully for variant {variant_id}, user {user_id}")
+        logger.info(f"Checkout created successfully for variant {variant_id_str}, user {user_id}")
         return {"checkout_url": checkout_url}
         
     except requests.exceptions.Timeout:
