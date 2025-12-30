@@ -1839,6 +1839,45 @@ async def create_checkout(
         )
     
     try:
+        request_payload = {
+            "data": {
+                "type": "checkouts",
+                "attributes": {
+                    "custom_price": None,
+                    "product_options": [],
+                    "checkout_options": {
+                        "embed": False,
+                        "media": False,
+                        "logo": True,
+                    },
+                    "checkout_data": {
+                        "custom": {
+                            "user_id": user_id,
+                        },
+                    },
+                    "expires_at": None,
+                },
+                "relationships": {
+                    "store": {
+                        "data": {
+                            "type": "stores",
+                            "id": LS_STORE_ID,
+                        },
+                    },
+                    "variant": {
+                        "data": {
+                            "type": "variants",
+                            "id": variant_id,
+                        },
+                    },
+                },
+            },
+        }
+        
+        # Log product_options value and type before request
+        product_options_value = request_payload["data"]["attributes"]["product_options"]
+        logger.info(f"[DEBUG] product_options value: {product_options_value}, type: {type(product_options_value).__name__}, is_array: {isinstance(product_options_value, list)}")
+        
         response = requests.post(
             "https://api.lemonsqueezy.com/v1/checkouts",
             headers={
@@ -1846,47 +1885,7 @@ async def create_checkout(
                 "Accept": "application/vnd.api+json",
                 "Content-Type": "application/vnd.api+json",
             },
-            json={
-                "data": {
-                    "type": "checkouts",
-                    "attributes": {
-                        "custom_price": None,
-                        "product_options": {
-                            "enabled_variants": [variant_id],
-                            "redirect_url": f"{APP_URL}/dashboard?payment=success",
-                            "cancel_url": f"{APP_URL}/dashboard?payment=cancel",
-                            "receipt_link_url": f"{APP_URL}/dashboard",
-                            "receipt_button_text": "Return to Dashboard",
-                            "receipt_thank_you_note": "Thank you for your purchase!",
-                        },
-                        "checkout_options": {
-                            "embed": False,
-                            "media": False,
-                            "logo": True,
-                        },
-                        "checkout_data": {
-                            "custom": {
-                                "user_id": user_id,
-                            },
-                        },
-                        "expires_at": None,
-                    },
-                    "relationships": {
-                        "store": {
-                            "data": {
-                                "type": "stores",
-                                "id": LS_STORE_ID,
-                            },
-                        },
-                        "variant": {
-                            "data": {
-                                "type": "variants",
-                                "id": variant_id,
-                            },
-                        },
-                    },
-                },
-            },
+            json=request_payload,
             timeout=10,
         )
         
