@@ -1630,7 +1630,77 @@ async def create_checkout(
         variant_id_str = str(variant_id)
         store_id_str = str(LS_STORE_ID)
         
-        logger.info(f"Creating checkout: variant_id={variant_id_str}, user_id={user_id}, store_id={store_id_str}")
+        # Temporary debug logs
+        logger.info(f"[DEBUG] Creating checkout: variant_id={variant_id_str}, user_id={user_id}, store_id={store_id_str}")
+        
+        # Preflight validation: Check if store and variant exist
+        api_headers = {
+            "Authorization": f"Bearer {LS_API_KEY}",
+            "Accept": "application/vnd.api+json",
+        }
+        
+        # Validate Store ID
+        logger.info(f"[DEBUG] Validating store_id: {store_id_str}")
+        store_check = requests.get(
+            f"https://api.lemonsqueezy.com/v1/stores/{store_id_str}",
+            headers=api_headers,
+            timeout=10,
+        )
+        logger.info(f"[DEBUG] Store validation response: status={store_check.status_code}, body={store_check.text[:500]}")
+        
+        if store_check.status_code == 404:
+            logger.error(f"[DEBUG] Store ID {store_id_str} does not exist in Lemon Squeezy")
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Invalid Store ID",
+                    "message": f"Store ID {store_id_str} does not exist in Lemon Squeezy. Please check LEMON_SQUEEZY_STORE_ID environment variable.",
+                    "store_id": store_id_str
+                }
+            )
+        elif store_check.status_code != 200:
+            logger.error(f"[DEBUG] Store validation failed: {store_check.status_code} - {store_check.text[:200]}")
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Store validation failed",
+                    "message": f"Failed to validate store ID {store_id_str}: HTTP {store_check.status_code}",
+                    "store_id": store_id_str
+                }
+            )
+        
+        # Validate Variant ID
+        logger.info(f"[DEBUG] Validating variant_id: {variant_id_str}")
+        variant_check = requests.get(
+            f"https://api.lemonsqueezy.com/v1/variants/{variant_id_str}",
+            headers=api_headers,
+            timeout=10,
+        )
+        logger.info(f"[DEBUG] Variant validation response: status={variant_check.status_code}, body={variant_check.text[:500]}")
+        
+        if variant_check.status_code == 404:
+            logger.error(f"[DEBUG] Variant ID {variant_id_str} does not exist in Lemon Squeezy")
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Invalid Variant ID",
+                    "message": f"Variant ID {variant_id_str} does not exist in Lemon Squeezy. Please check the variant ID in your configuration.",
+                    "variant_id": variant_id_str
+                }
+            )
+        elif variant_check.status_code != 200:
+            logger.error(f"[DEBUG] Variant validation failed: {variant_check.status_code} - {variant_check.text[:200]}")
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Variant validation failed",
+                    "message": f"Failed to validate variant ID {variant_id_str}: HTTP {variant_check.status_code}",
+                    "variant_id": variant_id_str
+                }
+            )
+        
+        # Both store and variant are valid, proceed with checkout creation
+        logger.info(f"[DEBUG] Preflight validation passed. Creating checkout...")
         
         request_payload = {
             "data": {
@@ -1673,7 +1743,7 @@ async def create_checkout(
             },
         }
         
-        logger.info(f"Lemon Squeezy request payload: {json.dumps(request_payload, indent=2)}")
+        logger.info(f"[DEBUG] Checkout request payload: {json.dumps(request_payload, indent=2)}")
         
         response = requests.post(
             "https://api.lemonsqueezy.com/v1/checkouts",
@@ -1686,12 +1756,12 @@ async def create_checkout(
             timeout=10,
         )
         
-        logger.info(f"Lemon Squeezy API response: status={response.status_code}, body={response.text[:500]}")
+        logger.info(f"[DEBUG] Lemon Squeezy API response: status={response.status_code}, body={response.text[:1000]}")
         
         if response.status_code != 201:
             error_detail = response.text
-            logger.error(f"Lemon Squeezy API error: {response.status_code}")
-            logger.error(f"Error details: {error_detail}")
+            logger.error(f"[DEBUG] Lemon Squeezy API error: {response.status_code}")
+            logger.error(f"[DEBUG] Error details: {error_detail}")
             
             # Try to parse error response for better error message
             try:
@@ -1700,7 +1770,7 @@ async def create_checkout(
                 if "errors" in error_json and isinstance(error_json["errors"], list) and len(error_json["errors"]) > 0:
                     first_error = error_json["errors"][0]
                     error_message = first_error.get("detail", first_error.get("title", "Unknown error"))
-                    logger.error(f"Parsed error: {error_message}")
+                    logger.error(f"[DEBUG] Parsed error: {error_message}")
             except:
                 error_message = error_detail[:200] if error_detail else f"HTTP {response.status_code}"
             
@@ -1717,7 +1787,7 @@ async def create_checkout(
         checkout_data = response.json()
         checkout_url = checkout_data["data"]["attributes"]["url"]
         
-        logger.info(f"Checkout created successfully for variant {variant_id_str}, user {user_id}")
+        logger.info(f"[DEBUG] Checkout created successfully for variant {variant_id_str}, user {user_id}")
         return {"checkout_url": checkout_url}
         
     except requests.exceptions.Timeout:
