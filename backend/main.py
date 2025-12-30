@@ -1707,14 +1707,7 @@ async def create_checkout(
                 "type": "checkouts",
                 "attributes": {
                     "custom_price": None,
-                    "product_options": {
-                        "enabled_variants": [variant_id_str],
-                        "redirect_url": f"{APP_URL}/dashboard?payment=success",
-                        "cancel_url": f"{APP_URL}/dashboard?payment=cancel",
-                        "receipt_link_url": f"{APP_URL}/dashboard",
-                        "receipt_button_text": "Return to Dashboard",
-                        "receipt_thank_you_note": "Thank you for your purchase!",
-                    },
+                    "product_options": [],
                     "checkout_options": {
                         "embed": False,
                         "media": False,
@@ -1743,6 +1736,10 @@ async def create_checkout(
                 },
             },
         }
+        
+        # Log product_options value and type before request
+        product_options_value = request_payload["data"]["attributes"]["product_options"]
+        logger.info(f"[DEBUG] product_options value: {product_options_value}, type: {type(product_options_value).__name__}, is_array: {isinstance(product_options_value, list)}")
         
         # Log exact JSON payload being sent
         payload_json = json.dumps(request_payload, indent=2)
