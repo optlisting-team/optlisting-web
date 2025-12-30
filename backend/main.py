@@ -1735,12 +1735,10 @@ async def create_checkout(
                         },
                     },
                     "variant": {
-                        "data": [
-                            {
-                                "type": "variants",
-                                "id": variant_id_str,
-                            }
-                        ],
+                        "data": {
+                            "type": "variants",
+                            "id": variant_id_str,
+                        },
                     },
                 },
             },
@@ -1884,12 +1882,10 @@ async def create_checkout(
                             },
                         },
                         "variant": {
-                            "data": [
-                                {
-                                    "type": "variants",
-                                    "id": variant_id,
-                                }
-                            ],
+                            "data": {
+                                "type": "variants",
+                                "id": variant_id,
+                            },
                         },
                     },
                 },
