@@ -1734,7 +1734,7 @@ async def create_checkout(
                             "id": store_id_str,
                         },
                     },
-                    "variants": {
+                    "variant": {
                         "data": [
                             {
                                 "type": "variants",
