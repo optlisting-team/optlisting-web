@@ -1013,6 +1013,209 @@ def analyze_zombie_listings(
     return zombies, zombie_breakdown
 
 
+def count_low_performing_candidates(
+    db: Session,
+    user_id: str,
+    min_days: int = 7,
+    max_sales: int = 0,
+    max_watch_count: int = 0,
+    max_watches: int = 0,
+    max_impressions: int = 100,
+    max_views: int = 10,
+    supplier_filter: str = "All",
+    platform_filter: str = "eBay",
+    store_id: Optional[str] = None
+) -> int:
+    """
+    분석 대상 SKU 수 계산 (필터 조건에 맞는 active listings 수)
+    
+    analyze_zombie_listings와 동일한 필터 로직을 사용하되, count만 반환합니다.
+    실제 분석을 수행하지 않으므로 크레딧을 차감하지 않습니다.
+    
+    Returns:
+        int: 필터 조건에 맞는 분석 대상 SKU 수
+    """
+    # Ensure values are non-negative
+    min_days = max(0, min_days)
+    max_sales = max(0, max_sales)
+    effective_max_watches = max(0, max_watches if max_watches > 0 else max_watch_count)
+    max_impressions = max(0, max_impressions)
+    max_views = max(0, max_views)
+    
+    # 날짜 필터
+    cutoff_date = date.today() - timedelta(days=min_days)
+    
+    # Build query with filters (analyze_zombie_listings와 동일한 로직)
+    query = db.query(Listing).filter(
+        Listing.user_id == user_id
+    )
+    
+    # Apply store filter if store_id is provided and not 'all'
+    if store_id and store_id != 'all':
+        if hasattr(Listing, 'store_id'):
+            query = query.filter(Listing.store_id == store_id)
+    
+    # Date filter (analyze_zombie_listings와 동일한 로직)
+    date_filters = []
+    date_filters.append(
+        and_(
+            Listing.metrics.isnot(None),
+            Listing.metrics.has_key('date_listed'),
+            or_(
+                and_(
+                    func.jsonb_typeof(Listing.metrics['date_listed']) == 'string',
+                    Listing.metrics['date_listed'].astext.isnot(None),
+                    cast(Listing.metrics['date_listed'].astext, Date) < cutoff_date
+                ),
+                and_(
+                    func.jsonb_typeof(Listing.metrics['date_listed']) == 'number',
+                    Listing.metrics['date_listed'].astext.isnot(None),
+                    cast(
+                        func.to_timestamp(cast(Listing.metrics['date_listed'].astext, Integer)),
+                        Date
+                    ) < cutoff_date
+                )
+            )
+        )
+    )
+    date_filters.append(
+        and_(
+            or_(
+                Listing.metrics == None,
+                ~Listing.metrics.has_key('date_listed')
+            ),
+            Listing.date_listed.isnot(None),
+            Listing.date_listed < cutoff_date
+        )
+    )
+    date_filters.append(
+        and_(
+            or_(
+                Listing.metrics == None,
+                ~Listing.metrics.has_key('date_listed')
+            ),
+            or_(
+                Listing.date_listed == None,
+                Listing.date_listed.is_(None)
+            ),
+            Listing.last_synced_at.isnot(None),
+            func.date(Listing.last_synced_at) < cutoff_date
+        )
+    )
+    
+    if date_filters:
+        query = query.filter(or_(*date_filters))
+    
+    # Sales filter
+    if max_sales is not None and max_sales >= 0:
+        sales_value = case(
+            (
+                and_(
+                    Listing.metrics.isnot(None),
+                    Listing.metrics.has_key('sales'),
+                    func.jsonb_typeof(Listing.metrics['sales']).in_(['number', 'string']),
+                    Listing.metrics['sales'].astext.isnot(None)
+                ),
+                cast(Listing.metrics['sales'].astext, Integer)
+            ),
+            else_=func.coalesce(
+                func.coalesce(Listing.quantity_sold, 0),
+                func.coalesce(Listing.sold_qty, 0),
+                0
+            )
+        )
+        query = query.filter(sales_value <= max_sales)
+    
+    # Watch filter
+    if effective_max_watches is not None and effective_max_watches >= 0:
+        watches_value = case(
+            (
+                and_(
+                    Listing.metrics.isnot(None),
+                    Listing.metrics.has_key('watches'),
+                    func.jsonb_typeof(Listing.metrics['watches']) == 'object',
+                    Listing.metrics['watches'].has_key('total_watches')
+                ),
+                cast(Listing.metrics['watches']['total_watches'].astext, Integer)
+            ),
+            (
+                and_(
+                    Listing.metrics.isnot(None),
+                    Listing.metrics.has_key('watches'),
+                    func.jsonb_typeof(Listing.metrics['watches']).in_(['number', 'string']),
+                    Listing.metrics['watches'].astext.isnot(None)
+                ),
+                cast(Listing.metrics['watches'].astext, Integer)
+            ),
+            else_=func.coalesce(Listing.watch_count, 0)
+        )
+        query = query.filter(watches_value <= effective_max_watches)
+    
+    # Impressions filter
+    if max_impressions is not None and max_impressions > 0:
+        impressions_filter = or_(
+            and_(
+                Listing.metrics.isnot(None),
+                Listing.metrics.has_key('impressions'),
+                func.jsonb_typeof(Listing.metrics['impressions']) == 'object',
+                Listing.metrics['impressions'].has_key('total_impressions'),
+                cast(Listing.metrics['impressions']['total_impressions'].astext, Integer) < max_impressions
+            ),
+            and_(
+                Listing.metrics.isnot(None),
+                Listing.metrics.has_key('impressions'),
+                func.jsonb_typeof(Listing.metrics['impressions']).in_(['number', 'string']),
+                Listing.metrics['impressions'].astext.isnot(None),
+                cast(Listing.metrics['impressions'].astext, Integer) < max_impressions
+            ),
+            or_(
+                Listing.metrics == None,
+                ~Listing.metrics.has_key('impressions')
+            )
+        )
+        query = query.filter(impressions_filter)
+    
+    # Views filter
+    if max_views is not None and max_views > 0:
+        views_value = case(
+            (
+                and_(
+                    Listing.metrics.isnot(None),
+                    Listing.metrics.has_key('views'),
+                    func.jsonb_typeof(Listing.metrics['views']) == 'object',
+                    Listing.metrics['views'].has_key('total_views')
+                ),
+                cast(Listing.metrics['views']['total_views'].astext, Integer)
+            ),
+            (
+                and_(
+                    Listing.metrics.isnot(None),
+                    Listing.metrics.has_key('views'),
+                    func.jsonb_typeof(Listing.metrics['views']).in_(['number', 'string']),
+                    Listing.metrics['views'].astext.isnot(None)
+                ),
+                cast(Listing.metrics['views'].astext, Integer)
+            ),
+            else_=0  # Fallback: no views data = 0 views
+        )
+        query = query.filter(views_value < max_views)
+    
+    # Apply platform filter
+    if platform_filter and platform_filter in ["eBay", "Shopify"]:
+        if hasattr(Listing, 'platform'):
+            query = query.filter(Listing.platform == platform_filter)
+        else:
+            query = query.filter(Listing.marketplace == platform_filter)
+    
+    # Apply supplier filter if not "All"
+    if supplier_filter and supplier_filter != "All":
+        query = query.filter(Listing.supplier_name == supplier_filter)
+    
+    # Count only (don't fetch actual listings)
+    count = query.count()
+    return count
+
+
 def upsert_listings(db: Session, listings: List[Listing]) -> int:
     """
     UPSERT listings using PostgreSQL's ON CONFLICT DO UPDATE.

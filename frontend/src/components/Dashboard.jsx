@@ -163,6 +163,9 @@ function Dashboard() {
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [pendingAnalysisFilters, setPendingAnalysisFilters] = useState(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [requiredCredits, setRequiredCredits] = useState(1)  // quote에서 받아온 값
+  const [isFetchingQuote, setIsFetchingQuote] = useState(false)  // quote 호출 중 플래그
+  const [isToppingUp, setIsToppingUp] = useState(false)  // Dev top-up 진행 중 플래그
   
   // API Health Check State
   const [apiConnected, setApiConnected] = useState(false)
@@ -825,38 +828,89 @@ function Dashboard() {
 
   // Apply filter - Confirm 모달 표시
   const handleApplyFilter = async (newFilters) => {
-    console.log('🔍 handleApplyFilter: Showing confirm modal...')
+    console.log('🔍 handleApplyFilter: Fetching quote...')
+    
+    setIsFetchingQuote(true)
     setPendingAnalysisFilters(newFilters)
-    setShowConfirmModal(true)
+    
+    try {
+      // Step 1: Quote (preflight) 호출 - requiredCredits 계산
+      const quoteResponse = await axios.post(`${API_BASE_URL}/api/analysis/low-performing/quote`, {
+        days: newFilters.analytics_period_days || newFilters.min_days || 7,
+        sales_lte: newFilters.max_sales || 0,
+        watch_lte: newFilters.max_watches || newFilters.max_watch_count || 0,
+        imp_lte: newFilters.max_impressions || 100,
+        views_lte: newFilters.max_views || 10,
+      }, {
+        params: {
+          user_id: CURRENT_USER_ID
+        },
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: 30000
+      })
+      
+      if (quoteResponse.data) {
+        const { estimatedCandidates, requiredCredits: quoteRequiredCredits, remainingCredits } = quoteResponse.data
+        
+        console.log(`📊 Quote received: estimatedCandidates=${estimatedCandidates}, requiredCredits=${quoteRequiredCredits}, remainingCredits=${remainingCredits}`)
+        
+        // requiredCredits 설정 (모달에 표시)
+        setRequiredCredits(quoteRequiredCredits)
+        
+        // 크레딧 업데이트 (quote에서 받은 최신 값)
+        setUserCredits(remainingCredits)
+        
+        // Step 2: Confirm modal 표시
+        setShowConfirmModal(true)
+      } else {
+        throw new Error('Invalid quote response')
+      }
+    } catch (err) {
+      console.error('❌ Quote fetch failed:', err)
+      let errorMessage = 'Failed to calculate required credits. Please try again.'
+      
+      if (err.response?.status === 402) {
+        const errorData = err.response?.data?.detail || {}
+        errorMessage = errorData.message || 'Insufficient credits. Please purchase more credits.'
+      }
+      
+      showToast(errorMessage, 'error')
+      setPendingAnalysisFilters(null)
+    } finally {
+      setIsFetchingQuote(false)
+    }
   }
   
   // Confirm 모달에서 확인 클릭 시 실제 분석 실행
   const handleConfirmAnalysis = async () => {
     if (!pendingAnalysisFilters || isAnalyzing) return
     
-    const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    // Idempotency-Key 생성 (execute에서 사용)
+    const idempotencyKey = `execute_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
     try {
       setIsAnalyzing(true)
       setShowConfirmModal(false)
       
-      console.log(`📊 [${requestId}] Starting Low-Performing analysis...`, pendingAnalysisFilters)
+      console.log(`📊 [${idempotencyKey}] Starting Low-Performing analysis execution...`, pendingAnalysisFilters)
       
-      // API 호출
-      const response = await axios.post(`${API_BASE_URL}/api/analysis/low-performing`, {
+      // Step 3: Execute 호출 - 크레딧 차감 + 분석 수행
+      const response = await axios.post(`${API_BASE_URL}/api/analysis/low-performing/execute`, {
         days: pendingAnalysisFilters.analytics_period_days || pendingAnalysisFilters.min_days || 7,
         sales_lte: pendingAnalysisFilters.max_sales || 0,
         watch_lte: pendingAnalysisFilters.max_watches || pendingAnalysisFilters.max_watch_count || 0,
         imp_lte: pendingAnalysisFilters.max_impressions || 100,
         views_lte: pendingAnalysisFilters.max_views || 10,
-        request_id: requestId
+        idempotency_key: idempotencyKey
       }, {
         params: {
           user_id: CURRENT_USER_ID
         },
         headers: {
-          'X-Request-Id': requestId,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey  // 헤더에도 포함 (표준 관행)
         },
         timeout: 120000
       })
@@ -865,15 +919,15 @@ function Dashboard() {
         throw new Error(response.data.message || 'Analysis failed')
       }
       
-      const { count, items, remaining_credits, request_id: returnedRequestId, filters: returnedFilters } = response.data
+      const { count, items, remainingCredits, chargedCredits, requestId: returnedRequestId, filters: returnedFilters } = response.data
       
-      console.log(`✅ [${requestId}] Analysis completed: ${count} items found, remaining credits: ${remaining_credits}`)
+      console.log(`✅ [${idempotencyKey}] Analysis completed: count=${count}, chargedCredits=${chargedCredits}, remainingCredits=${remainingCredits}`)
       
       // 분석 결과 저장
       setAnalysisResult({
         count,
         items,
-        requestId: returnedRequestId || requestId,
+        requestId: returnedRequestId || idempotencyKey,
         filters: returnedFilters || pendingAnalysisFilters
       })
       
@@ -882,8 +936,8 @@ function Dashboard() {
       setResultsFilters(pendingAnalysisFilters)
       setSelectedIds([])
       
-      // 크레딧 업데이트
-      setUserCredits(remaining_credits)
+      // 크레딧 업데이트 (execute에서 받은 최신 값)
+      setUserCredits(remainingCredits)
       
       // Dashboard 내부에 결과 표시
       setResultsMode('low')
@@ -900,7 +954,7 @@ function Dashboard() {
       setPendingAnalysisFilters(null)
       
     } catch (err) {
-      console.error(`❌ [${requestId}] Analysis failed:`, err)
+      console.error(`❌ [${idempotencyKey}] Analysis execution failed:`, err)
       
       let errorMessage = 'Analysis failed. Please try again.'
       let showRetry = true
@@ -1475,6 +1529,56 @@ function Dashboard() {
           onError={(msg, err) => showToast(getErrorMessage(err || { message: msg }), 'error')}
         />
 
+        {/* Dev-only Top-up Button */}
+        {import.meta.env.VITE_ENABLE_DEV_TOPUP === 'true' && (
+          <div className="mt-4 mb-4">
+            <button
+              onClick={async () => {
+                if (isToppingUp) return
+                
+                setIsToppingUp(true)
+                try {
+                  const response = await axios.post(`${API_BASE_URL}/api/dev/credits/topup`, {}, {
+                    params: {
+                      user_id: CURRENT_USER_ID,
+                      amount: 100
+                    },
+                    headers: {
+                      'Content-Type': 'application/json'
+                    },
+                    timeout: 30000
+                  })
+                  
+                  if (response.data.success) {
+                    const { totalCredits, addedAmount } = response.data
+                    setUserCredits(totalCredits)
+                    showToast(`Dev top-up successful: +${addedAmount} credits`, 'success')
+                    
+                    // 크레딧 정보 다시 가져오기
+                    fetchUserCredits().catch(err => console.error('Failed to refresh credits:', err))
+                  } else {
+                    throw new Error(response.data.message || 'Top-up failed')
+                  }
+                } catch (err) {
+                  console.error('Dev top-up failed:', err)
+                  
+                  if (err.response?.status === 403) {
+                    showToast('Dev top-up is not available in this environment', 'error')
+                  } else {
+                    showToast(getErrorMessage(err), 'error')
+                  }
+                } finally {
+                  setIsToppingUp(false)
+                }
+              }}
+              disabled={isToppingUp}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-800 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              {isToppingUp ? 'Topping up...' : '🧪 Dev Top-up +100'}
+            </button>
+          </div>
+        )}
+
         {/* FilterBar - Find Low-Performing SKUs 버튼 */}
         {isStoreConnected && summaryStats.activeCount > 0 && (
           <div className="mt-6">
@@ -1577,9 +1681,9 @@ function Dashboard() {
           }
         }}
         onConfirm={handleConfirmAnalysis}
-        creditsRequired={1}
+        creditsRequired={requiredCredits}
         currentCredits={userCredits}
-        isProcessing={isAnalyzing}
+        isProcessing={isAnalyzing || isFetchingQuote}
       />
 
       {/* Filtering Modal (레거시 - 필요시 유지) */}

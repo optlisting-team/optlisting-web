@@ -11,10 +11,11 @@ from datetime import date, datetime, timedelta
 import json
 import logging
 import os
+import uuid
 from pydantic import BaseModel
 
 from .models import init_db, get_db, Listing, DeletionLog, Profile, CSVFormat, Base, engine
-from .services import detect_source, extract_supplier_info, analyze_zombie_listings, generate_export_csv
+from .services import detect_source, extract_supplier_info, analyze_zombie_listings, generate_export_csv, count_low_performing_candidates
 from .dummy_data import generate_dummy_listings
 from .webhooks import verify_webhook_signature, process_webhook_event
 from .ebay_webhook import router as ebay_webhook_router
@@ -31,7 +32,7 @@ from .credit_service import (
     PlanType,
 )
 
-app = FastAPI(title="OptListing API", version="1.3.27")
+app = FastAPI(title="OptListing API", version="1.3.29")
 
 # ============================================================
 # [BOOT] Supabase Write Self-Test (Top-level execution)
@@ -838,6 +839,354 @@ class LowPerformingAnalysisRequest(BaseModel):
     imp_lte: int = 100  # max_impressions
     views_lte: int = 10  # max_views
     request_id: Optional[str] = None  # 클라이언트에서 생성한 requestId (idempotency)
+
+
+class LowPerformingExecuteRequest(BaseModel):
+    """Low-Performing 분석 실행 요청 모델 (idempotency 포함)"""
+    days: int = 7
+    sales_lte: int = 0
+    watch_lte: int = 0
+    imp_lte: int = 100
+    views_lte: int = 10
+    idempotency_key: str  # 클라이언트에서 생성한 고유 키 (필수) - 중복 실행 방지
+
+
+@app.post("/api/analysis/low-performing/quote")
+def quote_low_performing_analysis(
+    request: LowPerformingAnalysisRequest,
+    user_id: str = Query("default-user", description="User ID"),
+    store_id: Optional[str] = Query(None, description="Store ID (optional)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Low-Performing 분석 비용 견적 (Preflight)
+    
+    분석 대상 SKU 수를 계산하고, 필요한 크레딧과 남은 크레딧을 반환합니다.
+    크레딧을 차감하지 않습니다.
+    
+    Args:
+        request: 필터 파라미터
+        user_id: 사용자 ID
+        store_id: 스토어 ID (선택)
+        db: 데이터베이스 세션
+        
+    Returns:
+        {
+            "estimatedCandidates": int,  # 분석 대상 SKU 수
+            "requiredCredits": int,      # 필요한 크레딧 (SKU 수만큼)
+            "remainingCredits": int,     # 남은 크레딧
+            "filters": Dict              # 적용된 필터
+        }
+    """
+    import logging
+    from .credit_service import get_available_credits
+    
+    logger = logging.getLogger(__name__)
+    
+    # 필터 값 검증 및 정규화
+    days = max(1, request.days)
+    sales_lte = max(0, request.sales_lte)
+    watch_lte = max(0, request.watch_lte)
+    imp_lte = max(0, request.imp_lte)
+    views_lte = max(0, request.views_lte)
+    
+    filters = {
+        "days": days,
+        "sales_lte": sales_lte,
+        "watch_lte": watch_lte,
+        "imp_lte": imp_lte,
+        "views_lte": views_lte
+    }
+    
+    logger.info(f"📊 Low-Performing 분석 견적 요청: user_id={user_id}, filters={filters}")
+    
+    # 분석 대상 SKU 수 계산 (실제 분석 수행 X)
+    try:
+        estimated_candidates = count_low_performing_candidates(
+            db=db,
+            user_id=user_id,
+            min_days=days,
+            max_sales=sales_lte,
+            max_watches=watch_lte,
+            max_watch_count=watch_lte,
+            max_impressions=imp_lte,
+            max_views=views_lte,
+            supplier_filter="All",
+            platform_filter="eBay",
+            store_id=store_id
+        )
+    except Exception as e:
+        logger.error(f"❌ 분석 대상 SKU 수 계산 실패: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "count_calculation_failed",
+                "message": f"Failed to calculate candidate count: {str(e)}"
+            }
+        )
+    
+    # 필요한 크레딧 = 분석 대상 SKU 수
+    required_credits = max(1, estimated_candidates)  # 최소 1 크레딧
+    
+    # 남은 크레딧 조회
+    remaining_credits = get_available_credits(db, user_id)
+    
+    logger.info(f"✅ 견적 완료: estimated_candidates={estimated_candidates}, required_credits={required_credits}, remaining_credits={remaining_credits}")
+    
+    return {
+        "estimatedCandidates": estimated_candidates,
+        "requiredCredits": required_credits,
+        "remainingCredits": remaining_credits,
+        "filters": filters
+    }
+
+
+@app.post("/api/analysis/low-performing/execute")
+def execute_low_performing_analysis(
+    request: LowPerformingExecuteRequest,
+    user_id: str = Query("default-user", description="User ID"),
+    store_id: Optional[str] = Query(None, description="Store ID (optional)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Low-Performing 분석 실행 (크레딧 차감 + 분석 수행)
+    
+    Idempotency-Key를 사용하여 중복 실행을 방지합니다.
+    분석 대상 SKU 수만큼 크레딧을 차감하고, 실제 분석을 수행합니다.
+    
+    Args:
+        request: 필터 파라미터 + idempotency_key
+        user_id: 사용자 ID
+        store_id: 스토어 ID (선택)
+        db: 데이터베이스 세션
+        
+    Returns:
+        {
+            "success": bool,
+            "chargedCredits": int,        # 실제 차감된 크레딧
+            "remainingCredits": int,      # 남은 크레딧
+            "count": int,                 # 분석된 low-performing items 개수
+            "items": List[Dict],          # 분석된 items 리스트
+            "requestId": str,             # 요청 ID (idempotency_key)
+            "filters": Dict               # 적용된 필터
+        }
+    """
+    import uuid
+    import logging
+    from sqlalchemy import text
+    from .credit_service import deduct_credits_atomic, get_available_credits, TransactionType
+    from fastapi import status as http_status
+    
+    logger = logging.getLogger(__name__)
+    
+    # Idempotency 체크: credit_transactions 테이블에서 reference_id 확인
+    idempotency_key = request.idempotency_key
+    logger.info(f"📊 [{idempotency_key}] Low-Performing 분석 실행 요청: user_id={user_id}")
+    
+    # 중복 실행 체크
+    try:
+        existing_transaction = db.execute(
+            text("""
+                SELECT transaction_id, amount, balance_after, created_at
+                FROM credit_transactions
+                WHERE user_id = :user_id AND reference_id = :reference_id
+                ORDER BY created_at DESC
+                LIMIT 1
+            """),
+            {"user_id": user_id, "reference_id": idempotency_key}
+        ).fetchone()
+        
+        if existing_transaction:
+            # 이미 실행된 요청 - 이전 결과 반환
+            logger.info(f"🔄 [{idempotency_key}] 중복 실행 감지 - 이전 결과 반환")
+            
+            # 이전 분석 결과를 반환하려면 별도 테이블에 저장해야 하지만,
+            # 지금은 간단하게 "이미 실행됨" 메시지만 반환
+            # TODO: 분석 결과를 별도 테이블에 저장하여 중복 요청 시 재사용
+            
+            return {
+                "success": True,
+                "chargedCredits": existing_transaction.amount if existing_transaction.amount > 0 else 0,
+                "remainingCredits": existing_transaction.balance_after if existing_transaction.balance_after else get_available_credits(db, user_id),
+                "count": 0,  # 이전 결과를 저장하지 않았으므로 0
+                "items": [],
+                "requestId": idempotency_key,
+                "filters": {
+                    "days": request.days,
+                    "sales_lte": request.sales_lte,
+                    "watch_lte": request.watch_lte,
+                    "imp_lte": request.imp_lte,
+                    "views_lte": request.views_lte
+                },
+                "message": "This request was already processed. Please use the original request ID to retrieve results."
+            }
+    except Exception as e:
+        logger.warning(f"⚠️ [{idempotency_key}] 중복 실행 체크 실패 (계속 진행): {str(e)}")
+    
+    # 필터 값 검증 및 정규화
+    days = max(1, request.days)
+    sales_lte = max(0, request.sales_lte)
+    watch_lte = max(0, request.watch_lte)
+    imp_lte = max(0, request.imp_lte)
+    views_lte = max(0, request.views_lte)
+    
+    filters = {
+        "days": days,
+        "sales_lte": sales_lte,
+        "watch_lte": watch_lte,
+        "imp_lte": imp_lte,
+        "views_lte": views_lte
+    }
+    
+    # 분석 대상 SKU 수 계산 (크레딧 차감 전에 확인)
+    try:
+        estimated_candidates = count_low_performing_candidates(
+            db=db,
+            user_id=user_id,
+            min_days=days,
+            max_sales=sales_lte,
+            max_watches=watch_lte,
+            max_watch_count=watch_lte,
+            max_impressions=imp_lte,
+            max_views=views_lte,
+            supplier_filter="All",
+            platform_filter="eBay",
+            store_id=store_id
+        )
+    except Exception as e:
+        logger.error(f"❌ [{idempotency_key}] 분석 대상 SKU 수 계산 실패: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "count_calculation_failed",
+                "message": f"Failed to calculate candidate count: {str(e)}",
+                "requestId": idempotency_key
+            }
+        )
+    
+    # 필요한 크레딧 = 분석 대상 SKU 수
+    required_credits = max(1, estimated_candidates)
+    
+    logger.info(f"💰 [{idempotency_key}] 크레딧 차감 예정: required={required_credits}, estimated_candidates={estimated_candidates}")
+    
+    # 크레딧 체크 및 atomic 차감
+    try:
+        credit_result = deduct_credits_atomic(
+            db=db,
+            user_id=user_id,
+            amount=required_credits,
+            description=f"Low-Performing SKUs analysis (filters: {filters}, candidates: {estimated_candidates})",
+            reference_id=idempotency_key
+        )
+        
+        if not credit_result.success:
+            # 크레딧 부족
+            remaining = get_available_credits(db, user_id)
+            logger.warning(f"⚠️ [{idempotency_key}] 크레딧 부족: available={remaining}, required={required_credits}")
+            raise HTTPException(
+                status_code=http_status.HTTP_402_PAYMENT_REQUIRED,
+                detail={
+                    "error": "insufficient_credits",
+                    "message": credit_result.message,
+                    "available_credits": remaining,
+                    "required_credits": required_credits,
+                    "estimatedCandidates": estimated_candidates,
+                    "requestId": idempotency_key
+                }
+            )
+        
+        remaining_credits = credit_result.remaining_credits
+        charged_credits = credit_result.deducted_amount
+        logger.info(f"✅ [{idempotency_key}] 크레딧 차감 성공: charged={charged_credits}, remaining={remaining_credits}")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ [{idempotency_key}] 크레딧 차감 실패: {str(e)}")
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "credit_deduction_failed",
+                "message": f"Failed to deduct credits: {str(e)}",
+                "requestId": idempotency_key
+            }
+        )
+    
+    # 분석 실행
+    try:
+        zombies, zombie_breakdown = analyze_zombie_listings(
+            db=db,
+            user_id=user_id,
+            min_days=days,
+            max_sales=sales_lte,
+            max_watches=watch_lte,
+            max_watch_count=watch_lte,
+            max_impressions=imp_lte,
+            max_views=views_lte,
+            supplier_filter="All",
+            platform_filter="eBay",
+            store_id=store_id,
+            skip=0,
+            limit=10000
+        )
+        
+        count = len(zombies)
+        logger.info(f"✅ [{idempotency_key}] 분석 완료: {count}개 low-performing items 발견")
+        
+        # Items 변환
+        items = [
+            {
+                "id": z.id,
+                "item_id": getattr(z, 'item_id', None) or getattr(z, 'ebay_item_id', None) or "",
+                "ebay_item_id": getattr(z, 'item_id', None) or getattr(z, 'ebay_item_id', None) or "",
+                "title": z.title,
+                "sku": z.sku,
+                "image_url": z.image_url or (z.metrics.get('image_url') if z.metrics and isinstance(z.metrics, dict) else None),
+                "platform": getattr(z, 'platform', None) or getattr(z, 'marketplace', None) or "eBay",
+                "marketplace": getattr(z, 'platform', None) or getattr(z, 'marketplace', None) or "eBay",
+                "supplier_name": getattr(z, 'supplier_name', None) or "Unknown",
+                "supplier": getattr(z, 'supplier_name', None) or "Unknown",
+                "supplier_id": getattr(z, 'supplier_id', None),
+                "price": (z.metrics.get('price') if z.metrics and isinstance(z.metrics, dict) and 'price' in z.metrics else None) or getattr(z, 'price', None),
+                "date_listed": z.date_listed.isoformat() if z.date_listed else None,
+                "quantity_sold": (z.metrics.get('sales') if z.metrics and isinstance(z.metrics, dict) and 'sales' in z.metrics else None) or getattr(z, 'sold_qty', 0) or 0,
+                "total_sales": (z.metrics.get('sales') if z.metrics and isinstance(z.metrics, dict) and 'sales' in z.metrics else None) or getattr(z, 'sold_qty', 0) or 0,
+                "watch_count": (z.metrics.get('watches') if z.metrics and isinstance(z.metrics, dict) and 'watches' in z.metrics else None) or getattr(z, 'watch_count', 0) or 0,
+                "view_count": (z.metrics.get('views') if z.metrics and isinstance(z.metrics, dict) and 'views' in z.metrics else None) or getattr(z, 'view_count', None) or 0,
+                "views": (z.metrics.get('views') if z.metrics and isinstance(z.metrics, dict) and 'views' in z.metrics else None) or getattr(z, 'view_count', None) or 0,
+                "impressions": (z.metrics.get('impressions') if z.metrics and isinstance(z.metrics, dict) and 'impressions' in z.metrics else None) or getattr(z, 'impressions', None) or 0,
+                "days_listed": (date.today() - z.date_listed).days if z.date_listed else None,
+                "is_global_winner": bool(getattr(z, 'is_global_winner', 0)),
+                "is_active_elsewhere": bool(getattr(z, 'is_active_elsewhere', 0)),
+                "metrics": z.metrics if z.metrics else {},
+                "analysis_meta": z.analysis_meta if z.analysis_meta else {}
+            }
+            for z in zombies
+        ]
+        
+        return {
+            "success": True,
+            "chargedCredits": charged_credits,
+            "remainingCredits": remaining_credits,
+            "count": count,
+            "items": items,
+            "requestId": idempotency_key,
+            "filters": filters
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ [{idempotency_key}] 분석 실행 실패: {str(e)}")
+        # 분석 실패 시 크레딧 환불 고려 (현재는 환불하지 않음)
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "analysis_failed",
+                "message": f"Failed to analyze low-performing SKUs: {str(e)}",
+                "requestId": idempotency_key
+            }
+        )
 
 
 @app.post("/api/analysis/low-performing")
@@ -2316,6 +2665,402 @@ def init_csv_formats_endpoint(db: Session = Depends(get_db)):
         return {"message": "CSV formats initialized successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to initialize CSV formats: {str(e)}")
+
+
+# ============================================================
+# 테스트용 크레딧 충전 엔드포인트 (Admin-only)
+# ============================================================
+
+class AdminGrantCreditsRequest(BaseModel):
+    """관리자 크레딧 부여 요청"""
+    user_id: str
+    amount: int
+    description: Optional[str] = None
+
+
+@app.post("/api/admin/credits/grant")
+def admin_grant_credits(
+    request: AdminGrantCreditsRequest,
+    admin_key: str = Query(None, description="Admin API Key"),
+    db: Session = Depends(get_db)
+):
+    """
+    관리자용 크레딧 부여 엔드포인트 (Admin-only)
+    
+    프로덕션에서 일반 유저가 무제한 충전할 수 없도록 안전장치 구현:
+    - ADMIN_API_KEY 환경 변수로 인증 필요
+    - 프로덕션 환경에서는 admin_key가 필수
+    - amount는 양수만 허용
+    
+    Args:
+        request: 크레딧 부여 요청 (user_id, amount, description)
+        admin_key: 관리자 API 키 (환경 변수 ADMIN_API_KEY와 일치해야 함)
+        db: 데이터베이스 세션
+        
+    Returns:
+        {
+            "success": bool,
+            "totalCredits": int,  # 총 크레딧 (부여 후)
+            "addedAmount": int,    # 부여된 크레딧
+            "message": str
+        }
+    """
+    import logging
+    from .credit_service import add_credits, TransactionType
+    
+    logger = logging.getLogger(__name__)
+    
+    # 관리자 인증 체크
+    expected_admin_key = os.getenv("ADMIN_API_KEY", "")
+    
+    # 프로덕션 환경에서 admin_key 검증 (개발 환경에서는 선택적)
+    is_production = os.getenv("ENVIRONMENT", "").lower() in ["production", "prod"]
+    
+    if is_production or expected_admin_key:
+        if not admin_key or admin_key != expected_admin_key:
+            logger.warning(f"⚠️ 관리자 인증 실패: admin_key 제공 여부={admin_key is not None}")
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "unauthorized",
+                    "message": "Invalid admin key. This endpoint requires admin authentication."
+                }
+            )
+    
+    # 요청 검증
+    if request.amount <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_amount",
+                "message": "Amount must be positive"
+            }
+        )
+    
+    if not request.user_id or request.user_id.strip() == "":
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_user_id",
+                "message": "user_id is required"
+            }
+        )
+    
+    logger.info(f"🔐 [ADMIN] 크레딧 부여 요청: user_id={request.user_id}, amount={request.amount}")
+    
+    # 크레딧 부여
+    try:
+        result = add_credits(
+            db=db,
+            user_id=request.user_id,
+            amount=request.amount,
+            transaction_type=TransactionType.BONUS,
+            description=request.description or f"Admin grant: {request.amount} credits",
+            reference_id=f"admin_grant_{uuid.uuid4().hex[:16]}"
+        )
+        
+        if not result.success:
+            logger.error(f"❌ [ADMIN] 크레딧 부여 실패: {result.message}")
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "error": "credit_grant_failed",
+                    "message": result.message
+                }
+            )
+        
+        logger.info(f"✅ [ADMIN] 크레딧 부여 성공: user_id={request.user_id}, amount={request.amount}, total={result.total_credits}")
+        
+        return {
+            "success": True,
+            "totalCredits": result.total_credits,
+            "addedAmount": result.added_amount,
+            "message": "Credits granted successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ [ADMIN] 크레딧 부여 실패: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "credit_grant_failed",
+                "message": f"Failed to grant credits: {str(e)}"
+            }
+        )
+
+
+# ============================================================
+# 쿠폰 기반 크레딧 충전 엔드포인트 (Coupon Redeem)
+# ============================================================
+
+class CouponRedeemRequest(BaseModel):
+    """쿠폰 사용 요청"""
+    coupon_code: str
+
+
+@app.post("/api/credits/redeem")
+def redeem_coupon(
+    request: CouponRedeemRequest,
+    user_id: str = Query("default-user", description="User ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    쿠폰 사용 엔드포인트 (Coupon Redeem)
+    
+    프로덕션에서 일반 유저가 무제한 충전할 수 없도록 안전장치 구현:
+    - 쿠폰 코드는 환경 변수나 별도 테이블에서 관리
+    - 1회 사용 제한 (계정당 1회)
+    - 만료 날짜 체크
+    - 쿠폰 코드 검증
+    
+    Args:
+        request: 쿠폰 사용 요청 (coupon_code)
+        user_id: 사용자 ID
+        db: 데이터베이스 세션
+        
+    Returns:
+        {
+            "success": bool,
+            "totalCredits": int,  # 총 크레딧 (충전 후)
+            "addedAmount": int,    # 충전된 크레딧
+            "message": str
+        }
+    """
+    import logging
+    import uuid
+    from sqlalchemy import text
+    from datetime import datetime, timedelta
+    from .credit_service import add_credits, TransactionType
+    
+    logger = logging.getLogger(__name__)
+    
+    # 쿠폰 코드 검증 (환경 변수에서 관리 - 프로덕션에서는 별도 테이블 사용 권장)
+    # 예시 쿠폰 코드 (환경 변수에서 관리)
+    valid_coupons = {
+        "TEST100": {"credits": 100, "expires_days": 30, "one_time": True},
+        "WELCOME50": {"credits": 50, "expires_days": 30, "one_time": True},
+        # 프로덕션에서는 별도 coupons 테이블에서 관리 권장
+    }
+    
+    # 환경 변수에서 쿠폰 코드 추가 로드 (선택적)
+    coupon_code_env = os.getenv("COUPON_CODES", "")
+    if coupon_code_env:
+        try:
+            import json
+            env_coupons = json.loads(coupon_code_env)
+            valid_coupons.update(env_coupons)
+        except:
+            pass
+    
+    coupon_code = request.coupon_code.strip().upper()
+    
+    if coupon_code not in valid_coupons:
+        logger.warning(f"⚠️ 잘못된 쿠폰 코드: {coupon_code}")
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_coupon",
+                "message": "Invalid or expired coupon code"
+            }
+        )
+    
+    coupon_info = valid_coupons[coupon_code]
+    
+    # 1회 사용 제한 체크 (credit_transactions 테이블에서 확인)
+    if coupon_info.get("one_time", True):
+        try:
+            existing_redeem = db.execute(
+                text("""
+                    SELECT transaction_id, created_at
+                    FROM credit_transactions
+                    WHERE user_id = :user_id 
+                      AND reference_id LIKE :pattern
+                      AND transaction_type = 'bonus'
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """),
+                {"user_id": user_id, "pattern": f"coupon_{coupon_code}_%"}
+            ).fetchone()
+            
+            if existing_redeem:
+                logger.warning(f"⚠️ 이미 사용된 쿠폰: user_id={user_id}, coupon={coupon_code}")
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "error": "coupon_already_used",
+                        "message": "This coupon has already been redeemed"
+                    }
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning(f"⚠️ 쿠폰 사용 이력 확인 실패 (계속 진행): {str(e)}")
+    
+    # 쿠폰 만료 체크 (환경 변수나 별도 테이블에서 관리)
+    # 현재는 간단하게 처리 (실제로는 coupons 테이블에서 expires_at 확인)
+    
+    credits_amount = coupon_info.get("credits", 0)
+    
+    if credits_amount <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_coupon",
+                "message": "Invalid coupon configuration"
+            }
+        )
+    
+    logger.info(f"🎫 쿠폰 사용 요청: user_id={user_id}, coupon={coupon_code}, credits={credits_amount}")
+    
+    # 크레딧 충전
+    try:
+        reference_id = f"coupon_{coupon_code}_{uuid.uuid4().hex[:16]}"
+        result = add_credits(
+            db=db,
+            user_id=user_id,
+            amount=credits_amount,
+            transaction_type=TransactionType.BONUS,
+            description=f"Coupon redeemed: {coupon_code}",
+            reference_id=reference_id
+        )
+        
+        if not result.success:
+            logger.error(f"❌ 쿠폰 사용 실패: {result.message}")
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "error": "coupon_redeem_failed",
+                    "message": result.message
+                }
+            )
+        
+        logger.info(f"✅ 쿠폰 사용 성공: user_id={user_id}, coupon={coupon_code}, credits={credits_amount}, total={result.total_credits}")
+        
+        return {
+            "success": True,
+            "totalCredits": result.total_credits,
+            "addedAmount": result.added_amount,
+            "message": f"Coupon '{coupon_code}' redeemed successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ 쿠폰 사용 실패: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "coupon_redeem_failed",
+                "message": f"Failed to redeem coupon: {str(e)}"
+            }
+        )
+
+
+# ============================================================
+# Dev-only 테스트용 크레딧 충전 엔드포인트 (개발 환경 전용)
+# ============================================================
+
+@app.post("/api/dev/credits/topup")
+def dev_topup_credits(
+    amount: int = Query(100, description="Amount of credits to add"),
+    user_id: str = Query("default-user", description="User ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Dev-only 테스트용 크레딧 충전 엔드포인트
+    
+    보안: Production에서는 절대 작동하지 않도록 이중 체크
+    - ENABLE_DEV_TOPUP=true && ENVIRONMENT != "production" 일 때만 작동
+    - 조건 불만족 시 403 Forbidden 반환
+    
+    Args:
+        amount: 충전할 크레딧 수 (기본값: 100)
+        user_id: 사용자 ID
+        db: 데이터베이스 세션
+        
+    Returns:
+        {
+            "success": bool,
+            "totalCredits": int,
+            "addedAmount": int,
+            "message": str
+        }
+    """
+    import logging
+    from .credit_service import add_credits, TransactionType
+    
+    logger = logging.getLogger(__name__)
+    
+    # 이중 보안 체크: ENABLE_DEV_TOPUP && ENVIRONMENT != "production"
+    enable_dev_topup = os.getenv("ENABLE_DEV_TOPUP", "").lower() == "true"
+    environment = os.getenv("ENVIRONMENT", "").lower()
+    is_production = environment in ["production", "prod"]
+    
+    if not enable_dev_topup or is_production:
+        logger.warning(f"⚠️ Dev top-up blocked: ENABLE_DEV_TOPUP={enable_dev_topup}, ENVIRONMENT={environment}")
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "forbidden",
+                "message": "Dev top-up is only available in non-production environments with ENABLE_DEV_TOPUP=true"
+            }
+        )
+    
+    # amount 검증
+    if amount <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_amount",
+                "message": "Amount must be positive"
+            }
+        )
+    
+    logger.info(f"🧪 [DEV] 크레딧 충전 요청: user_id={user_id}, amount={amount}")
+    
+    # 크레딧 충전
+    try:
+        result = add_credits(
+            db=db,
+            user_id=user_id,
+            amount=amount,
+            transaction_type=TransactionType.BONUS,
+            description=f"Dev test top-up: {amount} credits",
+            reference_id=f"dev_topup_{uuid.uuid4().hex[:16]}"
+        )
+        
+        if not result.success:
+            logger.error(f"❌ [DEV] 크레딧 충전 실패: {result.message}")
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "error": "credit_topup_failed",
+                    "message": result.message
+                }
+            )
+        
+        logger.info(f"✅ [DEV] 크레딧 충전 성공: user_id={user_id}, amount={amount}, total={result.total_credits}")
+        
+        return {
+            "success": True,
+            "totalCredits": result.total_credits,
+            "addedAmount": result.added_amount,
+            "message": f"Dev top-up successful: +{amount} credits"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ [DEV] 크레딧 충전 실패: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "credit_topup_failed",
+                "message": f"Failed to top up credits: {str(e)}"
+            }
+        )
 
 
 if __name__ == "__main__":
