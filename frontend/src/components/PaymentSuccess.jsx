@@ -5,7 +5,7 @@ import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.DEV ? '' : 'https://optlisting-production.up.railway.app')
+  (import.meta.env.DEV ? '' : '')
 
 const POLLING_INTERVAL = 1500 // 1.5초
 const MAX_POLLING_TIME = 30000 // 30초

@@ -19,9 +19,10 @@ import { AlertCircle, X } from 'lucide-react'
 import { getImageUrlFromListing, normalizeImageUrl } from '../utils/imageUtils'
 
 // Use environment variable for Railway URL, fallback based on environment
-// Priority: VITE_API_URL env var > Development (empty for Vite proxy) > Production (Railway URL)
+// Priority: VITE_API_URL env var > Development (empty for Vite proxy) > Production (relative path for Vercel proxy)
+// Production uses relative path /api which is proxied by vercel.json to Railway backend
 const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.DEV ? '' : 'https://optlisting-production.up.railway.app')
+  (import.meta.env.DEV ? '' : '')
 const CURRENT_USER_ID = "default-user" // Temporary user ID for MVP phase
 
 // Demo Mode - Set to true to use dummy data (false for production with real API)

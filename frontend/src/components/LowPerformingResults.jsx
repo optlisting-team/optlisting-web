@@ -4,8 +4,10 @@ import ZombieTable from './ZombieTable'
 import { normalizeImageUrl } from '../utils/imageUtils'
 
 // Use environment variable for Railway URL, fallback based on environment
+// In local development, use empty string to leverage Vite proxy (localhost:8000)
+// In production, use relative path /api which is proxied by vercel.json to Railway backend
 const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.DEV ? '' : 'https://optlisting-production.up.railway.app')
+  (import.meta.env.DEV ? '' : '')
 const CURRENT_USER_ID = "default-user"
 
 function LowPerformingResults({ mode = 'low', initialFilters = null, initialItems = null, onClose = null, onError = null }) {

@@ -30,7 +30,7 @@ from .credit_service import (
     PlanType,
 )
 
-app = FastAPI(title="OptListing API", version="1.3.24")
+app = FastAPI(title="OptListing API", version="1.3.25")
 
 # ============================================================
 # [BOOT] Supabase Write Self-Test (Top-level execution)
@@ -188,24 +188,19 @@ import os
 import re
 
 # Define the allowed exact origins (for production build)
-# CRITICAL: Include all variations of production URL (with and without trailing slash)
+# CRITICAL: CORS configuration for production API access
+# Required origins as per production requirements
 allowed_origins = [
-    # 🚨 CUSTOM DOMAIN - CRITICAL FOR PRODUCTION
+    # 🚨 PRODUCTION CUSTOM DOMAIN - CRITICAL FOR PRODUCTION
     "https://optlisting.com",
-    "https://optlisting.com/",
     "https://www.optlisting.com",
-    "https://www.optlisting.com/",
     
     # Production Vercel deployment - All variations (CRITICAL for CORS)
     "https://optlisting.vercel.app",
-    "https://optlisting.vercel.app/",
     "https://www.optlisting.vercel.app",
-    "https://www.optlisting.vercel.app/",
     # Actual deployed Vercel domain
     "https://optlisting-three.vercel.app",
-    "https://optlisting-three.vercel.app/",
     "https://optlisting-1fev8br9z-optlistings-projects.vercel.app",
-    "https://optlisting-1fev8br9z-optlistings-projects.vercel.app/",
     
     # Local development environments
     "http://localhost:5173",
@@ -216,10 +211,10 @@ allowed_origins = [
 # Add environment variable for additional frontend URLs if provided
 frontend_url = os.getenv("FRONTEND_URL", "")
 if frontend_url:
-    allowed_origins.append(frontend_url)
-    # Also add with trailing slash if not present
-    if not frontend_url.endswith("/"):
-        allowed_origins.append(f"{frontend_url}/")
+    # Remove trailing slash for consistency
+    frontend_url_clean = frontend_url.rstrip("/")
+    if frontend_url_clean and frontend_url_clean not in allowed_origins:
+        allowed_origins.append(frontend_url_clean)
 
 # Filter out empty strings
 allowed_origins = [origin for origin in allowed_origins if origin]
@@ -238,15 +233,17 @@ logging.info(f"🌐 CORS Configuration:")
 logging.info(f"   Allowed origins: {allowed_origins}")
 logging.info(f"   Vercel regex: {vercel_regex}")
 
+# CORS configuration - CRITICAL for production API access
+# Ensure all production frontend domains are allowed
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,  # Explicit production and local URLs
     allow_origin_regex=vercel_regex,  # CRITICAL: Regex pattern for all Vercel subdomains
-    allow_credentials=True,  # Enable credentials for authenticated requests
-    allow_methods=["*"],  # Allow all HTTP methods
-    allow_headers=["*"],  # Allow all headers
-    expose_headers=["*"],  # Expose all headers
-    max_age=3600,  # Cache preflight requests for 1 hour
+    allow_credentials=True,  # Enable credentials (cookies/sessions) for authenticated requests
+    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, PUT, DELETE, PATCH, OPTIONS)
+    allow_headers=["*"],  # Allow all headers (including Content-Type, Authorization, X-Request-Id)
+    expose_headers=["*"],  # Expose all headers in response
+    max_age=3600,  # Cache preflight OPTIONS requests for 1 hour
 )
 
 # Helper function to get CORS headers based on request origin

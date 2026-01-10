@@ -11,9 +11,9 @@ const INITIAL_STORES = [
 
 // Use environment variable for Railway URL, fallback based on environment
 // In local development, use empty string to leverage Vite proxy (localhost:8000)
-// In production, use Railway URL
+// In production, use relative path /api which is proxied by vercel.json to Railway backend
 const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.DEV ? '' : 'https://optlisting-production.up.railway.app')
+  (import.meta.env.DEV ? '' : '')
 const CURRENT_USER_ID = 'default-user'
 
 // Store Selector Component
@@ -214,9 +214,9 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
     
     // API URL priority: Environment variable > Environment-based fallback
     // In local development, use empty string to leverage Vite proxy (localhost:8000)
-    // In production, use Railway URL
+    // In production, use relative path /api which is proxied by vercel.json to Railway backend
     const apiUrl = import.meta.env.VITE_API_URL || 
-      (import.meta.env.DEV ? '' : 'https://optlisting-production.up.railway.app')
+      (import.meta.env.DEV ? '' : '')
     const userId = 'default-user'
     const oauthUrl = `${apiUrl}/api/ebay/auth/start?user_id=${userId}`
     
