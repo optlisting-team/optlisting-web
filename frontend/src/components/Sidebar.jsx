@@ -6,10 +6,11 @@ import { useAccount } from '../contexts/AccountContext'
 import { LayoutDashboard, List, History, Settings, X, Check, ChevronDown, ChevronRight } from 'lucide-react'
 
 // Use environment variable for Railway URL, fallback based on environment
-// In local development, use empty string to leverage Vite proxy (localhost:8000)
-// In production, use relative path /api which is proxied by vercel.json to Railway backend
-const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.DEV ? '' : '')
+// CRITICAL: Production MUST use relative path /api (proxied by vercel.json) to avoid CORS issues
+// Only use VITE_API_URL in development if needed, production always uses relative path
+const API_BASE_URL = import.meta.env.DEV 
+  ? (import.meta.env.VITE_API_URL || '')  // Development: use env var or empty for Vite proxy
+  : ''  // Production: ALWAYS use relative path (vercel.json proxy handles routing to Railway)
 
 // Credit Pack Options
 const CREDIT_PACKS = [

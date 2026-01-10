@@ -4,8 +4,12 @@ import { CheckCircle, Loader2, RefreshCw, AlertCircle } from 'lucide-react'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.DEV ? '' : '')
+// Use environment variable for Railway URL, fallback based on environment
+// CRITICAL: Production MUST use relative path /api (proxied by vercel.json) to avoid CORS issues
+// Only use VITE_API_URL in development if needed, production always uses relative path
+const API_BASE_URL = import.meta.env.DEV 
+  ? (import.meta.env.VITE_API_URL || '')  // Development: use env var or empty for Vite proxy
+  : ''  // Production: ALWAYS use relative path (vercel.json proxy handles routing to Railway)
 
 const POLLING_INTERVAL = 1500 // 1.5초
 const MAX_POLLING_TIME = 30000 // 30초

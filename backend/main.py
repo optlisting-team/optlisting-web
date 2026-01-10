@@ -30,7 +30,7 @@ from .credit_service import (
     PlanType,
 )
 
-app = FastAPI(title="OptListing API", version="1.3.25")
+app = FastAPI(title="OptListing API", version="1.3.26")
 
 # ============================================================
 # [BOOT] Supabase Write Self-Test (Top-level execution)
@@ -189,7 +189,7 @@ import re
 
 # Define the allowed exact origins (for production build)
 # CRITICAL: CORS configuration for production API access
-# Required origins as per production requirements
+# Required origins as per production requirements - only production domains
 allowed_origins = [
     # 🚨 PRODUCTION CUSTOM DOMAIN - CRITICAL FOR PRODUCTION
     "https://optlisting.com",
@@ -235,13 +235,14 @@ logging.info(f"   Vercel regex: {vercel_regex}")
 
 # CORS configuration - CRITICAL for production API access
 # Ensure all production frontend domains are allowed
+# This middleware automatically handles OPTIONS preflight requests
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,  # Explicit production and local URLs
     allow_origin_regex=vercel_regex,  # CRITICAL: Regex pattern for all Vercel subdomains
     allow_credentials=True,  # Enable credentials (cookies/sessions) for authenticated requests
-    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, PUT, DELETE, PATCH, OPTIONS)
-    allow_headers=["*"],  # Allow all headers (including Content-Type, Authorization, X-Request-Id)
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],  # Explicitly allow required HTTP methods
+    allow_headers=["Content-Type", "Authorization", "X-Request-Id", "Accept", "Origin", "X-Requested-With"],  # Required headers explicitly listed
     expose_headers=["*"],  # Expose all headers in response
     max_age=3600,  # Cache preflight OPTIONS requests for 1 hour
 )
