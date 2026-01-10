@@ -623,12 +623,6 @@ function SummaryCard({
   // Low-Performing items data for Product Journey analysis
   zombies = []
 }) {
-  const handleCardClick = (mode) => {
-    if (onViewModeChange) {
-      onViewModeChange(mode)
-    }
-  }
-  
   // Plan colors
   const planColors = {
     BASIC: 'from-cyan-600/20 to-cyan-600/10 border-cyan-500/30 text-cyan-400',
@@ -647,12 +641,11 @@ function SummaryCard({
         loading={loading}
       />
 
-      {/* Stats Row - 3 Columns: Flow visualization */}
+      {/* Stats Row - 3 Columns: Display only (non-interactive) */}
       <div className="grid grid-cols-3 gap-4">
-        {/* 1. Active Listings - Click to see all listings */}
+        {/* 1. Active Listings - Display only */}
         <div 
-          onClick={() => handleCardClick('all')}
-          className={`opt-card p-6 cursor-pointer transition-all text-center relative hover:bg-zinc-800/50 ${viewMode === 'all' ? 'ring-2 ring-blue-500/50' : ''}`}
+          className="opt-card p-6 text-center relative"
         >
           <div className="text-4xl font-black text-white">{loading ? '...' : (totalListings || 0).toLocaleString()}</div>
           <div className="text-sm text-zinc-500 uppercase mt-1">Active</div>
@@ -670,24 +663,22 @@ function SummaryCard({
           )}
       </div>
 
-        {/* 2. Zombies - Click to view low-performing SKUs */}
+        {/* 2. Low-Performing - Display only */}
         <div 
-          onClick={() => handleCardClick('zombies')}
-          className={`opt-card p-6 cursor-pointer transition-all text-center group hover:bg-zinc-800/50 ${viewMode === 'zombies' ? 'ring-2 ring-red-500/50' : ''} ${totalZombies > 0 ? 'border-red-500/30' : ''} hover:ring-2 hover:ring-red-500/30 hover:border-red-500/20`}
+          className={`opt-card p-6 text-center ${totalZombies > 0 ? 'border-red-500/30' : ''}`}
           title="Number of low-performing (deletion target) SKUs detected based on current filter settings."
         >
-          <div className={`text-4xl font-black group-hover:opacity-90 transition-opacity ${totalZombies > 0 ? 'text-red-400' : 'text-white'}`}>{totalZombies || 0}</div>
-          <div className={`text-sm uppercase mt-1 group-hover:opacity-90 transition-opacity ${totalZombies > 0 ? 'text-red-400' : 'text-zinc-500'}`}>Low-Performing</div>
+          <div className={`text-4xl font-black ${totalZombies > 0 ? 'text-red-400' : 'text-white'}`}>{totalZombies || 0}</div>
+          <div className={`text-sm uppercase mt-1 ${totalZombies > 0 ? 'text-red-400' : 'text-zinc-500'}`}>Low-Performing</div>
             </div>
 
-        {/* 3. CSV Export - Selected for export */}
+        {/* 3. CSV Export - Display only */}
         <div 
-          onClick={() => handleCardClick('queue')}
-          className={`opt-card p-6 cursor-pointer transition-all text-center group hover:bg-zinc-800/50 ${viewMode === 'queue' ? 'ring-2 ring-orange-500/50' : ''} hover:ring-2 hover:ring-orange-500/30 hover:border-orange-500/20`}
-          title="Click to download custom root-cause removal CSV for analyzed low-performing SKUs."
+          className="opt-card p-6 text-center"
+          title="Selected items for CSV export."
         >
-          <div className={`text-4xl font-black group-hover:opacity-90 transition-opacity ${queueCount > 0 ? 'text-orange-400' : 'text-white'}`}>{queueCount || 0}</div>
-          <div className="text-sm text-zinc-500 uppercase mt-1 group-hover:text-zinc-400 transition-colors">CSV Export</div>
+          <div className={`text-4xl font-black ${queueCount > 0 ? 'text-orange-400' : 'text-white'}`}>{queueCount || 0}</div>
+          <div className="text-sm text-zinc-500 uppercase mt-1">CSV Export</div>
             </div>
           </div>
 

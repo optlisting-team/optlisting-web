@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import ZombieTable from './ZombieTable'
-import FilterBar from './FilterBar'
 import { normalizeImageUrl } from '../utils/imageUtils'
 
 // Use environment variable for Railway URL, fallback based on environment
@@ -10,25 +8,22 @@ const API_BASE_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? '' : 'https://optlisting-production.up.railway.app')
 const CURRENT_USER_ID = "default-user"
 
-function LowPerformingResults({ mode = 'all' }) {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const navigate = useNavigate()
-  
-  // Filters from URL params (for low-performing mode)
+function LowPerformingResults({ mode = 'low', initialFilters = null, onClose = null }) {
+  // Filters from props (for low-performing mode) or defaults
   const filters = useMemo(() => {
-    if (mode === 'low') {
+    if (mode === 'low' && initialFilters) {
       return {
-        analytics_period_days: parseInt(searchParams.get('days') || '7'),
-        min_days: parseInt(searchParams.get('days') || '7'),
-        max_sales: parseInt(searchParams.get('sales') || '0'),
-        max_watches: parseInt(searchParams.get('watch') || '0'),
-        max_watch_count: parseInt(searchParams.get('watch') || '0'),
-        max_impressions: parseInt(searchParams.get('imp') || '100'),
-        max_views: parseInt(searchParams.get('views') || '10')
+        analytics_period_days: initialFilters.analytics_period_days || initialFilters.min_days || 7,
+        min_days: initialFilters.min_days || initialFilters.analytics_period_days || 7,
+        max_sales: initialFilters.max_sales || 0,
+        max_watches: initialFilters.max_watches || initialFilters.max_watch_count || 0,
+        max_watch_count: initialFilters.max_watch_count || initialFilters.max_watches || 0,
+        max_impressions: initialFilters.max_impressions || 100,
+        max_views: initialFilters.max_views || 10
       }
     }
     return {}
-  }, [mode, searchParams])
+  }, [mode, initialFilters])
   
   // Pagination state
   const [page, setPage] = useState(1)
@@ -288,12 +283,14 @@ function LowPerformingResults({ mode = 'all' }) {
             }
           </p>
         </div>
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="px-4 py-2 text-sm text-zinc-400 hover:text-white transition-colors"
-        >
-          ← Back to Dashboard
-        </button>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-zinc-400 hover:text-white transition-colors"
+          >
+            ✕ 닫기
+          </button>
+        )}
       </div>
       
       {/* Filter Bar (for low mode) */}

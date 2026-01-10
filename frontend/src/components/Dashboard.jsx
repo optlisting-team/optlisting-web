@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import axios from 'axios'
 import { useStore } from '../contexts/StoreContext'
@@ -11,6 +11,7 @@ import HistoryTable from './HistoryTable'
 import HistoryView from './HistoryView'
 import QueueReviewPanel from './QueueReviewPanel'
 import FilteringModal from './FilteringModal'
+import LowPerformingResults from './LowPerformingResults'
 import { Button } from './ui/button'
 import { AlertCircle, X } from 'lucide-react'
 import { getImageUrlFromListing, normalizeImageUrl } from '../utils/imageUtils'
@@ -110,7 +111,6 @@ const DUMMY_STORE = {
 function Dashboard() {
   const { selectedStore } = useStore()
   const [searchParams] = useSearchParams()
-  const navigate = useNavigate()
   const viewParam = searchParams.get('view')
   // Client state only
   // NOTE: Dashboard에서는 제품 리스트 상태를 유지하지 않음 (카드 숫자만 관리)
@@ -147,8 +147,10 @@ function Dashboard() {
   })
   const [summaryLoading, setSummaryLoading] = useState(false)
   
-  // 테이블 표시 여부 (기본 숨김)
-  const [showTable, setShowTable] = useState(false)
+  // 결과 표시 여부 (Find 버튼 클릭 시에만 표시)
+  const [showResults, setShowResults] = useState(false)
+  const [resultsMode, setResultsMode] = useState('low') // 'all' or 'low'
+  const [resultsFilters, setResultsFilters] = useState(null)
   
   // API Health Check State
   const [apiConnected, setApiConnected] = useState(false)
@@ -710,43 +712,9 @@ function Dashboard() {
   }
 
   const handleViewModeChange = (mode) => {
-    setViewMode(mode)
-    setSelectedIds([]) // Reset selection when switching views
-    
-    // Close filter when switching to non-zombie views
-    if (mode === 'queue' || mode === 'history') {
-      setShowFilter(false)
-    }
-    
-    if (mode === 'total') {
-      // Statistical view - 테이블 숨김, summary stats만 표시
-      setShowTable(false)
-      return
-    } else if (mode === 'all') {
-      // 'All Listings' 클릭 시: /listings?mode=all로 이동 (별도 페이지에서 로드)
-      // Dashboard에서는 제품 리스트를 로드하지 않음
-      console.log('📋 Navigating to /listings?mode=all')
-      navigate('/listings?mode=all')
-      return
-    } else if (mode === 'zombies') {
-      // 'Find Low-Performing SKUs' 버튼 클릭 시: /listings?mode=low&filters=...로 이동
-      // 현재 필터 상태를 URL 파라미터로 전달
-      const filterParams = new URLSearchParams({
-        mode: 'low',
-        days: String(filters.analytics_period_days || filters.min_days || 7),
-        sales: String(filters.max_sales || 0),
-        watch: String(filters.max_watches || filters.max_watch_count || 0),
-        imp: String(filters.max_impressions || 100),
-        views: String(filters.max_views || 10)
-      })
-      console.log('📉 Navigating to /listings with filters:', filterParams.toString())
-      navigate(`/listings?${filterParams.toString()}`)
-      return
-    } else if (mode === 'history') {
-      setShowTable(false) // History는 별도 뷰에서 표시
-      fetchHistory()
-    }
-    // 'queue' mode doesn't need to fetch data, it uses existing queue state
+    // 카드 클릭 비활성화 - 아무 동작도 하지 않음
+    // 이제 SummaryCard에서 onViewModeChange를 전달하지 않으므로 호출되지 않음
+    console.log('⚠️ handleViewModeChange called but cards are now non-interactive:', mode)
   }
 
   const handleToggleFilter = () => {
@@ -754,8 +722,18 @@ function Dashboard() {
   }
 
   const handleAnalyze = () => {
-    // 'Find Low-Performing SKUs' 버튼 클릭 시 /listings로 이동
-    handleViewModeChange('zombies')
+    // 'Find Low-Performing SKUs' 버튼 클릭 시 Dashboard 내부에 결과 표시
+    console.log('🔍 handleAnalyze: Showing results panel in Dashboard')
+    setResultsMode('low')
+    setResultsFilters(filters)
+    setShowResults(true)
+    // 결과 섹션으로 스크롤
+    setTimeout(() => {
+      const resultsSection = document.getElementById('results-section')
+      if (resultsSection) {
+        resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }, 100)
   }
 
   // Handle filter confirmation from modal
@@ -763,31 +741,34 @@ function Dashboard() {
     if (!pendingFilters) return
     
     try {
-      console.log('🔍 handleConfirmFiltering: Navigating to /listings with filters...')
+      console.log('🔍 handleConfirmFiltering: Applying filters and showing results...')
       setIsFiltering(true)
       
       // 필터 상태 확정
       setFilters(pendingFilters)
+      setResultsFilters(pendingFilters)
       setSelectedIds([])
       
       // Small delay to show the filtering state
       await new Promise(resolve => setTimeout(resolve, 300))
       
-      // /listings 페이지로 이동 (필터 파라미터 포함)
-      const filterParams = new URLSearchParams({
-        mode: 'low',
-        days: String(pendingFilters.analytics_period_days || pendingFilters.min_days || 7),
-        sales: String(pendingFilters.max_sales || 0),
-        watch: String(pendingFilters.max_watches || pendingFilters.max_watch_count || 0),
-        imp: String(pendingFilters.max_impressions || 100),
-        views: String(pendingFilters.max_views || 10)
-      })
-      navigate(`/listings?${filterParams.toString()}`)
+      // Dashboard 내부에 결과 표시
+      setResultsMode('low')
+      setShowResults(true)
+      
+      // 결과 섹션으로 스크롤
+      setTimeout(() => {
+        const resultsSection = document.getElementById('results-section')
+        if (resultsSection) {
+          resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      }, 100)
       
     } catch (err) {
-      console.error('Failed to navigate to listings:', err)
+      console.error('Failed to apply filters:', err)
       // 에러 발생 시에도 필터 상태는 저장
       setFilters(pendingFilters)
+      setResultsFilters(pendingFilters)
       setSelectedIds([])
     } finally {
       setIsFiltering(false)
@@ -796,16 +777,33 @@ function Dashboard() {
     }
   }
 
-  // Apply filter with API refresh - fetch latest data before filtering
+  // Apply filter - 바로 결과 표시 (모달 제거)
   const handleApplyFilter = async (newFilters) => {
-    console.log('🔍 handleApplyFilter: Showing confirmation modal...')
+    console.log('🔍 handleApplyFilter: Applying filters and showing results...')
     
-    // Store filters for confirmation
-    setPendingFilters(newFilters)
-    
-    // Show filtering modal for user confirmation
-    setShowFilteringModal(true)
-    setIsFiltering(false)
+    try {
+      // 필터 상태 확정
+      setFilters(newFilters)
+      setResultsFilters(newFilters)
+      setSelectedIds([])
+      
+      // Dashboard 내부에 결과 표시
+      setResultsMode('low')
+      setShowResults(true)
+      
+      // 결과 섹션으로 스크롤
+      setTimeout(() => {
+        const resultsSection = document.getElementById('results-section')
+        if (resultsSection) {
+          resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      }, 100)
+    } catch (err) {
+      console.error('Failed to apply filters:', err)
+      setFilters(newFilters)
+      setResultsFilters(newFilters)
+      setSelectedIds([])
+    }
   }
 
   const handleSelect = (id, checked) => {
@@ -1323,7 +1321,7 @@ function Dashboard() {
           loading={loading || summaryLoading}
           filters={filters}
           viewMode={viewMode}
-          onViewModeChange={handleViewModeChange}
+          onViewModeChange={null}
           connectedStore={selectedStore}
           connectedStoresCount={connectedStoresCount}
           onSync={handleSync}
@@ -1346,6 +1344,18 @@ function Dashboard() {
           summaryStats={summaryStats}
         />
 
+        {/* FilterBar - Find Low-Performing SKUs 버튼 */}
+        {isStoreConnected && summaryStats.activeCount > 0 && (
+          <div className="mt-6">
+            <FilterBar 
+              onApplyFilter={handleApplyFilter}
+              onSync={handleSync}
+              loading={loading}
+              initialFilters={filters}
+            />
+          </div>
+        )}
+
         {/* Empty state when not connected (Dashboard에서는 카드만 표시) */}
         {!isStoreConnected || summaryStats.activeCount === 0 ? (
           <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg p-8 mt-8 text-center">
@@ -1357,7 +1367,7 @@ function Dashboard() {
                 ? "Connect your eBay account to start analyzing your listings."
                 : summaryStats.activeCount === 0
                 ? "No listings found. Click 'Sync' to refresh or connect your eBay account."
-                : "Click on 'All Listings' or 'Find Low-Performing SKUs' card to view detailed listings."
+                : "Use the filter bar below to analyze and find low-performing SKUs."
               }
             </p>
           </div>
@@ -1372,8 +1382,33 @@ function Dashboard() {
           />
         )}
 
-        {/* Main content - Dashboard에서는 테이블을 렌더링하지 않음 (카드만 표시) */}
-        {/* 'All Listings' 또는 'Find Low-Performing SKUs' 클릭 시 /listings 페이지로 이동 */}
+        {/* Results Section - Find 버튼 클릭 시에만 표시 */}
+        {showResults && (
+          <div id="results-section" className="mt-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-white">
+                {resultsMode === 'low' ? '📉 Low-Performing SKUs' : '📋 All Listings'}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowResults(false)
+                  setResultsFilters(null)
+                }}
+                className="px-4 py-2 text-sm text-zinc-400 hover:text-white transition-colors"
+              >
+                ✕ 닫기
+              </button>
+            </div>
+            <LowPerformingResults 
+              mode={resultsMode}
+              initialFilters={resultsFilters}
+              onClose={() => {
+                setShowResults(false)
+                setResultsFilters(null)
+              }}
+            />
+          </div>
+        )}
         
         {/* Queue View는 Dashboard에서 유지 (로컬 상태만 사용) */}
         {viewMode === 'queue' && queue.length > 0 && (
