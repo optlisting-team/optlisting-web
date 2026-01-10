@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi import FastAPI, Depends, HTTPException, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -10,6 +10,7 @@ from typing import Optional, List, Dict
 from datetime import date, datetime, timedelta
 import json
 import logging
+import os
 from pydantic import BaseModel
 
 from .models import init_db, get_db, Listing, DeletionLog, Profile, CSVFormat, Base, engine
@@ -30,7 +31,7 @@ from .credit_service import (
     PlanType,
 )
 
-app = FastAPI(title="OptListing API", version="1.3.26")
+app = FastAPI(title="OptListing API", version="1.3.27")
 
 # ============================================================
 # [BOOT] Supabase Write Self-Test (Top-level execution)
@@ -184,7 +185,6 @@ def set_cached_kpi(cache_key: str, data: Dict):
 
 # CORS middleware for React frontend
 # Allow both local development and production frontend URLs
-import os
 import re
 
 # Define the allowed exact origins (for production build)
