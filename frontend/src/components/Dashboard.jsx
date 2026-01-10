@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import axios from 'axios'
 import { useStore } from '../contexts/StoreContext'
@@ -110,15 +110,16 @@ const DUMMY_STORE = {
 function Dashboard() {
   const { selectedStore } = useStore()
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const viewParam = searchParams.get('view')
   // Client state only
+  // NOTE: Dashboard에서는 제품 리스트 상태를 유지하지 않음 (카드 숫자만 관리)
   const [isStoreConnected, setIsStoreConnected] = useState(false)
-  const [allListings, setAllListings] = useState([])
-  const [zombies, setZombies] = useState([])
+  // allListings, zombies는 Dashboard에서 제거 (결과 화면에서만 관리)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [selectedIds, setSelectedIds] = useState([])
-  const [queue, setQueue] = useState([])
+  const [queue, setQueue] = useState([]) // Queue는 로컬 상태로 유지
   const [viewMode, setViewModeRaw] = useState('total')
   
   const setViewMode = setViewModeRaw
@@ -136,6 +137,18 @@ function Dashboard() {
   ] : [])
   const [totalDeleted, setTotalDeleted] = useState(0) // Start at 0, updates from history
   const [showFilter, setShowFilter] = useState(false) // Default: filter collapsed
+  
+  // Summary statistics state (Dashboard 초기 로딩용)
+  const [summaryStats, setSummaryStats] = useState({
+    activeCount: 0,
+    lowPerformingCount: 0,
+    queueCount: 0,
+    lastSyncAt: null
+  })
+  const [summaryLoading, setSummaryLoading] = useState(false)
+  
+  // 테이블 표시 여부 (기본 숨김)
+  const [showTable, setShowTable] = useState(false)
   
   // API Health Check State
   const [apiConnected, setApiConnected] = useState(false)
@@ -168,35 +181,15 @@ function Dashboard() {
     supplier_filter: 'All'
   })
 
-  // Derived values only (no duplicate state)
-  const totalListings = useMemo(() => allListings.length, [allListings])
-  const totalZombies = useMemo(() => zombies.length, [zombies])
+  // Derived values only (summaryStats 사용)
+  // Dashboard에서는 allListings/zombies를 사용하지 않으므로 summaryStats만 사용
+  const totalListings = useMemo(() => summaryStats.activeCount || 0, [summaryStats.activeCount])
+  const totalZombies = useMemo(() => summaryStats.lowPerformingCount || 0, [summaryStats.lowPerformingCount])
   
-  const totalBreakdown = useMemo(() => {
-    const breakdown = {}
-    allListings.forEach(item => {
-      const supplier = item.supplier || item.supplier_name || 'Unknown'
-      breakdown[supplier] = (breakdown[supplier] || 0) + 1
-    })
-    return breakdown
-  }, [allListings])
-  
-  const platformBreakdown = useMemo(() => ({ eBay: allListings.length }), [allListings])
-  
-  const zombieBreakdown = useMemo(() => {
-    const breakdown = {}
-    zombies.forEach(item => {
-      const supplier = item.supplier || item.supplier_name || 'Unknown'
-      breakdown[supplier] = (breakdown[supplier] || 0) + 1
-    })
-    return breakdown
-  }, [zombies])
-
-  // Derived: filtered listings (100% local)
-  const filteredListings = useMemo(() => {
-    if (viewMode !== 'zombies' || zombies.length === 0) return allListings
-    return zombies
-  }, [viewMode, allListings, zombies])
+  // Breakdown은 summary API에서 제공하지 않으므로 빈 객체
+  const totalBreakdown = useMemo(() => ({}), [])
+  const platformBreakdown = useMemo(() => ({ eBay: totalListings }), [totalListings])
+  const zombieBreakdown = useMemo(() => ({}), [])
   
   // API Health Check - Check connection on mount
   const checkApiHealth = async () => {
@@ -253,6 +246,70 @@ function Dashboard() {
     } catch (err) {
       console.error('Failed to fetch credits:', err)
       // Use default values on error
+    }
+  }
+
+  // Fetch summary statistics (경량화된 통계만 가져오기)
+  const fetchSummaryStats = async () => {
+    try {
+      setSummaryLoading(true)
+      console.log('📊 fetchSummaryStats: Fetching summary statistics...')
+      
+      if (DEMO_MODE) {
+        // Demo 모드에서는 더미 데이터 사용
+        setSummaryStats({
+          activeCount: DUMMY_ALL_LISTINGS.length,
+          lowPerformingCount: DUMMY_ZOMBIES.length,
+          queueCount: queue.length,
+          lastSyncAt: new Date().toISOString()
+        })
+        setSummaryLoading(false)
+        return
+      }
+      
+      const response = await axios.get(`${API_BASE_URL}/api/ebay/summary`, {
+        params: {
+          user_id: CURRENT_USER_ID,
+          filters: JSON.stringify(filters) // 필터 파라미터 전달
+        },
+        timeout: 30000,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      if (response.data && response.data.success) {
+        console.log('✅ fetchSummaryStats: Successfully fetched summary:', response.data)
+        setSummaryStats({
+          activeCount: response.data.active_count || 0,
+          lowPerformingCount: response.data.low_performing_count || 0,
+          queueCount: response.data.queue_count || 0,
+          lastSyncAt: response.data.last_sync_at || null
+        })
+      } else {
+        console.warn('⚠️ fetchSummaryStats: Unexpected response format:', response.data)
+      }
+    } catch (err) {
+      console.error('❌ fetchSummaryStats error:', err)
+      if (err.response?.status === 401) {
+        console.warn('⚠️ Not authenticated - summary stats not available')
+        setSummaryStats({
+          activeCount: 0,
+          lowPerformingCount: 0,
+          queueCount: 0,
+          lastSyncAt: null
+        })
+      } else {
+        // 에러 발생 시에도 기본값 설정
+        setSummaryStats({
+          activeCount: 0,
+          lowPerformingCount: 0,
+          queueCount: 0,
+          lastSyncAt: null
+        })
+      }
+    } finally {
+      setSummaryLoading(false)
     }
   }
 
@@ -556,34 +613,12 @@ function Dashboard() {
     return Math.max(0, Math.min(score, 100))
   }
 
-  // 100% local filtering - no network calls
-  const applyLocalFilter = (filterParams = filters) => {
-    if (allListings.length === 0) {
-      setZombies([])
-      return
-    }
-
-    const minDays = filterParams.analytics_period_days || filterParams.min_days || 7
-    const maxSales = filterParams.max_sales || 0
-    const maxWatches = filterParams.max_watches || filterParams.max_watch_count || 0
-    const maxImpressions = filterParams.max_impressions || 100
-    const maxViews = filterParams.max_views || 10
-    
-    const filteredZombies = allListings.filter(item => {
-      if ((item.days_listed || 0) < minDays) return false
-      if ((item.total_sales || item.quantity_sold || 0) > maxSales) return false
-      if ((item.watch_count || 0) > maxWatches) return false
-      if ((item.impressions || 0) > maxImpressions) return false
-      if ((item.view_count || item.views || 0) > maxViews) return false
-      return true
-    }).map(item => ({ ...item, is_zombie: true }))
-    
-    setZombies(filteredZombies)
-  }
+  // NOTE: applyLocalFilter는 Dashboard에서 제거됨
+  // 필터링은 /listings 페이지의 LowPerformingResults 컴포넌트에서 서버 측에서 수행
 
   // Handle store connection change
   // 중복 호출 방지를 위한 플래그
-  const handleStoreConnectionInProgress = React.useRef(false)
+  const handleStoreConnectionInProgress = useRef(false)
   
   const handleStoreConnection = (connected, forceLoad = false) => {
     // Prevent duplicate calls - check if state is already set
@@ -604,234 +639,50 @@ function Dashboard() {
     
     // Clear data when disconnected
     if (!connected) {
-      setAllListings([])
-      setZombies([])
       setViewMode('total')
       setShowFilter(false)
+      setSummaryStats({
+        activeCount: 0,
+        lowPerformingCount: 0,
+        queueCount: 0,
+        lastSyncAt: null
+      })
       handleStoreConnectionInProgress.current = false
     } else {
-      // When connected, fetch listings if in demo mode or if forceLoad is true
+      // When connected, fetch summary stats only (not full listings)
       if (DEMO_MODE) {
-        setAllListings(DUMMY_ALL_LISTINGS)
-        setViewMode('all')
-        setShowFilter(true)
+        setSummaryStats({
+          activeCount: DUMMY_ALL_LISTINGS.length,
+          lowPerformingCount: DUMMY_ZOMBIES.length,
+          queueCount: queue.length,
+          lastSyncAt: new Date().toISOString()
+        })
         handleStoreConnectionInProgress.current = false
       } else if (forceLoad) {
-        // Fetch listings when connection is confirmed and forceLoad is true
-        console.log('📦 handleStoreConnection: forceLoad=true, calling fetchAllListings() (single call)')
-        // Use setTimeout to ensure state is updated before fetching
+        // forceLoad가 true여도 summary stats만 가져오기
+        console.log('📦 handleStoreConnection: forceLoad=true, calling fetchSummaryStats() only')
         setTimeout(() => {
-          fetchAllListings().then(() => {
+          fetchSummaryStats().then(() => {
             handleStoreConnectionInProgress.current = false
           }).catch(err => {
-            console.error('Failed to fetch listings after connection:', err)
+            console.error('Failed to fetch summary stats after connection:', err)
             handleStoreConnectionInProgress.current = false
           })
-        }, 200) // 약간의 지연으로 토큰 저장 완료 보장
+        }, 200)
       } else {
-        handleStoreConnectionInProgress.current = false
+        // forceLoad가 false면 summary stats만 가져오기
+        fetchSummaryStats().then(() => {
+          handleStoreConnectionInProgress.current = false
+        }).catch(err => {
+          console.error('Failed to fetch summary stats:', err)
+          handleStoreConnectionInProgress.current = false
+        })
       }
     }
   }
 
-  // Called ONLY from: (1) OAuth success OR (2) handleSync OR (3) handleStoreConnection with forceLoad
-  // 중복 호출 방지를 위한 플래그
-  const fetchAllListingsInProgress = React.useRef(false)
-  
-  const fetchAllListings = async () => {
-    // 중복 호출 방지
-    if (fetchAllListingsInProgress.current) {
-      console.warn('⚠️ fetchAllListings already in progress, skipping duplicate call')
-      return
-    }
-    
-    // requestId 생성 (UUID v4 스타일)
-    const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    
-    try {
-      fetchAllListingsInProgress.current = true
-      console.log(`📦 fetchAllListings [${requestId}]: Starting to fetch eBay listings...`)
-      setLoading(true)
-      setError(null)
-      
-      // Performance mark 시작
-      if (typeof performance !== 'undefined' && performance.mark) {
-        performance.mark(`fetchAllListings_start_${requestId}`)
-      }
-      
-      if (DEMO_MODE) {
-        setAllListings(DUMMY_ALL_LISTINGS)
-        setViewMode('all')
-        setShowFilter(true)
-        return
-      }
-      
-      console.log(`📡 fetchAllListings [${requestId}]: Calling API:`, `${API_BASE_URL}/api/ebay/listings/active`)
-      const response = await axios.get(`${API_BASE_URL}/api/ebay/listings/active`, {
-        params: {
-          user_id: CURRENT_USER_ID,
-          page: 1,
-          entries_per_page: 200
-        },
-        timeout: 120000, // 120초로 증가 (백엔드가 여러 API 호출을 순차 처리하므로 시간이 필요)
-        headers: {
-          'X-Request-Id': requestId
-        }
-      })
-      
-      if (!response.data.success) {
-        throw new Error(response.data.error || 'Failed to fetch eBay listings')
-      }
-      
-      const allListingsFromEbay = response.data.listings || []
-      
-      // Performance mark 종료 및 측정
-      if (typeof performance !== 'undefined' && performance.mark && performance.measure) {
-        performance.mark(`fetchAllListings_end_${requestId}`)
-        performance.measure(
-          `fetchAllListings_duration_${requestId}`,
-          `fetchAllListings_start_${requestId}`,
-          `fetchAllListings_end_${requestId}`
-        )
-        const measure = performance.getEntriesByName(`fetchAllListings_duration_${requestId}`)[0]
-        console.log(`⏱️ fetchAllListings [${requestId}]: Completed in ${measure.duration.toFixed(2)}ms`)
-      }
-      
-      console.log(`✅ fetchAllListings [${requestId}]: Successfully fetched ${allListingsFromEbay.length} listings`)
-      
-      // Debug: Check first item's image URLs
-      if (allListingsFromEbay.length > 0) {
-        const firstItem = allListingsFromEbay[0]
-        console.log('🔍 First item image URLs:', {
-          image_url: firstItem.image_url,
-          picture_url: firstItem.picture_url,
-          thumbnail_url: firstItem.thumbnail_url,
-          item_id: firstItem.item_id,
-          title: firstItem.title?.substring(0, 50)
-        })
-        
-        // Check if image URLs are valid
-        const imageUrl = firstItem.image_url || firstItem.picture_url || firstItem.thumbnail_url
-        if (imageUrl) {
-          console.log('🔗 First item image URL (raw):', imageUrl)
-          // Try to create an image element to test if URL is valid
-          const testImg = new Image()
-          testImg.onload = () => console.log('✅ First item image URL is valid and loadable')
-          testImg.onerror = () => console.error('❌ First item image URL failed to load:', imageUrl)
-          testImg.src = imageUrl
-        } else {
-          console.warn('⚠️ First item has no image URL')
-        }
-      }
-      
-      // Transform listing data and detect suppliers
-      const transformedListings = allListingsFromEbay.map((item, index) => {
-        const supplierInfo = extractSupplierInfo(item.title, item.sku, item.image_url || item.picture_url || item.thumbnail_url)
-        
-        // Normalize image URL immediately
-        const rawImageUrl = item.image_url || item.picture_url || item.thumbnail_url
-        const normalizedImageUrl = normalizeImageUrl(rawImageUrl)
-        
-        return {
-          id: item.item_id || `ebay-${index}`,
-          item_id: item.item_id || item.ebay_item_id,
-          ebay_item_id: item.ebay_item_id || item.item_id,
-          sell_item_id: item.sell_item_id || item.item_id || item.ebay_item_id,
-          title: item.title,
-          price: item.price,
-          sku: item.sku,
-          supplier: supplierInfo.supplier_name,
-          supplier_name: supplierInfo.supplier_name,
-          supplier_id: supplierInfo.supplier_id,
-          source: item.source || supplierInfo.supplier_name,
-          total_sales: item.quantity_sold || 0,
-          quantity_sold: item.quantity_sold || 0,
-          watch_count: item.watch_count || 0,
-          view_count: item.view_count || 0,
-          views: item.view_count || 0,
-          impressions: item.impressions || 0,
-          days_listed: item.days_listed || 0,
-          start_time: item.start_time,
-          picture_url: item.picture_url,
-          thumbnail_url: item.thumbnail_url || item.picture_url,
-          // Use normalized image URL (prioritize normalized, fallback to raw)
-          image_url: normalizedImageUrl || rawImageUrl
-        }
-      })
-      
-      // Debug: Check image URLs in transformed listings
-      const listingsWithImages = transformedListings.filter(l => l.image_url || l.picture_url || l.thumbnail_url).length
-      const listingsWithoutImages = transformedListings.length - listingsWithImages
-      console.log(`📊 Image statistics: ${listingsWithImages} with images, ${listingsWithoutImages} without images`)
-      
-      if (listingsWithoutImages > 0) {
-        const firstNoImage = transformedListings.find(l => !(l.image_url || l.picture_url || l.thumbnail_url))
-        if (firstNoImage) {
-          console.warn('⚠️ Sample item without image:', {
-            item_id: firstNoImage.item_id,
-            title: firstNoImage.title?.substring(0, 50),
-            raw_data: allListingsFromEbay.find(item => item.item_id === firstNoImage.item_id)
-          })
-        }
-      }
-      
-      if (transformedListings.length > 0) {
-        setViewMode('all')
-        setShowFilter(true)
-      }
-      
-      setAllListings(transformedListings)
-      setError(null)
-      
-    } catch (err) {
-      console.error(`❌ fetchAllListings [${requestId}] error:`, err)
-      console.error(`   Error details [${requestId}]:`, {
-        message: err.message,
-        code: err.code,
-        status: err.response?.status,
-        statusText: err.response?.statusText,
-        data: err.response?.data,
-        url: err.config?.url,
-        requestId: requestId
-      })
-      
-      let errorMessage = ''
-      
-      if (err.response?.status === 401) {
-        errorMessage = 'eBay 계정이 연결되지 않았습니다. eBay 계정을 먼저 연결해주세요.'
-        setError(errorMessage)
-        setAllListings([])
-      } else if (err.response?.status === 500) {
-        const serverError = err.response?.data?.detail || err.response?.data?.error_message || '서버 오류'
-        errorMessage = `서버 오류가 발생했습니다: ${serverError}. 잠시 후 다시 시도해주세요.`
-        setError(errorMessage)
-        console.error('   Server error details:', err.response?.data)
-      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
-        errorMessage = '요청 시간이 초과되었습니다. 서버가 응답하지 않거나 네트워크가 느릴 수 있습니다. 잠시 후 다시 시도해주세요.'
-        setError(errorMessage)
-        // Don't clear existing listings on timeout - keep what we have
-      } else if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
-        errorMessage = '네트워크 연결에 실패했습니다. 인터넷 연결을 확인하고 다시 시도해주세요.'
-        setError(errorMessage)
-      } else if (allListings.length === 0) {
-        errorMessage = `제품 목록을 가져오는데 실패했습니다: ${err.message || '알 수 없는 오류'}. 다시 시도해주세요.`
-        setError(errorMessage)
-      } else {
-        // If we have existing listings, just log the error but don't show it prominently
-        console.warn('⚠️ Failed to refresh listings, but keeping existing data:', err)
-        errorMessage = `제품 목록을 새로고침하는데 실패했습니다: ${err.message || '알 수 없는 오류'}. 기존 데이터는 유지됩니다.`
-      }
-      
-      // Show error modal if there's an error message
-      if (errorMessage) {
-        setErrorModalMessage(errorMessage)
-        setShowErrorModal(true)
-      }
-    } finally {
-      fetchAllListingsInProgress.current = false
-      setLoading(false)
-    }
-  }
+  // NOTE: Dashboard에서는 절대 제품 리스트를 로드하지 않음
+  // fetchAllListings 함수는 /listings 페이지의 LowPerformingResults 컴포넌트에서 사용
 
   const fetchHistory = async () => {
     try {
@@ -862,25 +713,37 @@ function Dashboard() {
     setViewMode(mode)
     setSelectedIds([]) // Reset selection when switching views
     
-    // Close filter when switching to non-zombie views (but keep filter when switching to 'all' mode)
+    // Close filter when switching to non-zombie views
     if (mode === 'queue' || mode === 'history') {
       setShowFilter(false)
     }
-    // Don't close filter when switching to 'all' mode (filter should be open when auto-displayed after connection)
     
     if (mode === 'total') {
-      // Statistical view - no data fetching needed
+      // Statistical view - 테이블 숨김, summary stats만 표시
+      setShowTable(false)
       return
     } else if (mode === 'all') {
-      setShowFilter(true)
+      // 'All Listings' 클릭 시: /listings?mode=all로 이동 (별도 페이지에서 로드)
+      // Dashboard에서는 제품 리스트를 로드하지 않음
+      console.log('📋 Navigating to /listings?mode=all')
+      navigate('/listings?mode=all')
       return
     } else if (mode === 'zombies') {
-      // When zombie card is clicked: filter if needed
-      if (zombies.length === 0 && allListings.length > 0) {
-        applyLocalFilter(filters)
-      }
+      // 'Find Low-Performing SKUs' 버튼 클릭 시: /listings?mode=low&filters=...로 이동
+      // 현재 필터 상태를 URL 파라미터로 전달
+      const filterParams = new URLSearchParams({
+        mode: 'low',
+        days: String(filters.analytics_period_days || filters.min_days || 7),
+        sales: String(filters.max_sales || 0),
+        watch: String(filters.max_watches || filters.max_watch_count || 0),
+        imp: String(filters.max_impressions || 100),
+        views: String(filters.max_views || 10)
+      })
+      console.log('📉 Navigating to /listings with filters:', filterParams.toString())
+      navigate(`/listings?${filterParams.toString()}`)
       return
     } else if (mode === 'history') {
+      setShowTable(false) // History는 별도 뷰에서 표시
       fetchHistory()
     }
     // 'queue' mode doesn't need to fetch data, it uses existing queue state
@@ -891,8 +754,8 @@ function Dashboard() {
   }
 
   const handleAnalyze = () => {
-    applyLocalFilter(filters)
-    setViewMode('zombies')
+    // 'Find Low-Performing SKUs' 버튼 클릭 시 /listings로 이동
+    handleViewModeChange('zombies')
   }
 
   // Handle filter confirmation from modal
@@ -900,33 +763,32 @@ function Dashboard() {
     if (!pendingFilters) return
     
     try {
-      console.log('🔍 handleConfirmFiltering: Starting filter analysis...')
+      console.log('🔍 handleConfirmFiltering: Navigating to /listings with filters...')
       setIsFiltering(true)
       
-      // Fetch latest listings from API first (if needed)
-      if (!DEMO_MODE && isStoreConnected && allListings.length === 0) {
-        await fetchAllListings()
-      }
+      // 필터 상태 확정
+      setFilters(pendingFilters)
+      setSelectedIds([])
       
       // Small delay to show the filtering state
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await new Promise(resolve => setTimeout(resolve, 300))
       
-      // Apply filter
-      setFilters(pendingFilters)
-      setSelectedIds([])
-      applyLocalFilter(pendingFilters)
-      setViewMode('zombies')
-      
-      // Small delay before closing modal
-      await new Promise(resolve => setTimeout(resolve, 800))
+      // /listings 페이지로 이동 (필터 파라미터 포함)
+      const filterParams = new URLSearchParams({
+        mode: 'low',
+        days: String(pendingFilters.analytics_period_days || pendingFilters.min_days || 7),
+        sales: String(pendingFilters.max_sales || 0),
+        watch: String(pendingFilters.max_watches || pendingFilters.max_watch_count || 0),
+        imp: String(pendingFilters.max_impressions || 100),
+        views: String(pendingFilters.max_views || 10)
+      })
+      navigate(`/listings?${filterParams.toString()}`)
       
     } catch (err) {
-      console.error('Failed to apply filter:', err)
-      // Still apply filter even if refresh fails
+      console.error('Failed to navigate to listings:', err)
+      // 에러 발생 시에도 필터 상태는 저장
       setFilters(pendingFilters)
       setSelectedIds([])
-      applyLocalFilter(pendingFilters)
-      setViewMode('zombies')
     } finally {
       setIsFiltering(false)
       setShowFilteringModal(false)
@@ -956,10 +818,11 @@ function Dashboard() {
 
   const handleSelectAll = (checkedOrIds) => {
     // Support both boolean (legacy) and array (new pagination mode)
+    // NOTE: Dashboard에서는 listings가 없으므로 queue만 처리
     if (Array.isArray(checkedOrIds)) {
       setSelectedIds(checkedOrIds)
     } else {
-      const currentData = viewMode === 'all' ? allListings : viewMode === 'queue' ? queue : zombies
+      const currentData = viewMode === 'queue' ? queue : []
       if (checkedOrIds) {
         setSelectedIds(currentData.map(item => item.id))
       } else {
@@ -968,55 +831,14 @@ function Dashboard() {
     }
   }
 
-  const handleAddToQueue = () => {
-    // Only allow adding to queue from zombies view
-    if (viewMode !== 'zombies') return
-    
-    const selectedItems = zombies.filter(z => selectedIds.includes(z.id)).map(item => ({
-      ...item,
-      // Set to supplier_name or supplier if source field is missing
-      source: item.source || item.supplier_name || item.supplier || 'Unknown'
-    }))
-    setQueue([...queue, ...selectedItems])
-    // Remove selected items from candidates (visually)
-    setZombies(zombies.filter(z => !selectedIds.includes(z.id)))
-    setSelectedIds([])
-    
-    // Navigate directly to Queue view
-    setViewMode('queue')
-    setShowFilter(false)
-  }
-
-  const handleMoveToZombies = (itemIds = null) => {
-    // Move items from all listings to zombies (manual zombie flagging)
-    const idsToMove = itemIds ? (Array.isArray(itemIds) ? itemIds : [itemIds]) : selectedIds
-    if (idsToMove.length === 0) return
-    
-    const itemsToMove = allListings.filter(item => idsToMove.includes(item.id))
-    // Mark as zombie
-    const markedItems = itemsToMove.map(item => ({ ...item, is_zombie: true, zombie_score: 0 }))
-    
-    // Add to zombies list
-    setZombies([...zombies, ...markedItems])
-    
-    // Remove from all listings
-    setAllListings(allListings.filter(item => !idsToMove.includes(item.id)))
-    
-    // Only clear selection if bulk action (not single item click)
-    if (!itemIds) {
-      setSelectedIds([])
-    }
-    
-    // Stay on Active page - don't navigate
-  }
+  // NOTE: handleAddToQueue, handleMoveToZombies는 /listings 페이지에서 구현
+  // Dashboard에서는 queue만 관리
 
   const handleRemoveFromQueueBulk = () => {
-    // Remove selected items from queue (restore to candidates)
+    // Remove selected items from queue
+    // NOTE: Dashboard에서는 zombies를 관리하지 않으므로 queue에서만 제거
     if (viewMode !== 'queue') return
     
-    const selectedItems = queue.filter(q => selectedIds.includes(q.id))
-    // Add back to zombies list
-    setZombies([...zombies, ...selectedItems])
     // Remove from queue
     setQueue(queue.filter(q => !selectedIds.includes(q.id)))
     setSelectedIds([])
@@ -1026,16 +848,17 @@ function Dashboard() {
     setQueue(queue.filter(item => item.id !== id))
   }
 
-  // Sync: fetchAllListings + history (only network calls)
+  // Sync: summary stats + history (Dashboard에서는 제품 리스트를 절대 로드하지 않음)
   const handleSync = async () => {
     try {
-      console.log('🔄 handleSync: Refreshing listings from eBay API...')
+      console.log('🔄 handleSync: Refreshing summary stats from eBay API...')
       setLoading(true)
       await Promise.all([
-        fetchAllListings(),
+        fetchSummaryStats(),
         fetchHistory().catch(err => console.error('History fetch error:', err))
       ])
-      console.log('✅ handleSync: Successfully refreshed listings')
+      console.log('✅ handleSync: Successfully refreshed summary stats')
+      // Dashboard에서는 listings를 로드하지 않음 - 결과 화면에서만 로드
     } catch (err) {
       console.error('❌ Sync failed:', err)
     } finally {
@@ -1050,20 +873,14 @@ function Dashboard() {
         supplier: newSupplier
       })
 
-      // Step 2: Update in local state (candidates/zombies/allListings)
+      // Step 2: Update in queue (Dashboard에서는 queue만 관리)
       const updateItemInList = (list) => {
         return list.map(item => 
           item.id === itemId ? { ...item, supplier: newSupplier, supplier_name: newSupplier } : item
         )
       }
 
-      if (viewMode === 'all') {
-        setAllListings(updateItemInList(allListings))
-      } else if (viewMode === 'zombies') {
-        setZombies(updateItemInList(zombies))
-      }
-
-      // Step 3: If item is in queue, update it there too (will auto-regroup by supplier)
+      // Queue에서만 업데이트 (Dashboard에서는 queue만 유지)
       const itemInQueue = queue.find(item => item.id === itemId)
       if (itemInQueue) {
         setQueue(updateItemInList(queue))
@@ -1073,7 +890,6 @@ function Dashboard() {
     } catch (err) {
       console.error('Failed to update source:', err)
       alert('Failed to update source. Please try again.')
-      // Optionally: revert the change in UI if backend update fails
     }
   }
 
@@ -1189,12 +1005,13 @@ function Dashboard() {
             performance.mark('oauth_callback_complete')
           }
           
-          // Small delay to ensure state is updated before fetching
-          // 중복 호출 방지: handleStoreConnection만 호출 (내부에서 fetchAllListings 호출)
+          // OAuth 콜백 성공 시 summary stats만 가져오기 (전체 listings는 가져오지 않음)
           setTimeout(() => {
-            console.log('🔄 Calling handleStoreConnection(true, true) to fetch listings (single call)...')
-            handleStoreConnection(true, true) // connected=true, forceLoad=true
-            // 중복 호출 제거: fetchAllListings는 handleStoreConnection 내부에서 호출됨
+            console.log('🔄 OAuth callback success - fetching summary stats only...')
+            setIsStoreConnected(true)
+            fetchSummaryStats().catch(err => {
+              console.error('Failed to fetch summary stats after OAuth:', err)
+            })
           }, 100)
         } else {
           console.warn('⚠️ Backend reports not connected, clearing session storage and showing error')
@@ -1207,8 +1024,10 @@ function Dashboard() {
         console.log('⚠️ Verification failed, but URL indicates success - proceeding with connection')
         sessionStorage.setItem(processedKey, 'connected')
         setIsStoreConnected(true)
-        // Verification 실패 시에도 한 번만 호출
-        handleStoreConnection(true, true)
+        // Verification 실패 시에도 summary stats만 가져오기
+        fetchSummaryStats().catch(fetchErr => {
+          console.error('Failed to fetch summary stats:', fetchErr)
+        })
       })
       
       // Clear the processed flag after a delay to allow for future connections
@@ -1256,10 +1075,12 @@ function Dashboard() {
                                !response.data?.is_expired
             
             if (isConnected) {
-              console.log('✅ eBay is already connected - fetching listings...')
+              console.log('✅ eBay is already connected - fetching summary stats...')
               setIsStoreConnected(true)
-              // Fetch listings if already connected
-              handleStoreConnection(true, true) // connected=true, forceLoad=true
+              // 연결되어 있으면 summary stats만 가져오기 (전체 listings는 가져오지 않음)
+              fetchSummaryStats().catch(err => {
+                console.error('Failed to fetch summary stats:', err)
+              })
             } else {
               console.log('ℹ️ eBay is not connected yet')
               setIsStoreConnected(false)
@@ -1283,13 +1104,11 @@ function Dashboard() {
   
   // Handle URL query param for view mode
   useEffect(() => {
-    if (allListings.length > 0) return
-    
     if (viewParam === 'history') {
       setViewMode('history')
       fetchHistory()
     }
-  }, [viewParam, allListings.length])
+  }, [viewParam])
 
   const handleExport = async (mode, itemsToExport = null) => {
     // Use provided items or default to full queue
@@ -1501,7 +1320,7 @@ function Dashboard() {
           zombieBreakdown={zombieBreakdown}
           queueCount={queue.length}
           totalDeleted={totalDeleted}
-          loading={loading}
+          loading={loading || summaryLoading}
           filters={filters}
           viewMode={viewMode}
           onViewModeChange={handleViewModeChange}
@@ -1514,8 +1333,8 @@ function Dashboard() {
           apiConnected={apiConnected}
           apiError={apiError}
           userPlan={userPlan}
-          // Low-Performing items for Product Journey analysis
-          zombies={zombies}
+          // Low-Performing items for Product Journey analysis (Dashboard에서는 사용하지 않음)
+          zombies={[]}
           userCredits={userCredits}
           usedCredits={usedCredits}
           // Store connection callback
@@ -1523,10 +1342,12 @@ function Dashboard() {
           // Supplier export callback
           onSupplierExport={handleSupplierExport}
           filterContent={null}
+          // Summary stats (새로 추가)
+          summaryStats={summaryStats}
         />
 
-        {/* Empty state when not connected or no data */}
-        {!isStoreConnected || allListings.length === 0 ? (
+        {/* Empty state when not connected (Dashboard에서는 카드만 표시) */}
+        {!isStoreConnected || summaryStats.activeCount === 0 ? (
           <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg p-8 mt-8 text-center">
             <p className="text-lg text-zinc-300 dark:text-zinc-300 mb-2">
               📊 <strong className="text-white">Ready to Analyze</strong>
@@ -1534,7 +1355,9 @@ function Dashboard() {
             <p className="text-sm text-zinc-400 dark:text-zinc-400 mb-4">
               {!isStoreConnected 
                 ? "Connect your eBay account to start analyzing your listings."
-                : "No listings found. Please sync from eBay or check your connection."
+                : summaryStats.activeCount === 0
+                ? "No listings found. Click 'Sync' to refresh or connect your eBay account."
+                : "Click on 'All Listings' or 'Find Low-Performing SKUs' card to view detailed listings."
               }
             </p>
           </div>
@@ -1549,164 +1372,28 @@ function Dashboard() {
           />
         )}
 
-        {/* Main content - render if connected and has data (excluding history) */}
-        {isStoreConnected && allListings.length > 0 && viewMode !== 'history' && (
-          <div className={`flex gap-8 transition-all duration-300 ${
-            viewMode === 'all' ? '' : ''
-          }`}>
-            {/* Left Column - Dynamic Width: Full width when queue is empty, flex-1 when queue has items */}
-            <div className={`space-y-8 transition-all duration-300 ${
-              (viewMode === 'all' || viewMode === 'history' || viewMode === 'queue')
-                ? 'w-full' 
-                : (viewMode === 'zombies' && queue.length === 0)
-                  ? 'w-full'
-                  : 'flex-1 min-w-0'
-            }`}>
-              {/* Active View - Header and FilterBar - SINGLE RENDER LOCATION */}
-              {/* Only display in 'all' view mode when eBay is connected and data exists */}
-              {viewMode === 'all' && isStoreConnected && allListings.length > 0 && !loading && (
-                <div className="mt-6 space-y-4">
-                  {/* Header */}
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-zinc-400">
-                      📋 <strong className="text-white">All {allListings.length} Listings</strong> - Filter to find zombies
-                    </p>
-                  </div>
-                  
-                  {/* FilterBar - SINGLE RENDER LOCATION - Show after product fetch is complete */}
-                  <div className="mt-4">
-                    <FilterBar 
-                      key="single-filter-bar-below-listings"
-                      onApplyFilter={async (newFilters) => {
-                        await handleApplyFilter(newFilters)
-                        setViewMode('zombies')
-                      }}
-                      onSync={handleSync}
-                      loading={loading}
-                      initialFilters={filters}
-                    />
-                  </div>
-                </div>
-              )}
-
-            {/* Zombies View - No Filter, just results */}
-            {viewMode === 'zombies' && (
-              <div className="mt-6 mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-zinc-400">
-                    📉 <strong className="text-red-400">{zombies.length} Low-Performing SKUs</strong> found
-                  </span>
-                </div>
-                <button
-                  onClick={() => setViewMode('all')}
-                  className="text-xs text-zinc-500 hover:text-white transition-colors"
-                >
-                  ← Back to All Listings
-                </button>
-              </div>
-            )}
-
-            {/* Briefing Text for Queue View */}
-            {viewMode === 'queue' && (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-4 mt-6">
-                <p className="text-sm text-zinc-400">
-                  ✅ <strong className="text-white">Full-Screen Final Review Mode</strong> - Review all items grouped by source. Each section has its own download button.
-                </p>
-              </div>
-            )}
-
-
-
-            {/* Table - Shows different data based on viewMode */}
-            {viewMode === 'queue' ? (
-              <QueueReviewPanel
-                queue={queue}
-                onRemove={handleRemoveFromQueue}
-                onSourceChange={handleSourceChange}
-                onExportComplete={(exportedIds) => {
-                  // Remove exported items from queue
-                  setQueue(queue.filter(item => !exportedIds.includes(item.id)))
-                }}
-                onHistoryUpdate={() => {
-                  // Refresh history count
-                  fetchHistory().catch(err => console.error('History fetch error:', err))
-                }}
-              />
-            ) : (
-              <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg overflow-hidden">
-                {loading ? (
-                  <div className="p-8 text-center text-slate-500">
-                    Loading {viewMode === 'all' ? 'all' : 'low interest'} listings...
-                  </div>
-                ) : error ? (
-                  <div className="p-8 text-center text-red-500">
-                    {error}
-                  </div>
-                ) : (() => {
-                  if (isStoreConnected && allListings.length > 0) {
-                    const tableData = filteredListings
-                    
-                    return (
-                      <div className="p-6">
-                        {viewMode === 'zombies' && tableData.length > 0 && (
-                          <div className="mb-6 p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg">
-                            <p className="text-base text-zinc-300">
-                              Low-Performing SKUs filtered by: No sales in the past{' '}
-                              <span className="font-bold text-white text-lg">{filters.analytics_period_days || filters.min_days || 7} days</span>
-                              {filters.max_views !== undefined && filters.max_views !== null && (
-                                <>, views ≤ <span className="font-bold text-white text-lg">{filters.max_views}</span></>
-                              )}
-                              {filters.max_watches !== undefined && filters.max_watches !== null && (
-                                <>, watches ≤ <span className="font-bold text-white text-lg">{filters.max_watches}</span></>
-                              )}
-                              {filters.max_impressions !== undefined && filters.max_impressions !== null && (
-                                <>, impressions ≤ <span className="font-bold text-white text-lg">{filters.max_impressions}</span></>
-                              )}
-                              .
-                            </p>
-                          </div>
-                        )}
-                        <ZombieTable 
-                          zombies={tableData}
-                          selectedIds={selectedIds}
-                          onSelect={handleSelect}
-                          onSelectAll={handleSelectAll}
-                          onSourceChange={handleSourceChange}
-                          onAddToQueue={viewMode === 'zombies' ? handleAddToQueue : null}
-                          showAddToQueue={viewMode === 'zombies'}
-                          onMoveToZombies={viewMode === 'all' ? handleMoveToZombies : null}
-                          showMoveToZombies={viewMode === 'all'}
-                        />
-                      </div>
-                    )
-                  }
-                  
-                  return (
-                    <div className="p-8 text-center text-slate-500">
-                      {!isStoreConnected 
-                        ? "Connect your eBay account to start analyzing your listings."
-                        : "No listings found. Please sync from eBay or check your connection."
-                      }
-                    </div>
-                  )
-                })()}
-              </div>
-            )}
+        {/* Main content - Dashboard에서는 테이블을 렌더링하지 않음 (카드만 표시) */}
+        {/* 'All Listings' 또는 'Find Low-Performing SKUs' 클릭 시 /listings 페이지로 이동 */}
+        
+        {/* Queue View는 Dashboard에서 유지 (로컬 상태만 사용) */}
+        {viewMode === 'queue' && queue.length > 0 && (
+          <div className="mt-8">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-4">
+              <p className="text-sm text-zinc-400">
+                ✅ <strong className="text-white">Full-Screen Final Review Mode</strong> - Review all items grouped by source. Each section has its own download button.
+              </p>
             </div>
-
-            {/* Right Column - Removed: Queue panel now accessed via Queue card */}
-            {false && viewMode === 'zombies' && queue.length > 0 && (
-              <div className="w-80 flex-shrink-0 transition-all duration-300">
-                <div className="sticky top-4">
-                  <DeleteQueue
-                    queue={queue}
-                    onRemove={handleRemoveFromQueue}
-                    onExport={handleExport}
-                    loading={loading}
-                  />
-                </div>
-              </div>
-            )}
+            <QueueReviewPanel
+              queue={queue}
+              onRemove={handleRemoveFromQueue}
+              onSourceChange={handleSourceChange}
+              onExportComplete={(exportedIds) => {
+                setQueue(queue.filter(item => !exportedIds.includes(item.id)))
+              }}
+              onHistoryUpdate={() => {
+                fetchHistory().catch(err => console.error('History fetch error:', err))
+              }}
+            />
           </div>
         )}
       </div>
@@ -1721,12 +1408,12 @@ function Dashboard() {
             setPendingFilters(null)
           }
         }}
-        onConfirm={handleConfirmFiltering}
-        creditsRequired={allListings.length}
-        currentCredits={userCredits}
-        listingCount={allListings.length}
-        isFiltering={isFiltering}
-      />
+          onConfirm={handleConfirmFiltering}
+          creditsRequired={summaryStats.activeCount || 0}
+          currentCredits={userCredits}
+          listingCount={summaryStats.activeCount || 0}
+          isFiltering={isFiltering}
+        />
 
       {/* Error Modal */}
       {showErrorModal && createPortal(
@@ -1767,15 +1454,18 @@ function Dashboard() {
                 >
                   닫기
                 </button>
-                <button
-                  onClick={() => {
-                    setShowErrorModal(false)
-                    fetchAllListings()
-                  }}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium"
-                >
-                  다시 시도
-                </button>
+                  <button
+                    onClick={() => {
+                      setShowErrorModal(false)
+                      // Dashboard에서는 listings를 로드하지 않으므로 summary stats만 다시 가져오기
+                      fetchSummaryStats().catch(err => {
+                        console.error('Failed to retry summary stats:', err)
+                      })
+                    }}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium"
+                  >
+                    다시 시도
+                  </button>
               </div>
             </div>
           </div>

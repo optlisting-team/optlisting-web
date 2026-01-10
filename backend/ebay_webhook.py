@@ -1649,3 +1649,118 @@ async def get_active_listings_trading_api(
         import traceback
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/summary")
+async def get_ebay_summary(
+    user_id: str = Query(..., description="User ID"),
+    filters: Optional[str] = Query(None, description="Optional filter JSON for low-performing calculation")
+):
+    """
+    📊 eBay Listings Summary (경량화된 통계 API)
+    
+    Dashboard 초기 로딩 시 카운트만 가져오는 경량 API
+    - Active listings count
+    - Low-performing count (필터 기준)
+    - Last sync timestamp
+    - Queue count (선택)
+    """
+    logger.info("=" * 60)
+    logger.info(f"📊 Fetching eBay summary for user: {user_id}")
+    
+    try:
+        from .models import get_db, Listing
+        from datetime import date as date_type
+        
+        db = next(get_db())
+        try:
+            # Active listings count (DB에서 직접 조회)
+            active_count = db.query(Listing).filter(
+                Listing.user_id == user_id,
+                Listing.platform == "eBay"
+            ).count()
+            
+            # Last sync timestamp (가장 최근 last_synced_at)
+            last_listing = db.query(Listing).filter(
+                Listing.user_id == user_id,
+                Listing.platform == "eBay"
+            ).order_by(Listing.last_synced_at.desc()).first()
+            
+            last_sync_at = last_listing.last_synced_at.isoformat() if last_listing and last_listing.last_synced_at else None
+            
+            # Low-performing count (기본 필터: 7일, 0 판매, 0 관심, 10 이하 조회수)
+            # 필터가 제공되면 사용, 없으면 기본값
+            default_filters = {
+                "analytics_period_days": 7,
+                "max_sales": 0,
+                "max_watches": 0,
+                "max_views": 10,
+                "max_impressions": 100
+            }
+            
+            filter_params = default_filters
+            if filters:
+                try:
+                    import json
+                    filter_params = {**default_filters, **json.loads(filters)}
+                except:
+                    pass
+            
+            # Low-performing 계산 (DB에서 직접 필터링)
+            # Note: view_count와 impressions는 Listing 모델에 직접 필드가 없으므로 metrics JSONB에서 확인 필요
+            # 간단한 통계를 위해 date_listed, sold_qty, watch_count만 필터링
+            min_days = filter_params.get("analytics_period_days", 7)
+            max_sales = filter_params.get("max_sales", 0)
+            max_watches = filter_params.get("max_watches", 0)
+            
+            # 날짜 기준 필터: min_days 이상 등록된 것 (cutoff_date 이전에 등록된 것)
+            cutoff_date = date_type.today() - timedelta(days=min_days)
+            
+            # 기본 필터: date_listed, sold_qty, watch_count만 사용
+            # view_count와 impressions는 metrics JSONB에 저장되므로 전체 listings 조회 시 필터링
+            low_performing_query = db.query(Listing).filter(
+                Listing.user_id == user_id,
+                Listing.platform == "eBay",
+                Listing.date_listed <= cutoff_date,
+                Listing.sold_qty <= max_sales,
+                Listing.watch_count <= max_watches
+            )
+            
+            low_performing_count = low_performing_query.count()
+            
+            # Queue count는 DeletionLog에서 가져오지 않고, 클라이언트에서 관리하는 것으로 가정
+            # 필요시 별도 API로 제공
+            queue_count = 0
+            
+            logger.info(f"✅ Summary retrieved for user {user_id}:")
+            logger.info(f"   Active count: {active_count}")
+            logger.info(f"   Low-performing count: {low_performing_count}")
+            logger.info(f"   Queue count: {queue_count}")
+            logger.info(f"   Last sync: {last_sync_at}")
+            logger.info("=" * 60)
+            
+            return {
+                "success": True,
+                "user_id": user_id,
+                "active_count": active_count,
+                "low_performing_count": low_performing_count,
+                "queue_count": queue_count,
+                "last_sync_at": last_sync_at,
+                "filters_applied": filter_params
+            }
+            
+        except Exception as db_err:
+            logger.error(f"❌ Database error in summary: {db_err}")
+            import traceback
+            logger.error(traceback.format_exc())
+            raise HTTPException(status_code=500, detail=f"Database error: {str(db_err)}")
+        finally:
+            db.close()
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error fetching summary: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
