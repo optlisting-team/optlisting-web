@@ -621,7 +621,10 @@ function SummaryCard({
   // Supplier export callback
   onSupplierExport = null,
   // Low-Performing items data for Product Journey analysis
-  zombies = []
+  zombies = [],
+  // Summary stats and analysis result (for filtered badge)
+  summaryStats = null,
+  analysisResult = null
 }) {
   // Plan colors
   const planColors = {
@@ -665,11 +668,17 @@ function SummaryCard({
 
         {/* 2. Low-Performing - Display only */}
         <div 
-          className={`opt-card p-6 text-center ${totalZombies > 0 ? 'border-red-500/30' : ''}`}
+          className={`opt-card p-6 text-center relative ${totalZombies > 0 ? 'border-red-500/30' : ''}`}
           title="Number of low-performing (deletion target) SKUs detected based on current filter settings."
         >
           <div className={`text-4xl font-black ${totalZombies > 0 ? 'text-red-400' : 'text-white'}`}>{totalZombies || 0}</div>
           <div className={`text-sm uppercase mt-1 ${totalZombies > 0 ? 'text-red-400' : 'text-zinc-500'}`}>Low-Performing</div>
+          {/* Filtered 배지 (분석 결과가 있을 때) */}
+          {totalZombies > 0 && analysisResult && (
+            <div className="absolute top-2 right-2 px-2 py-0.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs font-medium">
+              Filtered
+            </div>
+          )}
             </div>
 
         {/* 3. CSV Export - Display only */}

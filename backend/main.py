@@ -30,7 +30,7 @@ from .credit_service import (
     PlanType,
 )
 
-app = FastAPI(title="OptListing API", version="1.3.22")
+app = FastAPI(title="OptListing API", version="1.3.23")
 
 # ============================================================
 # [BOOT] Supabase Write Self-Test (Top-level execution)
@@ -830,6 +830,192 @@ def analyze_zombies(
             for z in zombies
         ]
     }
+
+
+class LowPerformingAnalysisRequest(BaseModel):
+    """Low-Performing 분석 요청 모델"""
+    days: int = 7  # analytics_period_days
+    sales_lte: int = 0  # max_sales
+    watch_lte: int = 0  # max_watches
+    imp_lte: int = 100  # max_impressions
+    views_lte: int = 10  # max_views
+    request_id: Optional[str] = None  # 클라이언트에서 생성한 requestId (idempotency)
+
+
+@app.post("/api/analysis/low-performing")
+def analyze_low_performing(
+    request: LowPerformingAnalysisRequest,
+    user_id: str = Query("default-user", description="User ID"),
+    store_id: Optional[str] = Query(None, description="Store ID (optional)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Low-Performing SKUs 분석 (크레딧 차감 포함)
+    
+    크레딧 차감: 1 credit (atomic 처리)
+    - 크레딧 부족 시 402 Payment Required 에러 반환
+    - 성공 시 분석 결과 반환 (count, items, remaining_credits, requestId)
+    
+    Args:
+        request: 필터 파라미터 (days, sales_lte, watch_lte, imp_lte, views_lte, request_id)
+        user_id: 사용자 ID
+        store_id: 스토어 ID (선택)
+        db: 데이터베이스 세션
+        
+    Returns:
+        {
+            "success": bool,
+            "count": int,  # 필터링된 low-performing items 개수
+            "items": List[Dict],  # 필터링된 items 리스트
+            "remaining_credits": int,  # 남은 크레딧
+            "request_id": str,  # 요청 ID
+            "filters": Dict  # 적용된 필터
+        }
+    """
+    import uuid
+    import logging
+    from .credit_service import deduct_credits_atomic, get_available_credits, TransactionType
+    from fastapi import status as http_status
+    
+    logger = logging.getLogger(__name__)
+    
+    # Request ID 생성 (idempotency를 위해)
+    request_id = request.request_id or f"analysis_{uuid.uuid4().hex[:16]}"
+    
+    # 필터 값 검증 및 정규화
+    days = max(1, request.days)
+    sales_lte = max(0, request.sales_lte)
+    watch_lte = max(0, request.watch_lte)
+    imp_lte = max(0, request.imp_lte)
+    views_lte = max(0, request.views_lte)
+    
+    filters = {
+        "days": days,
+        "sales_lte": sales_lte,
+        "watch_lte": watch_lte,
+        "imp_lte": imp_lte,
+        "views_lte": views_lte
+    }
+    
+    logger.info(f"📊 [{request_id}] Low-Performing 분석 요청: user_id={user_id}, filters={filters}")
+    
+    # 크레딧 체크 및 atomic 차감 (1 credit)
+    required_credits = 1
+    try:
+        credit_result = deduct_credits_atomic(
+            db=db,
+            user_id=user_id,
+            amount=required_credits,
+            description=f"Low-Performing SKUs analysis (filters: {filters})",
+            reference_id=request_id
+        )
+        
+        if not credit_result.success:
+            # 크레딧 부족
+            remaining = get_available_credits(db, user_id)
+            logger.warning(f"⚠️ [{request_id}] 크레딧 부족: available={remaining}, required={required_credits}")
+            raise HTTPException(
+                status_code=http_status.HTTP_402_PAYMENT_REQUIRED,
+                detail={
+                    "error": "insufficient_credits",
+                    "message": credit_result.message,
+                    "available_credits": remaining,
+                    "required_credits": required_credits,
+                    "request_id": request_id
+                }
+            )
+        
+        remaining_credits = credit_result.remaining_credits
+        logger.info(f"✅ [{request_id}] 크레딧 차감 성공: deducted={credit_result.deducted_amount}, remaining={remaining_credits}")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ [{request_id}] 크레딧 차감 실패: {str(e)}")
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "credit_deduction_failed",
+                "message": f"Failed to deduct credits: {str(e)}",
+                "request_id": request_id
+            }
+        )
+    
+    # 분석 실행
+    try:
+        zombies, zombie_breakdown = analyze_zombie_listings(
+            db=db,
+            user_id=user_id,
+            min_days=days,
+            max_sales=sales_lte,
+            max_watches=watch_lte,
+            max_watch_count=watch_lte,  # Legacy compatibility
+            max_impressions=imp_lte,
+            max_views=views_lte,
+            supplier_filter="All",  # 기본값
+            platform_filter="eBay",  # 기본값
+            store_id=store_id,
+            skip=0,  # 전체 결과 반환
+            limit=10000  # 최대 10000개까지 반환
+        )
+        
+        count = len(zombies)
+        logger.info(f"✅ [{request_id}] 분석 완료: {count}개 low-performing items 발견")
+        
+        # Items 변환
+        items = [
+            {
+                "id": z.id,
+                "item_id": getattr(z, 'item_id', None) or getattr(z, 'ebay_item_id', None) or "",
+                "ebay_item_id": getattr(z, 'item_id', None) or getattr(z, 'ebay_item_id', None) or "",
+                "title": z.title,
+                "sku": z.sku,
+                "image_url": z.image_url or (z.metrics.get('image_url') if z.metrics and isinstance(z.metrics, dict) else None),
+                "platform": getattr(z, 'platform', None) or getattr(z, 'marketplace', None) or "eBay",
+                "marketplace": getattr(z, 'platform', None) or getattr(z, 'marketplace', None) or "eBay",
+                "supplier_name": getattr(z, 'supplier_name', None) or "Unknown",
+                "supplier": getattr(z, 'supplier_name', None) or "Unknown",
+                "supplier_id": getattr(z, 'supplier_id', None),
+                "price": (z.metrics.get('price') if z.metrics and isinstance(z.metrics, dict) and 'price' in z.metrics else None) or getattr(z, 'price', None),
+                "date_listed": z.date_listed.isoformat() if z.date_listed else None,
+                "quantity_sold": (z.metrics.get('sales') if z.metrics and isinstance(z.metrics, dict) and 'sales' in z.metrics else None) or getattr(z, 'sold_qty', 0) or 0,
+                "total_sales": (z.metrics.get('sales') if z.metrics and isinstance(z.metrics, dict) and 'sales' in z.metrics else None) or getattr(z, 'sold_qty', 0) or 0,
+                "watch_count": (z.metrics.get('watches') if z.metrics and isinstance(z.metrics, dict) and 'watches' in z.metrics else None) or getattr(z, 'watch_count', 0) or 0,
+                "view_count": (z.metrics.get('views') if z.metrics and isinstance(z.metrics, dict) and 'views' in z.metrics else None) or getattr(z, 'view_count', None) or 0,
+                "views": (z.metrics.get('views') if z.metrics and isinstance(z.metrics, dict) and 'views' in z.metrics else None) or getattr(z, 'view_count', None) or 0,
+                "impressions": (z.metrics.get('impressions') if z.metrics and isinstance(z.metrics, dict) and 'impressions' in z.metrics else None) or getattr(z, 'impressions', None) or 0,
+                "days_listed": (date.today() - z.date_listed).days if z.date_listed else None,
+                "is_global_winner": bool(getattr(z, 'is_global_winner', 0)),
+                "is_active_elsewhere": bool(getattr(z, 'is_active_elsewhere', 0)),
+                "metrics": z.metrics if z.metrics else {},
+                "analysis_meta": z.analysis_meta if z.analysis_meta else {}
+            }
+            for z in zombies
+        ]
+        
+        return {
+            "success": True,
+            "count": count,
+            "items": items,
+            "remaining_credits": remaining_credits,
+            "request_id": request_id,
+            "filters": filters
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ [{request_id}] 분석 실행 실패: {str(e)}")
+        # 분석 실패 시 크레딧 환불 (선택사항 - 현재는 환불하지 않음)
+        # TODO: 분석 실패 시 크레딧 환불 로직 추가 고려
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "analysis_failed",
+                "message": f"Failed to analyze low-performing SKUs: {str(e)}",
+                "request_id": request_id
+            }
+        )
 
 
 @app.post("/api/export")

@@ -8,7 +8,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? '' : 'https://optlisting-production.up.railway.app')
 const CURRENT_USER_ID = "default-user"
 
-function LowPerformingResults({ mode = 'low', initialFilters = null, onClose = null }) {
+function LowPerformingResults({ mode = 'low', initialFilters = null, initialItems = null, onClose = null }) {
   // Filters from props (for low-performing mode) or defaults
   const filters = useMemo(() => {
     if (mode === 'low' && initialFilters) {
@@ -209,15 +209,74 @@ function LowPerformingResults({ mode = 'low', initialFilters = null, onClose = n
     }
   }
   
-  // Fetch listings when component mounts or params change
+  // 초기 items가 있으면 사용 (서버 호출 생략)
+  // initialItems가 변경될 때만 listings 업데이트
   useEffect(() => {
+    if (initialItems && Array.isArray(initialItems) && initialItems.length > 0) {
+      console.log('📦 LowPerformingResults: Using initial items from analysis result', initialItems.length)
+      // Transform initial items (한 번만 수행)
+      const transformedListings = initialItems.map((item, index) => {
+        const supplierInfo = extractSupplierInfo(item.title, item.sku, item.image_url)
+        const rawImageUrl = item.image_url
+        const normalizedImageUrl = normalizeImageUrl(rawImageUrl)
+        
+        return {
+          id: item.item_id || item.id || `ebay-${index}`,
+          item_id: item.item_id || item.ebay_item_id || item.id,
+          ebay_item_id: item.ebay_item_id || item.item_id || item.id,
+          sell_item_id: item.sell_item_id || item.item_id || item.ebay_item_id || item.id,
+          title: item.title,
+          price: item.price,
+          sku: item.sku,
+          supplier: supplierInfo.supplier_name,
+          supplier_name: supplierInfo.supplier_name,
+          supplier_id: supplierInfo.supplier_id,
+          source: item.source || supplierInfo.supplier_name,
+          total_sales: item.total_sales || item.quantity_sold || 0,
+          quantity_sold: item.quantity_sold || item.total_sales || 0,
+          watch_count: item.watch_count || 0,
+          view_count: item.view_count || item.views || 0,
+          views: item.views || item.view_count || 0,
+          impressions: item.impressions || 0,
+          days_listed: item.days_listed || 0,
+          start_time: item.start_time,
+          picture_url: item.image_url,
+          thumbnail_url: item.image_url,
+          image_url: normalizedImageUrl || rawImageUrl,
+          is_zombie: true
+        }
+      })
+      
+      setListings(transformedListings)
+      setTotalCount(initialItems.length)
+      setLoading(false)
+      setError(null)
+      setPage(1) // Reset to page 1 when initial items loaded
+      return
+    }
+    
+    // initialItems가 없거나 빈 배열이면 서버에서 가져오기
+    if (!initialItems || (Array.isArray(initialItems) && initialItems.length === 0)) {
+      fetchListings()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialItems]) // initialItems가 변경될 때만 실행
+  
+  // 페이지네이션/검색/정렬 변경 시 (initialItems가 없을 때만 서버 호출)
+  useEffect(() => {
+    // initialItems가 있으면 클라이언트 측 필터링만 수행 (이미 listings state에 있음)
+    if (initialItems && Array.isArray(initialItems) && initialItems.length > 0) {
+      return // 클라이언트 측 필터링만 수행 (useMemo에서 처리)
+    }
+    
+    // initialItems가 없으면 서버에서 가져오기
     fetchListings()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, page, pageSize, search, sortBy, sortOrder])
   
-  // Re-fetch when filters change (for low mode)
+  // 필터 변경 시 (initialItems가 없을 때만)
   useEffect(() => {
-    if (mode === 'low') {
+    if (mode === 'low' && (!initialItems || (Array.isArray(initialItems) && initialItems.length === 0))) {
       // Reset to page 1 when filters change
       if (page !== 1) {
         setPage(1)
@@ -252,21 +311,70 @@ function LowPerformingResults({ mode = 'low', initialFilters = null, onClose = n
     }
   }
   
-  const handleSelectAll = (checked) => {
-    if (checked) {
-      setSelectedIds(listings.map(item => item.id))
-    } else {
-      setSelectedIds([])
-    }
-  }
-  
   const handleAddToQueue = () => {
     // TODO: Implement queue functionality (navigate to dashboard with queue items)
     console.log('Add to queue:', selectedIds)
     alert('Queue functionality will be implemented')
   }
   
-  const totalPages = Math.ceil(totalCount / pageSize)
+  // 클라이언트 측 필터링/정렬/검색 (initialItems가 있을 때)
+  const filteredAndSortedListings = useMemo(() => {
+    let filtered = listings
+    
+    // 검색 필터
+    if (search) {
+      const searchLower = search.toLowerCase()
+      filtered = filtered.filter(item => 
+        item.title?.toLowerCase().includes(searchLower) ||
+        item.sku?.toLowerCase().includes(searchLower) ||
+        item.supplier_name?.toLowerCase().includes(searchLower)
+      )
+    }
+    
+    // 정렬
+    if (sortBy) {
+      filtered = [...filtered].sort((a, b) => {
+        let aVal = a[sortBy] || 0
+        let bVal = b[sortBy] || 0
+        
+        // 숫자 비교
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+          return sortOrder === 'asc' ? aVal - bVal : bVal - aVal
+        }
+        
+        // 문자열 비교
+        if (typeof aVal === 'string' && typeof bVal === 'string') {
+          return sortOrder === 'asc' 
+            ? aVal.localeCompare(bVal)
+            : bVal.localeCompare(aVal)
+        }
+        
+        return 0
+      })
+    }
+    
+    return filtered
+  }, [listings, search, sortBy, sortOrder])
+  
+  // 페이지네이션
+  const paginatedListings = useMemo(() => {
+    const startIndex = (page - 1) * pageSize
+    const endIndex = startIndex + pageSize
+    return filteredAndSortedListings.slice(startIndex, endIndex)
+  }, [filteredAndSortedListings, page, pageSize])
+  
+  const totalPages = Math.ceil(filteredAndSortedListings.length / pageSize)
+  const displayCount = filteredAndSortedListings.length
+  
+  // 전체 선택 핸들러 (paginatedListings 정의 후에 정의)
+  const handleSelectAll = (checked) => {
+    // 전체 선택: 현재 표시된 페이지의 모든 항목 선택
+    if (checked) {
+      setSelectedIds(paginatedListings.map(item => item.id))
+    } else {
+      setSelectedIds([])
+    }
+  }
   
   return (
     <div className="space-y-6">
@@ -278,8 +386,8 @@ function LowPerformingResults({ mode = 'low', initialFilters = null, onClose = n
           </h2>
           <p className="text-sm text-zinc-400">
             {mode === 'low' 
-              ? `Found ${totalCount} low-performing items based on filters`
-              : `Total ${totalCount} active listings`
+              ? `Found ${displayCount} low-performing items${search ? ` (filtered from ${totalCount})` : ''}`
+              : `Total ${displayCount} active listings${search ? ` (filtered from ${totalCount})` : ''}`
             }
           </p>
         </div>
@@ -375,11 +483,11 @@ function LowPerformingResults({ mode = 'low', initialFilters = null, onClose = n
       )}
       
       {/* Table */}
-      {!loading && !error && listings.length > 0 && (
+      {!loading && !error && paginatedListings.length > 0 && (
         <div className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
           <div className="p-6">
             <ZombieTable
-              zombies={listings}
+              zombies={paginatedListings}
               selectedIds={selectedIds}
               onSelect={handleSelect}
               onSelectAll={handleSelectAll}
@@ -394,10 +502,12 @@ function LowPerformingResults({ mode = 'low', initialFilters = null, onClose = n
       )}
       
       {/* Empty State */}
-      {!loading && !error && listings.length === 0 && (
+      {!loading && !error && paginatedListings.length === 0 && (
         <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-8 text-center">
           <p className="text-zinc-400">
-            {mode === 'low' 
+            {search
+              ? `No items found matching "${search}".`
+              : mode === 'low'
               ? 'No low-performing items found matching the filters.'
               : 'No listings found.'
             }
@@ -406,10 +516,10 @@ function LowPerformingResults({ mode = 'low', initialFilters = null, onClose = n
       )}
       
       {/* Pagination */}
-      {!loading && !error && listings.length > 0 && totalPages > 1 && (
+      {!loading && !error && displayCount > 0 && totalPages > 1 && (
         <div className="flex items-center justify-between">
           <div className="text-sm text-zinc-400">
-            Showing {(page - 1) * pageSize + 1} - {Math.min(page * pageSize, totalCount)} of {totalCount}
+            Showing {(page - 1) * pageSize + 1} - {Math.min(page * pageSize, displayCount)} of {displayCount}
           </div>
           <div className="flex items-center gap-2">
             <button

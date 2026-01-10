@@ -11,6 +11,7 @@ import HistoryTable from './HistoryTable'
 import HistoryView from './HistoryView'
 import QueueReviewPanel from './QueueReviewPanel'
 import FilteringModal from './FilteringModal'
+import ConfirmModal from './ConfirmModal'
 import LowPerformingResults from './LowPerformingResults'
 import { Button } from './ui/button'
 import { AlertCircle, X } from 'lucide-react'
@@ -152,6 +153,14 @@ function Dashboard() {
   const [resultsMode, setResultsMode] = useState('low') // 'all' or 'low'
   const [resultsFilters, setResultsFilters] = useState(null)
   
+  // 분석 결과 상태
+  const [analysisResult, setAnalysisResult] = useState(null) // { count, items, requestId, filters }
+  
+  // Confirm Modal 상태 (크레딧 소비 확인)
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [pendingAnalysisFilters, setPendingAnalysisFilters] = useState(null)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  
   // API Health Check State
   const [apiConnected, setApiConnected] = useState(false)
   const [apiError, setApiError] = useState(null)
@@ -160,10 +169,10 @@ function Dashboard() {
   const [showErrorModal, setShowErrorModal] = useState(false)
   const [errorModalMessage, setErrorModalMessage] = useState('')
   
-  // Filtering Modal State
+  // Filtering Modal State (레거시 - 필요시 유지)
   const [showFilteringModal, setShowFilteringModal] = useState(false)
   const [isFiltering, setIsFiltering] = useState(false)
-  const [pendingFilters, setPendingFilters] = useState(null)
+  const [pendingFiltersForModal, setPendingFiltersForModal] = useState(null)
   
   // User Credits & Plan State (from API)
   const [userCredits, setUserCredits] = useState(0)
@@ -186,7 +195,10 @@ function Dashboard() {
   // Derived values only (summaryStats 사용)
   // Dashboard에서는 allListings/zombies를 사용하지 않으므로 summaryStats만 사용
   const totalListings = useMemo(() => summaryStats.activeCount || 0, [summaryStats.activeCount])
-  const totalZombies = useMemo(() => summaryStats.lowPerformingCount || 0, [summaryStats.lowPerformingCount])
+  // LOW-PERFORMING 카드 숫자: analysisResult?.count ?? summaryStats.lowPerformingCount
+  const totalZombies = useMemo(() => {
+    return analysisResult?.count ?? summaryStats.lowPerformingCount ?? 0
+  }, [analysisResult?.count, summaryStats.lowPerformingCount])
   
   // Breakdown은 summary API에서 제공하지 않으므로 빈 객체
   const totalBreakdown = useMemo(() => ({}), [])
@@ -736,17 +748,17 @@ function Dashboard() {
     }, 100)
   }
 
-  // Handle filter confirmation from modal
+  // Handle filter confirmation from modal (레거시 - 필요시 유지)
   const handleConfirmFiltering = async () => {
-    if (!pendingFilters) return
+    if (!pendingFiltersForModal) return
     
     try {
       console.log('🔍 handleConfirmFiltering: Applying filters and showing results...')
       setIsFiltering(true)
       
       // 필터 상태 확정
-      setFilters(pendingFilters)
-      setResultsFilters(pendingFilters)
+      setFilters(pendingFiltersForModal)
+      setResultsFilters(pendingFiltersForModal)
       setSelectedIds([])
       
       // Small delay to show the filtering state
@@ -767,25 +779,77 @@ function Dashboard() {
     } catch (err) {
       console.error('Failed to apply filters:', err)
       // 에러 발생 시에도 필터 상태는 저장
-      setFilters(pendingFilters)
-      setResultsFilters(pendingFilters)
+      setFilters(pendingFiltersForModal)
+      setResultsFilters(pendingFiltersForModal)
       setSelectedIds([])
     } finally {
       setIsFiltering(false)
       setShowFilteringModal(false)
-      setPendingFilters(null)
+      setPendingFiltersForModal(null)
     }
   }
 
-  // Apply filter - 바로 결과 표시 (모달 제거)
+  // Apply filter - Confirm 모달 표시
   const handleApplyFilter = async (newFilters) => {
-    console.log('🔍 handleApplyFilter: Applying filters and showing results...')
+    console.log('🔍 handleApplyFilter: Showing confirm modal...')
+    setPendingAnalysisFilters(newFilters)
+    setShowConfirmModal(true)
+  }
+  
+  // Confirm 모달에서 확인 클릭 시 실제 분석 실행
+  const handleConfirmAnalysis = async () => {
+    if (!pendingAnalysisFilters || isAnalyzing) return
+    
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
     try {
+      setIsAnalyzing(true)
+      setShowConfirmModal(false)
+      
+      console.log(`📊 [${requestId}] Starting Low-Performing analysis...`, pendingAnalysisFilters)
+      
+      // API 호출
+      const response = await axios.post(`${API_BASE_URL}/api/analysis/low-performing`, {
+        days: pendingAnalysisFilters.analytics_period_days || pendingAnalysisFilters.min_days || 7,
+        sales_lte: pendingAnalysisFilters.max_sales || 0,
+        watch_lte: pendingAnalysisFilters.max_watches || pendingAnalysisFilters.max_watch_count || 0,
+        imp_lte: pendingAnalysisFilters.max_impressions || 100,
+        views_lte: pendingAnalysisFilters.max_views || 10,
+        request_id: requestId
+      }, {
+        params: {
+          user_id: CURRENT_USER_ID
+        },
+        headers: {
+          'X-Request-Id': requestId,
+          'Content-Type': 'application/json'
+        },
+        timeout: 120000
+      })
+      
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Analysis failed')
+      }
+      
+      const { count, items, remaining_credits, request_id: returnedRequestId, filters: returnedFilters } = response.data
+      
+      console.log(`✅ [${requestId}] Analysis completed: ${count} items found, remaining credits: ${remaining_credits}`)
+      
+      // 분석 결과 저장
+      setAnalysisResult({
+        count,
+        items,
+        requestId: returnedRequestId || requestId,
+        filters: returnedFilters || pendingAnalysisFilters
+      })
+      
       // 필터 상태 확정
-      setFilters(newFilters)
-      setResultsFilters(newFilters)
+      setFilters(pendingAnalysisFilters)
+      setResultsFilters(pendingAnalysisFilters)
       setSelectedIds([])
+      
+      // 크레딧 업데이트
+      setUserCredits(remaining_credits)
       
       // Dashboard 내부에 결과 표시
       setResultsMode('low')
@@ -798,11 +862,38 @@ function Dashboard() {
           resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
         }
       }, 100)
+      
+      setPendingAnalysisFilters(null)
+      
     } catch (err) {
-      console.error('Failed to apply filters:', err)
-      setFilters(newFilters)
-      setResultsFilters(newFilters)
-      setSelectedIds([])
+      console.error(`❌ [${requestId}] Analysis failed:`, err)
+      
+      let errorMessage = 'Analysis failed. Please try again.'
+      let showRetry = true
+      
+      if (err.response?.status === 402) {
+        // 크레딧 부족
+        const errorData = err.response?.data?.detail || {}
+        errorMessage = errorData.message || 'Insufficient credits. Please purchase more credits.'
+        showRetry = false
+        setUserCredits(errorData.available_credits || 0)
+      } else if (err.response?.status === 500) {
+        errorMessage = err.response?.data?.detail?.message || 'Server error. Please try again later.'
+      } else if (err.code === 'ECONNABORTED') {
+        errorMessage = 'Request timeout. Please try again.'
+      } else if (err.code === 'ERR_NETWORK') {
+        errorMessage = 'Network error. Please check your connection.'
+      }
+      
+      setErrorModalMessage(errorMessage)
+      setShowErrorModal(true)
+      
+      // 크레딧 부족이 아닌 경우에만 pendingAnalysisFilters 유지 (retry 가능)
+      if (!showRetry) {
+        setPendingAnalysisFilters(null)
+      }
+    } finally {
+      setIsAnalyzing(false)
     }
   }
 
@@ -1342,6 +1433,8 @@ function Dashboard() {
           filterContent={null}
           // Summary stats (새로 추가)
           summaryStats={summaryStats}
+          // Analysis result (for filtered badge)
+          analysisResult={analysisResult}
         />
 
         {/* FilterBar - Find Low-Performing SKUs 버튼 */}
@@ -1402,6 +1495,7 @@ function Dashboard() {
             <LowPerformingResults 
               mode={resultsMode}
               initialFilters={resultsFilters}
+              initialItems={analysisResult?.items}
               onClose={() => {
                 setShowResults(false)
                 setResultsFilters(null)
@@ -1433,22 +1527,37 @@ function Dashboard() {
         )}
       </div>
 
-      {/* Filtering Modal */}
+      {/* Confirm Modal - 크레딧 소비 확인 */}
+      <ConfirmModal
+        isOpen={showConfirmModal}
+        onClose={() => {
+          if (!isAnalyzing) {
+            setShowConfirmModal(false)
+            setPendingAnalysisFilters(null)
+          }
+        }}
+        onConfirm={handleConfirmAnalysis}
+        creditsRequired={1}
+        currentCredits={userCredits}
+        isProcessing={isAnalyzing}
+      />
+
+      {/* Filtering Modal (레거시 - 필요시 유지) */}
       <FilteringModal
         isOpen={showFilteringModal}
         onClose={() => {
           // Don't allow closing during filtering
           if (!isFiltering) {
             setShowFilteringModal(false)
-            setPendingFilters(null)
+            setPendingFiltersForModal(null)
           }
         }}
-          onConfirm={handleConfirmFiltering}
-          creditsRequired={summaryStats.activeCount || 0}
-          currentCredits={userCredits}
-          listingCount={summaryStats.activeCount || 0}
-          isFiltering={isFiltering}
-        />
+        onConfirm={handleConfirmFiltering}
+        creditsRequired={summaryStats.activeCount || 0}
+        currentCredits={userCredits}
+        listingCount={summaryStats.activeCount || 0}
+        isFiltering={isFiltering}
+      />
 
       {/* Error Modal */}
       {showErrorModal && createPortal(
