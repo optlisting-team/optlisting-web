@@ -582,6 +582,9 @@ function Dashboard() {
   }
 
   // Handle store connection change
+  // 중복 호출 방지를 위한 플래그
+  const handleStoreConnectionInProgress = React.useRef(false)
+  
   const handleStoreConnection = (connected, forceLoad = false) => {
     // Prevent duplicate calls - check if state is already set
     if (connected === isStoreConnected && !forceLoad) {
@@ -589,7 +592,14 @@ function Dashboard() {
       return
     }
     
+    // 중복 실행 방지
+    if (handleStoreConnectionInProgress.current) {
+      console.warn('⚠️ handleStoreConnection already in progress, skipping duplicate call')
+      return
+    }
+    
     console.log('🔄 handleStoreConnection:', { connected, forceLoad, currentState: isStoreConnected })
+    handleStoreConnectionInProgress.current = true
     setIsStoreConnected(connected)
     
     // Clear data when disconnected
@@ -598,31 +608,56 @@ function Dashboard() {
       setZombies([])
       setViewMode('total')
       setShowFilter(false)
+      handleStoreConnectionInProgress.current = false
     } else {
       // When connected, fetch listings if in demo mode or if forceLoad is true
       if (DEMO_MODE) {
         setAllListings(DUMMY_ALL_LISTINGS)
         setViewMode('all')
         setShowFilter(true)
+        handleStoreConnectionInProgress.current = false
       } else if (forceLoad) {
         // Fetch listings when connection is confirmed and forceLoad is true
-        console.log('📦 handleStoreConnection: forceLoad=true, calling fetchAllListings()')
+        console.log('📦 handleStoreConnection: forceLoad=true, calling fetchAllListings() (single call)')
         // Use setTimeout to ensure state is updated before fetching
         setTimeout(() => {
-          fetchAllListings().catch(err => {
+          fetchAllListings().then(() => {
+            handleStoreConnectionInProgress.current = false
+          }).catch(err => {
             console.error('Failed to fetch listings after connection:', err)
+            handleStoreConnectionInProgress.current = false
           })
-        }, 100)
+        }, 200) // 약간의 지연으로 토큰 저장 완료 보장
+      } else {
+        handleStoreConnectionInProgress.current = false
       }
     }
   }
 
   // Called ONLY from: (1) OAuth success OR (2) handleSync OR (3) handleStoreConnection with forceLoad
+  // 중복 호출 방지를 위한 플래그
+  const fetchAllListingsInProgress = React.useRef(false)
+  
   const fetchAllListings = async () => {
+    // 중복 호출 방지
+    if (fetchAllListingsInProgress.current) {
+      console.warn('⚠️ fetchAllListings already in progress, skipping duplicate call')
+      return
+    }
+    
+    // requestId 생성 (UUID v4 스타일)
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
     try {
-      console.log('📦 fetchAllListings: Starting to fetch eBay listings...')
+      fetchAllListingsInProgress.current = true
+      console.log(`📦 fetchAllListings [${requestId}]: Starting to fetch eBay listings...`)
       setLoading(true)
       setError(null)
+      
+      // Performance mark 시작
+      if (typeof performance !== 'undefined' && performance.mark) {
+        performance.mark(`fetchAllListings_start_${requestId}`)
+      }
       
       if (DEMO_MODE) {
         setAllListings(DUMMY_ALL_LISTINGS)
@@ -631,14 +666,17 @@ function Dashboard() {
         return
       }
       
-      console.log('📡 fetchAllListings: Calling API:', `${API_BASE_URL}/api/ebay/listings/active`)
+      console.log(`📡 fetchAllListings [${requestId}]: Calling API:`, `${API_BASE_URL}/api/ebay/listings/active`)
       const response = await axios.get(`${API_BASE_URL}/api/ebay/listings/active`, {
         params: {
           user_id: CURRENT_USER_ID,
           page: 1,
           entries_per_page: 200
         },
-        timeout: 120000 // 120초로 증가 (백엔드가 여러 API 호출을 순차 처리하므로 시간이 필요)
+        timeout: 120000, // 120초로 증가 (백엔드가 여러 API 호출을 순차 처리하므로 시간이 필요)
+        headers: {
+          'X-Request-Id': requestId
+        }
       })
       
       if (!response.data.success) {
@@ -646,7 +684,20 @@ function Dashboard() {
       }
       
       const allListingsFromEbay = response.data.listings || []
-      console.log(`✅ fetchAllListings: Successfully fetched ${allListingsFromEbay.length} listings`)
+      
+      // Performance mark 종료 및 측정
+      if (typeof performance !== 'undefined' && performance.mark && performance.measure) {
+        performance.mark(`fetchAllListings_end_${requestId}`)
+        performance.measure(
+          `fetchAllListings_duration_${requestId}`,
+          `fetchAllListings_start_${requestId}`,
+          `fetchAllListings_end_${requestId}`
+        )
+        const measure = performance.getEntriesByName(`fetchAllListings_duration_${requestId}`)[0]
+        console.log(`⏱️ fetchAllListings [${requestId}]: Completed in ${measure.duration.toFixed(2)}ms`)
+      }
+      
+      console.log(`✅ fetchAllListings [${requestId}]: Successfully fetched ${allListingsFromEbay.length} listings`)
       
       // Debug: Check first item's image URLs
       if (allListingsFromEbay.length > 0) {
@@ -733,14 +784,15 @@ function Dashboard() {
       setError(null)
       
     } catch (err) {
-      console.error('❌ fetchAllListings error:', err)
-      console.error('   Error details:', {
+      console.error(`❌ fetchAllListings [${requestId}] error:`, err)
+      console.error(`   Error details [${requestId}]:`, {
         message: err.message,
         code: err.code,
         status: err.response?.status,
         statusText: err.response?.statusText,
         data: err.response?.data,
-        url: err.config?.url
+        url: err.config?.url,
+        requestId: requestId
       })
       
       let errorMessage = ''
@@ -776,6 +828,7 @@ function Dashboard() {
         setShowErrorModal(true)
       }
     } finally {
+      fetchAllListingsInProgress.current = false
       setLoading(false)
     }
   }
@@ -1131,19 +1184,17 @@ function Dashboard() {
           sessionStorage.setItem(processedKey, 'connected')
           setIsStoreConnected(true)
           
+          // Performance mark: OAuth callback 완료 시점
+          if (typeof performance !== 'undefined' && performance.mark) {
+            performance.mark('oauth_callback_complete')
+          }
+          
           // Small delay to ensure state is updated before fetching
+          // 중복 호출 방지: handleStoreConnection만 호출 (내부에서 fetchAllListings 호출)
           setTimeout(() => {
-            // Use handleStoreConnection with forceLoad=true to fetch products
-            console.log('🔄 Calling handleStoreConnection(true, true) to fetch listings...')
+            console.log('🔄 Calling handleStoreConnection(true, true) to fetch listings (single call)...')
             handleStoreConnection(true, true) // connected=true, forceLoad=true
-            
-            // Also directly call fetchAllListings as a backup
-            setTimeout(() => {
-              console.log('🔄 Directly calling fetchAllListings as backup...')
-              fetchAllListings().catch(err => {
-                console.error('Failed to fetch listings after OAuth:', err)
-              })
-            }, 500)
+            // 중복 호출 제거: fetchAllListings는 handleStoreConnection 내부에서 호출됨
           }, 100)
         } else {
           console.warn('⚠️ Backend reports not connected, clearing session storage and showing error')
@@ -1156,6 +1207,7 @@ function Dashboard() {
         console.log('⚠️ Verification failed, but URL indicates success - proceeding with connection')
         sessionStorage.setItem(processedKey, 'connected')
         setIsStoreConnected(true)
+        // Verification 실패 시에도 한 번만 호출
         handleStoreConnection(true, true)
       })
       

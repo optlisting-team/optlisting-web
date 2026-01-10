@@ -11,6 +11,7 @@ OptListing Credit Service
 """
 
 import uuid
+import logging
 from datetime import datetime
 from typing import Optional, Tuple, Dict, Any
 from dataclasses import dataclass
@@ -249,19 +250,8 @@ def deduct_credits_atomic(
         row = result.fetchone()
         
         if row is None:
-            # 업데이트 실패 - 잔액 부족 또는 사용자 없음
+            # 업데이트 실패 - 잔액 부족
             available = get_available_credits(db, user_id)
-            
-            if available == 0:
-                # 사용자가 없거나 크레딧이 0
-                profile = db.query(Profile).filter(Profile.user_id == user_id).first()
-                if not profile:
-                    return CreditDeductResult(
-                        success=False,
-                        remaining_credits=0,
-                        deducted_amount=0,
-                        message="User not found"
-                    )
             
             return CreditDeductResult(
                 success=False,
@@ -324,6 +314,8 @@ def add_credits(
     """
     크레딧 추가 (구매, 보너스, 환불 등)
     
+    Profile이 없으면 자동으로 생성합니다 (idempotent).
+    
     Args:
         db: 데이터베이스 세션
         user_id: 사용자 ID
@@ -343,8 +335,58 @@ def add_credits(
             message="Amount must be positive"
         )
     
+    logger = logging.getLogger(__name__)
+    logger.info(f"[add_credits] START: user_id={user_id}, amount={amount}, transaction_type={transaction_type.value}, reference_id={reference_id}")
+    
     try:
+        # 먼저 profile이 있는지 확인하고 없으면 생성 (idempotent)
+        logger.info(f"[add_credits] Querying profile for user_id={user_id}")
+        profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+        
+        if not profile:
+            logger.info(f"[add_credits] Profile not found, creating new profile for user_id={user_id}")
+            # Profile이 없으면 자동 생성
+            try:
+                logger.info(f"[add_credits] Creating Profile object for user_id={user_id}")
+                profile = Profile(
+                    user_id=user_id,
+                    purchased_credits=0,
+                    consumed_credits=0,
+                    current_plan='free',
+                    subscription_status='inactive',
+                    subscription_plan='free',
+                    total_listings_limit=100
+                )
+                logger.info(f"[add_credits] Adding profile to session for user_id={user_id}")
+                db.add(profile)
+                logger.info(f"[add_credits] Committing profile creation for user_id={user_id}")
+                db.commit()
+                logger.info(f"[add_credits] Refreshing profile for user_id={user_id}")
+                db.refresh(profile)
+                logger.info(f"[add_credits] ✅ Auto-created profile for user_id={user_id}, profile_id={profile.id}")
+            except SQLAlchemyError as e:
+                db.rollback()
+                logger.error(f"[add_credits] ❌ Profile creation failed: user_id={user_id}, error={str(e)}", exc_info=True)
+                logger.error(f"[add_credits] Error type: {type(e).__name__}, Error details: {repr(e)}")
+                # Race condition: 다른 프로세스가 이미 생성했을 수 있음
+                # 다시 조회 시도
+                logger.info(f"[add_credits] Retrying query after rollback for user_id={user_id}")
+                profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+                if not profile:
+                    logger.error(f"[add_credits] ❌ Profile creation and retry both failed: user_id={user_id}")
+                    return CreditAddResult(
+                        success=False,
+                        total_credits=0,
+                        added_amount=0,
+                        message=f"Failed to create profile: {str(e)}"
+                    )
+                else:
+                    logger.info(f"[add_credits] ✅ Profile found after retry: user_id={user_id}, profile_id={profile.id}")
+        else:
+            logger.info(f"[add_credits] ✅ Profile found: user_id={user_id}, profile_id={profile.id}, purchased_credits={profile.purchased_credits}, consumed_credits={profile.consumed_credits}")
+        
         # 원자적 UPDATE
+        logger.info(f"[add_credits] Executing UPDATE query: user_id={user_id}, amount={amount}")
         result = db.execute(
             text("""
                 UPDATE profiles
@@ -360,20 +402,25 @@ def add_credits(
         )
         
         row = result.fetchone()
+        logger.info(f"[add_credits] UPDATE query executed, row={row}")
         
         if row is None:
+            logger.error(f"[add_credits] ❌ UPDATE returned no rows: user_id={user_id}, amount={amount}")
+            # 이 경우는 발생하지 않아야 하지만, 안전을 위해 처리
             return CreditAddResult(
                 success=False,
-                total_credits=0,
+                total_credits=get_available_credits(db, user_id),
                 added_amount=0,
-                message="User not found"
+                message="Failed to update credits"
             )
         
         total_credits = row.remaining
+        logger.info(f"[add_credits] ✅ UPDATE successful: user_id={user_id}, new_total_credits={total_credits}")
         transaction_id = str(uuid.uuid4())
         
         # 트랜잭션 이력 기록
         try:
+            logger.info(f"[add_credits] Inserting credit_transaction: user_id={user_id}, amount={amount}, reference_id={reference_id}")
             db.execute(
                 text("""
                     INSERT INTO credit_transactions 
@@ -389,26 +436,45 @@ def add_credits(
                     "reference_id": reference_id or transaction_id
                 }
             )
-        except SQLAlchemyError:
-            pass
+            logger.info(f"[add_credits] ✅ credit_transaction inserted successfully: user_id={user_id}, reference_id={reference_id}")
+        except SQLAlchemyError as e:
+            logger.error(f"[add_credits] ❌ Failed to insert credit_transaction: user_id={user_id}, error={str(e)}", exc_info=True)
+            logger.error(f"[add_credits] Error type: {type(e).__name__}, Error details: {repr(e)}")
+            # credit_transactions 테이블이 없으면 무시하되 로그는 남김
         
+        logger.info(f"[add_credits] Committing transaction for user_id={user_id}")
         db.commit()
+        logger.info(f"[add_credits] ✅ Transaction committed successfully: user_id={user_id}, total_credits={total_credits}")
         
-        return CreditAddResult(
+        result = CreditAddResult(
             success=True,
             total_credits=total_credits,
             added_amount=amount,
             message="Credits added successfully",
             transaction_id=transaction_id
         )
+        logger.info(f"[add_credits] END SUCCESS: user_id={user_id}, total_credits={total_credits}, added_amount={amount}")
+        return result
         
     except SQLAlchemyError as e:
         db.rollback()
+        logger.error(f"[add_credits] ❌ SQLAlchemyError: user_id={user_id}, error={str(e)}", exc_info=True)
+        logger.error(f"[add_credits] Error type: {type(e).__name__}, Error details: {repr(e)}")
         return CreditAddResult(
             success=False,
             total_credits=get_available_credits(db, user_id),
             added_amount=0,
             message=f"Database error: {str(e)}"
+        )
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[add_credits] ❌ Unexpected error: user_id={user_id}, error={str(e)}", exc_info=True)
+        logger.error(f"[add_credits] Error type: {type(e).__name__}, Error details: {repr(e)}")
+        return CreditAddResult(
+            success=False,
+            total_credits=get_available_credits(db, user_id),
+            added_amount=0,
+            message=f"Unexpected error: {str(e)}"
         )
 
 

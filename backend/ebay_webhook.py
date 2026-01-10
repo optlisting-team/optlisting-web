@@ -22,8 +22,9 @@ import os
 import hashlib
 import logging
 import base64
+import time as time_module  # time.sleep과 구분
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from urllib.parse import urlencode, quote
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, Request, HTTPException, Query, Depends
@@ -742,12 +743,15 @@ async def ebay_auth_callback(
                 })
                 logger.info(f"📝 Updating existing profile for user: {user_id} (eBay User ID: {ebay_user_id})")
             
-            # 트랜잭션 커밋
+            # 트랜잭션 커밋 (Race condition 방지: 커밋 완료 후 리다이렉트)
             db.commit()
             logger.info(f"✅ Tokens saved to database for user: {user_id}")
             logger.info(f"   Access token length: {len(access_token)}")
             logger.info(f"   Refresh token exists: {bool(refresh_token)}")
             logger.info(f"   Token expires at: {token_expires_at.isoformat()}")
+            
+            # Race condition 방지: DB 커밋 후 약간의 지연 (토큰 저장 완료 보장)
+            time_module.sleep(0.1)  # 100ms 지연으로 DB 쓰기 완료 보장
             
             # 저장 후 즉시 확인 (검증) - 새 세션으로 다시 조회
             db.close()
@@ -806,6 +810,9 @@ async def ebay_auth_callback(
             if db_verify:
                 db_verify.close()
                 db_verify = None
+            
+            # Race condition 방지: 검증 완료 후 추가 지연 (토큰이 완전히 저장되었음을 보장)
+            time_module.sleep(0.05)  # 50ms 추가 지연
             
         except Exception as e:
             if db:
@@ -1242,6 +1249,7 @@ async def get_ebay_listings(
 
 @router.get("/listings/active")
 async def get_active_listings_trading_api(
+    request: Request,
     user_id: str = Query(..., description="User ID"),
     page: int = Query(1, description="Page number", ge=1),
     entries_per_page: int = Query(100, description="Entries per page", ge=1, le=200)
@@ -1255,13 +1263,23 @@ async def get_active_listings_trading_api(
     - 판매 수량 (QuantitySold)
     - 노출 횟수 (ImpressionCount)
     """
-    logger.info("=" * 60)
-    logger.info(f"📦 Fetching active listings (Trading API) for user: {user_id}")
+    # RequestId 추출 (헤더에서)
+    request_id = request.headers.get("X-Request-Id", f"server_{datetime.now().timestamp()}_{user_id}")
     
+    t0 = datetime.utcnow()
+    logger.info("=" * 60)
+    logger.info(f"📦 [t0] Request received [RequestId: {request_id}]")
+    logger.info(f"   User ID: {user_id}")
+    logger.info(f"   Page: {page}, Entries per page: {entries_per_page}")
+    logger.info(f"   t0: {t0.isoformat()}")
+    
+    t1 = datetime.utcnow()
     access_token = get_user_access_token(user_id)
+    t1_duration = (datetime.utcnow() - t1).total_seconds() * 1000
+    logger.info(f"📋 [t1] Token retrieved [RequestId: {request_id}] - Duration: {t1_duration:.2f}ms")
     
     if not access_token:
-        logger.error(f"❌ No access token found for user_id: {user_id}")
+        logger.error(f"❌ [RequestId: {request_id}] No access token found for user_id: {user_id}")
         # 디버그 정보 추가
         try:
             from .models import get_db, Profile
@@ -1275,9 +1293,9 @@ async def get_active_listings_trading_api(
                 "is_expired": profile.ebay_token_expires_at < datetime.utcnow() if profile and profile.ebay_token_expires_at else None
             }
             db.close()
-            logger.error(f"   Debug info: {debug_info}")
+            logger.error(f"   [RequestId: {request_id}] Debug info: {debug_info}")
         except Exception as debug_err:
-            logger.error(f"   Debug info error: {debug_err}")
+            logger.error(f"   [RequestId: {request_id}] Debug info error: {debug_err}")
         
         raise HTTPException(
             status_code=401, 
@@ -1312,16 +1330,23 @@ async def get_active_listings_trading_api(
             "Content-Type": "text/xml"
         }
         
-        logger.info(f"   Calling Trading API: {trading_url}")
+        t2 = datetime.utcnow()
+        logger.info(f"🌐 [t2] Calling Trading API [RequestId: {request_id}]: {trading_url}")
         response = requests.post(trading_url, headers=headers, data=xml_request, timeout=60)
+        t2_duration = (datetime.utcnow() - t2).total_seconds() * 1000
+        logger.info(f"📡 [t2] Trading API response [RequestId: {request_id}] - Status: {response.status_code}, Duration: {t2_duration:.2f}ms")
         
         if response.status_code != 200:
-            logger.error(f"❌ Trading API error: {response.status_code}")
+            logger.error(f"❌ [RequestId: {request_id}] Trading API error: {response.status_code}")
+            logger.error(f"   [RequestId: {request_id}] Response: {response.text[:500]}")
             raise HTTPException(status_code=response.status_code, detail="eBay Trading API error")
         
         # XML 파싱
+        t3 = datetime.utcnow()
         import xml.etree.ElementTree as ET
         root = ET.fromstring(response.text)
+        t3_duration = (datetime.utcnow() - t3).total_seconds() * 1000
+        logger.info(f"📊 [t3] XML parsed [RequestId: {request_id}] - Duration: {t3_duration:.2f}ms")
         
         # 디버깅: 첫 번째 Item의 XML 구조 확인 (이미지 관련)
         first_item = root.find(".//{urn:ebay:apis:eBLBaseComponents}Item")
@@ -1508,7 +1533,7 @@ async def get_active_listings_trading_api(
         total_entries = int(pagination.findtext("ebay:TotalNumberOfEntries", "0", ns)) if pagination is not None else len(listings)
         total_pages = int(pagination.findtext("ebay:TotalNumberOfPages", "1", ns)) if pagination is not None else 1
         
-        logger.info(f"✅ Retrieved {len(listings)} active listings (Page {page}/{total_pages})")
+        logger.info(f"✅ [RequestId: {request_id}] Retrieved {len(listings)} active listings (Page {page}/{total_pages})")
         
         # MVP: 이미지 정보는 프론트엔드에서 사용하지 않으므로 GetMultipleItems API 호출 제거
         # 성능 최적화: 이미지 관련 API 호출을 생략하여 응답 시간 단축
@@ -1518,19 +1543,20 @@ async def get_active_listings_trading_api(
             listing.setdefault("thumbnail_url", "")
             listing.setdefault("image_url", "")
         
-        logger.info(f"✅ Image fetching skipped for performance (MVP optimization)")
+        logger.info(f"✅ [RequestId: {request_id}] Image fetching skipped for performance (MVP optimization)")
         
         # 첫 번째 리스팅의 이미지 정보 로깅
         if listings and len(listings) > 0:
             first_listing = listings[0]
-            logger.info(f"🔍 First listing image data (Item ID: {first_listing.get('item_id', 'N/A')}):")
+            logger.info(f"🔍 [RequestId: {request_id}] First listing image data (Item ID: {first_listing.get('item_id', 'N/A')}):")
             logger.info(f"   picture_url: {first_listing.get('picture_url', 'MISSING')[:80] if first_listing.get('picture_url') else 'MISSING'}")
             logger.info(f"   thumbnail_url: {first_listing.get('thumbnail_url', 'MISSING')[:80] if first_listing.get('thumbnail_url') else 'MISSING'}")
             logger.info(f"   image_url: {first_listing.get('image_url', 'MISSING')[:80] if first_listing.get('image_url') else 'MISSING'}")
         
-        logger.info("=" * 60)
-        
         # 🔥 DB에 리스팅 저장 (supplier_id 포함)
+        t4 = datetime.utcnow()
+        t4_duration = 0
+        upserted_count = 0
         try:
             from .models import get_db, Listing
             from .services import upsert_listings
@@ -1577,19 +1603,34 @@ async def get_active_listings_trading_api(
                 if listing_objects:
                     upserted_count = upsert_listings(db, listing_objects)
                     db.commit()
-                    logger.info(f"✅ Saved {upserted_count} listings to database (with supplier_id)")
+                    t4_duration = (datetime.utcnow() - t4).total_seconds() * 1000
+                    logger.info(f"💾 [t4] Saved {upserted_count} listings to database [RequestId: {request_id}] - Duration: {t4_duration:.2f}ms")
                 else:
-                    logger.warning("⚠️ No listings to save to database")
+                    logger.warning(f"⚠️ [RequestId: {request_id}] No listings to save to database")
             except Exception as db_err:
                 db.rollback()
-                logger.error(f"❌ Database save error: {db_err}")
+                t4_duration = (datetime.utcnow() - t4).total_seconds() * 1000
+                logger.error(f"❌ [RequestId: {request_id}] Database save error (Duration: {t4_duration:.2f}ms): {db_err}")
                 import traceback
                 logger.error(traceback.format_exc())
             finally:
                 db.close()
         except Exception as save_err:
-            logger.warning(f"⚠️ Failed to save listings to database: {save_err}")
+            t4_duration = (datetime.utcnow() - t4).total_seconds() * 1000
+            logger.warning(f"⚠️ [RequestId: {request_id}] Failed to save listings to database (Duration: {t4_duration:.2f}ms): {save_err}")
             # DB 저장 실패해도 API 응답은 반환
+        
+        # 전체 타임라인 로깅
+        t_end = datetime.utcnow()
+        total_duration = (t_end - t0).total_seconds() * 1000
+        logger.info(f"⏱️ [RequestId: {request_id}] Total timeline:")
+        logger.info(f"   t0: Request received - {t0.isoformat()}")
+        logger.info(f"   t1: Token retrieved - {t1_duration:.2f}ms")
+        logger.info(f"   t2: Trading API call - {t2_duration:.2f}ms (Status: {response.status_code})")
+        logger.info(f"   t3: XML parsing - {t3_duration:.2f}ms")
+        logger.info(f"   t4: DB upsert - {t4_duration:.2f}ms (if attempted)")
+        logger.info(f"   Total duration: {total_duration:.2f}ms")
+        logger.info("=" * 60)
         
         return {
             "success": True,
@@ -1597,7 +1638,8 @@ async def get_active_listings_trading_api(
             "page": page,
             "total_pages": total_pages,
             "entries_per_page": entries_per_page,
-            "listings": listings
+            "listings": listings,
+            "request_id": request_id  # Response에 requestId 포함
         }
         
     except HTTPException:

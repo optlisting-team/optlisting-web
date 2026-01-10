@@ -25,6 +25,10 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, loadi
   const [checkingConnection, setCheckingConnection] = useState(false) // Changed default to false - only check on button click
   const [ebayUserId, setEbayUserId] = useState(null) // Add eBay User ID state
   const dropdownRef = useRef(null)
+  
+  // 중복 클릭 방지를 위한 플래그 및 debounce
+  const connectButtonInProgress = useRef(false)
+  const connectButtonDebounceTimer = useRef(null)
 
   // Ensure dropdown is closed on mount
   useEffect(() => {
@@ -328,62 +332,107 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, loadi
         ) : (
           <button
             type="button"
+            disabled={connectButtonInProgress.current || checkingConnection}
             onClick={async (e) => {
               e.preventDefault()
               e.stopPropagation()
               
-              // Clear any stale sessionStorage flags to ensure clean OAuth flow
-              const processedKey = 'ebay_oauth_processed'
-              sessionStorage.removeItem(processedKey)
+              // 중복 클릭 방지
+              if (connectButtonInProgress.current) {
+                console.warn('⚠️ Connect button already in progress, ignoring click')
+                return
+              }
               
-              // Set loading state immediately when button is clicked
-              setCheckingConnection(true)
+              // Debounce: 이전 타이머가 있으면 취소
+              if (connectButtonDebounceTimer.current) {
+                clearTimeout(connectButtonDebounceTimer.current)
+              }
               
-              try {
-                console.log('🔘 Connect eBay button clicked')
-                console.log('   API_BASE_URL:', API_BASE_URL)
-                console.log('   CURRENT_USER_ID:', CURRENT_USER_ID)
-                console.log('   Cleared sessionStorage flag for fresh OAuth flow')
+              // Debounce 적용 (500ms)
+              connectButtonDebounceTimer.current = setTimeout(async () => {
+                connectButtonInProgress.current = true
                 
-                // Check token status when connect button is clicked
-                console.log('   Checking eBay connection status...')
-                const statusResult = await checkEbayTokenStatus()
-                console.log('   Status check result:', statusResult)
-                
-                // Use the result from API call instead of state (which may not be updated yet)
-                if (statusResult?.isConnected) {
-                  console.log('✅ Already connected to eBay - starting product query')
-                  // Notify parent component of connection status (trigger forced product query)
-                  if (onConnectionChange) {
-                    onConnectionChange(true, true) // forceLoad = true
-                  }
-                  setCheckingConnection(false)
-                  return
+                // Performance mark 시작
+                if (typeof performance !== 'undefined' && performance.mark) {
+                  performance.mark('connect_ebay_start')
                 }
                 
-                // Start OAuth if not connected
-                const oauthUrl = `${API_BASE_URL}/api/ebay/auth/start?user_id=${CURRENT_USER_ID}`
-                console.log('🔗 Starting OAuth flow...')
-                console.log('   OAuth URL:', oauthUrl)
-                console.log('   Redirecting to eBay login page...')
+                // requestId 생성
+                const requestId = `connect_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
                 
-                // Use window.location.replace to avoid adding to history
-                // This prevents back button issues
-                window.location.replace(oauthUrl)
-              } catch (err) {
-                console.error('❌ Error in connect button handler:', err)
-                console.error('   Error details:', {
-                  message: err.message,
-                  status: err.response?.status,
-                  data: err.response?.data
-                })
-                setCheckingConnection(false)
+                // Clear any stale sessionStorage flags to ensure clean OAuth flow
+                const processedKey = 'ebay_oauth_processed'
+                sessionStorage.removeItem(processedKey)
                 
-                // Show user-friendly error
-                alert(`연결 확인 중 오류가 발생했습니다: ${err.message || '알 수 없는 오류'}\n\n다시 시도해주세요.`)
-              }
+                // Set loading state immediately when button is clicked
+                setCheckingConnection(true)
+                
+                try {
+                  console.log(`🔘 Connect eBay button clicked [${requestId}]`)
+                  console.log(`   API_BASE_URL: ${API_BASE_URL}`)
+                  console.log(`   CURRENT_USER_ID: ${CURRENT_USER_ID}`)
+                  console.log(`   Cleared sessionStorage flag for fresh OAuth flow`)
+                  
+                  // Check token status when connect button is clicked
+                  console.log(`   [${requestId}] Checking eBay connection status...`)
+                  const statusResult = await checkEbayTokenStatus()
+                  console.log(`   [${requestId}] Status check result:`, statusResult)
+                  
+                  // Use the result from API call instead of state (which may not be updated yet)
+                  if (statusResult?.isConnected) {
+                    console.log(`✅ [${requestId}] Already connected to eBay - starting product query`)
+                    // Performance mark
+                    if (typeof performance !== 'undefined' && performance.mark && performance.measure) {
+                      performance.mark('connect_ebay_end')
+                      performance.measure('connect_ebay_duration', 'connect_ebay_start', 'connect_ebay_end')
+                      const measure = performance.getEntriesByName('connect_ebay_duration')[0]
+                      console.log(`⏱️ [${requestId}] Connect eBay completed in ${measure.duration.toFixed(2)}ms`)
+                    }
+                    
+                    // Notify parent component of connection status (trigger forced product query)
+                    if (onConnectionChange) {
+                      onConnectionChange(true, true) // forceLoad = true
+                    }
+                    setCheckingConnection(false)
+                    connectButtonInProgress.current = false
+                    return
+                  }
+                  
+                  // Start OAuth if not connected
+                  const oauthUrl = `${API_BASE_URL}/api/ebay/auth/start?user_id=${CURRENT_USER_ID}`
+                  console.log(`🔗 [${requestId}] Starting OAuth flow...`)
+                  console.log(`   OAuth URL: ${oauthUrl}`)
+                  console.log(`   Redirecting to eBay login page...`)
+                  
+                  // Performance mark: OAuth 시작
+                  if (typeof performance !== 'undefined' && performance.mark) {
+                    performance.mark('oauth_redirect_start')
+                  }
+                  
+                  // Use window.location.replace to avoid adding to history
+                  // This prevents back button issues
+                  window.location.replace(oauthUrl)
+                } catch (err) {
+                  console.error(`❌ [${requestId}] Error in connect button handler:`, err)
+                  console.error(`   Error details [${requestId}]:`, {
+                    message: err.message,
+                    status: err.response?.status,
+                    data: err.response?.data,
+                    requestId: requestId
+                  })
+                  setCheckingConnection(false)
+                  connectButtonInProgress.current = false
+                  
+                  // Show user-friendly error
+                  alert(`연결 확인 중 오류가 발생했습니다: ${err.message || '알 수 없는 오류'}\n\n다시 시도해주세요.`)
+                }
+              }, 300) // 300ms debounce
             }}
-            className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold rounded-lg transition-all flex items-center gap-2 text-base shadow-lg hover:shadow-emerald-500/40 transform hover:scale-105 active:scale-95 cursor-pointer border-2 border-emerald-500/50"
+            className={`px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold rounded-lg transition-all flex items-center gap-2 text-base shadow-lg hover:shadow-emerald-500/40 transform hover:scale-105 active:scale-95 border-2 border-emerald-500/50 ${
+              connectButtonInProgress.current || checkingConnection 
+                ? 'opacity-50 cursor-not-allowed' 
+                : 'cursor-pointer'
+            }`}
           >
             <Plus className="w-5 h-5 font-bold" strokeWidth={3} />
             <span>Connect eBay</span>

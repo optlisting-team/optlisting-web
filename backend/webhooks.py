@@ -89,7 +89,10 @@ def verify_webhook_signature(payload: bytes, signature: str) -> bool:
 
 def get_or_create_profile(db: Session, user_id: str) -> Profile:
     """
-    프로필 조회 또는 생성 (안정성: 트랜잭션 처리)
+    프로필 조회 또는 생성 (idempotent, 안정성: 트랜잭션 처리)
+    
+    Profile이 없으면 자동으로 생성합니다.
+    Race condition을 고려하여 idempotent하게 구현되었습니다.
     
     Args:
         db: 데이터베이스 세션
@@ -98,26 +101,60 @@ def get_or_create_profile(db: Session, user_id: str) -> Profile:
     Returns:
         Profile 객체
     """
+    logger.info(f"[get_or_create_profile] START: user_id={user_id}")
     try:
+        # 먼저 조회 시도
+        logger.info(f"[get_or_create_profile] Querying profile for user_id={user_id}")
         profile = db.query(Profile).filter(Profile.user_id == user_id).first()
         
         if not profile:
-            # 프로필이 없으면 생성
-            profile = Profile(
-                user_id=user_id,
-                subscription_status='inactive',
-                subscription_plan='free',
-                total_listings_limit=PLAN_LIMITS['free']
-            )
-            db.add(profile)
-            db.commit()
-            db.refresh(profile)
-            logger.info(f"새 프로필 생성: user_id={user_id}")
+            logger.info(f"[get_or_create_profile] Profile not found, creating new profile for user_id={user_id}")
+            # 프로필이 없으면 생성 (idempotent)
+            try:
+                logger.info(f"[get_or_create_profile] Creating Profile object for user_id={user_id}")
+                profile = Profile(
+                    user_id=user_id,
+                    subscription_status='inactive',
+                    subscription_plan='free',
+                    total_listings_limit=PLAN_LIMITS['free'],
+                    purchased_credits=0,
+                    consumed_credits=0,
+                    current_plan='free'
+                )
+                logger.info(f"[get_or_create_profile] Adding profile to session for user_id={user_id}")
+                db.add(profile)
+                logger.info(f"[get_or_create_profile] Committing profile creation for user_id={user_id}")
+                db.commit()
+                logger.info(f"[get_or_create_profile] Refreshing profile for user_id={user_id}")
+                db.refresh(profile)
+                logger.info(f"[get_or_create_profile] ✅ 새 프로필 생성 성공: user_id={user_id}, profile_id={profile.id}")
+            except SQLAlchemyError as e:
+                db.rollback()
+                logger.error(f"[get_or_create_profile] ❌ Profile creation failed: user_id={user_id}, error={str(e)}", exc_info=True)
+                logger.error(f"[get_or_create_profile] Error type: {type(e).__name__}, Error details: {repr(e)}")
+                # Race condition: 다른 프로세스가 이미 생성했을 수 있음
+                # 다시 조회 시도
+                logger.info(f"[get_or_create_profile] Retrying query after rollback for user_id={user_id}")
+                profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+                if not profile:
+                    logger.error(f"[get_or_create_profile] ❌ 프로필 생성 실패 및 재조회 실패: user_id={user_id}, error={e}")
+                    raise
+                else:
+                    logger.info(f"[get_or_create_profile] ✅ 프로필이 다른 프로세스에 의해 이미 생성됨: user_id={user_id}, profile_id={profile.id}")
+        else:
+            logger.info(f"[get_or_create_profile] ✅ Profile found: user_id={user_id}, profile_id={profile.id}, purchased_credits={profile.purchased_credits}, consumed_credits={profile.consumed_credits}")
         
+        logger.info(f"[get_or_create_profile] END: user_id={user_id}, profile_id={profile.id}")
         return profile
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"프로필 조회/생성 중 DB 오류: {e}")
+        logger.error(f"[get_or_create_profile] ❌ 프로필 조회/생성 중 DB 오류: user_id={user_id}, error={str(e)}", exc_info=True)
+        logger.error(f"[get_or_create_profile] Error type: {type(e).__name__}, Error details: {repr(e)}")
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[get_or_create_profile] ❌ 프로필 조회/생성 중 예상치 못한 오류: user_id={user_id}, error={str(e)}", exc_info=True)
+        logger.error(f"[get_or_create_profile] Error type: {type(e).__name__}, Error details: {repr(e)}")
         raise
 
 
@@ -362,13 +399,15 @@ def handle_order_created(db: Session, event_data: Dict) -> bool:
         logger.info(f"[WEBHOOK] order_created: Processing order_id={order_id}")
         
         # Idempotency check: Check if order_id already processed
+        # Use ls_order_ prefix for reference_id
+        reference_id = f"ls_order_{order_id}"
         try:
             existing = db.execute(
                 text("""
                     SELECT reference_id FROM credit_transactions 
-                    WHERE reference_id = :order_id AND transaction_type = 'purchase'
+                    WHERE reference_id = :reference_id AND transaction_type = 'purchase'
                 """),
-                {"order_id": order_id}
+                {"reference_id": reference_id}
             ).fetchone()
             
             if existing:
@@ -508,14 +547,22 @@ def handle_order_created(db: Session, event_data: Dict) -> bool:
             logger.warning(f"[WEBHOOK] order_created: Invalid credits amount {credits_to_add} for variant {variant_id}")
             return False
         
-        # Add credits atomically
+        # Ensure profile exists (idempotent - creates if not exists)
+        try:
+            get_or_create_profile(db, user_id)
+        except Exception as e:
+            logger.warning(f"[WEBHOOK] order_created: Failed to ensure profile exists: {e}, continuing anyway...")
+        
+        # Add credits atomically (will auto-create profile if needed)
+        # Use ls_order_ prefix for reference_id to avoid conflicts
+        reference_id = f"ls_order_{order_id}"
         result = add_credits(
             db=db,
             user_id=user_id,
             amount=credits_to_add,
             transaction_type=TransactionType.PURCHASE,
             description=f"Lemon Squeezy purchase: variant {variant_id}",
-            reference_id=order_id  # Use order_id for idempotency
+            reference_id=reference_id  # Use ls_order_ prefix for idempotency
         )
         
         if result.success:
@@ -556,13 +603,15 @@ def handle_order_paid(db: Session, event_data: Dict) -> bool:
         logger.info(f"[WEBHOOK] order_paid received: order_id={order_id}")
         
         # Idempotency check: Check if order_id already processed
+        # Use ls_order_ prefix for reference_id
+        reference_id = f"ls_order_{order_id}"
         try:
             existing = db.execute(
                 text("""
                     SELECT reference_id FROM credit_transactions 
-                    WHERE reference_id = :order_id AND transaction_type = 'purchase'
+                    WHERE reference_id = :reference_id AND transaction_type = 'purchase'
                 """),
-                {"order_id": order_id}
+                {"reference_id": reference_id}
             ).fetchone()
             
             if existing:
@@ -617,14 +666,22 @@ def handle_order_paid(db: Session, event_data: Dict) -> bool:
             logger.warning(f"[WEBHOOK] order_paid: Invalid credits amount {credits_to_add} for variant {variant_id}")
             return False
         
-        # Add credits atomically
+        # Ensure profile exists (idempotent - creates if not exists)
+        try:
+            get_or_create_profile(db, user_id)
+        except Exception as e:
+            logger.warning(f"[WEBHOOK] order_paid: Failed to ensure profile exists: {e}, continuing anyway...")
+        
+        # Add credits atomically (will auto-create profile if needed)
+        # Use ls_order_ prefix for reference_id to avoid conflicts
+        reference_id = f"ls_order_{order_id}"
         result = add_credits(
             db=db,
             user_id=user_id,
             amount=credits_to_add,
             transaction_type=TransactionType.PURCHASE,
             description=f"Lemon Squeezy purchase: variant {variant_id}",
-            reference_id=order_id  # Use order_id for idempotency
+            reference_id=reference_id  # Use ls_order_ prefix for idempotency
         )
         
         if result.success:

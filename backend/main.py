@@ -30,7 +30,127 @@ from .credit_service import (
     PlanType,
 )
 
-app = FastAPI(title="OptListing API", version="1.3.19")
+app = FastAPI(title="OptListing API", version="1.3.20")
+
+# ============================================================
+# [BOOT] Supabase Write Self-Test (Top-level execution)
+# ============================================================
+# This runs immediately when the module is imported by gunicorn
+# to ensure DB write capability is verified before server starts
+def run_supabase_self_test():
+    """Run Supabase write self-test at module import time"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        logger.info("[BOOT] ========================================")
+        logger.info("[BOOT] Starting Supabase write self-test...")
+        print("[BOOT] ========================================")
+        print("[BOOT] Starting Supabase write self-test...")
+        
+        # Log SUPABASE_URL / DATABASE_URL (masked for security)
+        DATABASE_URL = os.getenv("DATABASE_URL", "")
+        SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+        
+        if DATABASE_URL:
+            # Mask password in URL for logging
+            if "@" in DATABASE_URL:
+                parts = DATABASE_URL.split("@")
+                if len(parts) == 2:
+                    masked_url = parts[0].split(":")[0] + ":***@" + parts[1]
+                else:
+                    masked_url = DATABASE_URL[:50] + "..."
+            else:
+                masked_url = DATABASE_URL[:50] + "..."
+            logger.info(f"[BOOT] DATABASE_URL: {masked_url}")
+            print(f"[BOOT] DATABASE_URL: {masked_url}")
+        else:
+            logger.warning("[BOOT] DATABASE_URL not set")
+            print("[BOOT] DATABASE_URL not set")
+        
+        if SUPABASE_URL:
+            logger.info(f"[BOOT] SUPABASE_URL: {SUPABASE_URL}")
+            print(f"[BOOT] SUPABASE_URL: {SUPABASE_URL}")
+        else:
+            logger.info("[BOOT] SUPABASE_URL not set (using DATABASE_URL directly)")
+            print("[BOOT] SUPABASE_URL not set (using DATABASE_URL directly)")
+        
+        # Test database connection first
+        logger.info("[BOOT] Testing database connection...")
+        print("[BOOT] Testing database connection...")
+        from .models import engine
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        logger.info("[BOOT] Database connection successful")
+        print("[BOOT] Database connection successful")
+        
+        # Profiles table write self-test
+        logger.info("[BOOT] Starting profiles table write self-test...")
+        print("[BOOT] Starting profiles table write self-test...")
+        db = next(get_db())
+        try:
+            test_user_id = "boot-test-user-" + str(int(datetime.now().timestamp()))
+            logger.info(f"[BOOT] Test user_id: {test_user_id}")
+            print(f"[BOOT] Test user_id: {test_user_id}")
+            
+            # Try to create a test profile
+            test_profile = Profile(
+                user_id=test_user_id,
+                purchased_credits=0,
+                consumed_credits=0,
+                current_plan='free',
+                subscription_status='inactive',
+                subscription_plan='free',
+                total_listings_limit=100
+            )
+            logger.info(f"[BOOT] Attempting to INSERT profile for test_user_id={test_user_id}")
+            print(f"[BOOT] Attempting to INSERT profile...")
+            db.add(test_profile)
+            db.commit()
+            logger.info(f"[BOOT] ✅ Profile INSERT successful for test_user_id={test_user_id}")
+            print(f"[BOOT] ✅ Profile INSERT successful")
+            
+            # Try to UPDATE the profile
+            logger.info(f"[BOOT] Attempting to UPDATE profile for test_user_id={test_user_id}")
+            print(f"[BOOT] Attempting to UPDATE profile...")
+            test_profile.purchased_credits = 100
+            db.commit()
+            logger.info(f"[BOOT] ✅ Profile UPDATE successful for test_user_id={test_user_id}")
+            print(f"[BOOT] ✅ Profile UPDATE successful")
+            
+            # Clean up test profile
+            logger.info(f"[BOOT] Cleaning up test profile for test_user_id={test_user_id}")
+            print(f"[BOOT] Cleaning up test profile...")
+            db.delete(test_profile)
+            db.commit()
+            logger.info(f"[BOOT] ✅ Profile DELETE successful for test_user_id={test_user_id}")
+            print(f"[BOOT] ✅ Profile DELETE successful")
+            
+            logger.info("[BOOT] ✅ Profiles table write self-test PASSED")
+            print("[BOOT] ✅ Profiles table write self-test PASSED")
+            logger.info("[BOOT] ========================================")
+            print("[BOOT] ========================================")
+        except Exception as e:
+            db.rollback()
+            logger.error(f"[BOOT] ❌ Profiles table write self-test FAILED: {str(e)}", exc_info=True)
+            print(f"[BOOT] ❌ Profiles table write self-test FAILED: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            logger.error("[BOOT] ========================================")
+            print("[BOOT] ========================================")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"[BOOT] ❌ Supabase self-test setup FAILED: {str(e)}", exc_info=True)
+        print(f"[BOOT] ❌ Supabase self-test setup FAILED: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        logger.error("[BOOT] ========================================")
+        print("[BOOT] ========================================")
+
+# Execute self-test immediately at module import
+run_supabase_self_test()
 
 # eBay Webhook Router 등록
 app.include_router(ebay_webhook_router)
@@ -209,26 +329,26 @@ async def global_exception_handler(request: Request, exc):
         headers=cors_headers
     )
 
-# Initialize database on startup
+# Initialize database on startup (legacy - kept for compatibility)
+# Note: Supabase write self-test is now run at top-level (see run_supabase_self_test above)
 @app.on_event("startup")
 def startup_event():
     """
     Initialize database connection and create tables.
     This function must not crash the server if database connection fails.
+    Note: Supabase write self-test is now run at module import time (top-level).
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
-        # Test database connection first
-        print("Testing database connection...")
-        from .models import engine
-        from sqlalchemy import text
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        print("Database connection successful")
-        
         # Create tables if they don't exist (works for both SQLite and Supabase)
         print("Creating database tables if they don't exist...")
+        logger.info("[STARTUP] Creating database tables if they don't exist...")
+        from .models import engine
         Base.metadata.create_all(bind=engine)
         print("Database tables created/verified successfully")
+        logger.info("[STARTUP] Database tables created/verified successfully")
         
         # Generate dummy data on first startup (non-blocking)
         try:
@@ -1712,6 +1832,7 @@ async def create_checkout(
                         "embed": False,
                         "media": False,
                         "logo": True,
+                        "redirect_url": "https://optlisting.com/payment/success",
                     },
                     "checkout_data": {
                         "custom": {
@@ -1849,6 +1970,7 @@ async def create_checkout(
                         "embed": False,
                         "media": False,
                         "logo": True,
+                        "redirect_url": "https://optlisting.com/payment/success",
                     },
                     "checkout_data": {
                         "custom": {
