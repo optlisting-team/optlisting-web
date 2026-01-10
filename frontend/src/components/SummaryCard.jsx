@@ -17,7 +17,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL ||
 const CURRENT_USER_ID = 'default-user'
 
 // Store Selector Component
-function StoreSelector({ connectedStore, apiConnected, onConnectionChange, loading = false }) {
+function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onError, loading = false }) {
   const [isOpen, setIsOpen] = useState(false)
   const [stores, setStores] = useState(INITIAL_STORES)
   const [selectedStore, setSelectedStore] = useState(stores[0])
@@ -104,19 +104,28 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, loadi
     } catch (err) {
       // Handle timeout errors
       const isTimeout = err.code === 'ECONNABORTED' || err.message?.includes('timeout')
+      let errorMessage = 'Connection check failed. Please try again.'
+      
       if (isTimeout) {
         console.warn('⏱️ eBay connection status check timeout (server response may be delayed)')
-        alert('서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요.')
+        errorMessage = 'Server response is delayed. Please try again later.'
       } else {
         console.error('Failed to check eBay token status:', err)
         // Show user-friendly error message
         if (err.response?.status === 0 || err.code === 'ERR_NETWORK') {
-          alert('네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.')
+          errorMessage = 'Network error. Please check your internet connection.'
+        } else if (err.response?.status === 401 || err.response?.status === 403) {
+          errorMessage = 'Please reconnect your eBay account.'
         } else if (err.response?.status >= 500) {
-          alert('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
+          errorMessage = 'Server error. Try again later.'
         } else {
-          alert('연결 확인 중 오류가 발생했습니다. 다시 시도해주세요.')
+          errorMessage = 'Connection check failed. Please try again.'
         }
+      }
+      
+      // Call onError callback if provided
+      if (onError) {
+        onError(errorMessage, err)
       }
       
       // Maintain existing connection state even if error occurs (preserve data)
@@ -182,18 +191,17 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, loadi
     }, 1500)
   }
 
-  // Demo: Disconnect store
+  // Demo: Disconnect store (removed confirm - direct disconnect)
   const handleDisconnect = () => {
     if (!selectedStore || !selectedStore.connected) return
     
-    if (confirm(`Disconnect ${selectedStore.name}?`)) {
-      setStores(prev => prev.map(s => 
-        s.id === selectedStore.id ? { ...s, connected: false } : s
-      ))
-      setSelectedStore(prev => ({ ...prev, connected: false }))
-      // Notify parent
-      if (onConnectionChange) onConnectionChange(false)
-    }
+    // Direct disconnect without confirmation (Demo mode only)
+    setStores(prev => prev.map(s => 
+      s.id === selectedStore.id ? { ...s, connected: false } : s
+    ))
+    setSelectedStore(prev => ({ ...prev, connected: false }))
+    // Notify parent
+    if (onConnectionChange) onConnectionChange(false)
   }
 
   // Real API connect (for production)
@@ -423,8 +431,20 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, loadi
                   setCheckingConnection(false)
                   connectButtonInProgress.current = false
                   
-                  // Show user-friendly error
-                  alert(`연결 확인 중 오류가 발생했습니다: ${err.message || '알 수 없는 오류'}\n\n다시 시도해주세요.`)
+                  // Show user-friendly error via callback
+                  const errorMsg = err.code === 'ERR_NETWORK' 
+                    ? 'Network error. Please check your connection.'
+                    : err.response?.status === 401 || err.response?.status === 403
+                    ? 'Please reconnect your eBay account.'
+                    : err.response?.status >= 500
+                    ? 'Server error. Try again later.'
+                    : err.code === 'ECONNABORTED'
+                    ? 'Request timeout. Please try again.'
+                    : `Connection check failed: ${err.message || 'Unknown error'}. Please try again.`
+                  
+                  if (onError) {
+                    onError(errorMsg, err)
+                  }
                 }
               }, 300) // 300ms debounce
             }}
@@ -588,7 +608,7 @@ function calculateFeeSavings(zombieCount, avgPrice = 25) {
 }
 
 // Main Summary Card Component
-function SummaryCard({ 
+function SummaryCard({ onError, 
   totalListings, 
   totalBreakdown = {}, 
   platformBreakdown = {}, 
@@ -624,7 +644,9 @@ function SummaryCard({
   zombies = [],
   // Summary stats and analysis result (for filtered badge)
   summaryStats = null,
-  analysisResult = null
+  analysisResult = null,
+  // Error callback
+  onError = null
 }) {
   // Plan colors
   const planColors = {
@@ -641,6 +663,7 @@ function SummaryCard({
         connectedStore={connectedStore}
         apiConnected={apiConnected}
         onConnectionChange={onConnectionChange}
+        onError={onError}
         loading={loading}
       />
 

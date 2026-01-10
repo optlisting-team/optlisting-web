@@ -10,7 +10,7 @@ import axios from 'axios'
 const API_BASE_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.DEV ? '' : 'https://optlisting-production.up.railway.app')
 
-function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, onSourceChange, onMarkDownloaded }) {
+function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, onSourceChange, onMarkDownloaded, onError = null }) {
   const [downloadedGroups, setDownloadedGroups] = useState(new Set())
   const [showShopifyModal, setShowShopifyModal] = useState(false)
   const [pendingExport, setPendingExport] = useState(null) // { source, items, shopifyItems, supplierItems }
@@ -89,7 +89,11 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
 
   const handleShopifyExport = async (supplier, items) => {
     if (items.length === 0) {
-      alert(`No items in queue to export.`)
+      if (onError) {
+        onError('No items in queue to export.', null)
+      } else {
+        setExportError('No items in queue to export.')
+      }
       return
     }
     const { shopifyItems } = separateByShopify(items)
@@ -108,7 +112,11 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
 
   const handleSupplierExport = async (supplier, items) => {
     if (items.length === 0) {
-      alert(`No items in queue to export.`)
+      if (onError) {
+        onError('No items in queue to export.', null)
+      } else {
+        setExportError('No items in queue to export.')
+      }
       return
     }
     const { supplierItems } = separateByShopify(items)
@@ -138,7 +146,11 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
 
   const handleSourceExport = async (supplier, items) => {
     if (items.length === 0) {
-      alert(`No items in queue to export.`)
+      if (onError) {
+        onError('No items in queue to export.', null)
+      } else {
+        setExportError('No items in queue to export.')
+      }
       return
     }
 
@@ -319,9 +331,11 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
         if (apiErrorMsg) {
           console.warn(apiErrorMsg)
           // Notify user (but only warning since CSV is already downloaded)
-          setTimeout(() => {
-            alert(`${apiErrorMsg}\n\nCSV file has been generated in default format.`)
-          }, 500)
+          if (onError) {
+            onError(`${apiErrorMsg}\n\nCSV file has been generated in default format.`, null)
+          } else {
+            setExportError(`${apiErrorMsg}\n\nCSV file has been generated in default format.`)
+          }
         }
       }
 
@@ -349,9 +363,20 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
       setExporting(false)
     } catch (err) {
       setExporting(false)
-      setExportError(err.message || 'An error occurred while extracting CSV.')
+      const errorMsg = err.code === 'ERR_NETWORK' 
+        ? 'Network error. Please check your connection.'
+        : err.response?.status === 401 || err.response?.status === 403
+        ? 'Please reconnect your eBay account.'
+        : err.response?.status >= 500
+        ? 'Server error. Try again later.'
+        : err.code === 'ECONNABORTED'
+        ? 'Request timeout. Please try again.'
+        : `CSV extraction failed: ${err.message || 'An unknown error occurred.'}`
+      setExportError(errorMsg)
+      if (onError) {
+        onError(errorMsg, err)
+      }
       console.error('Export error:', err)
-      alert(`CSV extraction failed: ${err.message || 'An unknown error occurred.'}`)
     }
   }
 
@@ -437,13 +462,16 @@ function QueueReviewPanel({ queue, onRemove, onExportComplete, onHistoryUpdate, 
                     currentPreview.targetTool === 'wholesale2b' ? 'Wholesale2B' : 
                     currentPreview.targetTool === 'shopify_matrixify' ? 'Shopify' : 'Supplier'
     
-    setTimeout(() => {
-      if (currentPreview.targetTool === 'shopify_matrixify') {
-        alert(`✅ CSV downloaded successfully!\n\n📋 Next steps:\n1. Log in to your Shopify account\n2. Use Matrixify/Excelify to import the CSV\n3. Review and confirm deletion`)
-      } else {
-        alert(`✅ CSV downloaded successfully!\n\n📋 Next steps:\n1. Log in to your ${toolName} account\n2. Upload the CSV file using Bulk Actions\n3. Review and confirm deletion`)
-      }
-    }, 500)
+    // Show success message via callback or state
+    const successMsg = currentPreview.targetTool === 'shopify_matrixify'
+      ? `CSV downloaded successfully! Next steps: 1. Log in to your Shopify account 2. Use Matrixify/Excelify to import the CSV 3. Review and confirm deletion`
+      : `CSV downloaded successfully! Next steps: 1. Log in to your ${toolName} account 2. Upload the CSV file using Bulk Actions 3. Review and confirm deletion`
+    if (onError) {
+      // Use onError callback but with success type (if supported) or show in state
+      setTimeout(() => {
+        onError(successMsg, null) // Can be extended to support success type
+      }, 500)
+    }
   }
 
   // Monochrome theme - all sources use same styling

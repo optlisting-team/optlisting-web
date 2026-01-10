@@ -13,6 +13,7 @@ import QueueReviewPanel from './QueueReviewPanel'
 import FilteringModal from './FilteringModal'
 import ConfirmModal from './ConfirmModal'
 import LowPerformingResults from './LowPerformingResults'
+import Toast from './Toast'
 import { Button } from './ui/button'
 import { AlertCircle, X } from 'lucide-react'
 import { getImageUrlFromListing, normalizeImageUrl } from '../utils/imageUtils'
@@ -168,6 +169,37 @@ function Dashboard() {
   // Error Modal State
   const [showErrorModal, setShowErrorModal] = useState(false)
   const [errorModalMessage, setErrorModalMessage] = useState('')
+  
+  // Toast Notification State
+  const [toast, setToast] = useState(null) // { message, type: 'error' | 'success' | 'warning' }
+  
+  // 에러 유형별 메시지 생성 함수
+  const getErrorMessage = (err) => {
+    if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
+      return 'Network error. Please try again.'
+    }
+    if (err.response?.status === 401 || err.response?.status === 403) {
+      return 'Please reconnect your eBay account.'
+    }
+    if (err.response?.status === 402) {
+      // 크레딧 부족
+      const errorData = err.response?.data?.detail || {}
+      return errorData.message || 'Insufficient credits. Please purchase more credits.'
+    }
+    if (err.response?.status >= 500) {
+      return 'Server error. Try again later.'
+    }
+    if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+      return 'Request timeout. Please try again.'
+    }
+    return err.response?.data?.detail?.message || err.response?.data?.error || err.message || 'An error occurred. Please try again.'
+  }
+  
+  // Toast 표시 함수
+  const showToast = (message, type = 'error') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 5000) // 5초 후 자동 제거
+  }
   
   // Filtering Modal State (레거시 - 필요시 유지)
   const [showFilteringModal, setShowFilteringModal] = useState(false)
@@ -974,11 +1006,12 @@ function Dashboard() {
       if (itemInQueue) {
         setQueue(updateItemInList(queue))
         // Note: QueueReviewPanel automatically regroups by supplier, so the item will move to the correct group
+        showToast('Source updated successfully', 'success')
       }
 
     } catch (err) {
       console.error('Failed to update source:', err)
-      alert('Failed to update source. Please try again.')
+      showToast(getErrorMessage(err), 'error')
     }
   }
 
@@ -1105,7 +1138,7 @@ function Dashboard() {
         } else {
           console.warn('⚠️ Backend reports not connected, clearing session storage and showing error')
           sessionStorage.removeItem(processedKey)
-          alert('연결 확인에 실패했습니다. 다시 시도해주세요.')
+          showToast('Connection verification failed. Please try again.', 'error')
         }
       }).catch(err => {
         console.error('❌ Failed to verify connection status:', err)
@@ -1116,6 +1149,7 @@ function Dashboard() {
         // Verification 실패 시에도 summary stats만 가져오기
         fetchSummaryStats().catch(fetchErr => {
           console.error('Failed to fetch summary stats:', fetchErr)
+          showToast(getErrorMessage(fetchErr), 'error')
         })
       })
       
@@ -1126,7 +1160,7 @@ function Dashboard() {
     } else if (ebayError) {
       console.error('❌ OAuth callback error:', ebayError)
       const errorMessage = urlParams.get('message') || 'Failed to connect to eBay'
-      alert(`eBay connection failed: ${errorMessage}`)
+      showToast(`eBay connection failed: ${errorMessage}`, 'error')
       // Remove URL parameters
       window.history.replaceState({}, '', window.location.pathname)
       // Clear the processed flag and set connection state
@@ -1204,7 +1238,7 @@ function Dashboard() {
     const items = itemsToExport || queue
     
     if (items.length === 0) {
-      alert('No items to export. Please add items to the queue first.')
+      showToast('No items to export. Please add items to the queue first.', 'warning')
       return
     }
 
@@ -1306,7 +1340,7 @@ function Dashboard() {
       }
       
       setError(errorMessage)
-      alert(errorMessage)
+      showToast(getErrorMessage(err), 'error')
       console.error('Export error:', err)
     } finally {
       setLoading(false)
@@ -1316,7 +1350,7 @@ function Dashboard() {
   // Handle supplier-specific export from Product Journey section
   const handleSupplierExport = async (items, targetTool, supplierName) => {
     if (!items || items.length === 0) {
-      alert(`No items to export for ${supplierName}`)
+      showToast(`No items to export for ${supplierName}`, 'warning')
       return
     }
 
@@ -1388,7 +1422,7 @@ function Dashboard() {
       }
       
       setError(errorMessage)
-      alert(`Failed to export CSV for ${supplierName}: ${errorMessage}`)
+      showToast(`Failed to export CSV for ${supplierName}: ${getErrorMessage(err)}`, 'error')
       console.error('Export error:', err)
     } finally {
       setLoading(false)
@@ -1435,6 +1469,8 @@ function Dashboard() {
           summaryStats={summaryStats}
           // Analysis result (for filtered badge)
           analysisResult={analysisResult}
+          // Error callback
+          onError={(msg, err) => showToast(getErrorMessage(err || { message: msg }), 'error')}
         />
 
         {/* FilterBar - Find Low-Performing SKUs 버튼 */}
@@ -1500,6 +1536,7 @@ function Dashboard() {
                 setShowResults(false)
                 setResultsFilters(null)
               }}
+              onError={(msg, err) => showToast(getErrorMessage(err || { message: msg }), 'error')}
             />
           </div>
         )}
@@ -1522,6 +1559,7 @@ function Dashboard() {
               onHistoryUpdate={() => {
                 fetchHistory().catch(err => console.error('History fetch error:', err))
               }}
+              onError={(msg, err) => showToast(getErrorMessage(err || { message: msg }), err ? 'error' : 'success')}
             />
           </div>
         )}
@@ -1574,7 +1612,7 @@ function Dashboard() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <AlertCircle className="w-6 h-6 text-red-400" />
-                  <h3 className="text-xl font-bold text-white">제품 업로드 실패</h3>
+                  <h3 className="text-xl font-bold text-white">Error</h3>
                 </div>
                 <button
                   onClick={() => setShowErrorModal(false)}
@@ -1596,7 +1634,7 @@ function Dashboard() {
                   onClick={() => setShowErrorModal(false)}
                   className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors text-sm font-medium"
                 >
-                  닫기
+                  Close
                 </button>
                   <button
                     onClick={() => {
@@ -1604,17 +1642,27 @@ function Dashboard() {
                       // Dashboard에서는 listings를 로드하지 않으므로 summary stats만 다시 가져오기
                       fetchSummaryStats().catch(err => {
                         console.error('Failed to retry summary stats:', err)
+                        showToast(getErrorMessage(err), 'error')
                       })
                     }}
                     className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium"
                   >
-                    다시 시도
+                    Retry
                   </button>
               </div>
             </div>
           </div>
         </div>,
         document.body
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   )

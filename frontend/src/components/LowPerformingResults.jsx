@@ -8,7 +8,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? '' : 'https://optlisting-production.up.railway.app')
 const CURRENT_USER_ID = "default-user"
 
-function LowPerformingResults({ mode = 'low', initialFilters = null, initialItems = null, onClose = null }) {
+function LowPerformingResults({ mode = 'low', initialFilters = null, initialItems = null, onClose = null, onError = null }) {
   // Filters from props (for low-performing mode) or defaults
   const filters = useMemo(() => {
     if (mode === 'low' && initialFilters) {
@@ -299,7 +299,16 @@ function LowPerformingResults({ mode = 'low', initialFilters = null, initialItem
       ))
     } catch (err) {
       console.error('Failed to update source:', err)
-      alert('Failed to update source. Please try again.')
+      if (onError) {
+        const errorMsg = err.code === 'ERR_NETWORK' 
+          ? 'Network error. Please check your connection.'
+          : err.response?.status === 401 || err.response?.status === 403
+          ? 'Please reconnect your eBay account.'
+          : err.response?.status >= 500
+          ? 'Server error. Try again later.'
+          : 'Failed to update source. Please try again.'
+        onError(errorMsg, err)
+      }
     }
   }
   
@@ -314,7 +323,9 @@ function LowPerformingResults({ mode = 'low', initialFilters = null, initialItem
   const handleAddToQueue = () => {
     // TODO: Implement queue functionality (navigate to dashboard with queue items)
     console.log('Add to queue:', selectedIds)
-    alert('Queue functionality will be implemented')
+    if (onError) {
+      onError('Queue functionality will be implemented soon.', null)
+    }
   }
   
   // 클라이언트 측 필터링/정렬/검색 (initialItems가 있을 때)

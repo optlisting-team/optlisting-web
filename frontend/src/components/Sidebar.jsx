@@ -456,7 +456,8 @@ function Sidebar() {
                     
                     // Warn if variant ID is placeholder
                     if (variantId.includes('PLACEHOLDER')) {
-                      alert('⚠️ Lemon Squeezy Variant IDs need to be configured!\n\nPlease set up Variant IDs in the Sidebar.jsx file or environment variables.\n\nSee LEMONSQUEEZY_SETUP.md for instructions.')
+                      console.error('⚠️ Lemon Squeezy Variant IDs need to be configured! Please set up Variant IDs in the Sidebar.jsx file or environment variables. See LEMONSQUEEZY_SETUP.md for instructions.')
+                      // Show error in console instead of alert
                       return
                     }
                     
@@ -509,7 +510,9 @@ function Sidebar() {
                     } catch (error) {
                       console.error('Failed to create checkout:', error)
                       const errorMsg = error.message || 'Unknown error'
-                      alert(`Failed to create checkout: ${errorMsg}\n\nPlease check if Lemon Squeezy API keys are configured in Railway.`)
+                      // Show error in console instead of alert
+                      console.error(`Failed to create checkout: ${errorMsg}\n\nPlease check if Lemon Squeezy API keys are configured in Railway.`)
+                      // TODO: Add Toast or inline error display here
                     } finally {
                       setIsCreatingCheckout(false)
                     }

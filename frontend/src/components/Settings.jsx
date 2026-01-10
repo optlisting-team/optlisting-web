@@ -169,15 +169,18 @@ function Settings() {
     { id: '2', name: 'UK Store', email: 'user@ebay.co.uk', connectedDate: '2025-12-02' },
   ])
 
+  const [error, setError] = useState(null)
+  const [success, setSuccess] = useState(null)
+  
   const handleConnect = () => {
     // TODO: Open OAuth flow
-    alert('Connect Store flow will open here')
+    setError('Connect Store flow will open here soon.')
+    setTimeout(() => setError(null), 5000)
   }
 
   const handleDisconnect = (storeId) => {
-    if (confirm('Are you sure you want to disconnect this store?')) {
-      setConnectedStores(connectedStores.filter(s => s.id !== storeId))
-    }
+    // Direct disconnect without confirmation (removed confirm dialog)
+    setConnectedStores(connectedStores.filter(s => s.id !== storeId))
   }
 
   // Plan info
@@ -266,6 +269,20 @@ function Settings() {
             onConnect={handleConnect}
             onDisconnect={handleDisconnect}
           />
+          
+          {/* Error Message */}
+          {error && (
+            <div className="mt-4 p-4 bg-red-900/20 border border-red-500/30 rounded-xl">
+              <p className="text-sm text-red-400">{error}</p>
+            </div>
+          )}
+          
+          {/* Success Message */}
+          {success && (
+            <div className="mt-4 p-4 bg-green-900/20 border border-green-500/30 rounded-xl">
+              <p className="text-sm text-green-400">{success}</p>
+            </div>
+          )}
           
           {/* Expansion Info */}
           <div className="mt-4 p-4 bg-zinc-800/50 border border-zinc-700 rounded-xl">
