@@ -644,11 +644,9 @@ function SummaryCard({ onError,
   onSupplierExport = null,
   // Low-Performing items data for Product Journey analysis
   zombies = [],
-  // Summary stats and analysis result (for filtered badge)
-  summaryStats = null,
-  analysisResult = null,
-  // Error callback
-  onError = null
+    // Summary stats and analysis result (for filtered badge)
+    summaryStats = null,
+    analysisResult = null
 }) {
   // Plan colors
   const planColors = {
