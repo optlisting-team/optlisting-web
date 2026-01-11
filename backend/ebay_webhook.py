@@ -556,27 +556,37 @@ async def ebay_auth_callback(
         return RedirectResponse(url=error_redirect, status_code=302)
     
     # State에서 user_id 추출
-    # State 형식: "user_default-user_1765552671.251053"
-    user_id = "default-user"  # 기본값
+    # State 형식: "user_{user_id}_{timestamp}"
+    # CRITICAL: 'default-user'는 절대 사용하지 않음 - 실제 로그인 유저 ID만 허용
+    user_id = None
     if state:
         logger.info(f"   Raw state parameter: {state}")
         if state.startswith("user_"):
             try:
-                # "user_default-user_1765552671.251053" -> ["user", "default-user", "1765552671.251053"]
+                # "user_{user_id}_{timestamp}" -> ["user", "{user_id}", "{timestamp}"]
                 parts = state.split("_")
                 logger.info(f"   State parts: {parts}")
                 if len(parts) >= 2:
-                    user_id = parts[1]  # "default-user"
-                    logger.info(f"   Extracted user_id from state: {user_id}")
+                    extracted_user_id = parts[1]  # 실제 user_id 추출
+                    if extracted_user_id and extracted_user_id != "default-user":
+                        user_id = extracted_user_id
+                        logger.info(f"   ✅ Extracted valid user_id from state: {user_id}")
+                    else:
+                        logger.error(f"   ❌ Invalid user_id extracted: '{extracted_user_id}' (cannot be 'default-user')")
                 else:
                     logger.warning(f"   State format unexpected, parts count: {len(parts)}")
             except Exception as e:
                 logger.error(f"   Error parsing state: {e}")
-                # 기본값 유지
         else:
             logger.warning(f"   State does not start with 'user_': {state[:50]}")
     
-    logger.info(f"   Final user_id to use: {user_id}")
+    # user_id 검증 - 'default-user' 또는 None이면 에러 반환
+    if not user_id or user_id == "default-user":
+        logger.error(f"❌ Invalid user_id: '{user_id}' - Cannot save token with 'default-user' or empty user_id")
+        error_redirect = f"{FRONTEND_URL}/dashboard?ebay_error=invalid_user&message=User ID is required. Please log in and try again."
+        return RedirectResponse(url=error_redirect, status_code=302)
+    
+    logger.info(f"   ✅ Final user_id to use: {user_id} (validated)")
     
     # 환경변수 확인
     if not EBAY_CLIENT_ID or not EBAY_CLIENT_SECRET:
@@ -928,29 +938,83 @@ async def ebay_auth_status(
     DB에서 토큰 상태만 확인 (API 호출 없음)
     자동 갱신은 백그라운드 워커가 처리
     """
-    logger.info(f"📊 Checking eBay token status for user: {user_id}")
+    import traceback
+    logger.info("=" * 60)
+    logger.info(f"📊 [STATUS] Checking eBay token status for user: {user_id}")
     
     try:
         from .models import get_db, Profile
         
         db = next(get_db())
         
+        # 프로필 조회 및 상세 로깅
+        logger.info(f"📊 [STATUS] Querying Profile table for user_id: {user_id}")
+        profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+        
+        if not profile:
+            logger.warning(f"⚠️ [STATUS] Profile not found for user_id: {user_id}")
+            logger.info(f"📊 [STATUS] Resolved user_id: {user_id}")
+            logger.info(f"📊 [STATUS] Profile exists: False")
+            logger.info(f"📊 [STATUS] ebay_token row exists: False")
+            logger.info(f"📊 [STATUS] connected decision: False (no profile)")
+            return {
+                "connected": False,
+                "user_id": user_id,
+                "message": "No profile found for user",
+                "token_status": {
+                    "has_valid_token": False,
+                    "is_expired": True,
+                    "has_refresh_token": False,
+                    "expires_at": None,
+                    "needs_refresh": False
+                }
+            }
+        
+        logger.info(f"📊 [STATUS] Profile found: id={profile.id}, user_id={profile.user_id}")
+        logger.info(f"📊 [STATUS] ebay_access_token exists: {bool(profile.ebay_access_token)}")
+        logger.info(f"📊 [STATUS] ebay_access_token length: {len(profile.ebay_access_token) if profile.ebay_access_token else 0}")
+        logger.info(f"📊 [STATUS] ebay_refresh_token exists: {bool(profile.ebay_refresh_token)}")
+        logger.info(f"📊 [STATUS] ebay_token_expires_at: {profile.ebay_token_expires_at}")
+        logger.info(f"📊 [STATUS] ebay_user_id: {profile.ebay_user_id}")
+        
         # 경량화된 토큰 상태 확인
         token_status = check_token_status(user_id, db)
         
-        # 프로필 정보 추가 조회 (UI 표시용)
-        profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+        logger.info(f"📊 [STATUS] Token status check result:")
+        logger.info(f"   - has_valid_token: {token_status['has_valid_token']}")
+        logger.info(f"   - is_expired: {token_status['is_expired']}")
+        logger.info(f"   - has_refresh_token: {token_status['has_refresh_token']}")
+        logger.info(f"   - expires_at: {token_status['expires_at']}")
+        logger.info(f"   - needs_refresh: {token_status['needs_refresh']}")
         
-        if not profile or not token_status["has_valid_token"]:
-            logger.info(f"⚠️ No valid token for user: {user_id}")
+        # connected 판단 로직
+        has_valid_token = token_status["has_valid_token"]
+        is_expired = token_status["is_expired"]
+        connected = has_valid_token and not is_expired
+        
+        logger.info(f"📊 [STATUS] Connection decision logic:")
+        logger.info(f"   - has_valid_token: {has_valid_token}")
+        logger.info(f"   - is_expired: {is_expired}")
+        logger.info(f"   - connected = has_valid_token && !is_expired = {connected}")
+        
+        if not connected:
+            logger.warning(f"⚠️ [STATUS] No valid token for user: {user_id}")
+            logger.info(f"📊 [STATUS] Reason: has_valid_token={has_valid_token}, is_expired={is_expired}")
             return {
                 "connected": False,
                 "user_id": user_id,
                 "message": "No valid eBay token found",
-                "token_status": token_status
+                "token_status": token_status,
+                "debug": {
+                    "profile_exists": True,
+                    "has_access_token": bool(profile.ebay_access_token),
+                    "has_refresh_token": bool(profile.ebay_refresh_token),
+                    "expires_at": profile.ebay_token_expires_at.isoformat() if profile.ebay_token_expires_at else None,
+                    "is_expired": is_expired
+                }
             }
         
-        logger.info(f"✅ Valid token found for user: {user_id} (expired: {token_status['is_expired']}, needs_refresh: {token_status['needs_refresh']})")
+        logger.info(f"✅ [STATUS] Valid token found for user: {user_id} (expired: {is_expired}, needs_refresh: {token_status['needs_refresh']})")
         return {
             "connected": True,
             "user_id": user_id,
@@ -964,12 +1028,13 @@ async def ebay_auth_status(
         }
         
     except Exception as e:
-        logger.error(f"❌ Status check error: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
+        error_trace = traceback.format_exc()
+        logger.error(f"❌ [STATUS] Status check error: {str(e)}")
+        logger.error(f"❌ [STATUS] Stack trace:\n{error_trace}")
         return {
             "connected": False,
             "error": str(e),
+            "user_id": user_id,
             "token_status": {
                 "has_valid_token": False,
                 "is_expired": True,
@@ -1665,8 +1730,23 @@ async def get_ebay_summary(
     - Last sync timestamp
     - Queue count (선택)
     """
+    import traceback
     logger.info("=" * 60)
-    logger.info(f"📊 Fetching eBay summary for user: {user_id}")
+    logger.info(f"📊 [SUMMARY] Fetching eBay summary for user: {user_id}")
+    
+    # Validate user_id
+    if not user_id or user_id == "default-user":
+        logger.warning(f"⚠️ [SUMMARY] Invalid user_id: {user_id}")
+        return {
+            "success": False,
+            "error": "invalid_user_id",
+            "message": "User ID is required. Please log in and try again.",
+            "user_id": user_id,
+            "active_count": 0,
+            "low_performing_count": 0,
+            "queue_count": 0,
+            "last_sync_at": None
+        }
     
     try:
         from .models import get_db, Listing
@@ -1674,11 +1754,38 @@ async def get_ebay_summary(
         
         db = next(get_db())
         try:
+            logger.info(f"📊 [SUMMARY] Resolved user_id: {user_id}")
+            
             # Active listings count (DB에서 직접 조회)
-            active_count = db.query(Listing).filter(
+            logger.info(f"📊 [SUMMARY] Querying listings with user_id={user_id}, platform='eBay'")
+            active_query = db.query(Listing).filter(
                 Listing.user_id == user_id,
                 Listing.platform == "eBay"
-            ).count()
+            )
+            active_count = active_query.count()
+            
+            logger.info(f"📊 [SUMMARY] Active listings query result: {active_count} listings found")
+            
+            # Debug: Check if listings exist with different user_id or platform
+            if active_count == 0:
+                # Check total listings count (any user_id)
+                total_listings = db.query(Listing).count()
+                logger.info(f"📊 [SUMMARY] Total listings in DB (any user): {total_listings}")
+                
+                # Check listings with this user_id but different platform
+                listings_same_user = db.query(Listing).filter(Listing.user_id == user_id).count()
+                logger.info(f"📊 [SUMMARY] Listings with same user_id but any platform: {listings_same_user}")
+                
+                # Check listings with eBay platform but different user_id
+                listings_ebay = db.query(Listing).filter(Listing.platform == "eBay").count()
+                logger.info(f"📊 [SUMMARY] Listings with eBay platform but any user_id: {listings_ebay}")
+                
+                # Sample a few listings to see their user_id and platform
+                sample_listings = db.query(Listing).limit(5).all()
+                if sample_listings:
+                    logger.info(f"📊 [SUMMARY] Sample listings (first 5):")
+                    for listing in sample_listings:
+                        logger.info(f"   - Listing ID: {listing.id}, user_id: {listing.user_id}, platform: {listing.platform}, marketplace: {listing.marketplace}")
             
             # Last sync timestamp (가장 최근 last_synced_at)
             last_listing = db.query(Listing).filter(
@@ -1687,6 +1794,7 @@ async def get_ebay_summary(
             ).order_by(Listing.last_synced_at.desc()).first()
             
             last_sync_at = last_listing.last_synced_at.isoformat() if last_listing and last_listing.last_synced_at else None
+            logger.info(f"📊 [SUMMARY] Last sync timestamp: {last_sync_at}")
             
             # Low-performing count (기본 필터: 7일, 0 판매, 0 관심, 10 이하 조회수)
             # 필터가 제공되면 사용, 없으면 기본값

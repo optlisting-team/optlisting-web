@@ -1211,7 +1211,12 @@ function Dashboard() {
         return
       }
       
-      console.log('✅ OAuth callback success detected - verifying and connecting')
+      console.log('✅ OAuth callback success detected - verifying connection with backend')
+      console.log('📋 OAuth callback details:', {
+        user_id: currentUserId,
+        ebayConnected,
+        url: window.location.href
+      })
       
       // Clean URL FIRST to prevent re-triggering on re-render
       // This must happen before any async operations to prevent useEffect re-execution
@@ -1221,6 +1226,9 @@ function Dashboard() {
       sessionStorage.setItem(processedKey, 'processing')
       isVerifyingConnection.current = true
       verificationAttemptCount.current = 0
+      
+      // CRITICAL: Do NOT set connected state yet - wait for backend verification
+      setIsStoreConnected(false)
       
       // Verify connection status from backend with polling support
       const verifyConnectionWithPolling = async (attempt = 0) => {
@@ -1276,6 +1284,14 @@ function Dashboard() {
               sessionStorage.removeItem(processedKey)
             }, 10000)
           } else {
+            // Backend reports not connected - do NOT set connected state
+            console.warn('⚠️ Backend reports not connected:', {
+              backendConnected,
+              hasValidToken,
+              isExpired,
+              user_id: currentUserId
+            })
+            
             // Connection not ready yet, poll with backoff
             if (attempt < MAX_VERIFICATION_ATTEMPTS - 1) {
               const backoffMs = VERIFICATION_BACKOFF_MS[attempt] || 3000
@@ -1284,11 +1300,12 @@ function Dashboard() {
                 verifyConnectionWithPolling(attempt + 1)
               }, backoffMs)
             } else {
-              // Max attempts reached
-              console.warn('⚠️ Backend reports not connected after all attempts, clearing session storage')
+              // Max attempts reached - backend confirmed not connected
+              console.warn('⚠️ Backend confirmed not connected after all attempts')
               isVerifyingConnection.current = false
               sessionStorage.removeItem(processedKey)
-              showToast('Connection verification failed. Please try again.', 'error')
+              setIsStoreConnected(false)  // CRITICAL: Set to false based on backend status
+              showToast('Connection verification failed. Please reconnect your eBay account.', 'error')
             }
           }
         } catch (err) {
@@ -1304,20 +1321,12 @@ function Dashboard() {
             }, backoffMs)
           } else {
             // Max attempts or non-retryable error
-            console.warn('⚠️ Verification failed after all attempts, but URL indicates success - proceeding with connection')
+            // CRITICAL: Do NOT set connected state if backend verification failed
+            console.warn('⚠️ Verification failed after all attempts - backend status takes precedence')
             isVerifyingConnection.current = false
-            sessionStorage.setItem(processedKey, 'connected')
-            setIsStoreConnected(true)
-            // Verification 실패 시에도 summary stats만 가져오기
-            fetchSummaryStats().catch(fetchErr => {
-              console.error('Failed to fetch summary stats:', fetchErr)
-              showToast(getErrorMessage(fetchErr), 'error')
-            })
-            
-            // Clear the processed flag after delay
-            setTimeout(() => {
-              sessionStorage.removeItem(processedKey)
-            }, 10000)
+            sessionStorage.removeItem(processedKey)
+            setIsStoreConnected(false)  // CRITICAL: Set to false - backend verification failed
+            showToast('Connection verification failed. Please reconnect your eBay account.', 'error')
           }
         }
       }
@@ -1366,13 +1375,23 @@ function Dashboard() {
             try {
               console.log('🔍 Checking eBay connection status on mount...')
               const response = await axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
-                params: { user_id: CURRENT_USER_ID },
+                params: { user_id: currentUserId },
                 timeout: 30000
               })
               
-              const isConnected = response.data?.connected === true && 
-                                 response.data?.token_status?.has_valid_token !== false &&
-                                 !response.data?.is_expired
+              // CRITICAL: Only trust backend status
+              const backendConnected = response.data?.connected === true
+              const hasValidToken = response.data?.token_status?.has_valid_token === true
+              const isExpired = response.data?.is_expired === true
+              const isConnected = backendConnected && hasValidToken && !isExpired
+              
+              console.log('📊 Mount connection check:', {
+                backendConnected,
+                hasValidToken,
+                isExpired,
+                finalDecision: isConnected,
+                user_id: currentUserId
+              })
               
               if (isConnected) {
                 console.log('✅ eBay is already connected - fetching summary stats...')
@@ -1382,8 +1401,8 @@ function Dashboard() {
                   console.error('Failed to fetch summary stats:', err)
                 })
               } else {
-                console.log('ℹ️ eBay is not connected yet')
-                setIsStoreConnected(false)
+                console.log('ℹ️ eBay is not connected yet (backend confirmed)')
+                setIsStoreConnected(false)  // CRITICAL: Set to false based on backend status
               }
             } catch (ebayStatusErr) {
               console.warn('Failed to check eBay connection status on mount:', ebayStatusErr)

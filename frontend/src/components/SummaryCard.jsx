@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { ChevronDown, Plus, Check, Unplug, Loader2, RefreshCw } from 'lucide-react'
 import axios from 'axios'
+import { useAuth } from '../contexts/AuthContext'
 
 // Demo stores for testing - initial state
 const INITIAL_STORES = [
@@ -15,10 +16,12 @@ const INITIAL_STORES = [
 const API_BASE_URL = import.meta.env.DEV 
   ? (import.meta.env.VITE_API_URL || '')  // Development: use env var or empty for Vite proxy
   : ''  // Production: ALWAYS use relative path (vercel.json proxy handles routing to Railway)
-const CURRENT_USER_ID = 'default-user'
 
 // Store Selector Component
 function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onError, loading = false }) {
+  const { user } = useAuth()
+  // Get actual user ID from auth context, fallback to 'default-user' if not logged in
+  const currentUserId = user?.id || 'default-user'
   const [isOpen, setIsOpen] = useState(false)
   const [stores, setStores] = useState(INITIAL_STORES)
   const [selectedStore, setSelectedStore] = useState(stores[0])
@@ -59,7 +62,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
       setCheckingConnection(true)
       // Lightweight token status check
       const response = await axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
-        params: { user_id: CURRENT_USER_ID },
+        params: { user_id: currentUserId },
         timeout: 30000 // Increased from 5s to 30s
       })
       
@@ -219,8 +222,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
     const apiUrl = import.meta.env.DEV 
       ? (import.meta.env.VITE_API_URL || '')  // Development: use env var or empty for Vite proxy
       : ''  // Production: ALWAYS use relative path (vercel.json proxy handles routing to Railway)
-    const userId = 'default-user'
-    const oauthUrl = `${apiUrl}/api/ebay/auth/start?user_id=${userId}`
+    const oauthUrl = `${apiUrl}/api/ebay/auth/start?user_id=${currentUserId}`
     
     console.log('🔗 Attempting eBay OAuth connection')
     console.log('API URL:', apiUrl)
@@ -380,7 +382,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
                 try {
                   console.log(`🔘 Connect eBay button clicked [${requestId}]`)
                   console.log(`   API_BASE_URL: ${API_BASE_URL}`)
-                  console.log(`   CURRENT_USER_ID: ${CURRENT_USER_ID}`)
+                  console.log(`   currentUserId: ${currentUserId}`)
                   console.log(`   Cleared sessionStorage flag for fresh OAuth flow`)
                   
                   // Check token status when connect button is clicked
@@ -409,7 +411,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
                   }
                   
                   // Start OAuth if not connected
-                  const oauthUrl = `${API_BASE_URL}/api/ebay/auth/start?user_id=${CURRENT_USER_ID}`
+                  const oauthUrl = `${API_BASE_URL}/api/ebay/auth/start?user_id=${currentUserId}`
                   console.log(`🔗 [${requestId}] Starting OAuth flow...`)
                   console.log(`   OAuth URL: ${oauthUrl}`)
                   console.log(`   Redirecting to eBay login page...`)
