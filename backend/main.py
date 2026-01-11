@@ -879,9 +879,26 @@ def quote_low_performing_analysis(
         }
     """
     import logging
+    import traceback
     from .credit_service import get_available_credits
     
     logger = logging.getLogger(__name__)
+    
+    # Request logging
+    logger.info(f"📊 [QUOTE] Low-Performing 분석 견적 요청 시작")
+    logger.info(f"📊 [QUOTE] Request body: {request.dict()}")
+    logger.info(f"📊 [QUOTE] Query params: user_id={user_id}, store_id={store_id}")
+    
+    # Validate user_id
+    if not user_id or user_id == "default-user":
+        logger.warning(f"⚠️ [QUOTE] Invalid user_id: {user_id}")
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_user_id",
+                "message": "User ID is required. Please log in and try again."
+            }
+        )
     
     # 필터 값 검증 및 정규화
     days = max(1, request.days)
@@ -898,10 +915,12 @@ def quote_low_performing_analysis(
         "views_lte": views_lte
     }
     
-    logger.info(f"📊 Low-Performing 분석 견적 요청: user_id={user_id}, filters={filters}")
+    logger.info(f"📊 [QUOTE] Resolved filters: {filters}")
+    logger.info(f"📊 [QUOTE] Resolved user_id: {user_id}, store_id: {store_id}")
     
     # 분석 대상 SKU 수 계산 (실제 분석 수행 X)
     try:
+        logger.info(f"📊 [QUOTE] Calling count_low_performing_candidates...")
         estimated_candidates = count_low_performing_candidates(
             db=db,
             user_id=user_id,
@@ -915,8 +934,23 @@ def quote_low_performing_analysis(
             platform_filter="eBay",
             store_id=store_id
         )
+        logger.info(f"📊 [QUOTE] count_low_performing_candidates result: {estimated_candidates}")
     except Exception as e:
-        logger.error(f"❌ 분석 대상 SKU 수 계산 실패: {str(e)}")
+        error_trace = traceback.format_exc()
+        logger.error(f"❌ [QUOTE] 분석 대상 SKU 수 계산 실패: {str(e)}")
+        logger.error(f"❌ [QUOTE] Stack trace:\n{error_trace}")
+        
+        # Check if it's a database/user not found error
+        error_str = str(e).lower()
+        if "no row" in error_str or "not found" in error_str or "does not exist" in error_str:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "user_or_account_not_found",
+                    "message": f"User account or store not found. Please ensure your account is properly set up. Error: {str(e)}"
+                }
+            )
+        
         raise HTTPException(
             status_code=500,
             detail={
@@ -929,9 +963,17 @@ def quote_low_performing_analysis(
     required_credits = max(1, estimated_candidates)  # 최소 1 크레딧
     
     # 남은 크레딧 조회
-    remaining_credits = get_available_credits(db, user_id)
+    try:
+        remaining_credits = get_available_credits(db, user_id)
+        logger.info(f"📊 [QUOTE] Available credits: {remaining_credits}")
+    except Exception as e:
+        error_trace = traceback.format_exc()
+        logger.error(f"❌ [QUOTE] 크레딧 조회 실패: {str(e)}")
+        logger.error(f"❌ [QUOTE] Stack trace:\n{error_trace}")
+        # Default to 0 if credit check fails
+        remaining_credits = 0
     
-    logger.info(f"✅ 견적 완료: estimated_candidates={estimated_candidates}, required_credits={required_credits}, remaining_credits={remaining_credits}")
+    logger.info(f"✅ [QUOTE] 견적 완료: estimated_candidates={estimated_candidates}, required_credits={required_credits}, remaining_credits={remaining_credits}")
     
     return {
         "estimatedCandidates": estimated_candidates,

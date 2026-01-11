@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import axios from 'axios'
 import { useStore } from '../contexts/StoreContext'
+import { useAuth } from '../contexts/AuthContext'
 import SummaryCard from './SummaryCard'
 import ZombieTable from './ZombieTable'
 import FilterBar from './FilterBar'
@@ -24,7 +25,6 @@ import { getImageUrlFromListing, normalizeImageUrl } from '../utils/imageUtils'
 const API_BASE_URL = import.meta.env.DEV 
   ? (import.meta.env.VITE_API_URL || '')  // Development: use env var or empty for Vite proxy
   : ''  // Production: ALWAYS use relative path (vercel.json proxy handles routing to Railway)
-const CURRENT_USER_ID = "default-user" // Temporary user ID for MVP phase
 
 // Demo Mode - Set to true to use dummy data (false for production with real API)
 // Test mode: true = dummy data, false = real API
@@ -119,8 +119,12 @@ function Dashboard() {
   }
 
   const { selectedStore } = useStore()
+  const { user } = useAuth()
   const [searchParams] = useSearchParams()
   const viewParam = searchParams.get('view')
+  
+  // Get actual user ID from auth context, fallback to 'default-user' if not logged in
+  const currentUserId = user?.id || 'default-user'
   // Client state only
   // NOTE: Dashboard에서는 제품 리스트 상태를 유지하지 않음 (카드 숫자만 관리)
   const [isStoreConnected, setIsStoreConnected] = useState(false)
@@ -840,27 +844,45 @@ function Dashboard() {
   // Apply filter - Confirm 모달 표시
   const handleApplyFilter = async (newFilters) => {
     console.log('🔍 handleApplyFilter: Fetching quote...')
+    console.log('📋 Request details:', {
+      url: `${API_BASE_URL}/api/analysis/low-performing/quote`,
+      method: 'POST',
+      user_id: currentUserId,
+      filters: {
+        days: newFilters.analytics_period_days || newFilters.min_days || 7,
+        sales_lte: newFilters.max_sales || 0,
+        watch_lte: newFilters.max_watches || newFilters.max_watch_count || 0,
+        imp_lte: newFilters.max_impressions || 100,
+        views_lte: newFilters.max_views || 10,
+      },
+      store_id: selectedStore?.id || null
+    })
     
     setIsFetchingQuote(true)
     setPendingAnalysisFilters(newFilters)
     
     try {
       // Step 1: Quote (preflight) 호출 - requiredCredits 계산
-      const quoteResponse = await axios.post(`${API_BASE_URL}/api/analysis/low-performing/quote`, {
+      const requestBody = {
         days: newFilters.analytics_period_days || newFilters.min_days || 7,
         sales_lte: newFilters.max_sales || 0,
         watch_lte: newFilters.max_watches || newFilters.max_watch_count || 0,
         imp_lte: newFilters.max_impressions || 100,
         views_lte: newFilters.max_views || 10,
-      }, {
+      }
+      
+      const quoteResponse = await axios.post(`${API_BASE_URL}/api/analysis/low-performing/quote`, requestBody, {
         params: {
-          user_id: CURRENT_USER_ID
+          user_id: currentUserId,
+          store_id: selectedStore?.id || null
         },
         headers: {
           'Content-Type': 'application/json'
         },
         timeout: 30000
       })
+      
+      console.log('✅ Quote response received:', quoteResponse.data)
       
       if (quoteResponse.data) {
         const { estimatedCandidates, requiredCredits: quoteRequiredCredits, remainingCredits } = quoteResponse.data
@@ -879,12 +901,34 @@ function Dashboard() {
         throw new Error('Invalid quote response')
       }
     } catch (err) {
-      console.error('❌ Quote fetch failed:', err)
+      console.error('❌ Quote fetch failed:', {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+        message: err.message,
+        request: {
+          url: err.config?.url,
+          method: err.config?.method,
+          params: err.config?.params,
+          data: err.config?.data
+        }
+      })
+      
       let errorMessage = 'Failed to calculate required credits. Please try again.'
       
-      if (err.response?.status === 402) {
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        errorMessage = 'Authentication failed. Please log in again.'
+      } else if (err.response?.status === 400) {
+        const errorData = err.response?.data?.detail || err.response?.data || {}
+        errorMessage = errorData.message || 'Invalid request. Please check your filter settings.'
+      } else if (err.response?.status === 402) {
         const errorData = err.response?.data?.detail || {}
         errorMessage = errorData.message || 'Insufficient credits. Please purchase more credits.'
+      } else if (err.response?.status === 500) {
+        const errorData = err.response?.data?.detail || {}
+        errorMessage = errorData.message || 'Server error. Please try again later.'
+      } else if (err.code === 'ERR_NETWORK' || err.code === 'ECONNABORTED') {
+        errorMessage = 'Network error. Please check your connection and try again.'
       }
       
       showToast(errorMessage, 'error')
