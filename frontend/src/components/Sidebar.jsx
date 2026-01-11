@@ -443,9 +443,11 @@ function Sidebar() {
                 {/* Grant Test Credits Button (Dev-only) */}
                 {/* 
                   NOTE: This button is controlled by VITE_ENABLE_TEST_CREDITS environment variable.
-                  It will NOT be hidden based on NODE_ENV=production, but only when VITE_ENABLE_TEST_CREDITS is not 'true'.
-                  This allows the button to be visible in production if explicitly enabled via environment variable.
-                  Security: The actual grant is protected by ADMIN_API_KEY on the backend.
+                  - Default: Hidden (VITE_ENABLE_TEST_CREDITS=false or unset)
+                  - To show: Set VITE_ENABLE_TEST_CREDITS='true' (must be string 'true')
+                  - Production safety: Hidden by default, only shown when explicitly enabled
+                  - Security: The actual grant is protected by ADMIN_API_KEY on the backend.
+                  - Value must be exactly 'true' (string), not boolean true
                 */}
                 {import.meta.env.VITE_ENABLE_TEST_CREDITS === 'true' && (
                   <div className="mb-4 pt-4 border-t border-zinc-800">
