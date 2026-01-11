@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useAccount } from '../contexts/AccountContext'
 import { LayoutDashboard, List, History, Settings, X, Check, ChevronDown, ChevronRight } from 'lucide-react'
+import axios from 'axios'
 
 // Use environment variable for Railway URL, fallback based on environment
 // CRITICAL: Production MUST use relative path /api (proxied by vercel.json) to avoid CORS issues
@@ -29,6 +30,9 @@ function Sidebar() {
   const [selectedPack, setSelectedPack] = useState(CREDIT_PACKS[0])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isCreatingCheckout, setIsCreatingCheckout] = useState(false)
+  const [isGrantingTestCredits, setIsGrantingTestCredits] = useState(false)
+  const [grantError, setGrantError] = useState(null)
+  const [grantSuccess, setGrantSuccess] = useState(null)
   const planModalRef = useRef(null)
   const creditModalRef = useRef(null)
 
@@ -435,6 +439,99 @@ function Sidebar() {
                     <span className="text-emerald-300">Never Expires ✨</span>
                   </div>
                 </div>
+
+                {/* Grant Test Credits Button (Dev-only) */}
+                {/* 
+                  NOTE: This button is controlled by VITE_ENABLE_TEST_CREDITS environment variable.
+                  It will NOT be hidden based on NODE_ENV=production, but only when VITE_ENABLE_TEST_CREDITS is not 'true'.
+                  This allows the button to be visible in production if explicitly enabled via environment variable.
+                  Security: The actual grant is protected by ADMIN_API_KEY on the backend.
+                */}
+                {import.meta.env.VITE_ENABLE_TEST_CREDITS === 'true' && (
+                  <div className="mb-4 pt-4 border-t border-zinc-800">
+                    <button
+                      onClick={async () => {
+                        if (isGrantingTestCredits) return
+                        
+                        setIsGrantingTestCredits(true)
+                        setGrantError(null)
+                        setGrantSuccess(null)
+                        
+                        try {
+                          // Use admin grant endpoint with admin key from environment
+                          const adminKey = import.meta.env.VITE_ADMIN_API_KEY || ''
+                          const userId = user?.id || 'default-user'
+                          
+                          const response = await axios.post(
+                            `${API_BASE_URL}/api/admin/credits/grant`,
+                            {
+                              user_id: userId,
+                              amount: 1000,
+                              description: 'Test credits grant from Credits modal'
+                            },
+                            {
+                              params: {
+                                admin_key: adminKey
+                              },
+                              headers: {
+                                'Content-Type': 'application/json'
+                              },
+                              timeout: 30000
+                            }
+                          )
+                          
+                          if (response.data.success) {
+                            const { totalCredits, addedAmount } = response.data
+                            setGrantSuccess(`Test credits granted! +${addedAmount.toLocaleString()} credits (Total: ${totalCredits.toLocaleString()})`)
+                            
+                            // Refresh credits from AccountContext
+                            if (refreshCredits) {
+                              refreshCredits()
+                            }
+                            
+                            // Clear success message after 5 seconds
+                            setTimeout(() => setGrantSuccess(null), 5000)
+                          } else {
+                            throw new Error(response.data.message || 'Grant failed')
+                          }
+                        } catch (err) {
+                          console.error('Test credits grant failed:', err)
+                          
+                          if (err.response?.status === 403) {
+                            setGrantError('Test credits grant is not available. Check admin key configuration.')
+                          } else {
+                            const errorMsg = err.response?.data?.detail?.message || err.response?.data?.error || err.message || 'Failed to grant test credits. Please try again.'
+                            setGrantError(errorMsg)
+                          }
+                          
+                          // Clear error message after 5 seconds
+                          setTimeout(() => setGrantError(null), 5000)
+                        } finally {
+                          setIsGrantingTestCredits(false)
+                        }
+                      }}
+                      disabled={isGrantingTestCredits}
+                      className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 disabled:from-purple-800 disabled:to-purple-800 disabled:cursor-not-allowed text-white font-semibold rounded-xl text-sm transition-all shadow-lg shadow-purple-500/30 mb-2"
+                    >
+                      {isGrantingTestCredits ? 'Granting...' : '🧪 Grant Test Credits (+1000)'}
+                    </button>
+                    <p className="text-xs text-zinc-500 text-center">
+                      Dev-only: Grants 1000 test credits for testing purposes
+                    </p>
+                    {/* Error Message */}
+                    {grantError && (
+                      <div className="mt-2 p-2 bg-red-900/20 border border-red-500/30 rounded-lg">
+                        <p className="text-xs text-red-400">{grantError}</p>
+                      </div>
+                    )}
+                    {/* Success Message */}
+                    {grantSuccess && (
+                      <div className="mt-2 p-2 bg-emerald-900/20 border border-emerald-500/30 rounded-lg">
+                        <p className="text-xs text-emerald-400">{grantSuccess}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Purchase Button */}
                 {/* Using Lemon Squeezy Checkout API to create checkout dynamically */}
