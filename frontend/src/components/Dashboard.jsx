@@ -1529,8 +1529,13 @@ function Dashboard() {
           onError={(msg, err) => showToast(getErrorMessage(err || { message: msg }), 'error')}
         />
 
-        {/* Dev-only Top-up Button */}
-        {import.meta.env.VITE_ENABLE_DEV_TOPUP === 'true' && (
+        {/* Test Credits Top-up Button (Dev-only) */}
+        {/* 
+          NOTE: This button is controlled by VITE_ENABLE_TEST_CREDITS environment variable.
+          It will NOT be hidden based on NODE_ENV=production, but only when VITE_ENABLE_TEST_CREDITS is not 'true'.
+          This allows the button to be visible in production if explicitly enabled via environment variable.
+        */}
+        {import.meta.env.VITE_ENABLE_TEST_CREDITS === 'true' && (
           <div className="mt-4 mb-4">
             <button
               onClick={async () => {
@@ -1538,32 +1543,41 @@ function Dashboard() {
                 
                 setIsToppingUp(true)
                 try {
-                  const response = await axios.post(`${API_BASE_URL}/api/dev/credits/topup`, {}, {
-                    params: {
+                  // Use admin grant endpoint with admin key from environment
+                  const adminKey = import.meta.env.VITE_ADMIN_API_KEY || ''
+                  const response = await axios.post(
+                    `${API_BASE_URL}/api/admin/credits/grant`,
+                    {
                       user_id: CURRENT_USER_ID,
-                      amount: 100
+                      amount: 1000,
+                      description: 'Test credits grant (dev-only)'
                     },
-                    headers: {
-                      'Content-Type': 'application/json'
-                    },
-                    timeout: 30000
-                  })
+                    {
+                      params: {
+                        admin_key: adminKey
+                      },
+                      headers: {
+                        'Content-Type': 'application/json'
+                      },
+                      timeout: 30000
+                    }
+                  )
                   
                   if (response.data.success) {
                     const { totalCredits, addedAmount } = response.data
                     setUserCredits(totalCredits)
-                    showToast(`Dev top-up successful: +${addedAmount} credits`, 'success')
+                    showToast(`Test credits granted: +${addedAmount} credits (Total: ${totalCredits})`, 'success')
                     
                     // 크레딧 정보 다시 가져오기
                     fetchUserCredits().catch(err => console.error('Failed to refresh credits:', err))
                   } else {
-                    throw new Error(response.data.message || 'Top-up failed')
+                    throw new Error(response.data.message || 'Grant failed')
                   }
                 } catch (err) {
-                  console.error('Dev top-up failed:', err)
+                  console.error('Test credits grant failed:', err)
                   
                   if (err.response?.status === 403) {
-                    showToast('Dev top-up is not available in this environment', 'error')
+                    showToast('Test credits grant is not available. Check admin key configuration.', 'error')
                   } else {
                     showToast(getErrorMessage(err), 'error')
                   }
@@ -1574,7 +1588,7 @@ function Dashboard() {
               disabled={isToppingUp}
               className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-800 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
             >
-              {isToppingUp ? 'Topping up...' : '🧪 Dev Top-up +100'}
+              {isToppingUp ? 'Granting...' : '🧪 Grant Test Credits +1000'}
             </button>
           </div>
         )}

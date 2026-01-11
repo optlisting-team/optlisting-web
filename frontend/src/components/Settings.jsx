@@ -1,5 +1,15 @@
 import React, { useState } from 'react'
 import { Button } from './ui/button'
+import axios from 'axios'
+import { useAccount } from '../contexts/AccountContext'
+
+// Use environment variable for Railway URL, fallback based on environment
+// CRITICAL: Production MUST use relative path /api (proxied by vercel.json) to avoid CORS issues
+// Only use VITE_API_URL in development if needed, production always uses relative path
+const API_BASE_URL = import.meta.env.DEV 
+  ? (import.meta.env.VITE_API_URL || '')  // Development: use env var or empty for Vite proxy
+  : ''  // Production: ALWAYS use relative path (vercel.json proxy handles routing to Railway)
+const CURRENT_USER_ID = "default-user" // Temporary user ID for MVP phase
 
 // Store License Table Component
 function StoreLicenseTable({ 
@@ -157,11 +167,14 @@ function StoreLicenseTable({
 
 // Main Settings Component
 function Settings() {
+  // Use AccountContext for credits
+  const { credits, plan, refreshCredits } = useAccount()
+  
   // Mock data - replace with actual data from context/API
-  const [userPlan] = useState('PRO')
+  const [userPlan] = useState(plan || 'PRO')
   const [planStoreLimit] = useState(3)
   const [globalStoreLimit] = useState(10)
-  const [userCredits] = useState(8500)
+  const userCredits = credits || 0
   const [usedCredits] = useState(0)
   
   const [connectedStores, setConnectedStores] = useState([
@@ -171,6 +184,7 @@ function Settings() {
 
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
+  const [isGrantingCredits, setIsGrantingCredits] = useState(false)
   
   const handleConnect = () => {
     // TODO: Open OAuth flow
@@ -181,6 +195,63 @@ function Settings() {
   const handleDisconnect = (storeId) => {
     // Direct disconnect without confirmation (removed confirm dialog)
     setConnectedStores(connectedStores.filter(s => s.id !== storeId))
+  }
+
+  // Grant Test Credits handler
+  const handleGrantTestCredits = async () => {
+    if (isGrantingCredits) return
+    
+    setIsGrantingCredits(true)
+    setError(null)
+    setSuccess(null)
+    
+    try {
+      // Use admin grant endpoint with admin key from environment
+      const adminKey = import.meta.env.VITE_ADMIN_API_KEY || ''
+      const response = await axios.post(
+        `${API_BASE_URL}/api/admin/credits/grant`,
+        {
+          user_id: CURRENT_USER_ID,
+          amount: 1000,
+          description: 'Test credits grant from Settings'
+        },
+        {
+          params: {
+            admin_key: adminKey
+          },
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          timeout: 30000
+        }
+      )
+      
+      if (response.data.success) {
+        const { totalCredits, addedAmount } = response.data
+        setSuccess(`Test credits granted successfully! +${addedAmount} credits (Total: ${totalCredits.toLocaleString()})`)
+        // Refresh credits from AccountContext
+        if (refreshCredits) {
+          refreshCredits()
+        }
+        // Clear success message after 5 seconds
+        setTimeout(() => setSuccess(null), 5000)
+      } else {
+        throw new Error(response.data.message || 'Grant failed')
+      }
+    } catch (err) {
+      console.error('Test credits grant failed:', err)
+      
+      if (err.response?.status === 403) {
+        setError('Test credits grant is not available. Check admin key configuration.')
+      } else {
+        const errorMsg = err.response?.data?.detail?.message || err.response?.data?.error || err.message || 'Failed to grant test credits. Please try again.'
+        setError(errorMsg)
+      }
+      // Clear error message after 5 seconds
+      setTimeout(() => setError(null), 5000)
+    } finally {
+      setIsGrantingCredits(false)
+    }
   }
 
   // Plan info
@@ -247,6 +318,29 @@ function Settings() {
               </Button>
             </div>
           </div>
+          
+          {/* Grant Test Credits Button (Dev-only) */}
+          {/* 
+            NOTE: This button is controlled by VITE_ENABLE_TEST_CREDITS environment variable.
+            It will NOT be hidden based on NODE_ENV=production, but only when VITE_ENABLE_TEST_CREDITS is not 'true'.
+            This allows the button to be visible in production if explicitly enabled via environment variable.
+            Security: The actual grant is protected by ADMIN_API_KEY on the backend.
+          */}
+          {import.meta.env.VITE_ENABLE_TEST_CREDITS === 'true' && (
+            <div className="mt-4 pt-4 border-t border-zinc-800">
+              <Button
+                onClick={handleGrantTestCredits}
+                disabled={isGrantingCredits}
+                variant="outline"
+                className="w-full border-purple-500/30 text-purple-400 hover:bg-purple-500/10 disabled:opacity-50"
+              >
+                {isGrantingCredits ? 'Granting...' : '🧪 Grant Test Credits (+1000)'}
+              </Button>
+              <p className="text-xs text-zinc-500 mt-2 text-center">
+                Dev-only: Grants 1000 test credits for testing purposes
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Store Licenses Section */}
