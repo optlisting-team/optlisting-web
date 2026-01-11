@@ -1507,13 +1507,45 @@ async def get_active_listings_trading_api_internal(
     # Namespace 처리
     ns = {"ebay": "urn:ebay:apis:eBLBaseComponents"}
     
-    # 에러 체크
+    # 에러 체크 및 상세 로깅
     ack = root.find(".//ebay:Ack", ns)
+    ack_text = ack.text if ack is not None else "Unknown"
+    
+    # TotalNumberOfEntries 추출 (fetched=0 케이스 진단용)
+    pagination_result = root.find(".//ebay:PaginationResult", ns)
+    total_entries_from_api = None
+    if pagination_result is not None:
+        total_entries_elem = pagination_result.find("ebay:TotalNumberOfEntries", ns)
+        if total_entries_elem is not None:
+            total_entries_from_api = int(total_entries_elem.text) if total_entries_elem.text else 0
+    
+    logger.info(f"📊 [INTERNAL] Trading API Response Details:")
+    logger.info(f"   - Ack: {ack_text}")
+    logger.info(f"   - TotalNumberOfEntries (from API): {total_entries_from_api}")
+    
     if ack is not None and ack.text != "Success":
         errors = root.findall(".//ebay:Errors/ebay:ShortMessage", ns)
+        error_codes = root.findall(".//ebay:Errors/ebay:ErrorCode", ns)
         error_msg = errors[0].text if errors else "Unknown error"
-        logger.error(f"❌ eBay API Error: {error_msg}")
+        error_code = error_codes[0].text if error_codes else "Unknown"
+        
+        logger.error(f"❌ [INTERNAL] eBay API Error:")
+        logger.error(f"   - ErrorCode: {error_code}")
+        logger.error(f"   - ShortMessage: {error_msg}")
+        logger.error(f"   - TotalNumberOfEntries: {total_entries_from_api}")
+        
+        # fetched=0 케이스 진단을 위한 추가 정보
+        if total_entries_from_api == 0:
+            logger.warning(f"⚠️ [INTERNAL] TotalNumberOfEntries=0 - 가능한 원인:")
+            logger.warning(f"   1. eBay 계정에 활성 listings가 없음")
+            logger.warning(f"   2. API 권한 부족 (필요한 scope: https://api.ebay.com/oauth/api_scope/sell.marketing.readonly)")
+            logger.warning(f"   3. 필터 조건에 맞는 listings가 없음")
+        
         raise HTTPException(status_code=400, detail=f"eBay Error: {error_msg}")
+    
+    # Success인 경우에도 TotalNumberOfEntries 로깅
+    if total_entries_from_api is not None:
+        logger.info(f"✅ [INTERNAL] Trading API Success - TotalNumberOfEntries: {total_entries_from_api}")
     
     # 리스팅 파싱 (기존 로직과 동일)
     listings = []

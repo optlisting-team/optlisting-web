@@ -32,7 +32,7 @@ from .credit_service import (
     PlanType,
 )
 
-app = FastAPI(title="OptListing API", version="1.3.32")
+app = FastAPI(title="OptListing API", version="1.3.33")
 
 # ============================================================
 # [BOOT] Supabase Write Self-Test (Top-level execution)
@@ -463,6 +463,92 @@ async def trigger_token_refresh(
         raise HTTPException(status_code=500, detail="Worker module not available")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Job failed: {str(e)}")
+
+
+@app.get("/api/debug/listings")
+def debug_listings(
+    user_id: str = Query(..., description="User ID"),
+    platform: str = Query("eBay", description="Platform filter"),
+    db: Session = Depends(get_db)
+):
+    """
+    🔍 디버그 엔드포인트: Listings 테이블 조회 및 샘플 데이터 반환
+    
+    sync upsert와 summary 쿼리의 키 일치 여부를 확인하기 위한 임시 디버그 엔드포인트
+    - user_id + platform으로 count
+    - 샘플 row 5개 반환
+    - sync upsert와 summary 쿼리의 키 비교 정보 제공
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info("=" * 60)
+    logger.info(f"🔍 [DEBUG] Debug listings query for user_id={user_id}, platform={platform}")
+    
+    try:
+        # Summary 쿼리와 동일한 조건으로 조회
+        query = db.query(Listing).filter(
+            Listing.user_id == user_id,
+            Listing.platform == platform
+        )
+        
+        count = query.count()
+        
+        # 샘플 row 5개 가져오기
+        sample_listings = query.limit(5).all()
+        
+        # 샘플 데이터를 딕셔너리로 변환
+        sample_data = []
+        for listing in sample_listings:
+            sample_data.append({
+                "id": listing.id,
+                "user_id": listing.user_id,
+                "platform": listing.platform,
+                "marketplace": listing.marketplace,
+                "item_id": listing.item_id,
+                "ebay_item_id": listing.ebay_item_id,
+                "title": listing.title[:50] if listing.title else None,
+                "sku": listing.sku,
+                "last_synced_at": listing.last_synced_at.isoformat() if listing.last_synced_at else None
+            })
+        
+        logger.info(f"🔍 [DEBUG] Query result:")
+        logger.info(f"   - Count: {count}")
+        logger.info(f"   - Sample rows: {len(sample_data)}")
+        logger.info("=" * 60)
+        
+        # Sync upsert 키와 Summary 쿼리 키 비교 정보
+        sync_upsert_keys = {
+            "user_id": user_id,
+            "platform": platform,
+            "item_id": "used for conflict resolution"
+        }
+        
+        summary_query_keys = {
+            "user_id": user_id,
+            "platform": platform
+        }
+        
+        return {
+            "success": True,
+            "query_keys": {
+                "user_id": user_id,
+                "platform": platform
+            },
+            "count": count,
+            "sample_listings": sample_data,
+            "sync_upsert_keys": sync_upsert_keys,
+            "summary_query_keys": summary_query_keys,
+            "keys_match": sync_upsert_keys["user_id"] == summary_query_keys["user_id"] and 
+                         sync_upsert_keys["platform"] == summary_query_keys["platform"],
+            "note": "This endpoint uses the same WHERE conditions as summary query (user_id + platform)"
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ [DEBUG] Error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/listings")

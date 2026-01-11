@@ -348,12 +348,31 @@ function Dashboard() {
       })
       
       if (response.data && response.data.success) {
-        const { fetched, upserted, pages, total_pages, ebay_user_id } = response.data
-        console.log(`✅ [SYNC] Sync completed:`)
-        console.log(`   - Fetched from eBay: ${fetched} listings`)
-        console.log(`   - Upserted to DB: ${upserted} listings`)
-        console.log(`   - Pages processed: ${pages}/${total_pages}`)
-        console.log(`   - eBay User ID: ${ebay_user_id}`)
+        // 1) /api/ebay/listings/sync 응답 JSON을 콘솔에 그대로 출력
+        console.log('='.repeat(60))
+        console.log('📊 [SYNC] /api/ebay/listings/sync 응답 JSON:')
+        console.log(JSON.stringify(response.data, null, 2))
+        console.log('='.repeat(60))
+        
+        // sync 응답을 sessionStorage에 저장 (summary와 비교용)
+        sessionStorage.setItem('last_sync_response', JSON.stringify(response.data))
+        
+        const { fetched, upserted, pages, total_pages, ebay_user_id, page_stats } = response.data
+        
+        // 케이스 분기: fetched=0인 경우
+        if (fetched === 0) {
+          console.warn('⚠️ [SYNC] fetched=0 - Trading API에서 listings를 가져오지 못함')
+          console.warn('   백엔드 로그에서 Trading API 응답의 Ack/Errors/TotalNumberOfEntries를 확인하세요')
+          showToast('No listings found from eBay API. Check backend logs for details.', 'warning')
+        }
+        
+        // sync 응답을 sessionStorage에 저장 (summary와 비교용)
+        sessionStorage.setItem('last_sync_response', JSON.stringify(response.data))
+        
+        // 케이스 분기: upserted>0인데 active_count=0인 경우는 summary 응답에서 확인
+        if (upserted > 0) {
+          console.log(`✅ [SYNC] ${upserted} listings upserted - verifying with summary API...`)
+        }
         
         // Sync 완료 후 summary stats 재호출 (네트워크 확인용)
         console.log('🔄 [SYNC] Refetching summary stats after sync...')
@@ -421,15 +440,64 @@ function Dashboard() {
         },
       })
       
-      console.log('📊 [SUMMARY] API response received:', {
-        status: response.status,
-        success: response.data?.success,
-        active_count: response.data?.active_count,
-        low_performing_count: response.data?.low_performing_count,
-        user_id: response.data?.user_id
-      })
+      // 2) sync 직후 /api/summary 응답 JSON을 그대로 출력
+      console.log('='.repeat(60))
+      console.log('📊 [SUMMARY] /api/ebay/summary 응답 JSON:')
+      console.log(JSON.stringify(response.data, null, 2))
+      console.log('='.repeat(60))
       
+      // 케이스 분기: upserted>0인데 active_count=0인 경우
       if (response.data && response.data.success) {
+        const { active_count, user_id, low_performing_count } = response.data
+        
+        console.log('🔍 [SUMMARY] Sync vs Summary 비교:')
+        console.log(`   - Summary active_count: ${active_count}`)
+        console.log(`   - Summary user_id: ${user_id}`)
+        console.log(`   - Summary platform: eBay (assumed)`)
+        
+        // upserted>0인데 active_count=0인 경우 디버그 엔드포인트 자동 호출
+        const lastSyncResponse = sessionStorage.getItem('last_sync_response')
+        if (lastSyncResponse) {
+          try {
+            const syncData = JSON.parse(lastSyncResponse)
+            const syncUpserted = syncData.upserted || 0
+            
+            console.log(`   - Last sync upserted: ${syncUpserted}`)
+            
+            if (syncUpserted > 0 && active_count === 0) {
+              console.warn('⚠️ [SUMMARY] MISMATCH: upserted>0 but active_count=0')
+              console.warn('   디버그 엔드포인트를 호출하여 DB 상태 확인 중...')
+              
+              // 디버그 엔드포인트 호출
+              try {
+                const debugResponse = await axios.get(`${API_BASE_URL}/api/debug/listings`, {
+                  params: {
+                    user_id: currentUserId,
+                    platform: 'eBay'
+                  },
+                  timeout: 30000
+                })
+                
+                console.log('='.repeat(60))
+                console.log('🔍 [DEBUG] /api/debug/listings 응답 JSON:')
+                console.log(JSON.stringify(debugResponse.data, null, 2))
+                console.log('='.repeat(60))
+                
+                if (debugResponse.data && debugResponse.data.count > 0) {
+                  console.warn('⚠️ [DEBUG] DB에는 listings가 존재하지만 summary 쿼리가 0을 반환함')
+                  console.warn('   쿼리 키 불일치 가능성 - keys_match:', debugResponse.data.keys_match)
+                } else {
+                  console.warn('⚠️ [DEBUG] DB에도 listings가 없음 - sync upsert가 실제로 저장되지 않았을 가능성')
+                }
+              } catch (debugErr) {
+                console.error('❌ [DEBUG] 디버그 엔드포인트 호출 실패:', debugErr)
+              }
+            }
+          } catch (parseErr) {
+            console.warn('⚠️ [SUMMARY] Failed to parse last sync response:', parseErr)
+          }
+        }
+        
         console.log('✅ [SUMMARY] Successfully fetched summary:', response.data)
         setSummaryStats({
           activeCount: response.data.active_count || 0,
