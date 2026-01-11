@@ -172,6 +172,12 @@ function Dashboard() {
   const [isFetchingQuote, setIsFetchingQuote] = useState(false)  // quote 호출 중 플래그
   const [isToppingUp, setIsToppingUp] = useState(false)  // Dev top-up 진행 중 플래그
   
+  // OAuth callback verification guard - prevent multiple simultaneous verifications
+  const isVerifyingConnection = useRef(false)
+  const verificationAttemptCount = useRef(0)
+  const MAX_VERIFICATION_ATTEMPTS = 6
+  const VERIFICATION_BACKOFF_MS = [500, 1000, 1500, 2000, 2500, 3000] // Progressive backoff
+  
   // API Health Check State
   const [apiConnected, setApiConnected] = useState(false)
   const [apiError, setApiError] = useState(null)
@@ -1155,83 +1161,147 @@ function Dashboard() {
     // This ensures successful connections are handled even after page reload
     
     if (ebayConnected === 'true') {
+      // Prevent multiple simultaneous verifications
+      if (isVerifyingConnection.current) {
+        console.log('⚠️ Verification already in progress, skipping duplicate verification')
+        return
+      }
+      
       console.log('✅ OAuth callback success detected - verifying and connecting')
       
-      // Clean URL first to prevent re-triggering
+      // Clean URL FIRST to prevent re-triggering on re-render
+      // This must happen before any async operations to prevent useEffect re-execution
       window.history.replaceState({}, '', window.location.pathname)
       
-      // Verify connection status from backend before proceeding
-      console.log('🔍 Verifying connection status from backend...')
-      axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
-        params: { user_id: CURRENT_USER_ID },
-        timeout: 30000
-      }).then(response => {
-        const isConnected = response.data?.connected === true && 
-                           response.data?.token_status?.has_valid_token !== false &&
-                           !response.data?.is_expired
+      // Mark as processing immediately to prevent re-entry
+      sessionStorage.setItem(processedKey, 'processing')
+      isVerifyingConnection.current = true
+      verificationAttemptCount.current = 0
+      
+      // Verify connection status from backend with polling support
+      const verifyConnectionWithPolling = async (attempt = 0) => {
+        if (attempt >= MAX_VERIFICATION_ATTEMPTS) {
+          console.warn('⚠️ Max verification attempts reached, giving up')
+          isVerifyingConnection.current = false
+          sessionStorage.removeItem(processedKey)
+          showToast('Connection verification timeout. Please refresh the page.', 'error')
+          return
+        }
         
-        console.log('📊 Backend connection status:', {
-          connected: response.data?.connected,
-          hasValidToken: response.data?.token_status?.has_valid_token,
-          isExpired: response.data?.is_expired,
-          finalDecision: isConnected
-        })
+        verificationAttemptCount.current = attempt + 1
+        console.log(`🔍 Verifying connection status from backend... (attempt ${verificationAttemptCount.current}/${MAX_VERIFICATION_ATTEMPTS})`)
         
-        if (isConnected) {
-          console.log('✅ Connection verified - setting state and fetching listings')
-          // Mark as processed AFTER verification
-          sessionStorage.setItem(processedKey, 'connected')
-          setIsStoreConnected(true)
+        try {
+          const response = await axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
+            params: { user_id: CURRENT_USER_ID },
+            timeout: 30000
+          })
           
-          // Performance mark: OAuth callback 완료 시점
-          if (typeof performance !== 'undefined' && performance.mark) {
-            performance.mark('oauth_callback_complete')
-          }
+          const isConnected = response.data?.connected === true && 
+                             response.data?.token_status?.has_valid_token !== false &&
+                             !response.data?.is_expired
           
-          // OAuth 콜백 성공 시 summary stats만 가져오기 (전체 listings는 가져오지 않음)
-          setTimeout(() => {
-            console.log('🔄 OAuth callback success - fetching summary stats only...')
+          console.log('📊 Backend connection status:', {
+            connected: response.data?.connected,
+            hasValidToken: response.data?.token_status?.has_valid_token,
+            isExpired: response.data?.is_expired,
+            finalDecision: isConnected,
+            attempt: verificationAttemptCount.current
+          })
+          
+          if (isConnected) {
+            console.log('✅ Connection verified - setting state and fetching summary stats')
+            // Mark as processed AFTER successful verification
+            sessionStorage.setItem(processedKey, 'connected')
+            isVerifyingConnection.current = false
+            verificationAttemptCount.current = 0
             setIsStoreConnected(true)
+            
+            // Performance mark: OAuth callback 완료 시점
+            if (typeof performance !== 'undefined' && performance.mark) {
+              performance.mark('oauth_callback_complete')
+            }
+            
+            // OAuth 콜백 성공 시 summary stats만 가져오기 (전체 listings는 가져오지 않음)
             fetchSummaryStats().catch(err => {
               console.error('Failed to fetch summary stats after OAuth:', err)
             })
-          }, 100)
-        } else {
-          console.warn('⚠️ Backend reports not connected, clearing session storage and showing error')
-          sessionStorage.removeItem(processedKey)
-          showToast('Connection verification failed. Please try again.', 'error')
+            
+            // Clear the processed flag after delay to allow for future connections
+            setTimeout(() => {
+              sessionStorage.removeItem(processedKey)
+            }, 10000)
+          } else {
+            // Connection not ready yet, poll with backoff
+            if (attempt < MAX_VERIFICATION_ATTEMPTS - 1) {
+              const backoffMs = VERIFICATION_BACKOFF_MS[attempt] || 3000
+              console.log(`⏳ Connection not ready yet, retrying in ${backoffMs}ms...`)
+              setTimeout(() => {
+                verifyConnectionWithPolling(attempt + 1)
+              }, backoffMs)
+            } else {
+              // Max attempts reached
+              console.warn('⚠️ Backend reports not connected after all attempts, clearing session storage')
+              isVerifyingConnection.current = false
+              sessionStorage.removeItem(processedKey)
+              showToast('Connection verification failed. Please try again.', 'error')
+            }
+          }
+        } catch (err) {
+          console.error(`❌ Failed to verify connection status (attempt ${verificationAttemptCount.current}):`, err)
+          
+          // Retry on network errors with backoff
+          if (attempt < MAX_VERIFICATION_ATTEMPTS - 1 && 
+              (err.code === 'ERR_NETWORK' || err.code === 'ECONNABORTED' || err.response?.status >= 500)) {
+            const backoffMs = VERIFICATION_BACKOFF_MS[attempt] || 3000
+            console.log(`⏳ Network error, retrying in ${backoffMs}ms...`)
+            setTimeout(() => {
+              verifyConnectionWithPolling(attempt + 1)
+            }, backoffMs)
+          } else {
+            // Max attempts or non-retryable error
+            console.warn('⚠️ Verification failed after all attempts, but URL indicates success - proceeding with connection')
+            isVerifyingConnection.current = false
+            sessionStorage.setItem(processedKey, 'connected')
+            setIsStoreConnected(true)
+            // Verification 실패 시에도 summary stats만 가져오기
+            fetchSummaryStats().catch(fetchErr => {
+              console.error('Failed to fetch summary stats:', fetchErr)
+              showToast(getErrorMessage(fetchErr), 'error')
+            })
+            
+            // Clear the processed flag after delay
+            setTimeout(() => {
+              sessionStorage.removeItem(processedKey)
+            }, 10000)
+          }
         }
-      }).catch(err => {
-        console.error('❌ Failed to verify connection status:', err)
-        // Still try to connect if URL says so (might be network issue)
-        console.log('⚠️ Verification failed, but URL indicates success - proceeding with connection')
-        sessionStorage.setItem(processedKey, 'connected')
-        setIsStoreConnected(true)
-        // Verification 실패 시에도 summary stats만 가져오기
-        fetchSummaryStats().catch(fetchErr => {
-          console.error('Failed to fetch summary stats:', fetchErr)
-          showToast(getErrorMessage(fetchErr), 'error')
-        })
-      })
+      }
       
-      // Clear the processed flag after a delay to allow for future connections
-      setTimeout(() => {
-        sessionStorage.removeItem(processedKey)
-      }, 10000) // Increased to 10 seconds
+      // Start verification with polling
+      verifyConnectionWithPolling(0)
     } else if (ebayError) {
       console.error('❌ OAuth callback error:', ebayError)
       const errorMessage = urlParams.get('message') || 'Failed to connect to eBay'
-      showToast(`eBay connection failed: ${errorMessage}`, 'error')
-      // Remove URL parameters
+      
+      // Remove URL parameters FIRST to prevent re-triggering
       window.history.replaceState({}, '', window.location.pathname)
-      // Clear the processed flag and set connection state
+      
+      // Clear all flags
       sessionStorage.removeItem(processedKey)
+      isVerifyingConnection.current = false
+      verificationAttemptCount.current = 0
       setIsStoreConnected(false)
+      
+      // Show error toast
+      showToast(`eBay connection failed: ${errorMessage}`, 'error')
     } else if (!code && !ebayConnected && !ebayError && processed === 'connected') {
       // If we're marked as connected but URL doesn't show it, clear the flag
       // This can happen if connection failed but flag wasn't cleared
       console.log('⚠️ Session marked as connected but URL shows disconnected, clearing flag')
       sessionStorage.removeItem(processedKey)
+      isVerifyingConnection.current = false
+      verificationAttemptCount.current = 0
     }
   }, []) // Keep empty dependency array - only run on mount
   
@@ -1246,32 +1316,37 @@ function Dashboard() {
             console.error('History fetch error on mount:', err)
           })
           
-          // Check eBay connection status on mount
-          try {
-            console.log('🔍 Checking eBay connection status on mount...')
-            const response = await axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
-              params: { user_id: CURRENT_USER_ID },
-              timeout: 30000
-            })
-            
-            const isConnected = response.data?.connected === true && 
-                               response.data?.token_status?.has_valid_token !== false &&
-                               !response.data?.is_expired
-            
-            if (isConnected) {
-              console.log('✅ eBay is already connected - fetching summary stats...')
-              setIsStoreConnected(true)
-              // 연결되어 있으면 summary stats만 가져오기 (전체 listings는 가져오지 않음)
-              fetchSummaryStats().catch(err => {
-                console.error('Failed to fetch summary stats:', err)
+          // Check eBay connection status on mount (only if not already verifying from OAuth callback)
+          // Skip this check if OAuth verification is in progress to avoid duplicate calls
+          if (!isVerifyingConnection.current) {
+            try {
+              console.log('🔍 Checking eBay connection status on mount...')
+              const response = await axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
+                params: { user_id: CURRENT_USER_ID },
+                timeout: 30000
               })
-            } else {
-              console.log('ℹ️ eBay is not connected yet')
-              setIsStoreConnected(false)
+              
+              const isConnected = response.data?.connected === true && 
+                                 response.data?.token_status?.has_valid_token !== false &&
+                                 !response.data?.is_expired
+              
+              if (isConnected) {
+                console.log('✅ eBay is already connected - fetching summary stats...')
+                setIsStoreConnected(true)
+                // 연결되어 있으면 summary stats만 가져오기 (전체 listings는 가져오지 않음)
+                fetchSummaryStats().catch(err => {
+                  console.error('Failed to fetch summary stats:', err)
+                })
+              } else {
+                console.log('ℹ️ eBay is not connected yet')
+                setIsStoreConnected(false)
+              }
+            } catch (ebayStatusErr) {
+              console.warn('Failed to check eBay connection status on mount:', ebayStatusErr)
+              // Don't set connection state on error - let user manually connect
             }
-          } catch (ebayStatusErr) {
-            console.warn('Failed to check eBay connection status on mount:', ebayStatusErr)
-            // Don't set connection state on error - let user manually connect
+          } else {
+            console.log('⏸️ Skipping mount connection check - OAuth verification in progress')
           }
         }
       } catch (err) {
