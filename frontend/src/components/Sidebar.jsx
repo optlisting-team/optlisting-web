@@ -36,6 +36,11 @@ function Sidebar() {
   const planModalRef = useRef(null)
   const creditModalRef = useRef(null)
 
+  // Debug: Log environment variable in development mode only
+  if (import.meta.env.DEV) {
+    console.log('[DEBUG] Sidebar - VITE_ENABLE_TEST_CREDITS:', import.meta.env.VITE_ENABLE_TEST_CREDITS)
+  }
+
   // Close modals when clicking outside
   useEffect(() => {
     if (!showCreditModal && !showPlanModal) return

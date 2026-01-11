@@ -113,6 +113,11 @@ const DUMMY_STORE = {
 }
 
 function Dashboard() {
+  // Debug: Log environment variable in development mode only
+  if (import.meta.env.DEV) {
+    console.log('[DEBUG] Dashboard - VITE_ENABLE_TEST_CREDITS:', import.meta.env.VITE_ENABLE_TEST_CREDITS)
+  }
+
   const { selectedStore } = useStore()
   const [searchParams] = useSearchParams()
   const viewParam = searchParams.get('view')

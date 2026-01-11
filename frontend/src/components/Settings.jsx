@@ -167,6 +167,11 @@ function StoreLicenseTable({
 
 // Main Settings Component
 function Settings() {
+  // Debug: Log environment variable in development mode only
+  if (import.meta.env.DEV) {
+    console.log('[DEBUG] Settings - VITE_ENABLE_TEST_CREDITS:', import.meta.env.VITE_ENABLE_TEST_CREDITS)
+  }
+
   // Use AccountContext for credits
   const { credits, plan, refreshCredits } = useAccount()
   
