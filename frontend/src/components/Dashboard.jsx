@@ -16,7 +16,7 @@ import ConfirmModal from './ConfirmModal'
 import LowPerformingResults from './LowPerformingResults'
 import Toast from './Toast'
 import { Button } from './ui/button'
-import { AlertCircle, X } from 'lucide-react'
+import { AlertCircle, X, Loader2 } from 'lucide-react'
 import { getImageUrlFromListing, normalizeImageUrl } from '../utils/imageUtils'
 
 // Use environment variable for Railway URL, fallback based on environment
@@ -123,8 +123,9 @@ function Dashboard() {
   const [searchParams] = useSearchParams()
   const viewParam = searchParams.get('view')
   
-  // Get actual user ID from auth context, fallback to 'default-user' if not logged in
-  const currentUserId = user?.id || 'default-user'
+  // Get actual user ID from auth context - CRITICAL: No fallback to 'default-user'
+  // If user is not logged in, API calls will fail with proper error messages
+  const currentUserId = user?.id
   // Client state only
   // NOTE: Dashboard에서는 제품 리스트 상태를 유지하지 않음 (카드 숫자만 관리)
   const [isStoreConnected, setIsStoreConnected] = useState(false)
@@ -159,6 +160,7 @@ function Dashboard() {
     lastSyncAt: null
   })
   const [summaryLoading, setSummaryLoading] = useState(false)
+  const [isSyncingListings, setIsSyncingListings] = useState(false) // Sync 진행 중 상태
   
   // 결과 표시 여부 (Find 버튼 클릭 시에만 표시)
   const [showResults, setShowResults] = useState(false)
@@ -296,6 +298,12 @@ function Dashboard() {
   
   // Fetch user credits and plan info
   const fetchUserCredits = async () => {
+    // CRITICAL: No fetch if user is not logged in
+    if (!currentUserId) {
+      console.warn('⚠️ [CREDITS] Cannot fetch: user is not logged in')
+      return
+    }
+    
     try {
       const response = await axios.get(`${API_BASE_URL}/api/credits`, {
         params: { user_id: currentUserId },
@@ -315,11 +323,80 @@ function Dashboard() {
     }
   }
 
+  // Sync eBay listings (OAuth 연결 후 자동 호출)
+  const syncEbayListings = async () => {
+    // CRITICAL: No sync if user is not logged in
+    if (!currentUserId) {
+      console.error('❌ [SYNC] Cannot sync: user is not logged in')
+      showToast('Please log in to sync listings', 'error')
+      return
+    }
+    
+    try {
+      setIsSyncingListings(true)
+      console.log('🔄 [SYNC] Starting eBay listings sync...')
+      console.log('   user_id:', currentUserId)
+      
+      const response = await axios.post(`${API_BASE_URL}/api/ebay/listings/sync`, null, {
+        params: {
+          user_id: currentUserId
+        },
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: 120000 // 2분 타임아웃 (대량 listings 동기화 고려)
+      })
+      
+      if (response.data && response.data.success) {
+        const { fetched, upserted, pages, total_pages, ebay_user_id } = response.data
+        console.log(`✅ [SYNC] Sync completed:`)
+        console.log(`   - Fetched from eBay: ${fetched} listings`)
+        console.log(`   - Upserted to DB: ${upserted} listings`)
+        console.log(`   - Pages processed: ${pages}/${total_pages}`)
+        console.log(`   - eBay User ID: ${ebay_user_id}`)
+        
+        // Sync 완료 후 summary stats 재호출 (네트워크 확인용)
+        console.log('🔄 [SYNC] Refetching summary stats after sync...')
+        await fetchSummaryStats()
+        console.log('✅ [SYNC] Summary stats refetch completed')
+        
+        showToast(`Successfully synced ${fetched} listings (${upserted} upserted)`, 'success')
+      } else {
+        throw new Error(response.data?.message || 'Sync failed')
+      }
+    } catch (err) {
+      console.error('❌ [SYNC] Sync error:', err)
+      const errorMessage = err.response?.data?.detail?.message || err.response?.data?.message || err.message || 'Failed to sync listings'
+      showToast(`Sync failed: ${errorMessage}`, 'error')
+      
+      // Sync 실패해도 summary stats는 가져오기 (기존 데이터 표시)
+      fetchSummaryStats().catch(fetchErr => {
+        console.error('Failed to fetch summary stats after sync error:', fetchErr)
+      })
+    } finally {
+      setIsSyncingListings(false)
+    }
+  }
+
   // Fetch summary statistics (경량화된 통계만 가져오기)
   const fetchSummaryStats = async () => {
+    // CRITICAL: No fetch if user is not logged in
+    if (!currentUserId) {
+      console.warn('⚠️ [SUMMARY] Cannot fetch: user is not logged in')
+      setSummaryStats({
+        activeCount: 0,
+        lowPerformingCount: 0,
+        queueCount: 0,
+        lastSyncAt: null
+      })
+      return
+    }
+    
     try {
       setSummaryLoading(true)
-      console.log('📊 fetchSummaryStats: Fetching summary statistics...')
+      console.log('📊 [SUMMARY] Fetching summary statistics...')
+      console.log('   user_id:', currentUserId)
+      console.log('   API URL:', `${API_BASE_URL}/api/ebay/summary`)
       
       if (DEMO_MODE) {
         // Demo 모드에서는 더미 데이터 사용
@@ -344,8 +421,16 @@ function Dashboard() {
         },
       })
       
+      console.log('📊 [SUMMARY] API response received:', {
+        status: response.status,
+        success: response.data?.success,
+        active_count: response.data?.active_count,
+        low_performing_count: response.data?.low_performing_count,
+        user_id: response.data?.user_id
+      })
+      
       if (response.data && response.data.success) {
-        console.log('✅ fetchSummaryStats: Successfully fetched summary:', response.data)
+        console.log('✅ [SUMMARY] Successfully fetched summary:', response.data)
         setSummaryStats({
           activeCount: response.data.active_count || 0,
           lowPerformingCount: response.data.low_performing_count || 0,
@@ -1262,7 +1347,7 @@ function Dashboard() {
           })
           
           if (isConnected) {
-            console.log('✅ Connection verified - setting state and fetching summary stats')
+            console.log('✅ Connection verified - setting state and syncing listings')
             // Mark as processed AFTER successful verification
             sessionStorage.setItem(processedKey, 'connected')
             isVerifyingConnection.current = false
@@ -1274,9 +1359,14 @@ function Dashboard() {
               performance.mark('oauth_callback_complete')
             }
             
-            // OAuth 콜백 성공 시 summary stats만 가져오기 (전체 listings는 가져오지 않음)
-            fetchSummaryStats().catch(err => {
-              console.error('Failed to fetch summary stats after OAuth:', err)
+            // CRITICAL: OAuth 콜백 성공 직후 listings sync 자동 실행
+            console.log('🔄 Starting eBay listings sync after OAuth connection...')
+            syncEbayListings().catch(err => {
+              console.error('Failed to sync eBay listings after OAuth:', err)
+              // Sync 실패해도 summary stats는 가져오기
+              fetchSummaryStats().catch(fetchErr => {
+                console.error('Failed to fetch summary stats after sync error:', fetchErr)
+              })
             })
             
             // Clear the processed flag after delay to allow for future connections
@@ -1373,6 +1463,12 @@ function Dashboard() {
           // Skip this check if OAuth verification is in progress to avoid duplicate calls
           if (!isVerifyingConnection.current) {
             try {
+              // CRITICAL: No status check if user is not logged in
+              if (!currentUserId) {
+                console.warn('⚠️ [STATUS] Cannot check on mount: user is not logged in')
+                return
+              }
+              
               console.log('🔍 Checking eBay connection status on mount...')
               const response = await axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
                 params: { user_id: currentUserId },
@@ -1632,6 +1728,16 @@ function Dashboard() {
   return (
     <div className="font-sans bg-black dark:bg-black min-h-full">
       <div className="px-6">
+        {/* Sync 진행 중 로딩 표시 */}
+        {isSyncingListings && (
+          <div className="mb-4 p-4 bg-blue-900/20 border border-blue-500/30 rounded-xl">
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
+              <span className="text-blue-400 font-medium">Syncing eBay listings...</span>
+            </div>
+          </div>
+        )}
+        
         {/* Summary Card */}
         <SummaryCard 
           key="summary-card"

@@ -1382,8 +1382,12 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
         )
         
         # Execute the statement
-        db.execute(stmt)
+        result = db.execute(stmt)
         db.commit()
+        
+        # Note: PostgreSQL ON CONFLICT doesn't return inserted/updated counts separately
+        # We return the total number of listings processed
+        return len(listings)
     else:
         # SQLite: Use individual INSERT OR REPLACE (less efficient but compatible)
         for listing in listings:

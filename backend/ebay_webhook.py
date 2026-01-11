@@ -1312,6 +1312,385 @@ async def get_ebay_listings(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/listings/sync")
+async def sync_ebay_listings(
+    request: Request,
+    user_id: str = Query(..., description="User ID")
+):
+    """
+    🔄 eBay Listings Sync - eBay 연결 후 자동으로 listings를 가져와 DB에 저장
+    
+    OAuth 연결 성공 직후 자동으로 호출되어 사용자의 eBay listings를 가져와 DB에 저장합니다.
+    - Trading API를 사용하여 활성 listings 가져오기
+    - DB에 upsert (중복 시 업데이트)
+    - Summary stats 갱신을 위해 프론트엔드에서 fetchSummaryStats() 재호출 필요
+    """
+    logger.info("=" * 60)
+    logger.info(f"🔄 [SYNC] Starting eBay listings sync for user: {user_id}")
+    
+    # Validate user_id
+    if not user_id or user_id == "default-user":
+        logger.warning(f"⚠️ [SYNC] Invalid user_id: {user_id}")
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_user_id",
+                "message": "User ID is required. Please log in and try again."
+            }
+        )
+    
+    # Get ebay_user_id from profile for logging
+    ebay_user_id = None
+    try:
+        from .models import get_db, Profile
+        db = next(get_db())
+        profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+        if profile:
+            ebay_user_id = profile.ebay_user_id
+        db.close()
+    except Exception as e:
+        logger.warning(f"⚠️ [SYNC] Failed to get ebay_user_id: {e}")
+    
+    logger.info(f"📋 [SYNC] User details: user_id={user_id}, ebay_user_id={ebay_user_id}")
+    
+    try:
+        # 기존 get_active_listings_trading_api 로직 재사용
+        # 첫 페이지부터 모든 페이지를 순회하며 동기화
+        page = 1
+        entries_per_page = 200  # 최대값 사용
+        total_fetched = 0
+        total_upserted = 0
+        total_pages = 1
+        page_stats = []  # 각 페이지별 통계
+        
+        while page <= total_pages:
+            logger.info(f"🔄 [SYNC] Syncing page {page}/{total_pages} for user: {user_id}")
+            
+            # get_active_listings_trading_api의 로직을 직접 호출
+            result = await get_active_listings_trading_api_internal(
+                request=request,
+                user_id=user_id,
+                page=page,
+                entries_per_page=entries_per_page
+            )
+            
+            if result and result.get("success"):
+                fetched_count = len(result.get("listings", []))
+                upserted_count = result.get("upserted", 0)
+                total_entries = result.get("total", 0)
+                total_pages = result.get("total_pages", 1)
+                
+                total_fetched += fetched_count
+                total_upserted += upserted_count
+                
+                page_stat = {
+                    "page": page,
+                    "fetched": fetched_count,
+                    "upserted": upserted_count,
+                    "total_entries": total_entries
+                }
+                page_stats.append(page_stat)
+                
+                logger.info(f"✅ [SYNC] Page {page}/{total_pages} completed:")
+                logger.info(f"   - Fetched from eBay API: {fetched_count} listings")
+                logger.info(f"   - Upserted to DB: {upserted_count} listings")
+                logger.info(f"   - Total entries (eBay): {total_entries}")
+                
+                # 다음 페이지로
+                page += 1
+            else:
+                logger.warning(f"⚠️ [SYNC] Page {page} sync failed or returned no data")
+                break
+        
+        logger.info(f"✅ [SYNC] Sync completed for user: {user_id}")
+        logger.info(f"   - Total pages: {total_pages}")
+        logger.info(f"   - Total fetched from eBay: {total_fetched} listings")
+        logger.info(f"   - Total upserted to DB: {total_upserted} listings")
+        logger.info(f"   - eBay User ID: {ebay_user_id}")
+        logger.info("=" * 60)
+        
+        return {
+            "success": True,
+            "user_id": user_id,
+            "ebay_user_id": ebay_user_id,
+            "fetched": total_fetched,
+            "upserted": total_upserted,
+            "pages": len(page_stats),
+            "total_pages": total_pages,
+            "page_stats": page_stats,
+            "message": f"Successfully synced {total_fetched} listings (upserted: {total_upserted})"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ [SYNC] Sync error for user {user_id}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def get_active_listings_trading_api_internal(
+    request: Request,
+    user_id: str,
+    page: int = 1,
+    entries_per_page: int = 200
+):
+    """
+    내부 함수: Trading API를 사용하여 활성 listings를 가져와 DB에 저장
+    (get_active_listings_trading_api와 동일한 로직, 재사용을 위해 분리)
+    """
+    # RequestId 추출 (헤더에서)
+    request_id = request.headers.get("X-Request-Id", f"server_{datetime.now().timestamp()}_{user_id}")
+    
+    t0 = datetime.utcnow()
+    logger.info(f"📦 [t0] Request received [RequestId: {request_id}]")
+    logger.info(f"   User ID: {user_id}")
+    logger.info(f"   Page: {page}, Entries per page: {entries_per_page}")
+    
+    t1 = datetime.utcnow()
+    access_token = get_user_access_token(user_id)
+    t1_duration = (datetime.utcnow() - t1).total_seconds() * 1000
+    logger.info(f"📋 [t1] Token retrieved [RequestId: {request_id}] - Duration: {t1_duration:.2f}ms")
+    
+    if not access_token:
+        logger.error(f"❌ [RequestId: {request_id}] No valid access token found")
+        raise HTTPException(
+            status_code=401,
+            detail="eBay not connected or token expired. Please reconnect your eBay account."
+        )
+    
+    # eBay Trading API 호출
+    env = EBAY_ENVIRONMENT if EBAY_ENVIRONMENT in EBAY_API_ENDPOINTS else "PRODUCTION"
+    trading_url = EBAY_API_ENDPOINTS[env]["trading"]
+    
+    # GetMyeBaySelling XML Request
+    xml_request = f"""<?xml version="1.0" encoding="utf-8"?>
+<GetMyeBaySellingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+    <RequesterCredentials>
+        <eBayAuthToken>{access_token}</eBayAuthToken>
+    </RequesterCredentials>
+    <ActiveList>
+        <Include>true</Include>
+        <Pagination>
+            <EntriesPerPage>{entries_per_page}</EntriesPerPage>
+            <PageNumber>{page}</PageNumber>
+        </Pagination>
+        <DetailLevel>ReturnAll</DetailLevel>
+    </ActiveList>
+</GetMyeBaySellingRequest>"""
+    
+    headers = {
+        "X-EBAY-API-SITEID": "0",  # US site
+        "X-EBAY-API-COMPATIBILITY-LEVEL": "1225",
+        "X-EBAY-API-CALL-NAME": "GetMyeBaySelling",
+        "X-EBAY-API-IAF-TOKEN": access_token,
+        "Content-Type": "text/xml"
+    }
+    
+    t2 = datetime.utcnow()
+    response = requests.post(trading_url, headers=headers, data=xml_request, timeout=60)
+    t2_duration = (datetime.utcnow() - t2).total_seconds() * 1000
+    logger.info(f"📡 [t2] Trading API response [RequestId: {request_id}] - Status: {response.status_code}, Duration: {t2_duration:.2f}ms")
+    
+    if response.status_code != 200:
+        logger.error(f"❌ [RequestId: {request_id}] Trading API error: {response.status_code}")
+        raise HTTPException(status_code=response.status_code, detail="eBay Trading API error")
+    
+    # XML 파싱
+    t3 = datetime.utcnow()
+    import xml.etree.ElementTree as ET
+    root = ET.fromstring(response.text)
+    t3_duration = (datetime.utcnow() - t3).total_seconds() * 1000
+    logger.info(f"📊 [t3] XML parsed [RequestId: {request_id}] - Duration: {t3_duration:.2f}ms")
+    
+    # Namespace 처리
+    ns = {"ebay": "urn:ebay:apis:eBLBaseComponents"}
+    
+    # 에러 체크
+    ack = root.find(".//ebay:Ack", ns)
+    if ack is not None and ack.text != "Success":
+        errors = root.findall(".//ebay:Errors/ebay:ShortMessage", ns)
+        error_msg = errors[0].text if errors else "Unknown error"
+        logger.error(f"❌ eBay API Error: {error_msg}")
+        raise HTTPException(status_code=400, detail=f"eBay Error: {error_msg}")
+    
+    # 리스팅 파싱 (기존 로직과 동일)
+    listings = []
+    active_list = root.find(".//ebay:ActiveList", ns)
+    
+    if active_list is not None:
+        items = active_list.findall(".//ebay:Item", ns)
+        
+        for item in items:
+            # 기존 get_active_listings_trading_api와 동일한 파싱 로직
+            item_id = item.findtext("ebay:ItemID", "", ns)
+            title = item.findtext("ebay:Title", "", ns)
+            
+            current_price = item.find("ebay:SellingStatus/ebay:CurrentPrice", ns)
+            price = float(current_price.text) if current_price is not None and current_price.text else 0
+            
+            quantity = int(item.findtext("ebay:QuantityAvailable", "0", ns))
+            quantity_sold = int(item.findtext("ebay:SellingStatus/ebay:QuantitySold", "0", ns))
+            
+            watch_count = int(item.findtext("ebay:WatchCount", "0", ns))
+            hit_count = int(item.findtext("ebay:HitCount", "0", ns))
+            
+            start_time = item.findtext("ebay:ListingDetails/ebay:StartTime", "", ns)
+            sku = item.findtext("ebay:SKU", "", ns)
+            
+            # 이미지 처리 (기존 로직과 동일)
+            picture_url = ""
+            thumbnail_url = ""
+            
+            picture_details = item.find("ebay:PictureDetails", ns)
+            if picture_details is not None:
+                picture_urls = picture_details.findall("ebay:PictureURL", ns)
+                if picture_urls and len(picture_urls) > 0:
+                    picture_url = picture_urls[0].text.strip() if picture_urls[0].text else ""
+                    thumbnail_url = picture_url
+                    if "s-l" in thumbnail_url:
+                        import re
+                        thumbnail_url = re.sub(r's-l\d+', 's-l225', thumbnail_url)
+            
+            if not picture_url:
+                gallery_url = item.findtext("ebay:GalleryURL", "", ns)
+                if gallery_url and gallery_url.strip():
+                    picture_url = gallery_url.strip()
+                    thumbnail_url = gallery_url.strip()
+            
+            # Supplier 정보 추출
+            from .services import extract_supplier_info
+            supplier_name, supplier_id = extract_supplier_info(
+                sku=sku,
+                image_url=picture_url or thumbnail_url,
+                title=title,
+                brand="",
+                upc=""
+            )
+            
+            listing = {
+                "item_id": item_id,
+                "ebay_item_id": item_id,
+                "title": title,
+                "price": price,
+                "quantity_available": quantity,
+                "quantity_sold": quantity_sold,
+                "watch_count": watch_count,
+                "view_count": hit_count,
+                "impressions": 0,
+                "sku": sku,
+                "start_time": start_time,
+                "picture_url": picture_url,
+                "thumbnail_url": thumbnail_url,
+                "image_url": picture_url or thumbnail_url,
+                "days_listed": 0,
+                "supplier_name": supplier_name,
+                "supplier_id": supplier_id
+            }
+            
+            if start_time:
+                try:
+                    from dateutil import parser
+                    start_date = parser.parse(start_time)
+                    listing["days_listed"] = (datetime.utcnow() - start_date.replace(tzinfo=None)).days
+                except:
+                    pass
+            
+            listings.append(listing)
+    
+    # 페이지네이션 정보
+    pagination = active_list.find("ebay:PaginationResult", ns) if active_list is not None else None
+    total_entries = int(pagination.findtext("ebay:TotalNumberOfEntries", "0", ns)) if pagination is not None else len(listings)
+    total_pages = int(pagination.findtext("ebay:TotalNumberOfPages", "1", ns)) if pagination is not None else 1
+    
+    # DB에 리스팅 저장
+    t4 = datetime.utcnow()
+    upserted_count = 0
+    try:
+        from .models import get_db, Listing
+        from .services import upsert_listings
+        from dateutil import parser
+        
+        db = next(get_db())
+        try:
+            listing_objects = []
+            for listing_data in listings:
+                date_listed = date.today()
+                if listing_data.get("start_time"):
+                    try:
+                        start_date = parser.parse(listing_data["start_time"])
+                        date_listed = start_date.date()
+                    except:
+                        pass
+                
+                listing_obj = Listing(
+                    ebay_item_id=listing_data["item_id"],
+                    item_id=listing_data["item_id"],
+                    title=listing_data["title"],
+                    sku=listing_data.get("sku", ""),
+                    image_url=listing_data.get("image_url") or listing_data.get("picture_url") or listing_data.get("thumbnail_url") or "",
+                    price=listing_data.get("price", 0),
+                    date_listed=date_listed,
+                    sold_qty=listing_data.get("quantity_sold", 0),
+                    watch_count=listing_data.get("watch_count", 0),
+                    view_count=listing_data.get("view_count", 0),
+                    impressions=listing_data.get("impressions", 0),
+                    user_id=user_id,  # CRITICAL: Must match summary query key
+                    supplier_name=listing_data.get("supplier_name"),
+                    supplier_id=listing_data.get("supplier_id"),
+                    source=listing_data.get("supplier_name", "Unknown"),
+                    marketplace="eBay",
+                    platform="eBay",  # CRITICAL: Must match summary query key (platform == "eBay")
+                    last_synced_at=datetime.utcnow()
+                )
+                logger.debug(f"📝 [INTERNAL] Created Listing object: user_id={user_id}, platform=eBay, item_id={listing_data['item_id']}")
+                listing_objects.append(listing_obj)
+            
+            if listing_objects:
+                upserted_count = upsert_listings(db, listing_objects)
+                db.commit()
+                t4_duration = (datetime.utcnow() - t4).total_seconds() * 1000
+                logger.info(f"💾 [t4] Saved {upserted_count} listings to database [RequestId: {request_id}] - Duration: {t4_duration:.2f}ms")
+                logger.info(f"📊 [t4] DB Upsert details:")
+                logger.info(f"   - user_id: {user_id}")
+                logger.info(f"   - platform: eBay")
+                logger.info(f"   - item_id field: used for conflict resolution")
+                logger.info(f"   - listings processed: {len(listing_objects)}")
+                logger.info(f"   - upserted count: {upserted_count}")
+            else:
+                logger.warning(f"⚠️ [RequestId: {request_id}] No listing objects to upsert")
+                upserted_count = 0
+        except Exception as db_err:
+            db.rollback()
+            logger.error(f"❌ [RequestId: {request_id}] Database save error: {db_err}")
+            import traceback
+            logger.error(traceback.format_exc())
+            upserted_count = 0
+        finally:
+            db.close()
+    except Exception as save_err:
+        logger.warning(f"⚠️ [RequestId: {request_id}] Failed to save listings to database: {save_err}")
+        upserted_count = 0
+    
+    logger.info(f"📊 [INTERNAL] Page {page} result summary:")
+    logger.info(f"   - Fetched from eBay: {len(listings)} listings")
+    logger.info(f"   - Upserted to DB: {upserted_count} listings")
+    logger.info(f"   - Total entries (eBay): {total_entries}")
+    logger.info(f"   - Total pages (eBay): {total_pages}")
+    
+    return {
+        "success": True,
+        "total": total_entries,
+        "page": page,
+        "total_pages": total_pages,
+        "entries_per_page": entries_per_page,
+        "listings": listings,
+        "upserted": upserted_count,
+        "request_id": request_id
+    }
+
+
 @router.get("/listings/active")
 async def get_active_listings_trading_api(
     request: Request,
@@ -1757,7 +2136,14 @@ async def get_ebay_summary(
             logger.info(f"📊 [SUMMARY] Resolved user_id: {user_id}")
             
             # Active listings count (DB에서 직접 조회)
-            logger.info(f"📊 [SUMMARY] Querying listings with user_id={user_id}, platform='eBay'")
+            # CRITICAL: summary 쿼리 키는 sync upsert 키와 동일해야 함
+            # Sync upsert uses: user_id, platform="eBay", item_id (for conflict resolution)
+            # Summary query uses: user_id, platform="eBay"
+            logger.info(f"📊 [SUMMARY] Querying listings with WHERE conditions:")
+            logger.info(f"   - Listing.user_id == '{user_id}'")
+            logger.info(f"   - Listing.platform == 'eBay'")
+            logger.info(f"   (Note: This matches sync upsert keys: user_id + platform)")
+            
             active_query = db.query(Listing).filter(
                 Listing.user_id == user_id,
                 Listing.platform == "eBay"
