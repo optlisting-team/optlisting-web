@@ -298,7 +298,7 @@ function Dashboard() {
   const fetchUserCredits = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/credits`, {
-        params: { user_id: CURRENT_USER_ID },
+        params: { user_id: currentUserId },
         timeout: 30000,
         headers: {
           'Content-Type': 'application/json',
@@ -335,7 +335,7 @@ function Dashboard() {
       
       const response = await axios.get(`${API_BASE_URL}/api/ebay/summary`, {
         params: {
-          user_id: CURRENT_USER_ID,
+          user_id: currentUserId,
           filters: JSON.stringify(filters) // 필터 파라미터 전달
         },
         timeout: 30000,
@@ -961,7 +961,7 @@ function Dashboard() {
         idempotency_key: idempotencyKey
       }, {
         params: {
-          user_id: CURRENT_USER_ID
+          user_id: currentUserId
         },
         headers: {
           'Content-Type': 'application/json',
@@ -1237,7 +1237,7 @@ function Dashboard() {
         
         try {
           const response = await axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
-            params: { user_id: CURRENT_USER_ID },
+            params: { user_id: currentUserId },
             timeout: 30000
           })
           
@@ -1672,7 +1672,7 @@ function Dashboard() {
                   const response = await axios.post(
                     `${API_BASE_URL}/api/admin/credits/grant`,
                     {
-                      user_id: CURRENT_USER_ID,
+                      user_id: currentUserId,
                       amount: 1000,
                       description: 'Test credits grant (dev-only)'
                     },
