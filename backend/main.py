@@ -32,7 +32,7 @@ from .credit_service import (
     PlanType,
 )
 
-app = FastAPI(title="OptListing API", version="1.3.29")
+app = FastAPI(title="OptListing API", version="1.3.30")
 
 # ============================================================
 # [BOOT] Supabase Write Self-Test (Top-level execution)
