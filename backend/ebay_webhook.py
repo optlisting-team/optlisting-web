@@ -1591,6 +1591,15 @@ async def get_active_listings_trading_api_internal(
     env = EBAY_ENVIRONMENT if EBAY_ENVIRONMENT in EBAY_API_ENDPOINTS else "PRODUCTION"
     trading_url = EBAY_API_ENDPOINTS[env]["trading"]
     
+    # ✅ 3. 데이터 강제 싱크 테스트: API 파라미터 확인 및 로깅
+    logger.info("=" * 60)
+    logger.info(f"📋 [API PARAMS] eBay Trading API 요청 파라미터:")
+    logger.info(f"   - PageNumber: {page}")
+    logger.info(f"   - EntriesPerPage: {entries_per_page}")
+    logger.info(f"   - DetailLevel: ReturnAll")
+    logger.info(f"   - ActiveList Include: true")
+    logger.info("=" * 60)
+    
     # GetMyeBaySelling XML Request
     xml_request = f"""<?xml version="1.0" encoding="utf-8"?>
 <GetMyeBaySellingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
