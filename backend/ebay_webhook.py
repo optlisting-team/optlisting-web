@@ -1474,6 +1474,8 @@ async def sync_ebay_listings(
                     logger.error(traceback.format_exc())
                 finally:
                     db.close()
+            except Exception as db_err:
+                logger.warning(f"⚠️ [SYNC] DB 연결 실패 (last_sync_at 업데이트 스킵): {db_err}")
         else:
             logger.warn(f"⚠️ [SYNC] total_upserted=0이므로 last_synced_at 업데이트 스킵")
         
