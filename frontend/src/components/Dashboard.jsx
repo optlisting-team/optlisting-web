@@ -542,9 +542,22 @@ function Dashboard() {
         console.log(`   - Query platform: eBay (assumed)`)
         console.log(`   - Low-performing count: ${low_performing_count}`)
         
+        // ✅ FIX: syncData를 먼저 정의한 후 사용
+        const lastSyncResponse = sessionStorage.getItem('last_sync_response')
+        let syncData = null
+        let syncUpserted = 0
+        if (lastSyncResponse) {
+          try {
+            syncData = JSON.parse(lastSyncResponse)
+            syncUpserted = syncData.upserted || 0
+          } catch (parseErr) {
+            console.warn('⚠️ [SUMMARY] Failed to parse last sync response:', parseErr)
+          }
+        }
+        
         console.log('🔍 [SUMMARY] Sync vs Summary 비교:')
-        console.log(`   - eBay API Fetch Count: ${syncData.fetched || 0}`)
-        console.log(`   - DB Upsert Count: ${syncData.upserted || 0}`)
+        console.log(`   - eBay API Fetch Count: ${syncData?.fetched || 0}`)
+        console.log(`   - DB Upsert Count: ${syncData?.upserted || 0}`)
         console.log(`   - Summary active_count: ${active_count}`)
         console.log(`   - Summary user_id: ${user_id}`)
         console.log(`   - Summary platform: eBay (assumed)`)
@@ -562,45 +575,37 @@ function Dashboard() {
         }
         
         // upserted>0인데 active_count=0인 경우 디버그 엔드포인트 자동 호출
-        const lastSyncResponse = sessionStorage.getItem('last_sync_response')
-        if (lastSyncResponse) {
-          try {
-            const syncData = JSON.parse(lastSyncResponse)
-            const syncUpserted = syncData.upserted || 0
+        if (lastSyncResponse && syncData) {
+          console.log(`   - Last sync upserted: ${syncUpserted}`)
+          
+          if (syncUpserted > 0 && active_count === 0) {
+            console.warn('⚠️ [SUMMARY] MISMATCH: upserted>0 but active_count=0')
+            console.warn('   디버그 엔드포인트를 호출하여 DB 상태 확인 중...')
             
-            console.log(`   - Last sync upserted: ${syncUpserted}`)
-            
-            if (syncUpserted > 0 && active_count === 0) {
-              console.warn('⚠️ [SUMMARY] MISMATCH: upserted>0 but active_count=0')
-              console.warn('   디버그 엔드포인트를 호출하여 DB 상태 확인 중...')
+            // 디버그 엔드포인트 호출
+            try {
+              const debugResponse = await axios.get(`${API_BASE_URL}/api/debug/listings`, {
+                params: {
+                  user_id: currentUserId,
+                  platform: 'eBay'
+                },
+                timeout: 30000
+              })
               
-              // 디버그 엔드포인트 호출
-              try {
-                const debugResponse = await axios.get(`${API_BASE_URL}/api/debug/listings`, {
-                  params: {
-                    user_id: currentUserId,
-                    platform: 'eBay'
-                  },
-                  timeout: 30000
-                })
-                
-                console.log('='.repeat(60))
-                console.log('🔍 [DEBUG] /api/debug/listings 응답 JSON:')
-                console.log(JSON.stringify(debugResponse.data, null, 2))
-                console.log('='.repeat(60))
-                
-                if (debugResponse.data && debugResponse.data.count > 0) {
-                  console.warn('⚠️ [DEBUG] DB에는 listings가 존재하지만 summary 쿼리가 0을 반환함')
-                  console.warn('   쿼리 키 불일치 가능성 - keys_match:', debugResponse.data.keys_match)
-                } else {
-                  console.warn('⚠️ [DEBUG] DB에도 listings가 없음 - sync upsert가 실제로 저장되지 않았을 가능성')
-                }
-              } catch (debugErr) {
-                console.error('❌ [DEBUG] 디버그 엔드포인트 호출 실패:', debugErr)
+              console.log('='.repeat(60))
+              console.log('🔍 [DEBUG] /api/debug/listings 응답 JSON:')
+              console.log(JSON.stringify(debugResponse.data, null, 2))
+              console.log('='.repeat(60))
+              
+              if (debugResponse.data && debugResponse.data.count > 0) {
+                console.warn('⚠️ [DEBUG] DB에는 listings가 존재하지만 summary 쿼리가 0을 반환함')
+                console.warn('   쿼리 키 불일치 가능성 - keys_match:', debugResponse.data.keys_match)
+              } else {
+                console.warn('⚠️ [DEBUG] DB에도 listings가 없음 - sync upsert가 실제로 저장되지 않았을 가능성')
               }
+            } catch (debugErr) {
+              console.error('❌ [DEBUG] 디버그 엔드포인트 호출 실패:', debugErr)
             }
-          } catch (parseErr) {
-            console.warn('⚠️ [SUMMARY] Failed to parse last sync response:', parseErr)
           }
         }
         

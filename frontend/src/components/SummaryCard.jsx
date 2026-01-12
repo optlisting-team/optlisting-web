@@ -4,10 +4,12 @@ import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
 
 // Demo stores for testing - initial state
+// ✅ FIX: Amazon Store 제거 - eBay Store만 표시
 const INITIAL_STORES = [
   { id: 'store-1', name: 'eBay Store', platform: 'eBay', connected: false },
-  { id: 'store-2', name: 'Amazon Store', platform: 'Amazon', connected: false },
-  { id: 'store-3', name: 'Shopify Store', platform: 'Shopify', connected: false },
+  // Amazon Store와 Walmart Store 제거 - 실제로 연결된 스토어만 표시
+  // { id: 'store-2', name: 'Amazon Store', platform: 'Amazon', connected: false },
+  // { id: 'store-3', name: 'Shopify Store', platform: 'Shopify', connected: false },
 ]
 
 // Use environment variable for Railway URL, fallback based on environment
@@ -275,7 +277,9 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
                   <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Your Stores</p>
                 </div>
                 
-                {stores.map((store) => (
+                {stores
+                  .filter(store => store.platform === 'eBay' || store.connected) // ✅ FIX: eBay만 표시하거나 연결된 스토어만 표시
+                  .map((store) => (
                   <div
                     key={store.id}
                     className={`flex items-center gap-3 px-3 py-2 hover:bg-zinc-800/50 transition-all ${
