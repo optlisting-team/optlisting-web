@@ -1397,6 +1397,17 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
         import logging
         logger = logging.getLogger(__name__)
         
+        # ✅ 2단계: 저장 ID 일치화 - 명확한 로깅
+        if listings and len(listings) > 0:
+            sample_user_id = listings[0].user_id if hasattr(listings[0], 'user_id') else None
+            if sample_user_id:
+                logger.info("=" * 60)
+                logger.info(f"💾 [UPSERT] Saving for user: {sample_user_id}")
+                logger.info(f"   - Total listings: {len(listings)}개")
+                logger.info(f"   - Platform: eBay (강제 설정)")
+                logger.info(f"   - user_id type: {type(sample_user_id).__name__}")
+                logger.info("=" * 60)
+        
         # Execute the statement
         result = db.execute(stmt)
         
@@ -1413,10 +1424,9 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
                     text("SELECT COUNT(*) FROM listings WHERE user_id = :user_id AND platform = 'eBay'"),
                     {"user_id": sample_user_id}
                 ).scalar()
+                logger.info(f"✅ [UPSERT] 저장 완료: {len(listings)}개 처리, DB count={actual_count} (user_id={sample_user_id}, platform=eBay)")
                 if actual_count == 0:
-                    logger.error(f"❌ [UPSERT] CRITICAL: {len(listings)}개 처리했지만 DB count=0 (user_id={sample_user_id})")
-                else:
-                    logger.info(f"✅ [UPSERT] 완료: {len(listings)}개 처리, DB count={actual_count} (user_id={sample_user_id}, platform=eBay)")
+                    logger.error(f"❌ [UPSERT] CRITICAL: {len(listings)}개 처리했지만 DB count=0!")
         
         # Return the total number of listings processed
         upserted_count = len(listings)

@@ -1892,24 +1892,27 @@ async def get_active_listings_trading_api_internal(
                 listing_objects.append(listing_obj)
             
             if listing_objects:
-                # 🔍 STEP 2: DB 저장 로직 점검 - user_id 확인
-                logger.info(f"📊 [DB SAVE] DB에 저장하기 전 확인:")
-                logger.info(f"   - Processing {len(listing_objects)} listing objects")
-                logger.info(f"   - Target user_id: {user_id}")
+                # ✅ 2단계: 저장 ID 일치화 - 명확한 로깅
+                logger.info("=" * 60)
+                logger.info(f"💾 [DB SAVE] Saving for user: {user_id}")
+                logger.info(f"   - Total listings to save: {len(listing_objects)}개")
+                logger.info(f"   - Platform: eBay (강제 설정)")
+                logger.info(f"   - user_id type: {type(user_id).__name__}")
+                logger.info(f"   - user_id value: '{user_id}'")
+                logger.info("=" * 60)
                 
-                # user_id 일치 확인 (샘플 몇 개만 확인)
+                # user_id 일치 확인 (샘플 검증)
                 sample_user_ids = set()
                 for listing_obj in listing_objects[:5]:  # 처음 5개만 확인
                     sample_user_ids.add(getattr(listing_obj, 'user_id', None))
                 if sample_user_ids:
-                    logger.info(f"   - Sample user_ids from listing objects: {sample_user_ids}")
                     if len(sample_user_ids) == 1 and list(sample_user_ids)[0] == user_id:
-                        logger.info(f"   ✅ user_id 일치 확인됨: {user_id}")
+                        logger.info(f"✅ [DB SAVE] user_id 일치 확인: {user_id}")
                     else:
-                        logger.warn(f"   ⚠️ user_id 불일치 가능성: expected={user_id}, found={sample_user_ids}")
+                        logger.error(f"❌ [DB SAVE] user_id 불일치! expected={user_id}, found={sample_user_ids}")
                 
                 # ✅ DB 저장: upsert_listings 호출
-                logger.info(f"💾 [SYNC] DB 저장 시작: user_id={user_id}, listings={len(listing_objects)}개")
+                logger.info(f"💾 [DB SAVE] upsert_listings 호출 시작...")
                 upserted_count = upsert_listings(db, listing_objects)
                 
                 # ✅ 추가 commit 확인
@@ -2436,8 +2439,12 @@ async def get_ebay_summary(
         try:
             logger.info(f"📊 [SUMMARY] Resolved user_id: {user_id} (type: {type(user_id).__name__})")
             
-            # ✅ Summary 쿼리 실행
-            logger.info(f"📊 [SUMMARY] 쿼리 실행: user_id={user_id}, platform=eBay")
+            # ✅ 3단계: 조회 쿼리 점검 - 정확한 필터링 확인
+            logger.info("=" * 60)
+            logger.info(f"📊 [SUMMARY] Query for user: {user_id}")
+            logger.info(f"   - Query conditions: user_id='{user_id}' AND platform='eBay'")
+            logger.info(f"   - user_id type: {type(user_id).__name__}")
+            logger.info("=" * 60)
             
             # ✅ Summary 쿼리 실행 (Case-insensitive platform 검색)
             from sqlalchemy import func, text
@@ -2446,6 +2453,8 @@ async def get_ebay_summary(
                 func.lower(Listing.platform) == func.lower("eBay")  # Case-insensitive
             )
             active_count = active_query.count()
+            
+            logger.info(f"📊 [SUMMARY] Query result: active_count={active_count} (user_id={user_id}, platform=eBay)")
             
             # ✅ 에러 케이스만 로깅 (핵심만)
             if active_count == 0:
