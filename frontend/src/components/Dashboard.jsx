@@ -1925,7 +1925,7 @@ function Dashboard() {
 
   return (
     <div className="font-sans bg-black dark:bg-black min-h-full">
-      <div className="px-6">
+      <div className="px-6 pt-4">
         {/* Sync 진행 중 로딩 표시 */}
         {isSyncingListings && (
           <div className="mb-4 p-4 bg-blue-900/20 border border-blue-500/30 rounded-xl">

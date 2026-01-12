@@ -1,5 +1,5 @@
 import { useLocation } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Bell, Search, RefreshCw, User, ChevronDown, Zap } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useAccount } from '../contexts/AccountContext'
@@ -8,17 +8,8 @@ function PageHeader() {
   const location = useLocation()
   const { user, isAuthenticated, signOut } = useAuth()
   const { credits, setShowCreditModal } = useAccount()
-  const [currentTime, setCurrentTime] = useState(new Date())
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [showAuthMenu, setShowAuthMenu] = useState(false)
-
-  // Update time every minute
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date())
-    }, 60000)
-    return () => clearInterval(timer)
-  }, [])
 
   // Get page info based on route
   const getPageInfo = () => {
@@ -27,7 +18,7 @@ function PageHeader() {
       case '/dashboard':
         return {
           title: 'Dashboard',
-          subtitle: 'Monitor your store health and performance',
+          subtitle: '', // ✅ 제거: 설명 문구 삭제
           icon: '📊'
         }
       case '/listings':
@@ -59,14 +50,6 @@ function PageHeader() {
 
   const pageInfo = getPageInfo()
 
-  // Format greeting based on time
-  const getGreeting = () => {
-    const hour = currentTime.getHours()
-    if (hour < 12) return 'Good morning'
-    if (hour < 17) return 'Good afternoon'
-    return 'Good evening'
-  }
-
   const handleRefresh = () => {
     setIsRefreshing(true)
     // Send force refresh signal to Dashboard
@@ -80,7 +63,7 @@ function PageHeader() {
   }
 
   return (
-    <div className="bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-800/50 py-5 sticky top-0 z-20">
+    <div className="bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-800/50 py-4 sticky top-0 z-20">
       <div className="px-6">
         <div className="flex items-center justify-between">
           {/* Left: Title & Subtitle */}
@@ -91,21 +74,6 @@ function PageHeader() {
             </div>
             
             <div className="opacity-0 animate-fade-in" style={{ animationDelay: '100ms' }}>
-              {/* Greeting + Time */}
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs text-zinc-500 font-medium">
-                  {getGreeting()}, {user?.user_metadata?.full_name?.split(' ')[0] || 'CEO'}
-                </span>
-                <span className="text-zinc-700">•</span>
-                <span className="text-xs text-zinc-600 data-value">
-                  {currentTime.toLocaleDateString('en-US', { 
-                    weekday: 'short', 
-                    month: 'short', 
-                    day: 'numeric' 
-                  })}
-                </span>
-              </div>
-              
               {/* Title */}
               <h1 className="text-2xl font-bold text-white tracking-tight">
                 {pageInfo.title}
@@ -216,12 +184,14 @@ function PageHeader() {
           </div>
         </div>
 
-        {/* Breadcrumb / Subtitle */}
-        <div className="mt-2 opacity-0 animate-fade-in" style={{ animationDelay: '200ms' }}>
-          <p className="text-sm text-zinc-500">
-            {pageInfo.subtitle}
-          </p>
-        </div>
+        {/* Breadcrumb / Subtitle - 제거: subtitle이 있을 때만 표시 */}
+        {pageInfo.subtitle && (
+          <div className="mt-2 opacity-0 animate-fade-in" style={{ animationDelay: '200ms' }}>
+            <p className="text-sm text-zinc-500">
+              {pageInfo.subtitle}
+            </p>
+          </div>
+        )}
       </div>
 
     </div>
