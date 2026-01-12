@@ -1133,42 +1133,87 @@ def get_user_access_token(user_id: str) -> Optional[str]:
     DB에서 사용자의 eBay access token 가져오기
     토큰이 만료됐으면 refresh token으로 갱신
     """
+    logger.info("=" * 60)
+    logger.info(f"🔑 [TOKEN] get_user_access_token 호출:")
+    logger.info(f"   - user_id: {user_id} (type: {type(user_id).__name__})")
+    
     db = None
     try:
         from .models import get_db, Profile
         
         db = next(get_db())
+        logger.info(f"   - DB 연결 성공")
+        
         profile = db.query(Profile).filter(Profile.user_id == user_id).first()
         
         if not profile:
-            logger.warning(f"⚠️ No profile found for user_id: {user_id}")
+            logger.error(f"❌ [TOKEN] Profile not found for user_id: {user_id}")
+            logger.error(f"   - 가능한 원인: eBay OAuth 연결이 완료되지 않음")
+            logger.error(f"   - 해결 방법: Dashboard에서 'Connect eBay' 버튼을 클릭하여 다시 연결하세요")
+            logger.info("=" * 60)
             return None
         
+        logger.info(f"✅ [TOKEN] Profile found for user_id: {user_id}")
+        logger.info(f"   - Profile ID: {profile.id if hasattr(profile, 'id') else 'N/A'}")
+        logger.info(f"   - eBay User ID: {profile.ebay_user_id if hasattr(profile, 'ebay_user_id') else 'N/A'}")
+        
         if not profile.ebay_access_token:
-            logger.warning(f"⚠️ No access token found for user_id: {user_id}")
+            logger.error(f"❌ [TOKEN] No access token found for user_id: {user_id}")
+            logger.error(f"   - Profile은 존재하지만 ebay_access_token이 NULL")
+            logger.error(f"   - 가능한 원인: OAuth 토큰 저장 실패 또는 토큰이 삭제됨")
+            logger.error(f"   - 해결 방법: Dashboard에서 'Connect eBay' 버튼을 클릭하여 다시 연결하세요")
+            logger.info("=" * 60)
             return None
         
         # 토큰 만료 확인
-        if profile.ebay_token_expires_at and profile.ebay_token_expires_at < datetime.utcnow():
-            logger.info(f"🔄 Token expired for user_id: {user_id}, attempting refresh...")
-            # 토큰 갱신 필요
-            if profile.ebay_refresh_token:
-                new_token = refresh_access_token(profile.ebay_refresh_token)
-                if new_token:
-                    # DB 업데이트
-                    profile.ebay_access_token = new_token["access_token"]
-                    profile.ebay_token_expires_at = datetime.utcnow() + timedelta(seconds=new_token.get("expires_in", 7200))
-                    profile.ebay_token_updated_at = datetime.utcnow()
-                    db.commit()
-                    logger.info(f"✅ Token refreshed successfully for user_id: {user_id}")
-                    return new_token["access_token"]
+        token_expires_at = profile.ebay_token_expires_at if hasattr(profile, 'ebay_token_expires_at') else None
+        if token_expires_at:
+            now = datetime.utcnow()
+            is_expired = token_expires_at < now
+            time_until_expiry = (token_expires_at - now).total_seconds() if not is_expired else 0
+            
+            logger.info(f"📅 [TOKEN] Token expiry check:")
+            logger.info(f"   - Token expires at: {token_expires_at.isoformat()}")
+            logger.info(f"   - Current time: {now.isoformat()}")
+            logger.info(f"   - Is expired: {is_expired}")
+            if not is_expired:
+                logger.info(f"   - Time until expiry: {time_until_expiry:.0f} seconds ({time_until_expiry / 3600:.2f} hours)")
+            
+            if is_expired:
+                logger.warning(f"⚠️ [TOKEN] Token expired for user_id: {user_id}, attempting refresh...")
+                # 토큰 갱신 필요
+                refresh_token = profile.ebay_refresh_token if hasattr(profile, 'ebay_refresh_token') else None
+                if refresh_token:
+                    logger.info(f"   - Refresh token exists, attempting refresh...")
+                    new_token = refresh_access_token(refresh_token)
+                    if new_token:
+                        # DB 업데이트
+                        profile.ebay_access_token = new_token["access_token"]
+                        profile.ebay_token_expires_at = datetime.utcnow() + timedelta(seconds=new_token.get("expires_in", 7200))
+                        profile.ebay_token_updated_at = datetime.utcnow()
+                        db.commit()
+                        logger.info(f"✅ [TOKEN] Token refreshed successfully for user_id: {user_id}")
+                        logger.info(f"   - New token expires in: {new_token.get('expires_in', 7200)} seconds")
+                        logger.info("=" * 60)
+                        return new_token["access_token"]
+                    else:
+                        logger.error(f"❌ [TOKEN] Token refresh failed for user_id: {user_id}")
+                        logger.error(f"   - refresh_access_token 함수가 None을 반환함")
+                        logger.error(f"   - 해결 방법: Dashboard에서 'Connect eBay' 버튼을 클릭하여 다시 연결하세요")
+                        logger.info("=" * 60)
                 else:
-                    logger.error(f"❌ Token refresh failed for user_id: {user_id}")
-            else:
-                logger.error(f"❌ No refresh token available for user_id: {user_id}")
-            return None
+                    logger.error(f"❌ [TOKEN] No refresh token available for user_id: {user_id}")
+                    logger.error(f"   - ebay_refresh_token이 NULL")
+                    logger.error(f"   - 해결 방법: Dashboard에서 'Connect eBay' 버튼을 클릭하여 다시 연결하세요")
+                    logger.info("=" * 60)
+                return None
         
-        logger.info(f"✅ Valid access token found for user_id: {user_id}")
+        # 토큰 유효성 확인
+        token_preview = f"{profile.ebay_access_token[:10]}...{profile.ebay_access_token[-4:]}" if len(profile.ebay_access_token) > 14 else "***"
+        logger.info(f"✅ [TOKEN] Valid access token found for user_id: {user_id}")
+        logger.info(f"   - Token preview: {token_preview}")
+        logger.info(f"   - Token length: {len(profile.ebay_access_token)}")
+        logger.info("=" * 60)
         return profile.ebay_access_token
         
     except Exception as e:
