@@ -1908,43 +1908,32 @@ async def get_active_listings_trading_api_internal(
                     else:
                         logger.warn(f"   ⚠️ user_id 불일치 가능성: expected={user_id}, found={sample_user_ids}")
                 
-                # ✅ 1. DB 저장 확정: upsert_listings 호출 전 user_id 로깅
-                logger.info(f"📊 [SYNC SAVE] 저장 시작:")
-                logger.info(f"   - 저장할 user_id: '{user_id}' (type: {type(user_id).__name__})")
-                logger.info(f"   - 저장할 listings 수: {len(listing_objects)}개")
-                
+                # ✅ DB 저장: upsert_listings 호출
+                logger.info(f"💾 [SYNC] DB 저장 시작: user_id={user_id}, listings={len(listing_objects)}개")
                 upserted_count = upsert_listings(db, listing_objects)
                 
-                # ✅ 1-1. upsert_listings 후 추가 확인: flush와 commit 한 번 더 실행
+                # ✅ 추가 commit 확인
                 try:
                     db.flush()
                     db.commit()
-                    logger.info(f"✅ [SYNC SAVE] 추가 db.flush() + db.commit() 실행 완료")
                 except Exception as extra_commit_err:
-                    logger.warning(f"⚠️ [SYNC SAVE] 추가 commit 실패 (무시): {extra_commit_err}")
+                    logger.warning(f"⚠️ [SYNC] 추가 commit 실패: {extra_commit_err}")
                 
-                # ✅ 1-2. 저장 직후 SELECT COUNT(*)로 실제 DB에 저장되었는지 확인
+                # ✅ 저장 결과 확인
                 from sqlalchemy import text
-                after_count = db.query(Listing).filter(Listing.user_id == user_id).count()
-                logger.info(f"📊 [SYNC SAVE VERIFY] 저장 직후 DB 확인:")
-                logger.info(f"   - 저장 전 개수 (before_count): {before_count}개")
-                logger.info(f"   - 저장 후 개수 (after_count): {after_count}개")
-                logger.info(f"   - 증가량 (after - before): {after_count - before_count}개")
-                logger.info(f"   - upserted_count (반환값): {upserted_count}개")
-                logger.info(f"   - SELECT COUNT(*) WHERE user_id = '{user_id}': {after_count}개")
+                after_count = db.query(Listing).filter(
+                    Listing.user_id == user_id,
+                    Listing.platform == "eBay"
+                ).count()
+                
+                logger.info(f"✅ [SYNC] 저장 완료: upserted={upserted_count}, DB count={after_count} (user_id={user_id}, platform=eBay)")
                 
                 if after_count == 0 and upserted_count > 0:
-                    logger.error(f"   ❌ CRITICAL: upsert_listings는 {upserted_count}개를 처리했지만 DB에는 0개!")
-                    logger.error(f"   - 저장 전: {before_count}개, 저장 후: {after_count}개")
-                    logger.error(f"   - 데이터가 실제로 저장되지 않았을 가능성")
+                    logger.error(f"❌ [SYNC] CRITICAL: upserted={upserted_count}개 처리했지만 DB count=0!")
                 elif after_count > before_count:
-                    logger.info(f"   ✅ DB 저장 확인: {after_count - before_count}개가 추가됨")
+                    logger.info(f"✅ [SYNC] {after_count - before_count}개 추가 저장됨")
                 elif after_count == before_count and upserted_count > 0:
-                    logger.warn(f"   ⚠️ 저장 전후 개수가 동일하지만 upserted_count는 {upserted_count}개")
-                    logger.warn(f"   - 가능한 원인: 모든 레코드가 이미 존재하여 UPDATE만 수행됨")
-                    logger.error(f"   - DB commit이 실제로 반영되지 않았을 가능성")
-                elif verify_count > 0:
-                    logger.info(f"   ✅ DB 저장 확인됨: {verify_count}개 레코드 존재")
+                    logger.info(f"ℹ️ [SYNC] 모든 레코드 업데이트됨 (신규 추가 없음)")
                 
                 t4_duration = (datetime.utcnow() - t4).total_seconds() * 1000
                 logger.info(f"💾 [t4] Saved {upserted_count} listings to database [RequestId: {request_id}] - Duration: {t4_duration:.2f}ms")
@@ -2447,195 +2436,27 @@ async def get_ebay_summary(
         try:
             logger.info(f"📊 [SUMMARY] Resolved user_id: {user_id} (type: {type(user_id).__name__})")
             
-            # ✅ 4. 검증 로그 추가: 조회된 user_id와 platform 로깅
-            logger.info(f"📊 [SUMMARY QUERY] 쿼리 파라미터:")
-            logger.info(f"   - user_id: '{user_id}' (type: {type(user_id).__name__})")
-            logger.info(f"   - platform: 'eBay' (case-insensitive 검색)")
-            logger.info(f"   - filters: {filters}")
+            # ✅ Summary 쿼리 실행
+            logger.info(f"📊 [SUMMARY] 쿼리 실행: user_id={user_id}, platform=eBay")
             
-            # ✅ 3. 최종 확인 로그: 전체 DB에 데이터가 하나라도 들어있는지 확인
-            from sqlalchemy import text
-            total_db_count = db.execute(text("SELECT COUNT(*) FROM listings")).scalar()
-            logger.info("=" * 60)
-            logger.info(f"🔍 [FINAL CHECK] 전체 DB 확인:")
-            logger.info(f"   - SELECT COUNT(*) FROM listings (전체 DB): {total_db_count}개")
-            if total_db_count == 0:
-                logger.error(f"   ❌ CRITICAL: 전체 DB에 listings가 하나도 없습니다!")
-                logger.error(f"   - DB 연결 문제이거나 모든 데이터가 삭제되었을 수 있음")
-            else:
-                logger.info(f"   ✅ 전체 DB에 {total_db_count}개의 listings가 존재함")
-            logger.info("=" * 60)
-            
-            # ✅ 2. 강제 카운트 API 확인: summary API 로직 가장 처음에 실행
-            # 만약 이 숫자가 0이라면, sync_ebay_listings 함수 끝에 db.commit()이 누락되어 데이터가 실제 DB에 반영되지 않은 것
-            force_count = db.query(Listing).filter(Listing.user_id == user_id).count()
-            
-            # ✅ 2-1. 유저 ID 불일치 검증: summary API의 user_id와 저장 시 사용한 user_id 비교
-            logger.info("=" * 60)
-            logger.info(f"🔍 [USER ID VERIFY] 유저 ID 불일치 검증:")
-            logger.info(f"   - Summary API에서 사용하는 user_id: '{user_id}' (type: {type(user_id).__name__})")
-            
-            # DB에 저장된 실제 user_id 샘플 확인
-            sample_user_ids = db.query(Listing.user_id).distinct().limit(10).all()
-            if sample_user_ids:
-                sample_ids = [str(uid[0]) if uid[0] else None for uid in sample_user_ids]
-                logger.info(f"   - DB에 저장된 user_id 샘플 (최대 10개): {sample_ids}")
-                
-                # 타입 비교
-                sample_types = [type(uid[0]).__name__ if uid[0] else None for uid in sample_user_ids]
-                logger.info(f"   - 샘플 user_id 타입들: {list(set(sample_types))}")
-                
-                # 정확한 일치 확인
-                exact_match = db.execute(
-                    text("SELECT COUNT(*) FROM listings WHERE user_id = :user_id"),
-                    {"user_id": user_id}
-                ).scalar()
-                logger.info(f"   - 정확한 일치 (user_id = :user_id): {exact_match}개")
-                
-                # 문자열 변환 후 비교
-                string_match = db.execute(
-                    text("SELECT COUNT(*) FROM listings WHERE user_id::text = :user_id"),
-                    {"user_id": str(user_id)}
-                ).scalar()
-                logger.info(f"   - 문자열 변환 후 일치 (user_id::text = :user_id): {string_match}개")
-                
-                if exact_match == 0 and string_match > 0:
-                    logger.error(f"   ❌ CRITICAL: user_id 타입 불일치 발견!")
-                    logger.error(f"   - Summary API user_id 타입: {type(user_id).__name__}")
-                    logger.error(f"   - DB에 저장된 user_id 타입이 다를 수 있음")
-            else:
-                logger.warn(f"   ⚠️ DB에 저장된 user_id 샘플이 없음 (전체 DB가 비어있음)")
-            
-            logger.info(f"🔍 [FORCE COUNT] 강제 카운트 확인 (user_id='{user_id}'):")
-            logger.info(f"   - 해당 user_id의 전체 listings 개수: {force_count}")
-            if force_count == 0:
-                logger.error(f"   ❌ CRITICAL: user_id='{user_id}'에 대한 listings가 0개입니다!")
-                logger.error(f"   가능한 원인:")
-                logger.error(f"   1. sync_ebay_listings 함수 끝에 db.commit()이 누락됨")
-                logger.error(f"   2. user_id 불일치 (sync 시 사용한 user_id와 다름)")
-                logger.error(f"   3. DB 트랜잭션이 롤백됨")
-                logger.error(f"   4. user_id 타입 불일치 (문자열 vs 숫자)")
-            else:
-                logger.info(f"   ✅ 해당 user_id에 {force_count}개의 listings가 존재함")
-            logger.info("=" * 60)
-            
-            # 🔍 STEP 3: Summary 집계 로직 점검 - 쿼리 조건 및 결과 확인
-            # CRITICAL: summary 쿼리 키는 sync upsert 키와 동일해야 함
-            # Sync upsert uses: user_id, platform="eBay", item_id (for conflict resolution)
-            # Summary query uses: user_id, platform="eBay"
-            logger.info(f"📊 [SUMMARY QUERY] Summary 쿼리 조건:")
-            logger.info(f"   - WHERE Listing.user_id == '{user_id}'")
-            logger.info(f"   - WHERE Listing.platform == 'eBay'")
-            logger.info(f"   (Note: Sync upsert 키와 일치: user_id + platform)")
-            
-            # ✅ 1. 플랫폼 대소문자 통일: Case-insensitive 검색 사용
-            # PostgreSQL의 경우 func.lower()를 사용하여 대소문자 구분 없이 검색
-            # "ebay", "eBay", "EBAY" 모두 매칭되도록 보장
+            # ✅ Summary 쿼리 실행 (Case-insensitive platform 검색)
             from sqlalchemy import func, text
-            
-            # ✅ 3. 백엔드 터미널 로그 출력: 전체 상품 수와 필터 적용 후 상품 수
-            total_in_db = db.query(Listing).count()
-            same_user_any_platform = db.query(Listing).filter(Listing.user_id == user_id).count()
-            
-            logger.info("=" * 60)
-            logger.info(f"📊 [SUMMARY COUNT] 현재 DB에 저장된 전체 상품 수:")
-            logger.info(f"   - 전체 listings (any user_id, any platform): {total_in_db}")
-            logger.info(f"   - 같은 user_id (any platform): {same_user_any_platform}")
-            
-            # Case-insensitive로 platform 필터 적용 전 개수 확인
-            same_user_ebay_any_case = db.execute(
-                text("SELECT COUNT(*) FROM listings WHERE user_id = :user_id AND LOWER(platform) = 'ebay'"),
-                {"user_id": user_id}
-            ).scalar()
-            logger.info(f"   - 같은 user_id + platform='ebay' (case-insensitive): {same_user_ebay_any_case}")
-            
-            # ✅ 2. NameError 수정: same_platform_any_user 변수 정의
-            # 같은 platform (eBay)이지만 다른 user_id인 경우 확인
-            same_platform_any_user = db.execute(
-                text("SELECT COUNT(*) FROM listings WHERE LOWER(platform) = 'ebay'"),
-                {}
-            ).scalar()
-            logger.info(f"   - 같은 platform='ebay' (any user_id, case-insensitive): {same_platform_any_user}")
-            
-            # ✅ 1. 플랫폼 검색 조건 완전 허용: Case-insensitive 검색
             active_query = db.query(Listing).filter(
                 Listing.user_id == user_id,
-                func.lower(Listing.platform) == func.lower("eBay")  # Case-insensitive - "ebay", "eBay", "EBAY" 모두 매칭
+                func.lower(Listing.platform) == func.lower("eBay")  # Case-insensitive
             )
-            
-            # 필터 적용 후 상품 수
             active_count = active_query.count()
-            logger.info(f"📊 [SUMMARY COUNT] 플랫폼 필터 적용 후 상품 수:")
-            logger.info(f"   - Active count (user_id='{user_id}' AND LOWER(platform)='ebay'): {active_count}")
-            logger.info("=" * 60)
             
-            # Case sensitivity 확인을 위한 platform 값들 확인
-            platform_counts = db.query(
-                Listing.platform,
-                func.count(Listing.id).label('count')
-            ).filter(
-                Listing.user_id == user_id
-            ).group_by(Listing.platform).all()
-            
-            logger.info(f"📊 [SUMMARY QUERY] 쿼리 실행 전 DB 상태:")
-            logger.info(f"   - 전체 listings (any user_id, any platform): {total_in_db}")
-            logger.info(f"   - 같은 user_id (any platform): {same_user_any_platform}")
-            
-            if platform_counts:
-                logger.info(f"   - 같은 user_id의 platform별 개수:")
-                for platform_val, count in platform_counts:
-                    logger.info(f"     * platform='{platform_val}' (type: {type(platform_val).__name__}): {count}개")
-                    # Case sensitivity 체크
-                    if platform_val and platform_val.lower() != "ebay":
-                        logger.warn(f"       ⚠️ platform 값이 eBay가 아님: '{platform_val}'")
-                    elif platform_val and platform_val != "eBay":
-                        logger.warn(f"       ⚠️ platform 값 대소문자 불일치: '{platform_val}' != 'eBay' (다음 sync 시 자동 보정됨)")
-            
-            # Case-insensitive 검색 결과와 비교 (이미 위에서 same_user_ebay_any_case로 계산됨)
-            if active_count == 0 and same_user_ebay_any_case > 0:
-                logger.error(f"   ❌ Case sensitivity 문제 발견!")
-                logger.error(f"   - Case-insensitive 쿼리 결과: {same_user_ebay_any_case}개")
-                logger.error(f"   - Active count (func.lower 사용): {active_count}개")
-                logger.error(f"   - 원인: 쿼리 로직 문제 가능성 (func.lower가 제대로 작동하지 않음)")
-            
-            if active_count == 0 and same_user_any_platform > 0:
-                logger.warn(f"   ⚠️ user_id는 일치하지만 platform이 다를 수 있음")
-                # platform 샘플 확인
-                sample_platforms = db.query(Listing.platform).filter(
-                    Listing.user_id == user_id
-                ).distinct().limit(5).all()
-                if sample_platforms:
-                    logger.warn(f"   - Sample platforms for this user_id: {[p[0] for p in sample_platforms]}")
-            
-            if active_count == 0 and same_platform_any_user > 0:
-                logger.warn(f"   ⚠️ platform은 일치하지만 user_id가 다를 수 있음")
-                # user_id 샘플 확인
-                sample_user_ids = db.query(Listing.user_id).filter(
-                    Listing.platform == "eBay"
-                ).distinct().limit(5).all()
-                if sample_user_ids:
-                    logger.warn(f"   - Sample user_ids for eBay platform: {[u[0] for u in sample_user_ids]}")
-            
-            # Debug: Check if listings exist with different user_id or platform
+            # ✅ 에러 케이스만 로깅 (핵심만)
             if active_count == 0:
-                # Check total listings count (any user_id)
-                total_listings = db.query(Listing).count()
-                logger.info(f"📊 [SUMMARY] Total listings in DB (any user): {total_listings}")
-                
-                # Check listings with this user_id but different platform
-                listings_same_user = db.query(Listing).filter(Listing.user_id == user_id).count()
-                logger.info(f"📊 [SUMMARY] Listings with same user_id but any platform: {listings_same_user}")
-                
-                # Check listings with eBay platform but different user_id
-                listings_ebay = db.query(Listing).filter(Listing.platform == "eBay").count()
-                logger.info(f"📊 [SUMMARY] Listings with eBay platform but any user_id: {listings_ebay}")
-                
-                # Sample a few listings to see their user_id and platform
-                sample_listings = db.query(Listing).limit(5).all()
-                if sample_listings:
-                    logger.info(f"📊 [SUMMARY] Sample listings (first 5):")
-                    for listing in sample_listings:
-                        logger.info(f"   - Listing ID: {listing.id}, user_id: {listing.user_id}, platform: {listing.platform}, marketplace: {listing.marketplace}")
+                same_user_any_platform = db.query(Listing).filter(Listing.user_id == user_id).count()
+                same_platform_any_user = db.query(Listing).filter(Listing.platform == "eBay").count()
+                if same_user_any_platform > 0:
+                    logger.warn(f"⚠️ [SUMMARY] user_id={user_id}는 일치하지만 platform이 다를 수 있음 (platform별: {same_user_any_platform}개)")
+                elif same_platform_any_user > 0:
+                    logger.warn(f"⚠️ [SUMMARY] platform=eBay는 일치하지만 user_id가 다를 수 있음 (eBay 전체: {same_platform_any_user}개)")
+                else:
+                    logger.info(f"ℹ️ [SUMMARY] DB에 listings가 없음 (user_id={user_id}, platform=eBay)")
             
             # ✅ 2. Last sync timestamp (가장 최근 last_synced_at) - Case-insensitive 검색
             last_listing = db.query(Listing).filter(
@@ -2644,12 +2465,6 @@ async def get_ebay_summary(
             ).order_by(Listing.last_synced_at.desc()).first()
             
             last_sync_at = last_listing.last_synced_at.isoformat() if last_listing and last_listing.last_synced_at else None
-            logger.info(f"📊 [SUMMARY] Last sync timestamp: {last_sync_at}")
-            
-            # ✅ 2-1. last_sync_at이 null인 경우, sync 완료 시점을 현재 시간으로 설정
-            # (sync API에서 호출될 때 업데이트되도록 함)
-            if not last_sync_at:
-                logger.warn(f"⚠️ [SUMMARY] last_sync_at이 null입니다. Sync가 완료되지 않았거나 listings가 없을 수 있습니다.")
             
             # Low-performing count (기본 필터: 7일, 0 판매, 0 관심, 10 이하 조회수)
             # 필터가 제공되면 사용, 없으면 기본값
@@ -2668,26 +2483,10 @@ async def get_ebay_summary(
                     parsed_filters = json.loads(filters)
                     filter_params = {**default_filters, **parsed_filters}
                     
-                    # ✅ 3. 필터 매칭 확인: 프론트엔드에서 보낸 필터와 백엔드 처리 필터 일치 확인
-                    logger.info(f"📊 [FILTER MATCH] 필터 매칭 확인:")
-                    logger.info(f"   - 프론트엔드에서 보낸 filters (parsed): {parsed_filters}")
-                    logger.info(f"   - 백엔드에서 사용할 filter_params: {filter_params}")
-                    
-                    # ✅ 1. 필터 키(Key) 매핑 오류 해결: market_place_filter와 marketplace_filter 둘 다 체크
-                    marketplace_filter = None
-                    if "market_place_filter" in parsed_filters:
-                        marketplace_filter = parsed_filters.get("market_place_filter")
-                        logger.info(f"   - market_place_filter (언더바 있음) 발견: {marketplace_filter}")
-                    elif "marketplace_filter" in parsed_filters:
-                        marketplace_filter = parsed_filters.get("marketplace_filter")
-                        logger.info(f"   - marketplace_filter (언더바 없음) 발견: {marketplace_filter}")
-                    
-                    if marketplace_filter:
-                        logger.info(f"   - 최종 marketplace_filter 값: {marketplace_filter}")
-                        if marketplace_filter.lower() != "ebay":
-                            logger.warn(f"   ⚠️ marketplace_filter가 'eBay'가 아님: {marketplace_filter}")
-                    else:
-                        logger.info(f"   - marketplace_filter/market_place_filter 없음 (기본값 'eBay' 사용)")
+                    # 필터 키 매핑: market_place_filter와 marketplace_filter 둘 다 체크
+                    marketplace_filter = parsed_filters.get("market_place_filter") or parsed_filters.get("marketplace_filter")
+                    if marketplace_filter and marketplace_filter.lower() != "ebay":
+                        logger.warn(f"⚠️ [SUMMARY] marketplace_filter가 'eBay'가 아님: {marketplace_filter}")
                 except Exception as filter_err:
                     logger.warn(f"⚠️ [FILTER] 필터 파싱 실패: {filter_err}")
                     pass

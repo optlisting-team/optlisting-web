@@ -1312,15 +1312,9 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
                 analysis_meta["management_hub"] = "Shopify"
             
             # Convert Listing object to dictionary
-            # ✅ FIX: platform 필드가 없으면 marketplace 사용
-            platform = getattr(listing, 'platform', None) or getattr(listing, 'marketplace', None) or "eBay"
-            # ✅ CASE SENSITIVITY: platform 값을 정확히 "eBay"로 정규화 (대소문자 일치)
-            if platform and isinstance(platform, str):
-                # platform 값이 eBay 관련이면 정확히 "eBay"로 통일
-                platform_lower = platform.lower()
-                if platform_lower == "ebay":
-                    platform = "eBay"  # 정확히 "eBay"로 통일
-                logger.debug(f"📝 [UPSERT] platform 값 정규화: '{getattr(listing, 'platform', None)}' -> '{platform}'")
+            # ✅ CRITICAL: platform 필드를 반드시 "eBay"로 강제 설정
+            # eBay sync에서는 항상 platform="eBay"로 저장되어야 함
+            platform = "eBay"  # 항상 "eBay"로 강제 설정 (대소문자 정확히 일치)
             
             # ✅ FIX: item_id 필드가 없으면 ebay_item_id 사용
             item_id = getattr(listing, 'item_id', None) or getattr(listing, 'ebay_item_id', None) or ""
@@ -1378,7 +1372,7 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
         stmt = stmt.on_conflict_do_update(
             index_elements=conflict_columns,
             set_={
-                'platform': excluded.platform,  # ✅ CRITICAL: platform 필드도 업데이트 (eBay로 강제 설정)
+                'platform': 'eBay',  # ✅ CRITICAL: platform 필드를 항상 "eBay"로 강제 설정 (eBay sync 전용)
                 'title': excluded.title,
                 'image_url': excluded.image_url,
                 'sku': excluded.sku,
@@ -1403,50 +1397,29 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
         import logging
         logger = logging.getLogger(__name__)
         
-        # upsert 전 user_id 샘플 확인
-        sample_user_ids = [v.get('user_id') for v in values_list[:5]]
-        logger.info(f"📊 [UPSERT] PostgreSQL bulk upsert 실행:")
-        logger.info(f"   - Total listings to process: {len(listings)}")
-        logger.info(f"   - Sample user_ids (first 5): {sample_user_ids}")
-        logger.info(f"   - Conflict resolution: ON CONFLICT (user_id, platform, item_id) DO UPDATE")
-        
         # Execute the statement
         result = db.execute(stmt)
         
-        # ✅ 1. DB 저장 확정 (Force Commit): flush와 commit 강제 실행
-        db.flush()  # 변경사항을 DB에 전송 (아직 commit 전)
-        logger.info(f"✅ [UPSERT] db.flush() 실행 완료")
+        # ✅ DB 저장 확정: flush와 commit 실행
+        db.flush()
+        db.commit()
         
-        db.commit()  # 트랜잭션 확정
-        logger.info(f"✅ [UPSERT] db.commit() 실행 완료")
-        
-        # ✅ 1-1. 데이터 저장 직후 SELECT COUNT(*) 쿼리로 실제 DB에 저장되었는지 확인
+        # ✅ 저장 결과 확인 (핵심만 로깅)
         from sqlalchemy import text
         if listings and len(listings) > 0:
-            # 첫 번째 listing의 user_id를 사용하여 확인
             sample_user_id = listings[0].user_id if hasattr(listings[0], 'user_id') else None
             if sample_user_id:
                 actual_count = db.execute(
-                    text("SELECT COUNT(*) FROM listings WHERE user_id = :user_id"),
+                    text("SELECT COUNT(*) FROM listings WHERE user_id = :user_id AND platform = 'eBay'"),
                     {"user_id": sample_user_id}
                 ).scalar()
-                logger.info(f"📊 [UPSERT VERIFY] 저장 직후 DB 확인:")
-                logger.info(f"   - user_id: {sample_user_id} (type: {type(sample_user_id).__name__})")
-                logger.info(f"   - SELECT COUNT(*) FROM listings WHERE user_id = '{sample_user_id}': {actual_count}개")
-                logger.info(f"   - 처리한 listings 수: {len(listings)}개")
                 if actual_count == 0:
-                    logger.error(f"   ❌ CRITICAL: DB에 데이터가 저장되지 않았습니다!")
-                    logger.error(f"   - upsert_listings는 {len(listings)}개를 처리했지만 DB에는 0개")
+                    logger.error(f"❌ [UPSERT] CRITICAL: {len(listings)}개 처리했지만 DB count=0 (user_id={sample_user_id})")
                 else:
-                    logger.info(f"   ✅ DB 저장 확인됨: {actual_count}개 레코드 존재")
+                    logger.info(f"✅ [UPSERT] 완료: {len(listings)}개 처리, DB count={actual_count} (user_id={sample_user_id}, platform=eBay)")
         
-        # Note: PostgreSQL ON CONFLICT doesn't return inserted/updated counts separately
-        # We return the total number of listings processed
+        # Return the total number of listings processed
         upserted_count = len(listings)
-        logger.info(f"📊 [UPSERT] Upsert 완료: {upserted_count} listings processed")
-        logger.info(f"   - Note: PostgreSQL ON CONFLICT는 INSERT/UPDATE 개수를 분리해서 반환하지 않음")
-        logger.info(f"   - 모든 레코드가 성공적으로 처리되었거나 업데이트되었음")
-        logger.info(f"   - ✅ db.flush() + db.commit() 실행됨 - 데이터가 DB에 반영됨")
         
         return upserted_count
     else:
