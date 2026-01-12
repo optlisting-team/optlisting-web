@@ -32,7 +32,7 @@ from .credit_service import (
     PlanType,
 )
 
-app = FastAPI(title="OptListing API", version="1.3.35")
+app = FastAPI(title="OptListing API", version="1.3.36")
 
 # ============================================================
 # [BOOT] Supabase Write Self-Test (Top-level execution)
@@ -341,10 +341,26 @@ def startup_event():
     logger = logging.getLogger(__name__)
     
     try:
+        # ✅ 4. 검증 로그 추가: 서버 시작 시 DB 연결 성공 여부 확인
+        from .models import engine
+        from sqlalchemy import text
+        
+        # DB 연결 테스트
+        logger.info("[STARTUP] Testing database connection...")
+        try:
+            with engine.connect() as conn:
+                result = conn.execute(text("SELECT 1"))
+                result.fetchone()
+            logger.info("[STARTUP] ✅ Database connection successful")
+            print("✅ Database connection verified successfully")
+        except Exception as conn_err:
+            logger.error(f"[STARTUP] ❌ Database connection failed: {conn_err}")
+            print(f"❌ Database connection failed: {conn_err}")
+            raise
+        
         # Create tables if they don't exist (works for both SQLite and Supabase)
         print("Creating database tables if they don't exist...")
         logger.info("[STARTUP] Creating database tables if they don't exist...")
-        from .models import engine
         Base.metadata.create_all(bind=engine)
         print("Database tables created/verified successfully")
         logger.info("[STARTUP] Database tables created/verified successfully")

@@ -2314,6 +2314,12 @@ async def get_ebay_summary(
         try:
             logger.info(f"📊 [SUMMARY] Resolved user_id: {user_id} (type: {type(user_id).__name__})")
             
+            # ✅ 4. 검증 로그 추가: 조회된 user_id와 platform 로깅
+            logger.info(f"📊 [SUMMARY QUERY] 쿼리 파라미터:")
+            logger.info(f"   - user_id: '{user_id}' (type: {type(user_id).__name__})")
+            logger.info(f"   - platform: 'eBay' (case-insensitive 검색)")
+            logger.info(f"   - filters: {filters}")
+            
             # ✅ 3. 최종 확인 로그: 전체 DB에 데이터가 하나라도 들어있는지 확인
             from sqlalchemy import text
             total_db_count = db.execute(text("SELECT COUNT(*) FROM listings")).scalar()
@@ -2409,6 +2415,14 @@ async def get_ebay_summary(
                 {"user_id": user_id}
             ).scalar()
             logger.info(f"   - 같은 user_id + platform='ebay' (case-insensitive): {same_user_ebay_any_case}")
+            
+            # ✅ 2. NameError 수정: same_platform_any_user 변수 정의
+            # 같은 platform (eBay)이지만 다른 user_id인 경우 확인
+            same_platform_any_user = db.execute(
+                text("SELECT COUNT(*) FROM listings WHERE LOWER(platform) = 'ebay'"),
+                {}
+            ).scalar()
+            logger.info(f"   - 같은 platform='ebay' (any user_id, case-insensitive): {same_platform_any_user}")
             
             # ✅ 1. 플랫폼 검색 조건 완전 허용: Case-insensitive 검색
             active_query = db.query(Listing).filter(

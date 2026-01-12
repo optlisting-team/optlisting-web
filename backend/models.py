@@ -150,12 +150,40 @@ if DATABASE_URL:
 if DATABASE_URL and DATABASE_URL.startswith(("postgresql://", "postgres://")):
     # Supabase PostgreSQL connection
     SQLALCHEMY_DATABASE_URL = DATABASE_URL
+    
+    # ✅ 3. Supabase 연결 설정 최적화: Connection Pooling 및 재연결 설정
+    # Supabase Connection Pooling 포트(6543) 사용 여부 확인
+    use_pooling = False
+    if ":6543/" in SQLALCHEMY_DATABASE_URL or "pooler.supabase.com" in SQLALCHEMY_DATABASE_URL:
+        use_pooling = True
+        print("DEBUG: Using Supabase Connection Pooling (port 6543)")
+    else:
+        print("DEBUG: Using direct Supabase connection")
+        # Connection Pooling 포트로 변경 제안
+        if "supabase.co" in SQLALCHEMY_DATABASE_URL and ":5432/" in SQLALCHEMY_DATABASE_URL:
+            print("INFO: Consider using Connection Pooling port 6543 for better performance")
+    
+    # Connection Pool 설정
+    engine_kwargs = {
+        "pool_pre_ping": True,   # 연결이 끊겼는지 확인 후 재연결
+        "pool_recycle": 3600,    # 1시간마다 연결 재생성 (Supabase 권장)
+        "pool_size": 5,          # 기본 풀 크기
+        "max_overflow": 10,      # 최대 오버플로우 연결 수
+        "echo": False            # SQL 쿼리 로깅 (디버깅 시 True)
+    }
+    
+    # Supabase Connection Pooling 사용 시 추가 설정
+    if use_pooling:
+        engine_kwargs["connect_args"] = {
+            "sslmode": "require"
+        }
+    
+    print(f"DEBUG: Engine kwargs: pool_pre_ping={engine_kwargs['pool_pre_ping']}, pool_recycle={engine_kwargs['pool_recycle']}")
+    
     try:
         engine = create_engine(
             SQLALCHEMY_DATABASE_URL,
-            pool_pre_ping=True,  # Verify connections before using them
-            pool_size=5,
-            max_overflow=10
+            **engine_kwargs
         )
     except Exception as e:
         # ✅ FIX: DATABASE_URL 파싱 실패 시 SQLite로 폴백
