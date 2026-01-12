@@ -1216,7 +1216,7 @@ def count_low_performing_candidates(
     return count
 
 
-def upsert_listings(db: Session, listings: List[Listing]) -> int:
+def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Optional[str] = None) -> int:
     """
     UPSERT listings using PostgreSQL's ON CONFLICT DO UPDATE.
     
@@ -1238,6 +1238,22 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
     """
     if not listings:
         return 0
+    
+    # ✅ 2단계: 저장 시 ID 강제 일치 - expected_user_id가 제공되면 모든 listing의 user_id를 강제로 설정
+    if expected_user_id:
+        logger.info("=" * 60)
+        logger.info(f"🔒 [UPSERT] ID 강제 일치 모드 활성화")
+        logger.info(f"   - Expected user_id: {expected_user_id}")
+        logger.info(f"   - Total listings: {len(listings)}개")
+        logger.info("=" * 60)
+        
+        for listing in listings:
+            current_user_id = getattr(listing, 'user_id', None)
+            if current_user_id != expected_user_id:
+                logger.warn(f"⚠️ [UPSERT] user_id 불일치 감지: '{current_user_id}' -> '{expected_user_id}'로 강제 설정")
+                listing.user_id = expected_user_id
+            else:
+                logger.debug(f"✅ [UPSERT] user_id 일치: {current_user_id}")
     
     # 공급처 자동 감지: supplier_name이 없거나 "Unverified"인 경우 자동 감지
     for listing in listings:
@@ -1320,7 +1336,9 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
             item_id = getattr(listing, 'item_id', None) or getattr(listing, 'ebay_item_id', None) or ""
             
             # ✅ CRITICAL: user_id가 None이거나 빈 문자열이면 에러 발생 (fallback 금지)
-            listing_user_id = getattr(listing, 'user_id', None)
+            # expected_user_id가 제공되면 그것을 사용, 아니면 listing의 user_id 사용
+            listing_user_id = expected_user_id if expected_user_id else getattr(listing, 'user_id', None)
+            
             if not listing_user_id or listing_user_id == "default-user":
                 logger.error(f"❌ [UPSERT] CRITICAL: user_id가 None이거나 'default-user'입니다!")
                 logger.error(f"   - listing.user_id: {listing_user_id}")
@@ -1329,7 +1347,7 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
                 raise ValueError(f"user_id가 유효하지 않습니다: {listing_user_id}. 'default-user'로 저장할 수 없습니다.")
             
             values = {
-                'user_id': listing_user_id,  # ✅ CRITICAL: fallback 제거 - 반드시 유효한 user_id 사용
+                'user_id': listing_user_id,  # ✅ CRITICAL: expected_user_id 우선 사용
                 'platform': platform,  # 정규화된 platform 값 사용
                 'item_id': item_id,
                 'title': listing.title,

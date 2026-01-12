@@ -1911,9 +1911,9 @@ async def get_active_listings_trading_api_internal(
                     else:
                         logger.error(f"❌ [DB SAVE] user_id 불일치! expected={user_id}, found={sample_user_ids}")
                 
-                # ✅ DB 저장: upsert_listings 호출
+                # ✅ DB 저장: upsert_listings 호출 (user_id 강제 전달)
                 logger.info(f"💾 [DB SAVE] upsert_listings 호출 시작...")
-                upserted_count = upsert_listings(db, listing_objects)
+                upserted_count = upsert_listings(db, listing_objects, expected_user_id=user_id)
                 
                 # ✅ 추가 commit 확인
                 try:
@@ -2452,6 +2452,19 @@ async def get_ebay_summary(
                 Listing.user_id == user_id,
                 func.lower(Listing.platform) == func.lower("eBay")  # Case-insensitive
             )
+            
+            # ✅ 3단계: 조회 쿼리 수정 - 실제 SQL 쿼리문 로그 출력
+            try:
+                compiled_query = str(active_query.statement.compile(compile_kwargs={"literal_binds": True}))
+                logger.info("=" * 60)
+                logger.info(f"📊 [SUMMARY] 실제 SQL 쿼리문:")
+                logger.info(f"   {compiled_query}")
+                logger.info("=" * 60)
+            except Exception as compile_err:
+                # 쿼리 컴파일 실패 시 대체 로그
+                logger.info(f"📊 [SUMMARY] SQL 쿼리 (컴파일 실패, 대체 로그):")
+                logger.info(f"   SELECT COUNT(*) FROM listings WHERE user_id = '{user_id}' AND LOWER(platform) = 'ebay'")
+            
             active_count = active_query.count()
             
             logger.info(f"📊 [SUMMARY] Query result: active_count={active_count} (user_id={user_id}, platform=eBay)")

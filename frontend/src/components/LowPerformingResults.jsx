@@ -434,18 +434,8 @@ function LowPerformingResults({ mode = 'low', initialFilters = null, initialItem
         </div>
       )}
       
-      {/* Search and Sort */}
+      {/* Sort */}
       <div className="flex items-center gap-4">
-        <input
-          type="text"
-          placeholder="Search listings..."
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value)
-            setPage(1)
-          }}
-          className="flex-1 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
-        />
         <select
           value={sortBy}
           onChange={(e) => {
