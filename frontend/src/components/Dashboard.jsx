@@ -465,7 +465,23 @@ function Dashboard() {
       }
     } catch (err) {
       console.error('❌ [SYNC] Sync error:', err)
-      const errorMessage = err.response?.data?.detail?.message || err.response?.data?.message || err.message || 'Failed to sync listings'
+      
+      // ✅ 2. eBay 데이터 수집 이슈 해결: 토큰 오류 시 명확한 메시지 표시
+      let errorMessage = err.response?.data?.detail?.message || err.response?.data?.message || err.message || 'Failed to sync listings'
+      
+      // 401/403 에러인 경우 재연결 필요 메시지
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        errorMessage = 'eBay 연결이 만료되었습니다. "Connect eBay" 버튼을 클릭하여 다시 연결해주세요.'
+        console.error('❌ [SYNC] Token expired or invalid - Reconnection required')
+      }
+      // 토큰 관련 에러 메시지 확인
+      else if (errorMessage.toLowerCase().includes('token') || 
+               errorMessage.toLowerCase().includes('expired') || 
+               errorMessage.toLowerCase().includes('reconnect')) {
+        errorMessage = 'eBay 연결이 만료되었습니다. "Connect eBay" 버튼을 클릭하여 다시 연결해주세요.'
+        console.error('❌ [SYNC] Token-related error detected - Reconnection required')
+      }
+      
       showToast(`Sync failed: ${errorMessage}`, 'error')
       
       // Sync 실패해도 summary stats는 가져오기 (기존 데이터 표시)
