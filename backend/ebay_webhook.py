@@ -1521,12 +1521,22 @@ async def get_active_listings_trading_api_internal(
     logger.info(f"   Page: {page}, Entries per page: {entries_per_page}")
     
     t1 = datetime.utcnow()
+    logger.info(f"🔍 [TOKEN] Fetching access token for user_id: {user_id} (type: {type(user_id).__name__})")
     access_token = get_user_access_token(user_id)
     t1_duration = (datetime.utcnow() - t1).total_seconds() * 1000
-    logger.info(f"📋 [t1] Token retrieved [RequestId: {request_id}] - Duration: {t1_duration:.2f}ms")
     
-    if not access_token:
-        logger.error(f"❌ [RequestId: {request_id}] No valid access token found")
+    if access_token:
+        # 토큰의 일부만 로깅 (보안)
+        token_preview = f"{access_token[:10]}...{access_token[-4:]}" if len(access_token) > 14 else "***"
+        logger.info(f"📋 [t1] Token retrieved [RequestId: {request_id}] - Duration: {t1_duration:.2f}ms")
+        logger.info(f"   ✅ Access token found: {token_preview} (length: {len(access_token)})")
+    else:
+        logger.error(f"📋 [t1] Token retrieval failed [RequestId: {request_id}] - Duration: {t1_duration:.2f}ms")
+        logger.error(f"   ❌ No valid access token found for user_id: {user_id}")
+        logger.error(f"   가능한 원인:")
+        logger.error(f"   1. Profile이 DB에 없음")
+        logger.error(f"   2. ebay_access_token이 없음")
+        logger.error(f"   3. 토큰이 만료되었고 refresh도 실패함")
         raise HTTPException(
             status_code=401,
             detail="eBay not connected or token expired. Please reconnect your eBay account."
@@ -1561,12 +1571,20 @@ async def get_active_listings_trading_api_internal(
     }
     
     t2 = datetime.utcnow()
+    logger.info(f"🌐 [API CALL] Calling eBay Trading API:")
+    logger.info(f"   - URL: {trading_url}")
+    logger.info(f"   - User ID: {user_id}")
+    logger.info(f"   - Page: {page}, Entries per page: {entries_per_page}")
+    logger.info(f"   - Request XML length: {len(xml_request)} bytes")
+    
     response = requests.post(trading_url, headers=headers, data=xml_request, timeout=60)
     t2_duration = (datetime.utcnow() - t2).total_seconds() * 1000
     logger.info(f"📡 [t2] Trading API response [RequestId: {request_id}] - Status: {response.status_code}, Duration: {t2_duration:.2f}ms")
+    logger.info(f"   - Response length: {len(response.text)} bytes")
     
     if response.status_code != 200:
         logger.error(f"❌ [RequestId: {request_id}] Trading API error: {response.status_code}")
+        logger.error(f"   - Response text (first 500 chars): {response.text[:500]}")
         raise HTTPException(status_code=response.status_code, detail="eBay Trading API error")
     
     # XML 파싱
@@ -1624,11 +1642,31 @@ async def get_active_listings_trading_api_internal(
     active_list = root.find(".//ebay:ActiveList", ns)
     
     # 🔍 STEP 1: eBay API fetch 응답 데이터 개수 로깅
+    logger.info("=" * 60)
+    logger.info(f"🔍 [FETCH DEBUG] eBay API 응답 분석:")
+    logger.info(f"   - User ID: {user_id}")
+    logger.info(f"   - Page: {page}, Entries per page: {entries_per_page}")
+    logger.info(f"   - TotalNumberOfEntries (from API): {total_entries_from_api}")
+    
     if active_list is not None:
         items = active_list.findall(".//ebay:Item", ns)
         logger.info(f"📊 [FETCH COUNT] eBay API 응답에서 파싱된 Item 개수: {len(items)}")
         logger.info(f"   - TotalNumberOfEntries (from API): {total_entries_from_api}")
         logger.info(f"   - Page: {page}, Entries per page: {entries_per_page}")
+        
+        if len(items) == 0 and total_entries_from_api and total_entries_from_api > 0:
+            logger.warning(f"⚠️ [FETCH COUNT] 파싱된 Item이 0개인데 TotalNumberOfEntries는 {total_entries_from_api}개입니다!")
+            logger.warning(f"   - XML 파싱 문제 가능성")
+            logger.warning(f"   - Response XML 일부: {response.text[:1000]}")
+        elif len(items) == 0 and (not total_entries_from_api or total_entries_from_api == 0):
+            logger.warning(f"⚠️ [FETCH COUNT] eBay 계정에 활성 listings가 없습니다.")
+            logger.warning(f"   - TotalNumberOfEntries: {total_entries_from_api}")
+            logger.warning(f"   - User ID: {user_id}")
+    else:
+        logger.error(f"❌ [FETCH COUNT] active_list가 None입니다!")
+        logger.error(f"   - XML 응답에 ActiveList 요소가 없음")
+        logger.error(f"   - Response XML 일부: {response.text[:1000]}")
+    logger.info("=" * 60)
         
         for item in items:
             # 기존 get_active_listings_trading_api와 동일한 파싱 로직
@@ -1713,6 +1751,12 @@ async def get_active_listings_trading_api_internal(
     total_pages = int(pagination.findtext("ebay:TotalNumberOfPages", "1", ns)) if pagination is not None else 1
     
     # DB에 리스팅 저장
+    logger.info("=" * 60)
+    logger.info(f"💾 [DB SAVE] Preparing to save listings to DB:")
+    logger.info(f"   - User ID: {user_id} (type: {type(user_id).__name__})")
+    logger.info(f"   - Parsed listings count: {len(listings)}")
+    logger.info(f"   - Total entries from API: {total_entries_from_api}")
+    
     t4 = datetime.utcnow()
     upserted_count = 0
     try:
@@ -1722,6 +1766,10 @@ async def get_active_listings_trading_api_internal(
         
         db = next(get_db())
         try:
+            # DB 저장 전 개수 확인
+            before_count = db.query(Listing).filter(Listing.user_id == user_id).count()
+            logger.info(f"   - DB에 저장된 기존 listings 개수 (user_id='{user_id}'): {before_count}")
+            
             listing_objects = []
             for listing_data in listings:
                 date_listed = date.today()
@@ -1800,15 +1848,23 @@ async def get_active_listings_trading_api_internal(
                 
                 # ✅ 1-2. 저장 직후 SELECT COUNT(*)로 실제 DB에 저장되었는지 확인
                 from sqlalchemy import text
-                verify_count = db.execute(
-                    text("SELECT COUNT(*) FROM listings WHERE user_id = :user_id"),
-                    {"user_id": user_id}
-                ).scalar()
+                after_count = db.query(Listing).filter(Listing.user_id == user_id).count()
                 logger.info(f"📊 [SYNC SAVE VERIFY] 저장 직후 DB 확인:")
-                logger.info(f"   - SELECT COUNT(*) WHERE user_id = '{user_id}': {verify_count}개")
+                logger.info(f"   - 저장 전 개수 (before_count): {before_count}개")
+                logger.info(f"   - 저장 후 개수 (after_count): {after_count}개")
+                logger.info(f"   - 증가량 (after - before): {after_count - before_count}개")
                 logger.info(f"   - upserted_count (반환값): {upserted_count}개")
-                if verify_count == 0 and upserted_count > 0:
+                logger.info(f"   - SELECT COUNT(*) WHERE user_id = '{user_id}': {after_count}개")
+                
+                if after_count == 0 and upserted_count > 0:
                     logger.error(f"   ❌ CRITICAL: upsert_listings는 {upserted_count}개를 처리했지만 DB에는 0개!")
+                    logger.error(f"   - 저장 전: {before_count}개, 저장 후: {after_count}개")
+                    logger.error(f"   - 데이터가 실제로 저장되지 않았을 가능성")
+                elif after_count > before_count:
+                    logger.info(f"   ✅ DB 저장 확인: {after_count - before_count}개가 추가됨")
+                elif after_count == before_count and upserted_count > 0:
+                    logger.warn(f"   ⚠️ 저장 전후 개수가 동일하지만 upserted_count는 {upserted_count}개")
+                    logger.warn(f"   - 가능한 원인: 모든 레코드가 이미 존재하여 UPDATE만 수행됨")
                     logger.error(f"   - DB commit이 실제로 반영되지 않았을 가능성")
                 elif verify_count > 0:
                     logger.info(f"   ✅ DB 저장 확인됨: {verify_count}개 레코드 존재")
