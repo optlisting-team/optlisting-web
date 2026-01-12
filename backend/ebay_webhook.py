@@ -1655,17 +1655,40 @@ async def get_active_listings_trading_api_internal(
     ack = root.find(".//ebay:Ack", ns)
     ack_text = ack.text if ack is not None else "Unknown"
     
+    # ✅ 3. 데이터 강제 싱크 테스트: API 응답 상세 분석
+    logger.info("=" * 60)
+    logger.info(f"📊 [API RESPONSE] eBay Trading API 응답 분석:")
+    logger.info(f"   - Ack: {ack_text}")
+    
     # TotalNumberOfEntries 추출 (fetched=0 케이스 진단용)
     pagination_result = root.find(".//ebay:PaginationResult", ns)
     total_entries_from_api = None
+    total_pages_from_api = None
+    
     if pagination_result is not None:
         total_entries_elem = pagination_result.find("ebay:TotalNumberOfEntries", ns)
         if total_entries_elem is not None:
             total_entries_from_api = int(total_entries_elem.text) if total_entries_elem.text else 0
+        
+        total_pages_elem = pagination_result.find("ebay:TotalNumberOfPages", ns)
+        if total_pages_elem is not None:
+            total_pages_from_api = int(total_pages_elem.text) if total_pages_elem.text else 1
+        
+        logger.info(f"   - TotalNumberOfEntries: {total_entries_from_api}")
+        logger.info(f"   - TotalNumberOfPages: {total_pages_from_api}")
+        logger.info(f"   - Requested PageNumber: {page}")
+        logger.info(f"   - Requested EntriesPerPage: {entries_per_page}")
+        
+        if total_entries_from_api == 0:
+            logger.warning(f"⚠️ [API RESPONSE] TotalNumberOfEntries=0 - eBay 계정에 활성 listings가 없거나 API 권한 문제")
+            logger.warning(f"   - 가능한 원인:")
+            logger.warning(f"     1. eBay 계정에 활성 listings가 실제로 없음")
+            logger.warning(f"     2. API 권한 부족 (필요한 scope: https://api.ebay.com/oauth/api_scope/sell.marketing.readonly)")
+            logger.warning(f"     3. Access Token이 유효하지 않음 (401 에러가 아닌 경우)")
+    else:
+        logger.warning(f"⚠️ [API RESPONSE] PaginationResult가 응답에 없음")
     
-    logger.info(f"📊 [INTERNAL] Trading API Response Details:")
-    logger.info(f"   - Ack: {ack_text}")
-    logger.info(f"   - TotalNumberOfEntries (from API): {total_entries_from_api}")
+    logger.info("=" * 60)
     
     if ack is not None and ack.text != "Success":
         errors = root.findall(".//ebay:Errors/ebay:ShortMessage", ns)
