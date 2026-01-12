@@ -359,6 +359,24 @@ function Dashboard() {
         
         const { fetched, upserted, pages, total_pages, ebay_user_id, page_stats } = response.data
         
+        // 🔍 STEP 1: eBay API에서 가져온 데이터 개수 로깅
+        console.log('🔍 [SYNC STEP 1] eBay API Fetch Count:')
+        console.log(`   - Total fetched from eBay API: ${fetched} listings`)
+        console.log(`   - Total pages: ${total_pages}`)
+        console.log(`   - Current user_id: ${currentUserId}`)
+        if (page_stats && page_stats.length > 0) {
+          console.log(`   - Page stats:`, page_stats)
+          page_stats.forEach((stat, idx) => {
+            console.log(`     Page ${stat.page}: fetched=${stat.fetched}, upserted=${stat.upserted}, total_entries=${stat.total_entries}`)
+          })
+        }
+        
+        // 🔍 STEP 2: DB 저장 로직 점검 - upserted 개수 및 user_id 확인
+        console.log('🔍 [SYNC STEP 2] DB Upsert Count:')
+        console.log(`   - Total upserted to DB: ${upserted} listings`)
+        console.log(`   - Current user_id (should match DB user_id): ${currentUserId}`)
+        console.log(`   - eBay user_id (from eBay API): ${ebay_user_id || 'N/A'}`)
+        
         // 케이스 분기: fetched=0인 경우
         if (fetched === 0) {
           console.warn('⚠️ [SYNC] fetched=0 - Trading API에서 listings를 가져오지 못함')
@@ -366,18 +384,68 @@ function Dashboard() {
           showToast('No listings found from eBay API. Check backend logs for details.', 'warning')
         }
         
-        // sync 응답을 sessionStorage에 저장 (summary와 비교용)
-        sessionStorage.setItem('last_sync_response', JSON.stringify(response.data))
-        
-        // 케이스 분기: upserted>0인데 active_count=0인 경우는 summary 응답에서 확인
-        if (upserted > 0) {
+        // 케이스 분기: upserted와 fetched 비교
+        if (upserted > 0 && upserted !== fetched) {
+          console.warn(`⚠️ [SYNC] MISMATCH: fetched=${fetched} but upserted=${upserted}`)
+          console.warn('   가능한 원인: 중복 데이터로 인한 upsert (정상 동작)')
+        } else if (upserted === 0 && fetched > 0) {
+          console.error(`❌ [SYNC] ERROR: fetched=${fetched} but upserted=0`)
+          console.error('   DB 저장에 실패했을 가능성 - 백엔드 로그 확인 필요')
+        } else if (upserted > 0) {
           console.log(`✅ [SYNC] ${upserted} listings upserted - verifying with summary API...`)
         }
         
         // Sync 완료 후 summary stats 재호출 (네트워크 확인용)
         console.log('🔄 [SYNC] Refetching summary stats after sync...')
-        await fetchSummaryStats()
-        console.log('✅ [SYNC] Summary stats refetch completed')
+        
+        // ✅ 2. Sync 완료 후 데이터 리프레시: 약간의 딜레이 추가 후 summary 재호출
+        // DB 커밋이 완전히 완료될 때까지 잠시 대기 (PostgreSQL의 경우 즉시 반영되지만 안전을 위해)
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        // Summary API 강제 재호출
+        try {
+          // fetchSummaryStats는 내부에서 summaryStats를 업데이트하므로, 
+          // 응답을 직접 확인하기 위해 API를 직접 호출
+          const summaryResponse = await axios.get(`${API_BASE_URL}/api/ebay/summary`, {
+            params: {
+              user_id: currentUserId,
+              filters: JSON.stringify(filters)
+            },
+            timeout: 30000,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          })
+          
+          if (summaryResponse.data && summaryResponse.data.success) {
+            const activeCount = summaryResponse.data.active_count || 0
+            console.log('✅ [SYNC] Summary stats refetch completed')
+            
+            // Summary 결과 확인 및 불일치 시 경고
+            if (upserted > 0 && activeCount === 0) {
+              console.error('❌ [SYNC] MISMATCH AFTER REFETCH:')
+              console.error(`   - Upserted: ${upserted} listings`)
+              console.error(`   - Summary active_count: ${activeCount}`)
+              console.error('   백엔드 로그에서 쿼리 조건 확인 필요 (user_id, platform 대소문자 등)')
+              console.error('   가능한 원인:')
+              console.error('     1. platform 필드 대소문자 불일치 (예: "ebay" vs "eBay")')
+              console.error('     2. user_id 불일치')
+              console.error('     3. DB 커밋 지연 (0.5초 딜레이 후에도 반영 안됨)')
+            } else if (upserted > 0 && activeCount > 0) {
+              console.log(`✅ [SYNC] Summary 업데이트 확인: ${activeCount} active listings`)
+              console.log(`   - Upserted: ${upserted}, Summary: ${activeCount}`)
+            }
+            
+            // fetchSummaryStats도 호출하여 상태 업데이트
+            await fetchSummaryStats()
+          }
+        } catch (refetchErr) {
+          console.error('❌ [SYNC] Summary refetch 실패:', refetchErr)
+          // Refetch 실패해도 fetchSummaryStats 시도
+          fetchSummaryStats().catch(err => {
+            console.error('❌ [SYNC] fetchSummaryStats도 실패:', err)
+          })
+        }
         
         showToast(`Successfully synced ${fetched} listings (${upserted} upserted)`, 'success')
       } else {
@@ -429,6 +497,11 @@ function Dashboard() {
         return
       }
       
+      // ✅ 3. 필터 매칭 확인: 프론트엔드에서 보내는 필터 로깅
+      console.log('📊 [SUMMARY] Sending filters to backend:')
+      console.log('   - filters object:', filters)
+      console.log('   - filters JSON stringified:', JSON.stringify(filters))
+      
       const response = await axios.get(`${API_BASE_URL}/api/ebay/summary`, {
         params: {
           user_id: currentUserId,
@@ -440,7 +513,7 @@ function Dashboard() {
         },
       })
       
-      // 2) sync 직후 /api/summary 응답 JSON을 그대로 출력
+      // 🔍 STEP 3: Summary 집계 로직 점검 - 쿼리 조건 및 결과 확인
       console.log('='.repeat(60))
       console.log('📊 [SUMMARY] /api/ebay/summary 응답 JSON:')
       console.log(JSON.stringify(response.data, null, 2))
@@ -450,10 +523,31 @@ function Dashboard() {
       if (response.data && response.data.success) {
         const { active_count, user_id, low_performing_count } = response.data
         
+        console.log('🔍 [SUMMARY STEP 3] Summary Query Result:')
+        console.log(`   - Active count (DB query result): ${active_count}`)
+        console.log(`   - Query user_id: ${user_id}`)
+        console.log(`   - Current user_id (should match): ${currentUserId}`)
+        console.log(`   - Query platform: eBay (assumed)`)
+        console.log(`   - Low-performing count: ${low_performing_count}`)
+        
         console.log('🔍 [SUMMARY] Sync vs Summary 비교:')
+        console.log(`   - eBay API Fetch Count: ${syncData.fetched || 0}`)
+        console.log(`   - DB Upsert Count: ${syncData.upserted || 0}`)
         console.log(`   - Summary active_count: ${active_count}`)
         console.log(`   - Summary user_id: ${user_id}`)
         console.log(`   - Summary platform: eBay (assumed)`)
+        
+        // 비교 분석
+        if (syncUpserted > 0 && active_count === 0) {
+          console.error('❌ [COMPARISON] MISMATCH DETECTED:')
+          console.error(`   - DB에는 ${syncUpserted}개가 저장되었지만 summary 쿼리는 0개를 반환함`)
+          console.error('   가능한 원인:')
+          console.error('   1. user_id 불일치 (sync: ' + currentUserId + ', summary: ' + user_id + ')')
+          console.error('   2. platform 필드 불일치 (sync: eBay, summary query: eBay)')
+          console.error('   3. 쿼리 조건 문제 (status 필터링 등)')
+        } else if (syncUpserted === active_count && syncUpserted > 0) {
+          console.log('✅ [COMPARISON] 일치: DB upsert count와 summary count가 동일함')
+        }
         
         // upserted>0인데 active_count=0인 경우 디버그 엔드포인트 자동 호출
         const lastSyncResponse = sessionStorage.getItem('last_sync_response')
