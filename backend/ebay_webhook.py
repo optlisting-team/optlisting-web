@@ -1662,11 +1662,6 @@ async def get_active_listings_trading_api_internal(
             logger.warning(f"⚠️ [FETCH COUNT] eBay 계정에 활성 listings가 없습니다.")
             logger.warning(f"   - TotalNumberOfEntries: {total_entries_from_api}")
             logger.warning(f"   - User ID: {user_id}")
-    else:
-        logger.error(f"❌ [FETCH COUNT] active_list가 None입니다!")
-        logger.error(f"   - XML 응답에 ActiveList 요소가 없음")
-        logger.error(f"   - Response XML 일부: {response.text[:1000]}")
-    logger.info("=" * 60)
         
         for item in items:
             # 기존 get_active_listings_trading_api와 동일한 파싱 로직
@@ -1744,6 +1739,11 @@ async def get_active_listings_trading_api_internal(
                     pass
             
             listings.append(listing)
+    else:
+        logger.error(f"❌ [FETCH COUNT] active_list가 None입니다!")
+        logger.error(f"   - XML 응답에 ActiveList 요소가 없음")
+        logger.error(f"   - Response XML 일부: {response.text[:1000]}")
+    logger.info("=" * 60)
     
     # 페이지네이션 정보
     pagination = active_list.find("ebay:PaginationResult", ns) if active_list is not None else None
