@@ -1378,6 +1378,7 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
         stmt = stmt.on_conflict_do_update(
             index_elements=conflict_columns,
             set_={
+                'platform': excluded.platform,  # ✅ CRITICAL: platform 필드도 업데이트 (eBay로 강제 설정)
                 'title': excluded.title,
                 'image_url': excluded.image_url,
                 'sku': excluded.sku,
@@ -1519,6 +1520,11 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
             
             if existing:
                 # Update existing record
+                # ✅ CRITICAL: platform 필드도 업데이트 (eBay로 강제 설정)
+                if hasattr(existing, 'platform'):
+                    existing.platform = platform
+                elif hasattr(existing, 'marketplace'):
+                    existing.marketplace = platform
                 existing.title = listing.title
                 existing.image_url = listing.image_url
                 existing.sku = listing.sku
