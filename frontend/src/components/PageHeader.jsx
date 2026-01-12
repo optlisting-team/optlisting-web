@@ -1,6 +1,6 @@
 import { useLocation } from 'react-router-dom'
 import { useState } from 'react'
-import { Bell, Search, RefreshCw, User, ChevronDown, Zap } from 'lucide-react'
+import { Bell, RefreshCw, User, ChevronDown, Zap } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useAccount } from '../contexts/AccountContext'
 
@@ -84,19 +84,6 @@ function PageHeader() {
 
           {/* Right: Actions */}
           <div className="flex items-center gap-3 opacity-0 animate-fade-in" style={{ animationDelay: '150ms' }}>
-            {/* Search */}
-            <div className="relative hidden lg:block">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-              <input
-                type="text"
-                placeholder="Search listings..."
-                className="w-64 pl-10 pr-4 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 transition-all"
-              />
-              <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-zinc-600 bg-zinc-800 px-1.5 py-0.5 rounded font-mono">
-                ⌘K
-              </kbd>
-            </div>
-
             {/* Refresh Button */}
             <button
               onClick={handleRefresh}
