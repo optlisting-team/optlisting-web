@@ -385,12 +385,14 @@ function Dashboard() {
         }
         
         // 케이스 분기: upserted와 fetched 비교
+        // ✅ 1. Frontend Sync Logic: upserted가 0이더라도 fetched가 0보다 크면 성공으로 처리
         if (upserted > 0 && upserted !== fetched) {
           console.warn(`⚠️ [SYNC] MISMATCH: fetched=${fetched} but upserted=${upserted}`)
           console.warn('   가능한 원인: 중복 데이터로 인한 upsert (정상 동작)')
         } else if (upserted === 0 && fetched > 0) {
-          console.error(`❌ [SYNC] ERROR: fetched=${fetched} but upserted=0`)
-          console.error('   DB 저장에 실패했을 가능성 - 백엔드 로그 확인 필요')
+          // ✅ 수정: upserted=0이어도 fetched>0이면 성공으로 처리 (기존 데이터가 이미 DB에 있을 수 있음)
+          console.log(`ℹ️ [SYNC] fetched=${fetched} but upserted=0 - 기존 데이터가 이미 DB에 있거나 upsert 로직이 0을 반환했을 수 있음`)
+          console.log('   Summary API로 실제 DB 상태 확인 중...')
         } else if (upserted > 0) {
           console.log(`✅ [SYNC] ${upserted} listings upserted - verifying with summary API...`)
         }
@@ -419,24 +421,34 @@ function Dashboard() {
           
           if (summaryResponse.data && summaryResponse.data.success) {
             const activeCount = summaryResponse.data.active_count || 0
-            console.log('✅ [SYNC] Summary stats refetch completed')
+            const lowPerformingCount = summaryResponse.data.low_performing_count || 0
+            const queueCount = summaryResponse.data.queue_count || 0
+            const lastSyncAt = summaryResponse.data.last_sync_at || null
             
-            // Summary 결과 확인 및 불일치 시 경고
+            console.log('✅ [SYNC] Summary stats refetch completed')
+            console.log(`   - Active count from backend: ${activeCount}`)
+            
+            // ✅ 2. State Force Refresh: Sync 작업이 끝나면 백엔드로부터 받은 active_count 값을 강제로 할당
+            setSummaryStats({
+              activeCount: activeCount,
+              lowPerformingCount: lowPerformingCount,
+              queueCount: queueCount,
+              lastSyncAt: lastSyncAt
+            })
+            console.log(`✅ [SYNC] State force updated: activeCount=${activeCount}`)
+            
+            // Summary 결과 확인 및 불일치 시 경고 (로깅만, 에러 처리하지 않음)
             if (upserted > 0 && activeCount === 0) {
-              console.error('❌ [SYNC] MISMATCH AFTER REFETCH:')
-              console.error(`   - Upserted: ${upserted} listings`)
-              console.error(`   - Summary active_count: ${activeCount}`)
-              console.error('   백엔드 로그에서 쿼리 조건 확인 필요 (user_id, platform 대소문자 등)')
-              console.error('   가능한 원인:')
-              console.error('     1. platform 필드 대소문자 불일치 (예: "ebay" vs "eBay")')
-              console.error('     2. user_id 불일치')
-              console.error('     3. DB 커밋 지연 (0.5초 딜레이 후에도 반영 안됨)')
-            } else if (upserted > 0 && activeCount > 0) {
+              console.warn('⚠️ [SYNC] MISMATCH AFTER REFETCH:')
+              console.warn(`   - Upserted: ${upserted} listings`)
+              console.warn(`   - Summary active_count: ${activeCount}`)
+              console.warn('   백엔드 로그에서 쿼리 조건 확인 필요 (user_id, platform 대소문자 등)')
+            } else if (fetched > 0 && activeCount > 0) {
               console.log(`✅ [SYNC] Summary 업데이트 확인: ${activeCount} active listings`)
-              console.log(`   - Upserted: ${upserted}, Summary: ${activeCount}`)
+              console.log(`   - Fetched: ${fetched}, Upserted: ${upserted}, Summary: ${activeCount}`)
             }
             
-            // fetchSummaryStats도 호출하여 상태 업데이트
+            // fetchSummaryStats도 호출하여 상태 업데이트 (중복이지만 안전을 위해)
             await fetchSummaryStats()
           }
         } catch (refetchErr) {
@@ -593,14 +605,33 @@ function Dashboard() {
         }
         
         console.log('✅ [SUMMARY] Successfully fetched summary:', response.data)
+        
+        // ✅ 3. UI Sync: summary API 응답 데이터가 있으면 무조건 화면의 숫자를 업데이트
+        const activeCount = response.data.active_count || 0
+        const lowPerformingCount = response.data.low_performing_count || 0
+        const queueCount = response.data.queue_count || 0
+        const lastSyncAt = response.data.last_sync_at || null
+        
+        // 응답 데이터가 있으면 무조건 상태 업데이트 (0이어도 업데이트)
         setSummaryStats({
-          activeCount: response.data.active_count || 0,
-          lowPerformingCount: response.data.low_performing_count || 0,
-          queueCount: response.data.queue_count || 0,
-          lastSyncAt: response.data.last_sync_at || null
+          activeCount: activeCount,
+          lowPerformingCount: lowPerformingCount,
+          queueCount: queueCount,
+          lastSyncAt: lastSyncAt
         })
+        console.log(`✅ [SUMMARY] UI updated: activeCount=${activeCount}, lowPerformingCount=${lowPerformingCount}`)
       } else {
         console.warn('⚠️ fetchSummaryStats: Unexpected response format:', response.data)
+        // 응답 형식이 예상과 다르더라도, active_count가 있으면 업데이트 시도
+        if (response.data && typeof response.data.active_count === 'number') {
+          setSummaryStats({
+            activeCount: response.data.active_count || 0,
+            lowPerformingCount: response.data.low_performing_count || 0,
+            queueCount: response.data.queue_count || 0,
+            lastSyncAt: response.data.last_sync_at || null
+          })
+          console.log(`✅ [SUMMARY] UI updated from partial response: activeCount=${response.data.active_count}`)
+        }
       }
     } catch (err) {
       console.error('❌ fetchSummaryStats error:', err)
