@@ -365,28 +365,58 @@ def startup_event():
         print("Database tables created/verified successfully")
         logger.info("[STARTUP] Database tables created/verified successfully")
         
-        # Generate dummy data on first startup (non-blocking)
+        # ✅ 자동 정리 로직: 서버 시작 시 유효하지 않은 user_id 데이터 정리
         try:
             db = next(get_db())
             try:
+                from sqlalchemy import text
+                from .models import Profile
+                
+                # 유효한 user_id 목록 조회
+                valid_user_ids = db.query(Profile.user_id).filter(Profile.user_id.isnot(None)).all()
+                valid_user_id_set = {uid[0] for uid in valid_user_ids}
+                
+                # 유효하지 않은 user_id를 가진 listings 삭제
+                invalid_count = db.execute(
+                    text("""
+                        DELETE FROM listings 
+                        WHERE user_id IS NULL 
+                        OR user_id = 'default-user'
+                        OR (user_id NOT IN (SELECT user_id FROM profiles WHERE user_id IS NOT NULL) 
+                            AND user_id IS NOT NULL)
+                    """)
+                ).rowcount
+                
+                if invalid_count > 0:
+                    logger.info(f"🧹 [STARTUP] 유효하지 않은 user_id를 가진 {invalid_count}개 listings 삭제됨")
+                    print(f"🧹 [STARTUP] Cleaned up {invalid_count} listings with invalid user_id")
+                    db.commit()
+                
+                # platform 보정: "ebay" (소문자)를 "eBay"로 업데이트
+                platform_fixed = db.execute(
+                    text("""
+                        UPDATE listings 
+                        SET platform = 'eBay', updated_at = NOW()
+                        WHERE LOWER(platform) = 'ebay'
+                        AND platform != 'eBay'
+                    """)
+                ).rowcount
+                
+                if platform_fixed > 0:
+                    logger.info(f"🔧 [STARTUP] platform 보정: {platform_fixed}개 listings 업데이트됨")
+                    print(f"🔧 [STARTUP] Fixed platform case for {platform_fixed} listings")
+                    db.commit()
+                
                 count = db.query(Listing).count()
-                if count == 0:
-                    print("Generating 550 dummy listings (500 active, 50 zombies)... This may take a moment.")
-                    generate_dummy_listings(db, count=550, user_id="default-user")
-                    print("Dummy data generated successfully")
-                else:
-                    print(f"Database already contains {count} listings")
-            except Exception as e:
-                print(f"Error generating dummy data: {e}")
-                import traceback
-                traceback.print_exc()
+                print(f"Database contains {count} listings after cleanup")
+            except Exception as cleanup_err:
+                logger.warning(f"⚠️ [STARTUP] 정리 로직 실행 중 오류: {cleanup_err}")
+                db.rollback()
             finally:
                 db.close()
         except Exception as e:
-            print(f"Warning: Could not generate dummy data: {e}")
-            # Don't crash the server if dummy data generation fails
-            import traceback
-            traceback.print_exc()
+            logger.warning(f"⚠️ [STARTUP] 정리 로직 실행 실패: {e}")
+            # Don't crash the server if cleanup fails
     except Exception as e:
         # Log error but don't crash the server
         print(f"CRITICAL: Database connection failed: {e}")

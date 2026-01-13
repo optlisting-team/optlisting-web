@@ -1239,26 +1239,21 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
     if not listings:
         return 0
     
-    # 🔥 HARDCODED USER ID: 모든 데이터를 ee0da9dd-566e-4a97-95f2-baf3733221ad로 강제 고정
-    HARDCODED_USER_ID = "ee0da9dd-566e-4a97-95f2-baf3733221ad"
-    forced_user_id = HARDCODED_USER_ID
-    
-    # ✅ 2단계: 저장 시 ID 강제 일치 - HARDCODED_USER_ID로 모든 listing의 user_id를 강제로 설정
-    logger.warning("=" * 60)
-    logger.warning(f"🔒 [UPSERT] HARDCODED USER ID 모드 활성화")
-    logger.warning(f"   - HARDCODED user_id: {forced_user_id}")
-    logger.warning(f"   - Original expected_user_id: {expected_user_id}")
-    logger.warning(f"   - Total listings: {len(listings)}개")
-    logger.warning(f"   - ⚠️ 모든 listings의 user_id가 '{forced_user_id}'로 강제 설정됩니다!")
-    logger.warning("=" * 60)
-    
-    for listing in listings:
-        current_user_id = getattr(listing, 'user_id', None)
-        if current_user_id != forced_user_id:
-            logger.warning(f"⚠️ [UPSERT] user_id 강제 변경: '{current_user_id}' -> '{forced_user_id}'")
-            listing.user_id = forced_user_id
-        else:
-            logger.debug(f"✅ [UPSERT] user_id 일치: {current_user_id}")
+    # ✅ 2단계: 저장 시 ID 강제 일치 - expected_user_id가 제공되면 모든 listing의 user_id를 강제로 설정
+    if expected_user_id:
+        logger.info("=" * 60)
+        logger.info(f"🔒 [UPSERT] ID 강제 일치 모드 활성화")
+        logger.info(f"   - Expected user_id: {expected_user_id}")
+        logger.info(f"   - Total listings: {len(listings)}개")
+        logger.info("=" * 60)
+        
+        for listing in listings:
+            current_user_id = getattr(listing, 'user_id', None)
+            if current_user_id != expected_user_id:
+                logger.warning(f"⚠️ [UPSERT] user_id 불일치 감지: '{current_user_id}' -> '{expected_user_id}'로 강제 설정")
+                listing.user_id = expected_user_id
+            else:
+                logger.debug(f"✅ [UPSERT] user_id 일치: {current_user_id}")
     
     # 공급처 자동 감지: supplier_name이 없거나 "Unverified"인 경우 자동 감지
     for listing in listings:
@@ -1431,12 +1426,61 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 logger.info(f"   - user_id type: {type(sample_user_id).__name__}")
                 logger.info("=" * 60)
         
-        # Execute the statement
-        result = db.execute(stmt)
-        
-        # ✅ DB 저장 확정: flush와 commit 실행
-        db.flush()
-        db.commit()
+        # Execute the statement with error handling for UNIQUE CONSTRAINT
+        try:
+            result = db.execute(stmt)
+            # ✅ DB 저장 확정: flush와 commit 실행
+            db.flush()
+            db.commit()
+        except Exception as e:
+            # UNIQUE CONSTRAINT 에러 처리: 기존 데이터를 덮어쓰는 방식으로 재시도
+            error_str = str(e).lower()
+            if 'unique' in error_str or 'duplicate' in error_str or 'constraint' in error_str:
+                logger.warning(f"⚠️ [UPSERT] UNIQUE CONSTRAINT 에러 발생, 개별 upsert로 재시도: {e}")
+                db.rollback()
+                
+                # 개별 upsert로 재시도 (더 안전한 방식)
+                upserted_count = 0
+                for listing in listings:
+                    try:
+                        # 기존 레코드 확인
+                        existing = db.query(Listing).filter(
+                            Listing.user_id == (expected_user_id if expected_user_id else listing.user_id),
+                            Listing.platform == "eBay",
+                            Listing.item_id == (getattr(listing, 'item_id', None) or getattr(listing, 'ebay_item_id', None))
+                        ).first()
+                        
+                        if existing:
+                            # 기존 레코드 업데이트
+                            for key, value in {
+                                'title': listing.title,
+                                'image_url': listing.image_url,
+                                'sku': listing.sku,
+                                'supplier_name': listing.supplier_name,
+                                'supplier_id': listing.supplier_id,
+                                'price': listing.price,
+                                'sold_qty': listing.sold_qty,
+                                'watch_count': listing.watch_count,
+                                'last_synced_at': listing.last_synced_at if listing.last_synced_at else datetime.utcnow(),
+                                'updated_at': datetime.utcnow()
+                            }.items():
+                                setattr(existing, key, value)
+                            upserted_count += 1
+                        else:
+                            # 새 레코드 삽입
+                            db.add(listing)
+                            upserted_count += 1
+                    except Exception as individual_err:
+                        logger.error(f"❌ [UPSERT] 개별 upsert 실패: {individual_err}")
+                        continue
+                
+                db.commit()
+                logger.info(f"✅ [UPSERT] 개별 upsert 완료: {upserted_count}개 처리됨")
+                return upserted_count
+            else:
+                # 다른 에러는 그대로 전파
+                db.rollback()
+                raise
         
         # ✅ 저장 결과 확인 (핵심만 로깅)
         from sqlalchemy import text

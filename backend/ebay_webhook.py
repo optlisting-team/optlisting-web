@@ -1517,17 +1517,17 @@ async def get_active_listings_trading_api_internal(
     내부 함수: Trading API를 사용하여 활성 listings를 가져와 DB에 저장
     (get_active_listings_trading_api와 동일한 로직, 재사용을 위해 분리)
     """
-    # 🔥 HARDCODED USER ID: 모든 데이터를 ee0da9dd-566e-4a97-95f2-baf3733221ad로 강제 고정
-    HARDCODED_USER_ID = "ee0da9dd-566e-4a97-95f2-baf3733221ad"
-    user_id = HARDCODED_USER_ID
-    logger.warning(f"🔒 [HARDCODED] user_id가 '{HARDCODED_USER_ID}'로 강제 고정되었습니다. 원래 user_id는 무시됩니다.")
+    # ✅ user_id 검증: 프론트엔드에서 전달된 user_id 사용
+    if not user_id or user_id == "default-user":
+        logger.error(f"❌ [INTERNAL] Invalid user_id: {user_id}")
+        raise HTTPException(status_code=400, detail=f"Invalid user_id: {user_id}. User must be logged in.")
     
     # RequestId 추출 (헤더에서)
     request_id = request.headers.get("X-Request-Id", f"server_{datetime.now().timestamp()}_{user_id}")
     
     t0 = datetime.utcnow()
     logger.info(f"📦 [t0] Request received [RequestId: {request_id}]")
-    logger.info(f"   User ID (HARDCODED): {user_id}")
+    logger.info(f"   User ID: {user_id}")
     logger.info(f"   Page: {page}, Entries per page: {entries_per_page}")
     
     t1 = datetime.utcnow()
@@ -1854,9 +1854,9 @@ async def get_active_listings_trading_api_internal(
         
         db = next(get_db())
         try:
-            # DB 저장 전 개수 확인 (HARDCODED user_id 기준)
-            before_count = db.query(Listing).filter(Listing.user_id == forced_user_id).count()
-            logger.info(f"   - DB에 저장된 기존 listings 개수 (HARDCODED user_id='{forced_user_id}'): {before_count}")
+            # DB 저장 전 개수 확인
+            before_count = db.query(Listing).filter(Listing.user_id == user_id).count()
+            logger.info(f"   - DB에 저장된 기존 listings 개수 (user_id='{user_id}'): {before_count}")
             
             listing_objects = []
             for listing_data in listings:
@@ -1868,12 +1868,12 @@ async def get_active_listings_trading_api_internal(
                     except:
                         pass
                 
-                # ✅ CRITICAL: user_id 검증 (HARDCODED user_id 사용)
-                if not forced_user_id or forced_user_id == "default-user":
+                # ✅ CRITICAL: user_id 검증
+                if not user_id or user_id == "default-user":
                     logger.error(f"❌ [INTERNAL] CRITICAL: user_id가 유효하지 않습니다!")
-                    logger.error(f"   - HARDCODED user_id: {forced_user_id}")
+                    logger.error(f"   - user_id: {user_id}")
                     logger.error(f"   - item_id: {listing_data.get('item_id')}")
-                    raise ValueError(f"user_id가 유효하지 않습니다: {forced_user_id}. 'default-user'로 저장할 수 없습니다.")
+                    raise ValueError(f"user_id가 유효하지 않습니다: {user_id}. 'default-user'로 저장할 수 없습니다.")
                 
                 listing_obj = Listing(
                     ebay_item_id=listing_data["item_id"],
@@ -1887,7 +1887,7 @@ async def get_active_listings_trading_api_internal(
                     watch_count=listing_data.get("watch_count", 0),
                     view_count=listing_data.get("view_count", 0),
                     impressions=listing_data.get("impressions", 0),
-                    user_id=forced_user_id,  # 🔥 HARDCODED: ee0da9dd-566e-4a97-95f2-baf3733221ad로 강제 고정
+                    user_id=user_id,  # ✅ 프론트엔드에서 전달된 user_id 사용
                     supplier_name=listing_data.get("supplier_name"),
                     supplier_id=listing_data.get("supplier_id"),
                     source=listing_data.get("supplier_name", "Unknown"),
@@ -1903,29 +1903,28 @@ async def get_active_listings_trading_api_internal(
                 listing_objects.append(listing_obj)
             
             if listing_objects:
-                # ✅ 2단계: 저장 ID 일치화 - 명확한 로깅 (HARDCODED USER ID)
-                logger.warning("=" * 60)
-                logger.warning(f"💾 [DB SAVE] Saving for HARDCODED user: {forced_user_id}")
-                logger.warning(f"   - Original user_id: {user_id}")
-                logger.warning(f"   - HARDCODED user_id: {forced_user_id}")
-                logger.warning(f"   - Total listings to save: {len(listing_objects)}개")
-                logger.warning(f"   - Platform: eBay (강제 설정)")
-                logger.warning(f"   - ⚠️ 모든 listings의 user_id가 '{forced_user_id}'로 강제 설정됩니다!")
-                logger.warning("=" * 60)
+                # ✅ 2단계: 저장 ID 일치화 - 명확한 로깅
+                logger.info("=" * 60)
+                logger.info(f"💾 [DB SAVE] Saving for user: {user_id}")
+                logger.info(f"   - Total listings to save: {len(listing_objects)}개")
+                logger.info(f"   - Platform: eBay (강제 설정)")
+                logger.info(f"   - user_id type: {type(user_id).__name__}")
+                logger.info(f"   - user_id value: '{user_id}'")
+                logger.info("=" * 60)
                 
                 # user_id 일치 확인 (샘플 검증)
                 sample_user_ids = set()
                 for listing_obj in listing_objects[:5]:  # 처음 5개만 확인
                     sample_user_ids.add(getattr(listing_obj, 'user_id', None))
                 if sample_user_ids:
-                    if len(sample_user_ids) == 1 and list(sample_user_ids)[0] == forced_user_id:
-                        logger.info(f"✅ [DB SAVE] user_id 일치 확인: {forced_user_id}")
+                    if len(sample_user_ids) == 1 and list(sample_user_ids)[0] == user_id:
+                        logger.info(f"✅ [DB SAVE] user_id 일치 확인: {user_id}")
                     else:
-                        logger.error(f"❌ [DB SAVE] user_id 불일치! expected={forced_user_id}, found={sample_user_ids}")
+                        logger.error(f"❌ [DB SAVE] user_id 불일치! expected={user_id}, found={sample_user_ids}")
                 
-                # ✅ DB 저장: upsert_listings 호출 (HARDCODED user_id 강제 전달)
-                logger.warning(f"💾 [DB SAVE] upsert_listings 호출 시작 (HARDCODED user_id: {forced_user_id})...")
-                upserted_count = upsert_listings(db, listing_objects, expected_user_id=forced_user_id)
+                # ✅ DB 저장: upsert_listings 호출 (user_id 전달)
+                logger.info(f"💾 [DB SAVE] upsert_listings 호출 시작...")
+                upserted_count = upsert_listings(db, listing_objects, expected_user_id=user_id)
                 
                 # ✅ 추가 commit 확인
                 try:
