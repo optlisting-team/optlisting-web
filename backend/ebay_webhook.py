@@ -1624,10 +1624,20 @@ async def get_active_listings_trading_api_internal(
     
     # XML 파싱
     t3 = datetime.utcnow()
-    import xml.etree.ElementTree as ET
-    root = ET.fromstring(response.text)
-    t3_duration = (datetime.utcnow() - t3).total_seconds() * 1000
-    logger.info(f"📊 [t3] XML parsed [RequestId: {request_id}] - Duration: {t3_duration:.2f}ms")
+    try:
+        import xml.etree.ElementTree as ET
+        root = ET.fromstring(response.text)
+        t3_duration = (datetime.utcnow() - t3).total_seconds() * 1000
+        logger.info(f"📊 [t3] XML parsed [RequestId: {request_id}] - Duration: {t3_duration:.2f}ms")
+    except ET.ParseError as e:
+        logger.error(f"❌ [RequestId: {request_id}] XML parsing error: {e}")
+        logger.error(f"   - Response text (first 2000 chars): {response.text[:2000]}")
+        raise HTTPException(status_code=500, detail=f"Invalid XML response from eBay API: {str(e)}")
+    except Exception as e:
+        logger.error(f"❌ [RequestId: {request_id}] Unexpected XML parsing error: {e}")
+        import traceback
+        logger.error(f"   Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"XML parsing error: {str(e)}")
     
     # Namespace 처리
     ns = {"ebay": "urn:ebay:apis:eBLBaseComponents"}
@@ -1635,6 +1645,7 @@ async def get_active_listings_trading_api_internal(
     # 에러 체크 및 상세 로깅
     ack = root.find(".//ebay:Ack", ns)
     ack_text = ack.text if ack is not None else "Unknown"
+    logger.info(f"🔍 [API RESPONSE] Ack status: {ack_text}")
     
     # ✅ 3. 데이터 강제 싱크 테스트: API 응답 상세 분석
     logger.info("=" * 60)
