@@ -1392,14 +1392,28 @@ async def sync_ebay_listings(
     except Exception as e:
         pass
     
-    # ✅ 2. 기존 데이터 강제 보정: platform이 "ebay" (소문자)인 것들을 모두 "eBay"로 업데이트
+    # ✅ 2. 자동 정리 로직: 유효하지 않은 user_id 데이터 정리 및 platform 보정
     try:
-        from .models import get_db, Listing
+        from .models import get_db, Listing, Profile
         from sqlalchemy import func, text
         db = next(get_db())
         try:
-            # Case-insensitive로 "ebay"인 모든 레코드를 "eBay"로 업데이트
-            db.execute(
+            # 2-1. 유효하지 않은 user_id를 가진 listings 삭제 (default-user, None, 또는 Profile에 없는 user_id)
+            invalid_count = db.execute(
+                text("""
+                    DELETE FROM listings 
+                    WHERE user_id IS NULL 
+                    OR user_id = 'default-user'
+                    OR user_id NOT IN (SELECT user_id FROM profiles WHERE user_id IS NOT NULL)
+                """)
+            ).rowcount
+            
+            if invalid_count > 0:
+                logger.info(f"🧹 [CLEANUP] 유효하지 않은 user_id를 가진 {invalid_count}개 listings 삭제됨")
+                db.commit()
+            
+            # 2-2. platform 보정: "ebay" (소문자)를 "eBay"로 업데이트
+            platform_fixed = db.execute(
                 text("""
                     UPDATE listings 
                     SET platform = 'eBay', updated_at = NOW()
@@ -1409,12 +1423,17 @@ async def sync_ebay_listings(
                 """),
                 {"user_id": user_id}
             ).rowcount
-            db.commit()
-        except Exception as correct_err:
+            
+            if platform_fixed > 0:
+                logger.info(f"🔧 [CLEANUP] platform 보정: {platform_fixed}개 listings 업데이트됨")
+                db.commit()
+        except Exception as cleanup_err:
+            logger.warning(f"⚠️ [CLEANUP] 정리 로직 실행 중 오류: {cleanup_err}")
             db.rollback()
         finally:
             db.close()
     except Exception as db_err:
+        logger.warning(f"⚠️ [CLEANUP] DB 연결 실패: {db_err}")
         pass
     
     try:
