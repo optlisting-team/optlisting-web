@@ -1868,12 +1868,12 @@ async def get_active_listings_trading_api_internal(
                     except:
                         pass
                 
-                # ✅ CRITICAL: user_id 검증 - None이거나 "default-user"면 에러
-                if not user_id or user_id == "default-user":
+                # ✅ CRITICAL: user_id 검증 (HARDCODED user_id 사용)
+                if not forced_user_id or forced_user_id == "default-user":
                     logger.error(f"❌ [INTERNAL] CRITICAL: user_id가 유효하지 않습니다!")
-                    logger.error(f"   - user_id: {user_id}")
+                    logger.error(f"   - HARDCODED user_id: {forced_user_id}")
                     logger.error(f"   - item_id: {listing_data.get('item_id')}")
-                    raise ValueError(f"user_id가 유효하지 않습니다: {user_id}. 'default-user'로 저장할 수 없습니다.")
+                    raise ValueError(f"user_id가 유효하지 않습니다: {forced_user_id}. 'default-user'로 저장할 수 없습니다.")
                 
                 listing_obj = Listing(
                     ebay_item_id=listing_data["item_id"],
