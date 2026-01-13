@@ -1517,12 +1517,17 @@ async def get_active_listings_trading_api_internal(
     내부 함수: Trading API를 사용하여 활성 listings를 가져와 DB에 저장
     (get_active_listings_trading_api와 동일한 로직, 재사용을 위해 분리)
     """
+    # 🔥 HARDCODED USER ID: 모든 데이터를 ee0da9dd-566e-4a97-95f2-baf3733221ad로 강제 고정
+    HARDCODED_USER_ID = "ee0da9dd-566e-4a97-95f2-baf3733221ad"
+    user_id = HARDCODED_USER_ID
+    logger.warning(f"🔒 [HARDCODED] user_id가 '{HARDCODED_USER_ID}'로 강제 고정되었습니다. 원래 user_id는 무시됩니다.")
+    
     # RequestId 추출 (헤더에서)
     request_id = request.headers.get("X-Request-Id", f"server_{datetime.now().timestamp()}_{user_id}")
     
     t0 = datetime.utcnow()
     logger.info(f"📦 [t0] Request received [RequestId: {request_id}]")
-    logger.info(f"   User ID: {user_id}")
+    logger.info(f"   User ID (HARDCODED): {user_id}")
     logger.info(f"   Page: {page}, Entries per page: {entries_per_page}")
     
     t1 = datetime.utcnow()
