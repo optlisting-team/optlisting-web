@@ -1590,16 +1590,37 @@ async def get_active_listings_trading_api_internal(
     logger.info(f"   - User ID: {user_id}")
     logger.info(f"   - Page: {page}, Entries per page: {entries_per_page}")
     logger.info(f"   - Request XML length: {len(xml_request)} bytes")
+    logger.info(f"   - Access token length: {len(access_token)}")
+    logger.info(f"   - Access token preview: {access_token[:20]}...{access_token[-10:]}")
     
-    response = requests.post(trading_url, headers=headers, data=xml_request, timeout=60)
-    t2_duration = (datetime.utcnow() - t2).total_seconds() * 1000
-    logger.info(f"📡 [t2] Trading API response [RequestId: {request_id}] - Status: {response.status_code}, Duration: {t2_duration:.2f}ms")
-    logger.info(f"   - Response length: {len(response.text)} bytes")
-    
-    if response.status_code != 200:
-        logger.error(f"❌ [RequestId: {request_id}] Trading API error: {response.status_code}")
-        logger.error(f"   - Response text (first 500 chars): {response.text[:500]}")
-        raise HTTPException(status_code=response.status_code, detail="eBay Trading API error")
+    try:
+        response = requests.post(trading_url, headers=headers, data=xml_request, timeout=60)
+        t2_duration = (datetime.utcnow() - t2).total_seconds() * 1000
+        logger.info(f"📡 [t2] Trading API response [RequestId: {request_id}] - Status: {response.status_code}, Duration: {t2_duration:.2f}ms")
+        logger.info(f"   - Response length: {len(response.text)} bytes")
+        
+        if response.status_code != 200:
+            logger.error(f"❌ [RequestId: {request_id}] Trading API HTTP error: {response.status_code}")
+            logger.error(f"   - Response headers: {dict(response.headers)}")
+            logger.error(f"   - Response text (first 1000 chars): {response.text[:1000]}")
+            logger.error(f"   - Full response text: {response.text}")
+            raise HTTPException(status_code=response.status_code, detail=f"eBay Trading API error: {response.status_code}")
+    except requests.exceptions.Timeout as e:
+        logger.error(f"❌ [RequestId: {request_id}] Trading API timeout error: {e}")
+        raise HTTPException(status_code=504, detail=f"eBay Trading API timeout: {str(e)}")
+    except requests.exceptions.ConnectionError as e:
+        logger.error(f"❌ [RequestId: {request_id}] Trading API connection error: {e}")
+        raise HTTPException(status_code=503, detail=f"eBay Trading API connection error: {str(e)}")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"❌ [RequestId: {request_id}] Trading API request error: {e}")
+        import traceback
+        logger.error(f"   Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"eBay Trading API request error: {str(e)}")
+    except Exception as e:
+        logger.error(f"❌ [RequestId: {request_id}] Unexpected error during API call: {e}")
+        import traceback
+        logger.error(f"   Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
     
     # XML 파싱
     t3 = datetime.utcnow()
@@ -1653,13 +1674,26 @@ async def get_active_listings_trading_api_internal(
     if ack is not None and ack.text != "Success":
         errors = root.findall(".//ebay:Errors/ebay:ShortMessage", ns)
         error_codes = root.findall(".//ebay:Errors/ebay:ErrorCode", ns)
+        long_messages = root.findall(".//ebay:Errors/ebay:LongMessage", ns)
         error_msg = errors[0].text if errors else "Unknown error"
         error_code = error_codes[0].text if error_codes else "Unknown"
+        long_msg = long_messages[0].text if long_messages else None
         
         logger.error(f"❌ [INTERNAL] eBay API Error:")
         logger.error(f"   - ErrorCode: {error_code}")
         logger.error(f"   - ShortMessage: {error_msg}")
+        if long_msg:
+            logger.error(f"   - LongMessage: {long_msg}")
         logger.error(f"   - TotalNumberOfEntries: {total_entries_from_api}")
+        logger.error(f"   - User ID: {user_id}")
+        logger.error(f"   - Access token preview: {access_token[:20]}...{access_token[-10:]}")
+        
+        # 전체 에러 XML 로깅
+        errors_elem = root.find(".//ebay:Errors", ns)
+        if errors_elem is not None:
+            import xml.etree.ElementTree as ET
+            errors_xml = ET.tostring(errors_elem, encoding='unicode')
+            logger.error(f"   - Full Errors XML: {errors_xml}")
         
         # fetched=0 케이스 진단을 위한 추가 정보
         if total_entries_from_api == 0:
@@ -1667,8 +1701,9 @@ async def get_active_listings_trading_api_internal(
             logger.warning(f"   1. eBay 계정에 활성 listings가 없음")
             logger.warning(f"   2. API 권한 부족 (필요한 scope: https://api.ebay.com/oauth/api_scope/sell.marketing.readonly)")
             logger.warning(f"   3. 필터 조건에 맞는 listings가 없음")
+            logger.warning(f"   4. Access Token이 유효하지 않음 (토큰 재검증 필요)")
         
-        raise HTTPException(status_code=400, detail=f"eBay Error: {error_msg}")
+        raise HTTPException(status_code=400, detail=f"eBay Error ({error_code}): {error_msg}")
     
     # Success인 경우에도 TotalNumberOfEntries 로깅
     if total_entries_from_api is not None:
