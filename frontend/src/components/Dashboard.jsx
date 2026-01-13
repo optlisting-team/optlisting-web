@@ -2068,22 +2068,6 @@ function Dashboard() {
           </div>
         )}
 
-        {/* Empty state when not connected (Dashboard에서는 카드만 표시) */}
-        {!isStoreConnected || summaryStats.activeCount === 0 ? (
-          <div className="bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 dark:border-zinc-800 rounded-lg p-8 mt-8 text-center">
-            <p className="text-lg text-zinc-300 dark:text-zinc-300 mb-2">
-              📊 <strong className="text-white">Ready to Analyze</strong>
-            </p>
-            <p className="text-sm text-zinc-400 dark:text-zinc-400 mb-4">
-              {!isStoreConnected 
-                ? "Connect your eBay account to start analyzing your listings."
-                : summaryStats.activeCount === 0
-                ? "No listings found. Click 'Sync' to refresh or connect your eBay account."
-                : "Use the filter bar below to analyze and find low-performing SKUs."
-              }
-            </p>
-          </div>
-        ) : null}
 
         {/* History View - Full Page */}
         {viewMode === 'history' && (

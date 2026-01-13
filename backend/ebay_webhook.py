@@ -1370,12 +1370,8 @@ async def sync_ebay_listings(
     - DB에 upsert (중복 시 업데이트)
     - Summary stats 갱신을 위해 프론트엔드에서 fetchSummaryStats() 재호출 필요
     """
-    logger.info("=" * 60)
-    logger.info(f"🔄 [SYNC] Starting eBay listings sync for user: {user_id}")
-    
-    # Validate user_id
+    # Validate user_id - default-user 차단
     if not user_id or user_id == "default-user":
-        logger.warning(f"⚠️ [SYNC] Invalid user_id: {user_id}")
         raise HTTPException(
             status_code=400,
             detail={
@@ -1384,7 +1380,7 @@ async def sync_ebay_listings(
             }
         )
     
-    # Get ebay_user_id from profile for logging
+    # Get ebay_user_id from profile for response
     ebay_user_id = None
     try:
         from .models import get_db, Profile
@@ -1394,9 +1390,7 @@ async def sync_ebay_listings(
             ebay_user_id = profile.ebay_user_id
         db.close()
     except Exception as e:
-        logger.warning(f"⚠️ [SYNC] Failed to get ebay_user_id: {e}")
-    
-    logger.info(f"📋 [SYNC] User details: user_id={user_id}, ebay_user_id={ebay_user_id}")
+        pass
     
     # ✅ 2. 기존 데이터 강제 보정: platform이 "ebay" (소문자)인 것들을 모두 "eBay"로 업데이트
     try:
@@ -1405,7 +1399,7 @@ async def sync_ebay_listings(
         db = next(get_db())
         try:
             # Case-insensitive로 "ebay"인 모든 레코드를 "eBay"로 업데이트
-            corrected_count = db.execute(
+            db.execute(
                 text("""
                     UPDATE listings 
                     SET platform = 'eBay', updated_at = NOW()
@@ -1416,17 +1410,12 @@ async def sync_ebay_listings(
                 {"user_id": user_id}
             ).rowcount
             db.commit()
-            if corrected_count > 0:
-                logger.info(f"✅ [SYNC] 기존 데이터 platform 보정 완료: {corrected_count}개 레코드를 'eBay'로 업데이트")
-            else:
-                logger.info(f"📊 [SYNC] 기존 데이터 platform 보정 불필요 (이미 정규화됨)")
         except Exception as correct_err:
             db.rollback()
-            logger.warning(f"⚠️ [SYNC] 기존 데이터 platform 보정 실패 (무시): {correct_err}")
         finally:
             db.close()
     except Exception as db_err:
-        logger.warning(f"⚠️ [SYNC] DB 연결 실패 (platform 보정 스킵): {db_err}")
+        pass
     
     try:
         # 기존 get_active_listings_trading_api 로직 재사용
@@ -1439,8 +1428,6 @@ async def sync_ebay_listings(
         page_stats = []  # 각 페이지별 통계
         
         while page <= total_pages:
-            logger.info(f"🔄 [SYNC] Syncing page {page}/{total_pages} for user: {user_id}")
-            
             # get_active_listings_trading_api의 로직을 직접 호출
             result = await get_active_listings_trading_api_internal(
                 request=request,
@@ -1466,22 +1453,10 @@ async def sync_ebay_listings(
                 }
                 page_stats.append(page_stat)
                 
-                logger.info(f"✅ [SYNC] Page {page}/{total_pages} completed:")
-                logger.info(f"   - Fetched from eBay API: {fetched_count} listings")
-                logger.info(f"   - Upserted to DB: {upserted_count} listings")
-                logger.info(f"   - Total entries (eBay): {total_entries}")
-                
                 # 다음 페이지로
                 page += 1
             else:
-                logger.warning(f"⚠️ [SYNC] Page {page} sync failed or returned no data")
                 break
-        
-        logger.info(f"✅ [SYNC] Sync completed for user: {user_id}")
-        logger.info(f"   - Total pages: {total_pages}")
-        logger.info(f"   - Total fetched from eBay: {total_fetched} listings")
-        logger.info(f"   - Total upserted to DB: {total_upserted} listings")
-        logger.info(f"   - eBay User ID: {ebay_user_id}")
         
         # ✅ 3. last_sync_at 강제 업데이트: Sync 완료 후 해당 user_id의 listings의 last_synced_at을 현재 시간으로 강제 업데이트 및 commit
         sync_timestamp = datetime.utcnow()
@@ -1499,32 +1474,17 @@ async def sync_ebay_listings(
                         {"last_synced_at": sync_timestamp},
                         synchronize_session=False
                     )
-                    # ✅ CRITICAL: db.commit() 확실히 실행
                     db.commit()
-                    logger.info(f"✅ [SYNC] last_synced_at 강제 업데이트 완료: {updated_count} listings")
-                    logger.info(f"   - Sync timestamp: {sync_timestamp.isoformat()}")
-                    logger.info(f"   - db.commit() 실행 완료")
-                    
-                    # 업데이트 확인: 실제로 DB에 반영되었는지 확인
-                    verify_count = db.query(Listing).filter(
-                        Listing.user_id == user_id,
-                        func.lower(Listing.platform) == func.lower("eBay"),
-                        Listing.last_synced_at == sync_timestamp
-                    ).count()
-                    logger.info(f"   - 업데이트 확인: {verify_count}개 레코드가 last_synced_at={sync_timestamp.isoformat()}로 설정됨")
                 except Exception as update_err:
                     db.rollback()
-                    logger.error(f"❌ [SYNC] last_synced_at 업데이트 실패: {update_err}")
-                    import traceback
-                    logger.error(traceback.format_exc())
                 finally:
                     db.close()
             except Exception as db_err:
-                logger.warning(f"⚠️ [SYNC] DB 연결 실패 (last_sync_at 업데이트 스킵): {db_err}")
-        else:
-            logger.warn(f"⚠️ [SYNC] total_upserted=0이므로 last_synced_at 업데이트 스킵")
+                pass
         
-        logger.info("=" * 60)
+        # 검증 로그 표준화: 세 줄만 남김
+        logger.info(f"[FETCH] eBay로부터 {total_fetched}개 수집 완료.")
+        logger.info(f"[STORE] 유저 {user_id}의 상품 {total_upserted}개 DB 저장/업데이트 완료.")
         
         return {
             "success": True,
@@ -1977,11 +1937,7 @@ async def get_active_listings_trading_api_internal(
         logger.warning(f"⚠️ [RequestId: {request_id}] Failed to save listings to database: {save_err}")
         upserted_count = 0
     
-    logger.info(f"📊 [INTERNAL] Page {page} result summary:")
-    logger.info(f"   - Fetched from eBay: {len(listings)} listings")
-    logger.info(f"   - Upserted to DB: {upserted_count} listings")
-    logger.info(f"   - Total entries (eBay): {total_entries}")
-    logger.info(f"   - Total pages (eBay): {total_pages}")
+    # 검증 로그 표준화: 세 줄만 남김 (페이지별 상세 로그 제거)
     
     return {
         "success": True,
@@ -2414,12 +2370,8 @@ async def get_ebay_summary(
     - Queue count (선택)
     """
     import traceback
-    logger.info("=" * 60)
-    logger.info(f"📊 [SUMMARY] Fetching eBay summary for user: {user_id}")
-    
-    # Validate user_id
+    # Validate user_id - default-user 차단
     if not user_id or user_id == "default-user":
-        logger.warning(f"⚠️ [SUMMARY] Invalid user_id: {user_id}")
         return {
             "success": False,
             "error": "invalid_user_id",
@@ -2437,15 +2389,6 @@ async def get_ebay_summary(
         
         db = next(get_db())
         try:
-            logger.info(f"📊 [SUMMARY] Resolved user_id: {user_id} (type: {type(user_id).__name__})")
-            
-            # ✅ 3단계: 조회 쿼리 점검 - 정확한 필터링 확인
-            logger.info("=" * 60)
-            logger.info(f"📊 [SUMMARY] Query for user: {user_id}")
-            logger.info(f"   - Query conditions: user_id='{user_id}' AND platform='eBay'")
-            logger.info(f"   - user_id type: {type(user_id).__name__}")
-            logger.info("=" * 60)
-            
             # ✅ Summary 쿼리 실행 (Case-insensitive platform 검색)
             from sqlalchemy import func, text
             active_query = db.query(Listing).filter(
@@ -2453,32 +2396,7 @@ async def get_ebay_summary(
                 func.lower(Listing.platform) == func.lower("eBay")  # Case-insensitive
             )
             
-            # ✅ 3단계: 조회 쿼리 수정 - 실제 SQL 쿼리문 로그 출력
-            try:
-                compiled_query = str(active_query.statement.compile(compile_kwargs={"literal_binds": True}))
-                logger.info("=" * 60)
-                logger.info(f"📊 [SUMMARY] 실제 SQL 쿼리문:")
-                logger.info(f"   {compiled_query}")
-                logger.info("=" * 60)
-            except Exception as compile_err:
-                # 쿼리 컴파일 실패 시 대체 로그
-                logger.info(f"📊 [SUMMARY] SQL 쿼리 (컴파일 실패, 대체 로그):")
-                logger.info(f"   SELECT COUNT(*) FROM listings WHERE user_id = '{user_id}' AND LOWER(platform) = 'ebay'")
-            
             active_count = active_query.count()
-            
-            logger.info(f"📊 [SUMMARY] Query result: active_count={active_count} (user_id={user_id}, platform=eBay)")
-            
-            # ✅ 에러 케이스만 로깅 (핵심만)
-            if active_count == 0:
-                same_user_any_platform = db.query(Listing).filter(Listing.user_id == user_id).count()
-                same_platform_any_user = db.query(Listing).filter(Listing.platform == "eBay").count()
-                if same_user_any_platform > 0:
-                    logger.warn(f"⚠️ [SUMMARY] user_id={user_id}는 일치하지만 platform이 다를 수 있음 (platform별: {same_user_any_platform}개)")
-                elif same_platform_any_user > 0:
-                    logger.warn(f"⚠️ [SUMMARY] platform=eBay는 일치하지만 user_id가 다를 수 있음 (eBay 전체: {same_platform_any_user}개)")
-                else:
-                    logger.info(f"ℹ️ [SUMMARY] DB에 listings가 없음 (user_id={user_id}, platform=eBay)")
             
             # ✅ 2. Last sync timestamp (가장 최근 last_synced_at) - Case-insensitive 검색
             last_listing = db.query(Listing).filter(
@@ -2544,12 +2462,8 @@ async def get_ebay_summary(
             # 필요시 별도 API로 제공
             queue_count = 0
             
-            logger.info(f"✅ Summary retrieved for user {user_id}:")
-            logger.info(f"   Active count: {active_count}")
-            logger.info(f"   Low-performing count: {low_performing_count}")
-            logger.info(f"   Queue count: {queue_count}")
-            logger.info(f"   Last sync: {last_sync_at}")
-            logger.info("=" * 60)
+            # 검증 로그 표준화: 세 줄만 남김
+            logger.info(f"[DASHBOARD] 현재 활성 상품 수: {active_count}개.")
             
             return {
                 "success": True,
