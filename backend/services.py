@@ -8,6 +8,10 @@ import pandas as pd
 from io import StringIO
 import re
 import json
+import logging
+
+# Initialize logger for this module
+logger = logging.getLogger(__name__)
 
 
 def detect_shopify_routing(
@@ -1339,12 +1343,12 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
             # expected_user_id가 제공되면 그것을 사용, 아니면 listing의 user_id 사용
             listing_user_id = expected_user_id if expected_user_id else getattr(listing, 'user_id', None)
             
-            if not listing_user_id or listing_user_id == "default-user":
-                logger.error(f"❌ [UPSERT] CRITICAL: user_id가 None이거나 'default-user'입니다!")
+            if not listing_user_id:
+                logger.error(f"❌ [UPSERT] CRITICAL: user_id가 None입니다!")
                 logger.error(f"   - listing.user_id: {listing_user_id}")
                 logger.error(f"   - listing.id: {getattr(listing, 'id', 'N/A')}")
                 logger.error(f"   - listing.title: {getattr(listing, 'title', 'N/A')[:50]}")
-                raise ValueError(f"user_id가 유효하지 않습니다: {listing_user_id}. 'default-user'로 저장할 수 없습니다.")
+                raise ValueError(f"user_id가 유효하지 않습니다: {listing_user_id}. user_id는 필수입니다.")
             
             values = {
                 'user_id': listing_user_id,  # ✅ CRITICAL: expected_user_id 우선 사용
@@ -1548,12 +1552,12 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
             
             # ✅ CRITICAL: user_id가 None이면 에러 발생 (fallback 금지)
             user_id = getattr(listing, 'user_id', None)
-            if not user_id or user_id == "default-user":
-                logger.error(f"❌ [UPSERT SQLite] CRITICAL: user_id가 None이거나 'default-user'입니다!")
+            if not user_id:
+                logger.error(f"❌ [UPSERT SQLite] CRITICAL: user_id가 None입니다!")
                 logger.error(f"   - listing.user_id: {user_id}")
                 logger.error(f"   - listing.id: {getattr(listing, 'id', 'N/A')}")
                 logger.error(f"   - listing.title: {getattr(listing, 'title', 'N/A')[:50]}")
-                raise ValueError(f"user_id가 유효하지 않습니다: {user_id}. 'default-user'로 저장할 수 없습니다.")
+                raise ValueError(f"user_id가 유효하지 않습니다: {user_id}. user_id는 필수입니다.")
             
             # Check if listing exists
             query = db.query(Listing).filter(Listing.user_id == user_id)
@@ -1785,9 +1789,10 @@ def generate_export_csv(
     listings,
     target_tool: str,
     db: Optional[Session] = None,
-    user_id: str = "default-user",
+    user_id: str = None,  # user_id는 필수 파라미터 - None이면 에러 발생
     mode: str = "delete_list",
-    store_id: Optional[str] = None
+    store_id: Optional[str] = None,
+    platform: Optional[str] = None
 ) -> str:
     """
     CSV Export for Dropshipping Automation Tools Only
@@ -1802,20 +1807,33 @@ def generate_export_csv(
     4. Shopify (Tagging Method): Headers: "Handle", "Tags" | Data: handle/sku, "OptListing_Delete"
     5. eBay File Exchange: Headers: "Action", "ItemID" | Data: "End", item_id
     6. Yaballe: Headers: "Monitor ID", "Action" | Data: supplier_id, "DELETE"
+    7. BigCommerce: Headers: "Product ID", "Action" | Data: item_id/sku, "DELETE"
     
     Args:
         listings: List of Listing objects or dictionaries (items to delete OR items to exclude in full_sync mode)
-        target_tool: Tool name (e.g., "autods", "wholesale2b", "shopify_matrixify", "shopify_tagging", "ebay", "yaballe")
+        target_tool: Tool name (e.g., "autods", "wholesale2b", "shopify_matrixify", "shopify_tagging", "ebay", "yaballe", "bigcommerce")
         db: Optional database session for logging deletions with snapshots and fetching all listings
         user_id: User ID for deletion logging and fetching listings
         mode: Export mode - "delete_list" (default) exports items to delete, "full_sync_list" exports survivors (all items except provided list)
         store_id: Optional store ID filter for full_sync_list mode
+        platform: Optional platform parameter - if provided, overrides target_tool mapping ("shopify" -> "shopify_matrixify", "bigcommerce" -> "bigcommerce")
     
     Returns:
         CSV string in tool-specific format
     
     Note: Assumes 100% of items are from supported Dropshipping Tools (no manual/direct listings).
     """
+    # Platform-based target_tool mapping (if platform is provided)
+    # platform 파라미터가 제공되면 target_tool을 플랫폼에 맞게 매핑
+    if platform:
+        platform_to_tool = {
+            'shopify': 'shopify_matrixify',
+            'bigcommerce': 'bigcommerce'
+        }
+        # Override target_tool if platform is recognized
+        if platform.lower() in platform_to_tool:
+            target_tool = platform_to_tool[platform.lower()]
+            logger.info(f"🔄 Platform '{platform}' mapped to target_tool '{target_tool}'")
     # Full Sync Mode: Export all active listings EXCEPT the provided list
     if mode == "full_sync_list" and db:
         # Get all active listings for this user/store
@@ -1848,6 +1866,10 @@ def generate_export_csv(
         listings = survivor_listings
     elif not listings:
         return ""
+    
+    # Validate user_id (필수 파라미터)
+    if not user_id:
+        raise ValueError("user_id is required for CSV export. Cannot export without a valid user_id.")
     
     # Log deletions with snapshots BEFORE generating CSV (only for delete_list mode)
     if db and mode == "delete_list":

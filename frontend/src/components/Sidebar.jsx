@@ -467,7 +467,11 @@ function Sidebar() {
                         try {
                           // Use admin grant endpoint with admin key from environment
                           const adminKey = import.meta.env.VITE_ADMIN_API_KEY || ''
-                          const userId = user?.id || 'default-user'
+                          const userId = user?.id
+                          if (!userId) {
+                            console.error('User not logged in')
+                            return
+                          }
                           
                           const response = await axios.post(
                             `${API_BASE_URL}/api/admin/credits/grant`,
@@ -546,8 +550,12 @@ function Sidebar() {
                   onClick={async (e) => {
                     e.preventDefault()
                     
-                    // Get user_id (default to 'default-user' for MVP testing)
-                    const userId = user?.id || 'default-user'
+                    // Get user_id - must be logged in
+                    const userId = user?.id
+                    if (!userId) {
+                      console.error('User not logged in')
+                      return
+                    }
                     
                     // Lemon Squeezy Variant IDs
                     const variantIdMap = {

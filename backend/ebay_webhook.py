@@ -568,11 +568,11 @@ async def ebay_auth_callback(
                 logger.info(f"   State parts: {parts}")
                 if len(parts) >= 2:
                     extracted_user_id = parts[1]  # 실제 user_id 추출
-                    if extracted_user_id and extracted_user_id != "default-user":
+                    if extracted_user_id:
                         user_id = extracted_user_id
                         logger.info(f"   ✅ Extracted valid user_id from state: {user_id}")
                     else:
-                        logger.error(f"   ❌ Invalid user_id extracted: '{extracted_user_id}' (cannot be 'default-user')")
+                        logger.error(f"   ❌ Invalid user_id extracted: '{extracted_user_id}' (must be valid UUID)")
                 else:
                     logger.warning(f"   State format unexpected, parts count: {len(parts)}")
             except Exception as e:
@@ -580,9 +580,9 @@ async def ebay_auth_callback(
         else:
             logger.warning(f"   State does not start with 'user_': {state[:50]}")
     
-    # user_id 검증 - 'default-user' 또는 None이면 에러 반환
-    if not user_id or user_id == "default-user":
-        logger.error(f"❌ Invalid user_id: '{user_id}' - Cannot save token with 'default-user' or empty user_id")
+    # user_id 검증 - None이면 에러 반환
+    if not user_id:
+        logger.error(f"❌ Invalid user_id: '{user_id}' - Cannot save token without valid user_id")
         error_redirect = f"{FRONTEND_URL}/dashboard?ebay_error=invalid_user&message=User ID is required. Please log in and try again."
         return RedirectResponse(url=error_redirect, status_code=302)
     
@@ -1062,7 +1062,10 @@ async def ebay_oauth_config():
 
 @router.get("/debug/tokens")
 async def debug_tokens(
-    user_id: str = Query("default-user", description="User ID to check")
+    # 디버그 엔드포인트는 JWT 인증 필요
+    # get_current_user를 import해야 하지만, router는 별도 파일이므로 Depends 사용
+    # 일단 Query로 유지하되, 기본값 제거
+    user_id: str = Query(..., description="User ID to check (required)")
 ):
     """
     🔍 디버그: 모든 토큰 정보 확인 (긴급 디버깅용)
@@ -1370,8 +1373,8 @@ async def sync_ebay_listings(
     - DB에 upsert (중복 시 업데이트)
     - Summary stats 갱신을 위해 프론트엔드에서 fetchSummaryStats() 재호출 필요
     """
-    # Validate user_id - default-user 차단
-    if not user_id or user_id == "default-user":
+    # Validate user_id - 유효한 UUID여야 함
+    if not user_id:
         raise HTTPException(
             status_code=400,
             detail={
@@ -1536,8 +1539,8 @@ async def get_active_listings_trading_api_internal(
     내부 함수: Trading API를 사용하여 활성 listings를 가져와 DB에 저장
     (get_active_listings_trading_api와 동일한 로직, 재사용을 위해 분리)
     """
-    # ✅ user_id 검증: 프론트엔드에서 전달된 user_id 사용
-    if not user_id or user_id == "default-user":
+    # ✅ user_id 검증: 유효한 UUID여야 함
+    if not user_id:
         logger.error(f"❌ [INTERNAL] Invalid user_id: {user_id}")
         raise HTTPException(status_code=400, detail=f"Invalid user_id: {user_id}. User must be logged in.")
     
@@ -2440,8 +2443,8 @@ async def get_ebay_summary(
     - Queue count (선택)
     """
     import traceback
-    # Validate user_id - default-user 차단
-    if not user_id or user_id == "default-user":
+    # Validate user_id - 유효한 UUID여야 함
+    if not user_id:
         return {
             "success": False,
             "error": "invalid_user_id",

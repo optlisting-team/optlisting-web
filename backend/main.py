@@ -32,7 +32,100 @@ from .credit_service import (
     PlanType,
 )
 
+# Supabase Auth for JWT verification
+try:
+    from supabase import create_client, Client
+    SUPABASE_AVAILABLE = True
+except ImportError:
+    SUPABASE_AVAILABLE = False
+    logger = logging.getLogger(__name__)
+    logger.warning("⚠️ Supabase client not available. Install with: pip install supabase")
+
 app = FastAPI(title="OptListing API", version="1.4.0")
+
+# ============================================================
+# JWT Authentication with Supabase
+# ============================================================
+def get_current_user(request: Request) -> str:
+    """
+    FastAPI 의존성 함수: JWT 토큰을 검증하고 user_id를 반환합니다.
+    
+    Authorization: Bearer <JWT> 헤더에서 토큰을 추출하고
+    Supabase Auth를 통해 검증합니다.
+    
+    Returns:
+        str: 인증된 사용자의 user_id (UUID)
+    
+    Raises:
+        HTTPException: 토큰이 없거나 유효하지 않은 경우 401 반환
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Authorization 헤더 확인
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        logger.warning("❌ [AUTH] Authorization header missing")
+        raise HTTPException(
+            status_code=401,
+            detail="Authorization header missing. Please provide a valid JWT token."
+        )
+    
+    # Bearer 토큰 추출
+    try:
+        scheme, token = auth_header.split()
+        if scheme.lower() != "bearer":
+            raise ValueError("Invalid authorization scheme")
+    except ValueError:
+        logger.warning("❌ [AUTH] Invalid authorization header format")
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authorization header format. Expected: Bearer <token>"
+        )
+    
+    # Supabase 클라이언트 생성 및 토큰 검증
+    if not SUPABASE_AVAILABLE:
+        logger.error("❌ [AUTH] Supabase client not available")
+        raise HTTPException(
+            status_code=500,
+            detail="Authentication service not available. Please check server configuration."
+        )
+    
+    try:
+        supabase_url = os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_ANON_KEY") or os.getenv("VITE_SUPABASE_ANON_KEY")
+        
+        if not supabase_url or not supabase_key:
+            logger.error("❌ [AUTH] Supabase credentials not configured")
+            raise HTTPException(
+                status_code=500,
+                detail="Authentication service not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY."
+            )
+        
+        supabase: Client = create_client(supabase_url, supabase_key)
+        
+        # 토큰 검증 및 사용자 정보 조회
+        user_response = supabase.auth.get_user(token)
+        
+        if user_response.user is None:
+            logger.warning("❌ [AUTH] Invalid or expired token")
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or expired token. Please log in again."
+            )
+        
+        user_id = user_response.user.id
+        logger.info(f"✅ [AUTH] User authenticated: {user_id}")
+        return user_id
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ [AUTH] Token verification failed: {str(e)}")
+        raise HTTPException(
+            status_code=401,
+            detail=f"Token verification failed: {str(e)}"
+        )
 
 # ============================================================
 # [BOOT] Supabase Write Self-Test (Top-level execution)
@@ -381,7 +474,7 @@ def startup_event():
                     text("""
                         DELETE FROM listings 
                         WHERE user_id IS NULL 
-                        OR user_id = 'default-user'
+                        -- OR user_id = 'default-user' -- 제거됨: 이제 모든 user_id는 유효한 UUID여야 함
                         OR (user_id NOT IN (SELECT user_id FROM profiles WHERE user_id IS NOT NULL) 
                             AND user_id IS NOT NULL)
                     """)
@@ -513,10 +606,19 @@ async def trigger_token_refresh(
 
 @app.get("/api/debug/listings")
 def debug_listings(
-    user_id: str = Query(..., description="User ID"),
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     platform: str = Query("eBay", description="Platform filter"),
     db: Session = Depends(get_db)
 ):
+    """
+    🔍 디버그 엔드포인트: Listings 테이블 조회 및 샘플 데이터 반환
+    JWT 인증이 필요합니다.
+    
+    sync upsert와 summary 쿼리의 키 일치 여부를 확인하기 위한 임시 디버그 엔드포인트
+    - user_id + platform으로 count
+    - 샘플 row 5개 반환
+    - sync upsert와 summary 쿼리의 키 비교 정보 제공
+    """
     """
     🔍 디버그 엔드포인트: Listings 테이블 조회 및 샘플 데이터 반환
     
@@ -602,7 +704,7 @@ def get_listings(
     skip: int = 0,
     limit: int = 100,
     store_id: Optional[str] = None,  # Store ID filter - 'all' or None means all stores
-    user_id: str = "default-user",  # Default user ID for MVP phase
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     db: Session = Depends(get_db)
 ):
     """Get all listings for a specific user"""
@@ -698,7 +800,7 @@ def analyze_zombies(
     supplier_filter: str = "All",
     marketplace: str = "eBay",       # MVP Scope: Default to eBay
     store_id: Optional[str] = None,
-    user_id: str = "default-user",
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db)
@@ -986,7 +1088,7 @@ class LowPerformingExecuteRequest(BaseModel):
 @app.post("/api/analysis/low-performing/quote")
 def quote_low_performing_analysis(
     request: LowPerformingAnalysisRequest,
-    user_id: str = Query("default-user", description="User ID"),
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     store_id: Optional[str] = Query(None, description="Store ID (optional)"),
     db: Session = Depends(get_db)
 ):
@@ -1022,7 +1124,7 @@ def quote_low_performing_analysis(
     logger.info(f"📊 [QUOTE] Query params: user_id={user_id}, store_id={store_id}")
     
     # Validate user_id
-    if not user_id or user_id == "default-user":
+    if not user_id:
         logger.warning(f"⚠️ [QUOTE] Invalid user_id: {user_id}")
         raise HTTPException(
             status_code=400,
@@ -1118,7 +1220,7 @@ def quote_low_performing_analysis(
 @app.post("/api/analysis/low-performing/execute")
 def execute_low_performing_analysis(
     request: LowPerformingExecuteRequest,
-    user_id: str = Query("default-user", description="User ID"),
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     store_id: Optional[str] = Query(None, description="Store ID (optional)"),
     db: Session = Depends(get_db)
 ):
@@ -1366,7 +1468,7 @@ def execute_low_performing_analysis(
 @app.post("/api/analysis/low-performing")
 def analyze_low_performing(
     request: LowPerformingAnalysisRequest,
-    user_id: str = Query("default-user", description="User ID"),
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     store_id: Optional[str] = Query(None, description="Store ID (optional)"),
     db: Session = Depends(get_db)
 ):
@@ -1573,10 +1675,18 @@ def export_csv(
     max_watch_count = max(0, max_watch_count)
     
     # Get zombie listings with filters
-    zombies, _ = analyze_zombie_listings(
-        db, 
-        user_id="default-user",  # Default user ID
-        min_days=min_days, 
+    # Note: This endpoint is deprecated - use /api/analysis/low-performing instead
+    # Keeping for backward compatibility but requires authentication
+    raise HTTPException(
+        status_code=400,
+        detail="This endpoint is deprecated. Please use /api/analysis/low-performing with JWT authentication."
+    )
+    
+    # Original code (commented out):
+    # zombies, _ = analyze_zombie_listings(
+    #     db, 
+    #     user_id=user_id,  # JWT 인증으로 추출된 user_id 사용
+    #     min_days=min_days, 
         max_sales=max_sales,
         max_watch_count=max_watch_count,
         supplier_filter=supplier_filter
@@ -1585,8 +1695,8 @@ def export_csv(
     if not zombies:
         raise HTTPException(status_code=404, detail="No zombie listings found")
     
-    # Generate CSV (with snapshot logging)
-    csv_content = generate_export_csv(zombies, export_mode, db=db, user_id="default-user")
+    # Generate CSV (with snapshot logging) - 코드가 실행되지 않음 (위에서 raise됨)
+    # csv_content = generate_export_csv(zombies, export_mode, db=db, user_id=user_id)
     
     # Determine filename
     filename_map = {
@@ -1610,10 +1720,12 @@ class ExportQueueRequest(BaseModel):
     export_mode: Optional[str] = None  # Legacy parameter for backward compatibility
     mode: Optional[str] = "delete_list"  # "delete_list" (default) or "full_sync_list"
     store_id: Optional[str] = None  # Store ID for full_sync_list mode
+    platform: Optional[str] = None  # Platform parameter: "shopify", "bigcommerce" (maps to target_tool)
 
 @app.post("/api/export-queue")
 def export_queue_csv(
     request: ExportQueueRequest,
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     db: Session = Depends(get_db)
 ):
     """
@@ -1644,14 +1756,19 @@ def export_queue_csv(
             detail="Invalid mode. Must be 'delete_list' or 'full_sync_list'"
         )
     
+    # Extract platform from request if provided (optional parameter)
+    # Frontend에서 platform 파라미터를 전달하면 이를 사용하여 target_tool 매핑
+    platform = getattr(request, 'platform', None)
+    
     # Generate CSV directly from items (dictionaries) with target_tool (with snapshot logging)
     csv_content = generate_export_csv(
         items, 
         target_tool, 
         db=db, 
-        user_id="default-user",
+        user_id=user_id,  # JWT 인증으로 추출된 user_id 사용
         mode=mode,
-        store_id=request.store_id
+        store_id=request.store_id,
+        platform=platform
     )
     
     # Determine filename
@@ -1881,7 +1998,7 @@ def update_listing(
 @app.post("/api/dummy-data")
 def create_dummy_data(
     count: int = 50,
-    user_id: str = "default-user",
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     db: Session = Depends(get_db)
 ):
     """Generate dummy listings for testing with new hybrid schema"""
@@ -1919,7 +2036,7 @@ class CSVUploadResponse(BaseModel):
 @app.post("/api/upload-supplier-csv", response_model=CSVUploadResponse)
 async def upload_supplier_csv(
     file: UploadFile = File(...),
-    user_id: str = "default-user",
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     dry_run: bool = False,
     db: Session = Depends(get_db)
 ):
@@ -2004,7 +2121,7 @@ def download_csv_template():
 
 @app.get("/api/unmatched-listings")
 def get_unmatched_listings_endpoint(
-    user_id: str = "default-user",
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     limit: int = 100,
     db: Session = Depends(get_db)
 ):
@@ -2073,7 +2190,7 @@ class AddCreditsRequest(BaseModel):
 
 @app.get("/api/credits", response_model=CreditBalanceResponse)
 def get_credit_balance(
-    user_id: str = "default-user",
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     db: Session = Depends(get_db)
 ):
     """
@@ -2114,7 +2231,7 @@ def get_credit_balance(
 @app.post("/api/analysis/start", response_model=AnalysisStartResponse)
 def start_analysis(
     request: AnalysisStartRequest,
-    user_id: str = "default-user",
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     db: Session = Depends(get_db)
 ):
     """
@@ -2225,7 +2342,7 @@ def start_analysis(
 @app.post("/api/credits/add")
 def add_user_credits(
     request: AddCreditsRequest,
-    user_id: str = "default-user",
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     admin_key: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
@@ -2280,7 +2397,7 @@ def add_user_credits(
 def refund_user_credits(
     amount: int,
     reason: str,
-    user_id: str = "default-user",
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     reference_id: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
@@ -2422,7 +2539,7 @@ async def lemonsqueezy_webhook(request: Request, db: Session = Depends(get_db)):
 
 class CreateCheckoutRequest(BaseModel):
     variant_id: str
-    user_id: str = "default-user"
+    # user_id는 JWT에서 추출되므로 모델에서 제거
 
 @app.post("/api/lemonsqueezy/create-checkout")
 async def create_checkout(
@@ -2643,7 +2760,7 @@ async def create_checkout(
 @app.post("/api/lemonsqueezy/create-checkout")
 async def create_checkout(
     variant_id: str,
-    user_id: str = "default-user",  # User ID for custom data
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     db: Session = Depends(get_db)
 ):
     """
@@ -3139,7 +3256,7 @@ def redeem_coupon(
 @app.post("/api/dev/credits/topup")
 def dev_topup_credits(
     amount: int = Query(100, description="Amount of credits to add"),
-    user_id: str = Query("default-user", description="User ID"),
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     db: Session = Depends(get_db)
 ):
     """

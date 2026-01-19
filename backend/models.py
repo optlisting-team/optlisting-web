@@ -16,7 +16,9 @@ class Listing(Base):
     __tablename__ = "listings"
 
     id = Column(Integer, primary_key=True, index=True)
-    ebay_item_id = Column(String, unique=True, index=True, nullable=False)
+    # ✅ 멀티테넌시: ebay_item_id의 unique 제약조건 제거
+    # 대신 (user_id, ebay_item_id) 복합 UNIQUE 제약조건을 마이그레이션 SQL로 생성
+    ebay_item_id = Column(String, index=True, nullable=False)
     title = Column(String, nullable=False)
     sku = Column(String, nullable=False)
     image_url = Column(String, nullable=False)

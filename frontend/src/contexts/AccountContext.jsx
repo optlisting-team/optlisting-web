@@ -53,7 +53,7 @@ export const AccountProvider = ({ children }) => {
   const fetchCredits = async () => {
     try {
       const response = await retryFetch(
-        `${API_BASE_URL}/api/credits?user_id=default-user`,
+        `${API_BASE_URL}/api/credits`,  // user_id는 JWT에서 추출됨
         {
           method: 'GET',
           headers: {

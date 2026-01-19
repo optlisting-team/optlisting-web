@@ -28,7 +28,7 @@ function PaymentSuccess() {
     const fetchInitialCredits = async () => {
       try {
         const response = await fetch(
-          `${API_BASE_URL}/api/credits?user_id=default-user`,
+          `${API_BASE_URL}/api/credits`,  // user_id는 JWT에서 추출됨
           {
             method: 'GET',
             headers: {
@@ -61,7 +61,7 @@ function PaymentSuccess() {
     const checkCredits = async () => {
       try {
         const response = await fetch(
-          `${API_BASE_URL}/api/credits?user_id=default-user`,
+          `${API_BASE_URL}/api/credits`,  // user_id는 JWT에서 추출됨
           {
             method: 'GET',
             headers: {

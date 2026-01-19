@@ -22,8 +22,8 @@ const API_BASE_URL = import.meta.env.DEV
 // Store Selector Component
 function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onError, loading = false }) {
   const { user } = useAuth()
-  // Get actual user ID from auth context, fallback to 'default-user' if not logged in
-  const currentUserId = user?.id || 'default-user'
+  // Get actual user ID from auth context - CRITICAL: No fallback (must be logged in)
+  const currentUserId = user?.id
   const [isOpen, setIsOpen] = useState(false)
   const [stores, setStores] = useState(INITIAL_STORES)
   const [selectedStore, setSelectedStore] = useState(stores[0])
@@ -652,7 +652,9 @@ function SummaryCard({ onError,
   zombies = [],
     // Summary stats and analysis result (for filtered badge)
     summaryStats = null,
-    analysisResult = null
+    analysisResult = null,
+    // Export CSV callback
+    onExportCSV = null
 }) {
   // Plan colors
   const planColors = {
@@ -673,8 +675,8 @@ function SummaryCard({ onError,
         loading={loading}
       />
 
-      {/* Stats Row - 3 Columns: Display only (non-interactive) */}
-      <div className="grid grid-cols-3 gap-4">
+      {/* Stats Row - 2 Columns: Display only (non-interactive) */}
+      <div className="grid grid-cols-2 gap-4">
         {/* 1. Active Listings - Display only */}
         <div 
           className="opt-card p-6 text-center relative"
@@ -695,7 +697,7 @@ function SummaryCard({ onError,
           )}
       </div>
 
-        {/* 2. Low-Performing - Display only */}
+        {/* 2. Low-Performing - Display only with Export CSV button */}
         <div 
           className={`opt-card p-6 text-center relative ${totalZombies > 0 ? 'border-red-500/30' : ''}`}
           title="Number of low-performing (deletion target) SKUs detected based on current filter settings."
@@ -708,15 +710,23 @@ function SummaryCard({ onError,
               Filtered
             </div>
           )}
+          {/* Export CSV 버튼 */}
+          {totalZombies > 0 && analysisResult && (
+            <div className="mt-4">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onExportCSV) {
+                    onExportCSV();
+                  }
+                }}
+                disabled={loading}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                Export CSV
+              </button>
             </div>
-
-        {/* 3. CSV Export - Display only */}
-        <div 
-          className="opt-card p-6 text-center"
-          title="Selected items for CSV export."
-        >
-          <div className={`text-4xl font-black ${queueCount > 0 ? 'text-orange-400' : 'text-white'}`}>{queueCount || 0}</div>
-          <div className="text-sm text-zinc-500 uppercase mt-1">CSV Export</div>
+          )}
             </div>
           </div>
 

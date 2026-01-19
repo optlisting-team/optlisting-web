@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import axios from 'axios'
+import apiClient, { API_BASE_URL } from '../lib/api'
 import { useStore } from '../contexts/StoreContext'
 import { useAuth } from '../contexts/AuthContext'
 import SummaryCard from './SummaryCard'
@@ -15,16 +16,13 @@ import FilteringModal from './FilteringModal'
 import ConfirmModal from './ConfirmModal'
 import LowPerformingResults from './LowPerformingResults'
 import Toast from './Toast'
+import PlatformSelectModal from './PlatformSelectModal'
 import { Button } from './ui/button'
 import { AlertCircle, X, Loader2 } from 'lucide-react'
 import { getImageUrlFromListing, normalizeImageUrl } from '../utils/imageUtils'
 
-// Use environment variable for Railway URL, fallback based on environment
-// CRITICAL: Production MUST use relative path /api (proxied by vercel.json) to avoid CORS issues
-// Only use VITE_API_URL in development if needed, production always uses relative path
-const API_BASE_URL = import.meta.env.DEV 
-  ? (import.meta.env.VITE_API_URL || '')  // Development: use env var or empty for Vite proxy
-  : ''  // Production: ALWAYS use relative path (vercel.json proxy handles routing to Railway)
+// API_BASE_URL은 api.js에서 import
+// JWT 인증이 필요한 요청은 apiClient 사용, 인증이 필요 없는 요청(health check 등)은 axios 사용
 
 // Demo Mode - Set to true to use dummy data (false for production with real API)
 // Test mode: true = dummy data, false = real API
@@ -195,6 +193,10 @@ function Dashboard() {
   // Toast Notification State
   const [toast, setToast] = useState(null) // { message, type: 'error' | 'success' | 'warning' }
   
+  // Platform Select Modal State
+  const [showPlatformModal, setShowPlatformModal] = useState(false)
+  const [isExportingCSV, setIsExportingCSV] = useState(false)
+  
   // 에러 유형별 메시지 생성 함수
   const getErrorMessage = (err) => {
     if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
@@ -260,6 +262,7 @@ function Dashboard() {
   const zombieBreakdown = useMemo(() => ({}), [])
   
   // API Health Check - Check connection on mount
+  // Health check는 인증이 필요 없으므로 axios 사용
   const checkApiHealth = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/health`, { 
@@ -337,13 +340,8 @@ function Dashboard() {
       console.log('🔄 [SYNC] Starting eBay listings sync...')
       console.log('   user_id:', currentUserId)
       
-      const response = await axios.post(`${API_BASE_URL}/api/ebay/listings/sync`, null, {
-        params: {
-          user_id: currentUserId
-        },
-        headers: {
-          'Content-Type': 'application/json'
-        },
+      // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+      const response = await apiClient.post(`/api/ebay/listings/sync`, null, {
         timeout: 120000 // 2분 타임아웃 (대량 listings 동기화 고려)
       })
       
@@ -408,15 +406,12 @@ function Dashboard() {
         try {
           // fetchSummaryStats는 내부에서 summaryStats를 업데이트하므로, 
           // 응답을 직접 확인하기 위해 API를 직접 호출
-          const summaryResponse = await axios.get(`${API_BASE_URL}/api/ebay/summary`, {
+          // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+          const summaryResponse = await apiClient.get(`/api/ebay/summary`, {
             params: {
-              user_id: currentUserId,
               filters: JSON.stringify(filters)
             },
             timeout: 30000,
-            headers: {
-              'Content-Type': 'application/json',
-            },
           })
           
           if (summaryResponse.data && summaryResponse.data.success) {
@@ -530,15 +525,12 @@ function Dashboard() {
       console.log('   - filters object:', filters)
       console.log('   - filters JSON stringified:', JSON.stringify(filters))
       
-      const response = await axios.get(`${API_BASE_URL}/api/ebay/summary`, {
+      // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+      const response = await apiClient.get(`/api/ebay/summary`, {
         params: {
-          user_id: currentUserId,
           filters: JSON.stringify(filters) // 필터 파라미터 전달
         },
         timeout: 30000,
-        headers: {
-          'Content-Type': 'application/json',
-        },
       })
       
       // 🔍 STEP 3: Summary 집계 로직 점검 - 쿼리 조건 및 결과 확인
@@ -1170,13 +1162,10 @@ function Dashboard() {
         views_lte: newFilters.max_views || 10,
       }
       
-      const quoteResponse = await axios.post(`${API_BASE_URL}/api/analysis/low-performing/quote`, requestBody, {
+      // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+      const quoteResponse = await apiClient.post(`/api/analysis/low-performing/quote`, requestBody, {
         params: {
-          user_id: currentUserId,
           store_id: selectedStore?.id || null
-        },
-        headers: {
-          'Content-Type': 'application/json'
         },
         timeout: 30000
       })
@@ -1251,7 +1240,8 @@ function Dashboard() {
       console.log(`📊 [${idempotencyKey}] Starting Low-Performing analysis execution...`, pendingAnalysisFilters)
       
       // Step 3: Execute 호출 - 크레딧 차감 + 분석 수행
-      const response = await axios.post(`${API_BASE_URL}/api/analysis/low-performing/execute`, {
+      // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+      const response = await apiClient.post(`/api/analysis/low-performing/execute`, {
         days: pendingAnalysisFilters.analytics_period_days || pendingAnalysisFilters.min_days || 7,
         sales_lte: pendingAnalysisFilters.max_sales || 0,
         watch_lte: pendingAnalysisFilters.max_watches || pendingAnalysisFilters.max_watch_count || 0,
@@ -1259,11 +1249,7 @@ function Dashboard() {
         views_lte: pendingAnalysisFilters.max_views || 10,
         idempotency_key: idempotencyKey
       }, {
-        params: {
-          user_id: currentUserId
-        },
         headers: {
-          'Content-Type': 'application/json',
           'Idempotency-Key': idempotencyKey  // 헤더에도 포함 (표준 관행)
         },
         timeout: 120000
@@ -1856,6 +1842,93 @@ function Dashboard() {
     }
   }
 
+  // Handle Export CSV from Low-Performing card
+  const handleExportCSV = () => {
+    // Show platform selection modal
+    setShowPlatformModal(true)
+  }
+
+  // Handle platform selection and export
+  const handlePlatformSelect = async (platform) => {
+    if (!analysisResult || !analysisResult.items || analysisResult.items.length === 0) {
+      showToast('내보낼 항목이 없습니다.', 'warning')
+      setShowPlatformModal(false)
+      return
+    }
+
+    setIsExportingCSV(true)
+    setShowPlatformModal(false)
+
+    try {
+      // Get items from analysis result
+      const itemsToExport = analysisResult.items
+
+      // Map platform to target_tool
+      // platform: 'shopify' -> target_tool: 'shopify_matrixify'
+      // platform: 'bigcommerce' -> target_tool: 'bigcommerce' (or appropriate format)
+      const targetToolMap = {
+        'shopify': 'shopify_matrixify',
+        'bigcommerce': 'bigcommerce'
+      }
+      
+      const targetTool = targetToolMap[platform] || platform
+
+      console.log(`📤 [EXPORT] Exporting ${itemsToExport.length} items to ${platform} (${targetTool})...`)
+
+      // Call export API
+      // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+      const response = await apiClient.post(
+        `/api/export-queue`,
+        {
+          items: itemsToExport,
+          target_tool: targetTool,
+          platform: platform,  // platform 파라미터도 전달
+          mode: 'delete_list'
+        },
+        {
+          responseType: 'blob',
+          timeout: 30000
+        }
+      )
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      
+      // Determine filename based on platform
+      const filenameMap = {
+        'shopify': 'low_performing_shopify.csv',
+        'bigcommerce': 'low_performing_bigcommerce.csv'
+      }
+      
+      link.setAttribute('download', filenameMap[platform] || `low_performing_${platform}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+
+      showToast(`${platform.toUpperCase()} 형식으로 CSV를 내보냈습니다.`, 'success')
+    } catch (err) {
+      console.error('Export CSV error:', err)
+      let errorMessage = 'CSV 내보내기 중 오류가 발생했습니다.'
+      
+      if (err.code === 'ECONNABORTED') {
+        errorMessage = '요청 시간 초과. 다시 시도해주세요.'
+      } else if (err.response) {
+        errorMessage = `서버 오류: ${err.response.status} - ${err.response.statusText || err.response.data?.detail || '알 수 없는 오류'}`
+      } else if (err.request) {
+        errorMessage = '서버에 연결할 수 없습니다. 네트워크 연결을 확인하세요.'
+      } else {
+        errorMessage = `CSV 내보내기 실패: ${err.message || '알 수 없는 오류'}`
+      }
+      
+      showToast(errorMessage, 'error')
+    } finally {
+      setIsExportingCSV(false)
+    }
+  }
+
   // Handle supplier-specific export from Product Journey section
   const handleSupplierExport = async (items, targetTool, supplierName) => {
     if (!items || items.length === 0) {
@@ -1988,6 +2061,8 @@ function Dashboard() {
           summaryStats={summaryStats}
           // Analysis result (for filtered badge)
           analysisResult={analysisResult}
+          // Export CSV callback
+          onExportCSV={handleExportCSV}
           // Error callback
           onError={(msg, err) => showToast(getErrorMessage(err || { message: msg }), 'error')}
         />
@@ -2231,6 +2306,18 @@ function Dashboard() {
           onClose={() => setToast(null)}
         />
       )}
+
+      {/* Platform Select Modal */}
+      <PlatformSelectModal
+        isOpen={showPlatformModal}
+        onClose={() => {
+          if (!isExportingCSV) {
+            setShowPlatformModal(false)
+          }
+        }}
+        onSelectPlatform={handlePlatformSelect}
+        loading={isExportingCSV}
+      />
     </div>
   )
 }

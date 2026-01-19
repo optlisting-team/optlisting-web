@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import axios from 'axios'
+import apiClient, { API_BASE_URL } from '../lib/api'
 import ZombieTable from './ZombieTable'
 import { normalizeImageUrl } from '../utils/imageUtils'
 
 // Use environment variable for Railway URL, fallback based on environment
 // CRITICAL: Production MUST use relative path /api (proxied by vercel.json) to avoid CORS issues
 // Only use VITE_API_URL in development if needed, production always uses relative path
-const API_BASE_URL = import.meta.env.DEV 
-  ? (import.meta.env.VITE_API_URL || '')  // Development: use env var or empty for Vite proxy
-  : ''  // Production: ALWAYS use relative path (vercel.json proxy handles routing to Railway)
-const CURRENT_USER_ID = "default-user"
+// API_BASE_URL은 api.js에서 import
+// JWT 인증이 필요한 요청은 apiClient 사용, 인증이 필요 없는 요청(health check 등)은 axios 사용
 
 function LowPerformingResults({ mode = 'low', initialFilters = null, initialItems = null, onClose = null, onError = null }) {
   // Filters from props (for low-performing mode) or defaults
@@ -111,8 +110,8 @@ function LowPerformingResults({ mode = 'low', initialFilters = null, initialItem
       }
       
       // Build API params
+      // user_id는 JWT 인증으로 자동 추출되므로 파라미터에서 제거
       const params = {
-        user_id: CURRENT_USER_ID,
         page: page,
         entries_per_page: pageSize,
         search: search || undefined
@@ -135,7 +134,8 @@ function LowPerformingResults({ mode = 'low', initialFilters = null, initialItem
       
       console.log(`📡 fetchListings [${requestId}]: Calling API:`, `${API_BASE_URL}/api/ebay/listings/active`, params)
       
-      const response = await axios.get(`${API_BASE_URL}/api/ebay/listings/active`, {
+      // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+      const response = await apiClient.get(`/api/ebay/listings/active`, {
         params,
         timeout: 120000,
         headers: {

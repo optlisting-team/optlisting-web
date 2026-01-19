@@ -27,7 +27,11 @@ export default function Pricing() {
   // Generate Lemon Squeezy Checkout link
   const generateCheckoutUrl = (productId, variantId = null, isSubscription = false) => {
     // Use Supabase user ID or default value
-    const userId = user?.id || user?.user_metadata?.user_id || 'default-user'
+    const userId = user?.id || user?.user_metadata?.user_id
+    if (!userId) {
+      console.error('User not logged in')
+      return
+    }
     const baseUrl = `${LEMON_SQUEEZY_STORE}/checkout/buy/${productId}`
     const params = new URLSearchParams({
       'checkout[custom][user_id]': userId,
