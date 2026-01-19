@@ -2430,8 +2430,19 @@ async def get_active_listings_trading_api(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# 백그라운드 sync를 위한 헬퍼 함수
+async def start_background_sync(request: Request, user_id: str):
+    """백그라운드에서 eBay listings sync 시작"""
+    try:
+        logger.info(f"🔄 [BG-SYNC] Starting background sync for user {user_id}")
+        await sync_ebay_listings(request, user_id)
+        logger.info(f"✅ [BG-SYNC] Background sync completed for user {user_id}")
+    except Exception as e:
+        logger.error(f"❌ [BG-SYNC] Background sync failed for user {user_id}: {e}")
+
 @router.get("/summary")
 async def get_ebay_summary(
+    request: Request,
     user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     filters: Optional[str] = Query(None, description="Optional filter JSON for low-performing calculation")
 ):
@@ -2480,7 +2491,29 @@ async def get_ebay_summary(
             ).limit(1).first()
             
             if not has_listings:
-                # 데이터가 없으면 즉시 빈 값 반환 (DB 쿼리 최소화)
+                # ✅ 초기 로딩 최적화: 데이터가 없으면 백그라운드에서 자동 sync 시작
+                # 첫 로그인 시 자동으로 eBay API에서 데이터 가져오기
+                logger.info(f"🔄 [AUTO-SYNC] No listings found for user {user_id}, starting background sync...")
+                
+                # 백그라운드 태스크로 sync 시작 (응답 지연 없음)
+                # FastAPI의 BackgroundTasks를 사용하는 대신, 이미 실행 중인 요청의 이벤트 루프에서 태스크 생성
+                try:
+                    import asyncio
+                    # 현재 이벤트 루프 가져오기
+                    try:
+                        loop = asyncio.get_running_loop()
+                        # 실행 중인 루프가 있으면 태스크 생성
+                        loop.create_task(start_background_sync(request, user_id))
+                        logger.info(f"✅ [AUTO-SYNC] Background sync task created for user {user_id}")
+                    except RuntimeError:
+                        # 실행 중인 루프가 없으면 새로 생성하여 실행
+                        # 이 경우는 일반적으로 발생하지 않지만 안전을 위해 처리
+                        asyncio.run(start_background_sync(request, user_id))
+                except Exception as bg_err:
+                    logger.warning(f"⚠️ [AUTO-SYNC] Failed to start background sync: {bg_err}")
+                    # 백그라운드 태스크 실패해도 응답은 정상 반환
+                
+                # 데이터가 없어도 즉시 빈 값 반환 (백그라운드 sync는 별도로 진행)
                 return {
                     "success": True,
                     "user_id": user_id,
@@ -2488,7 +2521,8 @@ async def get_ebay_summary(
                     "low_performing_count": 0,
                     "queue_count": 0,
                     "last_sync_at": None,
-                    "filters_applied": {}
+                    "filters_applied": {},
+                    "auto_sync_started": True  # 프론트엔드에서 알림 표시용
                 }
             
             # ✅ 최적화된 쿼리: 인덱스 활용 (user_id, platform)

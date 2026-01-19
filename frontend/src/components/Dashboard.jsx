@@ -265,8 +265,9 @@ function Dashboard() {
   // Health check는 인증이 필요 없으므로 axios 사용
   const checkApiHealth = async () => {
     try {
+      // Health check는 인증이 필요 없으므로 axios 사용 (하지만 timeout은 60초로 증가)
       const response = await axios.get(`${API_BASE_URL}/api/health`, { 
-        timeout: 30000,
+        timeout: 60000,
         headers: {
             'Content-Type': 'application/json',
           },
@@ -311,7 +312,7 @@ function Dashboard() {
       // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
       // 이미 apiClient로 변경되었으므로 params에서 user_id 제거
       const response = await apiClient.get(`/api/credits`, {
-        timeout: 30000,
+        timeout: 60000,  // 60초로 증가 (API 응답 시간 초과 방지)
       })
       if (response.data) {
         setUserCredits(response.data.available_credits || 0)
@@ -409,7 +410,7 @@ function Dashboard() {
             params: {
               filters: JSON.stringify(filters)
             },
-            timeout: 30000,
+            timeout: 60000,  // 60초로 증가 (API 응답 시간 초과 방지)
           })
           
           if (summaryResponse.data && summaryResponse.data.success) {
@@ -528,7 +529,7 @@ function Dashboard() {
         params: {
           filters: JSON.stringify(filters) // 필터 파라미터 전달
         },
-        timeout: 30000,
+        // apiClient의 기본 timeout(60000) 사용, 여기서는 명시하지 않음
       })
       
       // 🔍 STEP 3: Summary 집계 로직 점검 - 쿼리 조건 및 결과 확인
@@ -1367,16 +1368,21 @@ function Dashboard() {
   // Sync: summary stats + history (Dashboard에서는 제품 리스트를 절대 로드하지 않음)
   const handleSync = async () => {
     try {
-      console.log('🔄 handleSync: Refreshing summary stats from eBay API...')
+      console.log('🔄 handleSync: Starting eBay listings sync...')
       setLoading(true)
+      
+      // ✅ 강제 동기화: eBay API에서 데이터를 가져와 DB에 저장
+      await syncEbayListings()
+      
+      // Sync 완료 후 summary stats와 history 갱신
       await Promise.all([
         fetchSummaryStats(),
         fetchHistory().catch(err => console.error('History fetch error:', err))
       ])
-      console.log('✅ handleSync: Successfully refreshed summary stats')
-      // Dashboard에서는 listings를 로드하지 않음 - 결과 화면에서만 로드
+      console.log('✅ handleSync: Successfully synced and refreshed summary stats')
     } catch (err) {
       console.error('❌ Sync failed:', err)
+      showToast('Sync failed. Please try again.', 'error')
     } finally {
       setLoading(false)
     }

@@ -66,9 +66,8 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
       setCheckingConnection(true)
       // Lightweight token status check
       // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
-      const response = await apiClient.get(`/api/ebay/auth/status`, {
-        timeout: 30000 // Increased from 5s to 30s
-      })
+      // apiClient의 기본 timeout(60000) 사용
+      const response = await apiClient.get(`/api/ebay/auth/status`)
       
       // Check if valid token exists
       const hasValidToken = response.data?.connected === true && 
