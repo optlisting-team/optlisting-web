@@ -30,6 +30,8 @@ from typing import Optional, Dict, Any
 from fastapi import APIRouter, Request, HTTPException, Query, Depends
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
+from starlette.requests import Request as StarletteRequest
+from .auth import get_current_user
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -454,21 +456,24 @@ async def test_challenge(
 @router.get("/auth/start")
 async def ebay_auth_start(
     request: Request,
-    user_id: str = Query(..., description="User ID to associate with eBay account"),
+    # JWT 인증으로 user_id 추출 (쿼리 파라미터 제거)
+    user_id: str = Depends(get_current_user),
     state: Optional[str] = Query(None, description="Optional state parameter for CSRF protection")
 ):
     """
     🚀 eBay OAuth 시작 - "Connect eBay" 버튼 클릭 시 호출
     
-    1. Authorization URL 생성
-    2. 사용자를 eBay 로그인 페이지로 리다이렉트
+    1. JWT 토큰에서 user_id 추출 (Authorization 헤더)
+    2. Authorization URL 생성
+    3. 사용자를 eBay 로그인 페이지로 리다이렉트
     
     프론트엔드에서 호출 방법:
-    window.location.href = `${API_URL}/api/ebay/auth/start?user_id=${userId}`
+    - apiClient를 사용하여 JWT 토큰이 자동으로 헤더에 추가됨
+    - window.location.href = `${API_URL}/api/ebay/auth/start`
     """
     logger.info("=" * 60)
     logger.info("🚀 eBay OAuth Start Request")
-    logger.info(f"   user_id: {user_id}")
+    logger.info(f"   user_id: {user_id} (from JWT)")
     logger.info(f"   state: {state}")
     logger.info(f"   Request headers: {dict(request.headers)}")
     
@@ -930,7 +935,7 @@ def check_token_status(user_id: str, db: Session = None) -> Dict[str, Any]:
 
 @router.get("/auth/status")
 async def ebay_auth_status(
-    user_id: str = Query(..., description="User ID to check")
+    user_id: str = Depends(get_current_user)  # JWT 인증으로 user_id 추출
 ):
     """
     📊 eBay 연결 상태 확인 (경량화된 버전)

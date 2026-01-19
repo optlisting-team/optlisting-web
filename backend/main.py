@@ -44,88 +44,44 @@ except ImportError:
 app = FastAPI(title="OptListing API", version="1.4.0")
 
 # ============================================================
-# JWT Authentication with Supabase
+# Environment Variables Validation (서버 시작 시 체크)
 # ============================================================
-def get_current_user(request: Request) -> str:
-    """
-    FastAPI 의존성 함수: JWT 토큰을 검증하고 user_id를 반환합니다.
-    
-    Authorization: Bearer <JWT> 헤더에서 토큰을 추출하고
-    Supabase Auth를 통해 검증합니다.
-    
-    Returns:
-        str: 인증된 사용자의 user_id (UUID)
-    
-    Raises:
-        HTTPException: 토큰이 없거나 유효하지 않은 경우 401 반환
-    """
+def validate_supabase_env():
+    """Supabase 환경 변수 검증 - 서버 시작 시 필수"""
     import logging
     logger = logging.getLogger(__name__)
     
-    # Authorization 헤더 확인
-    auth_header = request.headers.get("Authorization")
-    if not auth_header:
-        logger.warning("❌ [AUTH] Authorization header missing")
-        raise HTTPException(
-            status_code=401,
-            detail="Authorization header missing. Please provide a valid JWT token."
-        )
+    supabase_url = os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_ANON_KEY") or os.getenv("VITE_SUPABASE_ANON_KEY")
     
-    # Bearer 토큰 추출
-    try:
-        scheme, token = auth_header.split()
-        if scheme.lower() != "bearer":
-            raise ValueError("Invalid authorization scheme")
-    except ValueError:
-        logger.warning("❌ [AUTH] Invalid authorization header format")
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid authorization header format. Expected: Bearer <token>"
+    if not supabase_url or not supabase_key:
+        error_msg = (
+            "❌ CRITICAL: Supabase credentials not configured!\n"
+            "   Required environment variables:\n"
+            "   - SUPABASE_URL or VITE_SUPABASE_URL\n"
+            "   - SUPABASE_ANON_KEY or VITE_SUPABASE_ANON_KEY\n"
+            "   Please set these variables before starting the server."
         )
+        logger.error(error_msg)
+        print(error_msg)
+        raise ValueError("Supabase credentials not configured. Server cannot start without authentication.")
     
-    # Supabase 클라이언트 생성 및 토큰 검증
-    if not SUPABASE_AVAILABLE:
-        logger.error("❌ [AUTH] Supabase client not available")
-        raise HTTPException(
-            status_code=500,
-            detail="Authentication service not available. Please check server configuration."
-        )
-    
-    try:
-        supabase_url = os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_ANON_KEY") or os.getenv("VITE_SUPABASE_ANON_KEY")
-        
-        if not supabase_url or not supabase_key:
-            logger.error("❌ [AUTH] Supabase credentials not configured")
-            raise HTTPException(
-                status_code=500,
-                detail="Authentication service not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY."
-            )
-        
-        supabase: Client = create_client(supabase_url, supabase_key)
-        
-        # 토큰 검증 및 사용자 정보 조회
-        user_response = supabase.auth.get_user(token)
-        
-        if user_response.user is None:
-            logger.warning("❌ [AUTH] Invalid or expired token")
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid or expired token. Please log in again."
-            )
-        
-        user_id = user_response.user.id
-        logger.info(f"✅ [AUTH] User authenticated: {user_id}")
-        return user_id
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ [AUTH] Token verification failed: {str(e)}")
-        raise HTTPException(
-            status_code=401,
-            detail=f"Token verification failed: {str(e)}"
-        )
+    logger.info("✅ Supabase credentials validated")
+    print("✅ Supabase credentials validated")
+    return True
+
+# 서버 시작 시 환경 변수 검증
+try:
+    validate_supabase_env()
+except ValueError as e:
+    import sys
+    print(f"FATAL ERROR: {str(e)}")
+    sys.exit(1)
+
+# ============================================================
+# JWT Authentication with Supabase
+# ============================================================
+from .auth import get_current_user
 
 # ============================================================
 # [BOOT] Supabase Write Self-Test (Top-level execution)
@@ -1681,37 +1637,6 @@ def export_csv(
         status_code=400,
         detail="This endpoint is deprecated. Please use /api/analysis/low-performing with JWT authentication."
     )
-    
-    # Original code (commented out):
-    # zombies, _ = analyze_zombie_listings(
-    #     db, 
-    #     user_id=user_id,  # JWT 인증으로 추출된 user_id 사용
-    #     min_days=min_days, 
-        max_sales=max_sales,
-        max_watch_count=max_watch_count,
-        supplier_filter=supplier_filter
-    )
-    
-    if not zombies:
-        raise HTTPException(status_code=404, detail="No zombie listings found")
-    
-    # Generate CSV (with snapshot logging) - 코드가 실행되지 않음 (위에서 raise됨)
-    # csv_content = generate_export_csv(zombies, export_mode, db=db, user_id=user_id)
-    
-    # Determine filename
-    filename_map = {
-        "autods": "zombies_autods.csv",
-        "yaballe": "zombies_yaballe.csv",
-        "ebay": "zombies_ebay.csv"
-    }
-    
-    return Response(
-        content=csv_content,
-        media_type="text/csv",
-        headers={
-            "Content-Disposition": f"attachment; filename={filename_map[export_mode]}"
-        }
-    )
 
 
 class ExportQueueRequest(BaseModel):
@@ -1796,6 +1721,7 @@ class LogDeletionRequest(BaseModel):
 @app.post("/api/log-deletion")
 def log_deletion(
     request: LogDeletionRequest,
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     db: Session = Depends(get_db)
 ):
     """
@@ -1835,6 +1761,7 @@ def log_deletion(
             title=item.get("title", "Unknown"),
             platform=platform,
             supplier=supplier,  # Use supplier_name (not source)
+            user_id=user_id,  # JWT 인증으로 추출된 user_id 추가
             snapshot=snapshot_data  # Store full snapshot in JSONB
         )
         logs.append(log_entry)
@@ -1860,6 +1787,7 @@ def log_deletion(
 def get_deletion_history(
     skip: int = 0,
     limit: int = 1000,
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     db: Session = Depends(get_db)
 ):
     """
@@ -1872,11 +1800,11 @@ def get_deletion_history(
         skip = max(0, skip)
         limit = min(max(1, limit), 10000)  # Clamp between 1 and 10000
         
-        # Get total count
-        total_count = db.query(DeletionLog).count()
+        # Get total count (user_id 필터 적용)
+        total_count = db.query(DeletionLog).filter(DeletionLog.user_id == user_id).count()
         
-        # Get logs (most recent first)
-        logs = db.query(DeletionLog).order_by(DeletionLog.deleted_at.desc()).offset(skip).limit(limit).all()
+        # Get logs (most recent first) - user_id 필터 적용
+        logs = db.query(DeletionLog).filter(DeletionLog.user_id == user_id).order_by(DeletionLog.deleted_at.desc()).offset(skip).limit(limit).all()
         
         # Build response with safe field access
         log_list = []

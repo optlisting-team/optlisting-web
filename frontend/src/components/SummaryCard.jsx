@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef } from 'react'
 import { ChevronDown, Plus, Check, Unplug, Loader2, RefreshCw } from 'lucide-react'
 import axios from 'axios'
+import apiClient, { API_BASE_URL } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 
 // Demo stores for testing - initial state
 // ✅ FIX: Amazon Store 제거 - eBay Store만 표시
@@ -63,8 +65,8 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
     try {
       setCheckingConnection(true)
       // Lightweight token status check
-      const response = await axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
-        params: { user_id: currentUserId },
+      // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+      const response = await apiClient.get(`/api/ebay/auth/status`, {
         timeout: 30000 // Increased from 5s to 30s
       })
       
@@ -211,39 +213,60 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
   }
 
   // Real API connect (for production)
-  const handleRealConnect = (e) => {
+  const handleRealConnect = async (e) => {
     // Prevent event propagation
     if (e) {
       e.preventDefault()
       e.stopPropagation()
     }
     
-    // API URL priority: Environment variable > Environment-based fallback
-    // CRITICAL: Production MUST use relative path /api (proxied by vercel.json) to avoid CORS issues
-    // Only use VITE_API_URL in development if needed, production always uses relative path
-    const apiUrl = import.meta.env.DEV 
-      ? (import.meta.env.VITE_API_URL || '')  // Development: use env var or empty for Vite proxy
-      : ''  // Production: ALWAYS use relative path (vercel.json proxy handles routing to Railway)
-    const oauthUrl = `${apiUrl}/api/ebay/auth/start?user_id=${currentUserId}`
+    // JWT 인증 사용 - user_id는 헤더에서 자동 추출됨
+    if (!currentUserId) {
+      onError('Please log in to connect eBay', null)
+      return
+    }
     
-    console.log('🔗 Attempting eBay OAuth connection')
-    console.log('API URL:', apiUrl)
-    console.log('OAuth URL:', oauthUrl)
-    console.log('User ID:', userId)
-    console.log('VITE_API_URL env:', import.meta.env.VITE_API_URL)
-    
-    // Redirect immediately (synchronously)
-    console.log('Starting redirect...')
-    console.log('oauthUrl:', oauthUrl)
-    
-    // Use window.location.replace directly (most reliable)
-    window.location.replace(oauthUrl)
-    
-    // If replace doesn't work, use href
-    setTimeout(() => {
-      console.warn('Replace not working, retrying with href')
-      window.location.href = oauthUrl
-    }, 100)
+    try {
+      // JWT 토큰을 헤더에 포함하여 OAuth start 요청
+      // OAuth는 리다이렉트이므로, fetch로 요청하여 Location 헤더를 받아 리다이렉트
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        onError('Please log in to connect eBay', null)
+        return
+      }
+      
+      const apiUrl = import.meta.env.DEV 
+        ? (import.meta.env.VITE_API_URL || '')
+        : ''
+      
+      console.log('🔗 Attempting eBay OAuth connection with JWT')
+      
+      // fetch를 사용하여 헤더에 JWT 포함
+      const response = await fetch(`${apiUrl}/api/ebay/auth/start`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        redirect: 'manual'  // 리다이렉트를 수동으로 처리
+      })
+      
+      // 리다이렉트 URL 추출
+      if (response.status === 302 || response.status === 301) {
+        const redirectUrl = response.headers.get('Location')
+        if (redirectUrl) {
+          console.log('✅ Redirecting to:', redirectUrl)
+          window.location.replace(redirectUrl)
+          return
+        }
+      }
+      
+      // 리다이렉트 헤더가 없으면 에러
+      throw new Error('No redirect URL received from server')
+    } catch (err) {
+      console.error('❌ Failed to start OAuth:', err)
+      onError('Failed to start eBay connection. Please try again.', err)
+    }
   }
 
   return (
@@ -415,19 +438,45 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
                   }
                   
                   // Start OAuth if not connected
-                  const oauthUrl = `${API_BASE_URL}/api/ebay/auth/start?user_id=${currentUserId}`
-                  console.log(`🔗 [${requestId}] Starting OAuth flow...`)
-                  console.log(`   OAuth URL: ${oauthUrl}`)
-                  console.log(`   Redirecting to eBay login page...`)
+                  // JWT 인증 사용 - user_id는 헤더에서 자동 추출됨
+                  if (!currentUserId) {
+                    throw new Error('User not logged in')
+                  }
+                  
+                  // JWT 토큰을 헤더에 포함하여 OAuth start 요청
+                  const { data: { session } } = await supabase.auth.getSession()
+                  
+                  if (!session?.access_token) {
+                    throw new Error('No session found. Please log in.')
+                  }
+                  
+                  console.log(`🔗 [${requestId}] Starting OAuth flow with JWT...`)
                   
                   // Performance mark: OAuth 시작
                   if (typeof performance !== 'undefined' && performance.mark) {
                     performance.mark('oauth_redirect_start')
                   }
                   
-                  // Use window.location.replace to avoid adding to history
-                  // This prevents back button issues
-                  window.location.replace(oauthUrl)
+                  // fetch를 사용하여 헤더에 JWT 포함
+                  const oauthResponse = await fetch(`${API_BASE_URL}/api/ebay/auth/start`, {
+                    method: 'GET',
+                    headers: {
+                      'Authorization': `Bearer ${session.access_token}`
+                    },
+                    redirect: 'manual'  // 리다이렉트를 수동으로 처리
+                  })
+                  
+                  // 리다이렉트 URL 추출
+                  if (oauthResponse.status === 302 || oauthResponse.status === 301) {
+                    const redirectUrl = oauthResponse.headers.get('Location')
+                    if (redirectUrl) {
+                      console.log(`   Redirecting to eBay: ${redirectUrl}`)
+                      window.location.replace(redirectUrl)
+                      return
+                    }
+                  }
+                  
+                  throw new Error('No redirect URL received from server')
                 } catch (err) {
                   console.error(`❌ [${requestId}] Error in connect button handler:`, err)
                   console.error(`   Error details [${requestId}]:`, {

@@ -58,6 +58,10 @@ class DeletionLog(Base):
     platform = Column(String, nullable=True)  # marketplace: "eBay", "Amazon", "Shopify", "Walmart"
     source = Column(String, nullable=False)  # "Amazon", "Walmart", etc.
     deleted_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    # 멀티테넌시: user_id 필드 추가 (기존 데이터는 nullable로 유지, 마이그레이션 필요)
+    user_id = Column(String, nullable=True, index=True)
+    # JSONB snapshot 필드 (기존 스키마에 있을 수 있음 - 확인 필요)
+    snapshot = Column(JSONB, nullable=True)
 
     def __repr__(self):
         return f"<DeletionLog(item_id={self.item_id}, title={self.title}, deleted_at={self.deleted_at})>"

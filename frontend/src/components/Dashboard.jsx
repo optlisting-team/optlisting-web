@@ -308,12 +308,10 @@ function Dashboard() {
     }
     
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/credits`, {
-        params: { user_id: currentUserId },
+      // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+      // 이미 apiClient로 변경되었으므로 params에서 user_id 제거
+      const response = await apiClient.get(`/api/credits`, {
         timeout: 30000,
-        headers: {
-          'Content-Type': 'application/json',
-        },
       })
       if (response.data) {
         setUserCredits(response.data.available_credits || 0)
@@ -592,9 +590,9 @@ function Dashboard() {
             
             // 디버그 엔드포인트 호출
             try {
-              const debugResponse = await axios.get(`${API_BASE_URL}/api/debug/listings`, {
+              // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+              const debugResponse = await apiClient.get(`/api/debug/listings`, {
                 params: {
-                  user_id: currentUserId,
                   platform: 'eBay'
                 },
                 timeout: 30000
@@ -1044,7 +1042,8 @@ function Dashboard() {
   const fetchHistory = async () => {
     try {
       // Don't set loading to true here to avoid blocking other operations
-      const response = await axios.get(`${API_BASE_URL}/api/history`, {
+      // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+      const response = await apiClient.get(`/api/history`, {
         params: {
           skip: 0,
           limit: 10000
@@ -1529,8 +1528,8 @@ function Dashboard() {
         console.log(`🔍 Verifying connection status from backend... (attempt ${verificationAttemptCount.current}/${MAX_VERIFICATION_ATTEMPTS})`)
         
         try {
-          const response = await axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
-            params: { user_id: currentUserId },
+          // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+          const response = await apiClient.get(`/api/ebay/auth/status`, {
             timeout: 30000
           })
           
@@ -1670,8 +1669,8 @@ function Dashboard() {
               }
               
               console.log('🔍 Checking eBay connection status on mount...')
-              const response = await axios.get(`${API_BASE_URL}/api/ebay/auth/status`, {
-                params: { user_id: currentUserId },
+              // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+              const response = await apiClient.get(`/api/ebay/auth/status`, {
                 timeout: 30000
               })
               
@@ -1749,13 +1748,15 @@ function Dashboard() {
     try {
       // Step 1: Log deletion to history BEFORE exporting
       try {
-        await axios.post(`${API_BASE_URL}/api/log-deletion`, {
+        // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+        await apiClient.post(`/api/log-deletion`, {
           items: items
         }, {
           timeout: 30000 // Increased from 10s to 30s
         })
         // Refresh total deleted count
-        const historyResponse = await axios.get(`${API_BASE_URL}/api/history`, {
+        // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+        const historyResponse = await apiClient.get(`/api/history`, {
           params: { skip: 0, limit: 1 },
           timeout: 30000 // Increased from 10s to 30s
         })
@@ -1948,13 +1949,15 @@ function Dashboard() {
     try {
       // Step 1: Log deletion to history BEFORE exporting
       try {
-        await axios.post(`${API_BASE_URL}/api/log-deletion`, {
+        // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+        await apiClient.post(`/api/log-deletion`, {
           items: items
         }, {
           timeout: 30000 // Increased from 10s to 30s
         })
         // Refresh total deleted count
-        const historyResponse = await axios.get(`${API_BASE_URL}/api/history`, {
+        // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+        const historyResponse = await apiClient.get(`/api/history`, {
           params: { skip: 0, limit: 1 },
           timeout: 30000 // Increased from 10s to 30s
         })
