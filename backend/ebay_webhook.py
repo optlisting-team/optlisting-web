@@ -2496,19 +2496,17 @@ async def get_ebay_summary(
                 logger.info(f"🔄 [AUTO-SYNC] No listings found for user {user_id}, starting background sync...")
                 
                 # 백그라운드 태스크로 sync 시작 (응답 지연 없음)
-                # FastAPI의 BackgroundTasks를 사용하는 대신, 이미 실행 중인 요청의 이벤트 루프에서 태스크 생성
+                # FastAPI의 async 함수에서는 get_running_loop()를 사용해야 함
                 try:
                     import asyncio
-                    # 현재 이벤트 루프 가져오기
-                    try:
-                        loop = asyncio.get_running_loop()
-                        # 실행 중인 루프가 있으면 태스크 생성
-                        loop.create_task(start_background_sync(request, user_id))
-                        logger.info(f"✅ [AUTO-SYNC] Background sync task created for user {user_id}")
-                    except RuntimeError:
-                        # 실행 중인 루프가 없으면 새로 생성하여 실행
-                        # 이 경우는 일반적으로 발생하지 않지만 안전을 위해 처리
-                        asyncio.run(start_background_sync(request, user_id))
+                    # 현재 실행 중인 이벤트 루프 가져오기 (FastAPI async context)
+                    loop = asyncio.get_running_loop()
+                    # 백그라운드 태스크 생성 (fire-and-forget)
+                    loop.create_task(start_background_sync(request, user_id))
+                    logger.info(f"✅ [AUTO-SYNC] Background sync task created for user {user_id}")
+                except RuntimeError:
+                    # 실행 중인 루프가 없는 경우 (일반적으로 발생하지 않음)
+                    logger.warning(f"⚠️ [AUTO-SYNC] No running event loop found, skipping background sync")
                 except Exception as bg_err:
                     logger.warning(f"⚠️ [AUTO-SYNC] Failed to start background sync: {bg_err}")
                     # 백그라운드 태스크 실패해도 응답은 정상 반환
