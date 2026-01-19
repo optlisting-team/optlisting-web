@@ -1268,7 +1268,7 @@ def refresh_access_token(refresh_token: str) -> Optional[Dict]:
 
 @router.get("/listings")
 async def get_ebay_listings(
-    user_id: str = Query(..., description="User ID"),
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     limit: int = Query(100, description="Number of listings to fetch", ge=1, le=500),
     offset: int = Query(0, description="Offset for pagination", ge=0)
 ):
