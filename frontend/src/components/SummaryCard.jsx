@@ -14,12 +14,7 @@ const INITIAL_STORES = [
   // { id: 'store-3', name: 'Shopify Store', platform: 'Shopify', connected: false },
 ]
 
-// Use environment variable for Railway URL, fallback based on environment
-// CRITICAL: Production MUST use relative path /api (proxied by vercel.json) to avoid CORS issues
-// Only use VITE_API_URL in development if needed, production always uses relative path
-const API_BASE_URL = import.meta.env.DEV 
-  ? (import.meta.env.VITE_API_URL || '')  // Development: use env var or empty for Vite proxy
-  : ''  // Production: ALWAYS use relative path (vercel.json proxy handles routing to Railway)
+// ✅ FIX: API_BASE_URL은 이미 '../lib/api'에서 import하므로 중복 선언 제거
 
 // Store Selector Component
 function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onError, loading = false }) {
