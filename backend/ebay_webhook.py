@@ -2029,7 +2029,7 @@ async def get_active_listings_trading_api_internal(
 @router.get("/listings/active")
 async def get_active_listings_trading_api(
     request: Request,
-    user_id: str = Query(..., description="User ID"),
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     page: int = Query(1, description="Page number", ge=1),
     entries_per_page: int = Query(100, description="Entries per page", ge=1, le=200)
 ):
@@ -2432,7 +2432,7 @@ async def get_active_listings_trading_api(
 
 @router.get("/summary")
 async def get_ebay_summary(
-    user_id: str = Query(..., description="User ID"),
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     filters: Optional[str] = Query(None, description="Optional filter JSON for low-performing calculation")
 ):
     """
