@@ -2038,7 +2038,7 @@ function Dashboard() {
           zombieBreakdown={zombieBreakdown}
           queueCount={queue.length}
           totalDeleted={totalDeleted}
-          loading={loading || summaryLoading}
+          loading={summaryLoading}  // SummaryCard는 자체 로딩 상태만 사용 (전체 화면 블로킹 방지)
           filters={filters}
           viewMode={viewMode}
           onViewModeChange={null}

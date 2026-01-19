@@ -13,7 +13,7 @@ const API_BASE_URL = import.meta.env.DEV
 // Axios 인스턴스 생성
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 60000,  // 60초로 연장 (API 응답 시간 초과 문제 해결)
   headers: {
     'Content-Type': 'application/json',
   },

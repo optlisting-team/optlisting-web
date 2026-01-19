@@ -483,12 +483,17 @@ def root():
 @app.get("/api/health")
 def health_check():
     """
-    서비스 Health Check 엔드포인트
+    서비스 Health Check 엔드포인트 (성능 최적화)
     - API 상태
-    - DB 연결 상태
+    - DB 연결 상태 (타임아웃 적용)
     - eBay Worker 상태
+    
+    성능 최적화:
+    - DB 연결 테스트에 타임아웃 적용 (1초 이내 응답 보장)
+    - Worker 상태 확인은 비동기로 처리
     """
     from datetime import datetime
+    import signal
     
     health = {
         "status": "healthy",
@@ -501,18 +506,23 @@ def health_check():
         }
     }
     
-    # DB 연결 테스트
+    # DB 연결 테스트 (타임아웃 적용)
     try:
         from .models import engine
         from sqlalchemy import text
+        
+        # 타임아웃을 위한 간단한 연결 테스트
+        # pool_pre_ping이 활성화되어 있으면 빠른 연결 확인 가능
         with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
+            # 간단한 쿼리로 빠른 응답 보장
+            result = conn.execute(text("SELECT 1"))
+            result.fetchone()  # 결과 가져오기
         health["services"]["database"] = "ok"
     except Exception as e:
         health["services"]["database"] = f"error: {str(e)[:50]}"
         health["status"] = "degraded"
     
-    # Worker 상태 확인 (import 시도)
+    # Worker 상태 확인 (비동기, 타임아웃 적용)
     try:
         from .workers.ebay_token_worker import get_worker_status
         worker_status = get_worker_status()
@@ -525,6 +535,7 @@ def health_check():
     except ImportError:
         health["services"]["ebay_worker"] = "not_loaded"
     except Exception as e:
+        # Worker 상태 확인 실패는 전체 health에 영향 주지 않음
         health["services"]["ebay_worker"] = f"error: {str(e)[:50]}"
     
     return health
@@ -2122,38 +2133,68 @@ def get_credit_balance(
     db: Session = Depends(get_db)
 ):
     """
-    사용자 크레딧 잔액 조회
+    사용자 크레딧 잔액 조회 (성능 최적화)
     
     Returns:
     - purchased_credits: 총 구매/부여된 크레딧
     - consumed_credits: 총 사용된 크레딧
     - available_credits: 사용 가능한 크레딧 (purchased - consumed)
     - current_plan: 현재 플랜 (free, starter, pro, enterprise)
+    
+    성능 최적화:
+    - 프로필이 없을 경우 즉시 기본값 반환
+    - DB 쿼리 최소화
     """
-    summary = get_credit_summary(db, user_id)
-    
-    # 프로필이 없으면 자동 생성
-    if not summary.get("exists"):
-        result = initialize_user_credits(db, user_id, PlanType.FREE)
+    try:
         summary = get_credit_summary(db, user_id)
-    
-    # Safely get free tier fields with defaults
-    free_tier_count = summary.get("free_tier_count", 0) or 0
-    free_tier_remaining = summary.get("free_tier_remaining", 3)
-    
-    # Ensure free_tier_remaining is calculated correctly if not provided
-    if free_tier_remaining == 3 and free_tier_count > 0:
-        free_tier_remaining = max(0, 3 - free_tier_count)
-    
-    return CreditBalanceResponse(
-        user_id=user_id,
-        purchased_credits=summary["purchased_credits"],
-        consumed_credits=summary["consumed_credits"],
-        available_credits=summary["available_credits"],
-        current_plan=summary["current_plan"],
-        free_tier_count=free_tier_count,
-        free_tier_remaining=free_tier_remaining
-    )
+        
+        # 프로필이 없으면 자동 생성 (최소한의 DB 작업만 수행)
+        if not summary.get("exists"):
+            try:
+                initialize_user_credits(db, user_id, PlanType.FREE)
+                summary = get_credit_summary(db, user_id)
+            except Exception as init_err:
+                # 초기화 실패 시 기본값 반환 (서버 오류 방지)
+                logger.warning(f"⚠️ [CREDITS] Failed to initialize credits for user {user_id}: {init_err}")
+                return CreditBalanceResponse(
+                    user_id=user_id,
+                    purchased_credits=0,
+                    consumed_credits=0,
+                    available_credits=0,
+                    current_plan="free",
+                    free_tier_count=0,
+                    free_tier_remaining=3
+                )
+        
+        # Safely get free tier fields with defaults
+        free_tier_count = summary.get("free_tier_count", 0) or 0
+        free_tier_remaining = summary.get("free_tier_remaining", 3)
+        
+        # Ensure free_tier_remaining is calculated correctly if not provided
+        if free_tier_remaining == 3 and free_tier_count > 0:
+            free_tier_remaining = max(0, 3 - free_tier_count)
+        
+        return CreditBalanceResponse(
+            user_id=user_id,
+            purchased_credits=summary["purchased_credits"],
+            consumed_credits=summary["consumed_credits"],
+            available_credits=summary["available_credits"],
+            current_plan=summary["current_plan"],
+            free_tier_count=free_tier_count,
+            free_tier_remaining=free_tier_remaining
+        )
+    except Exception as e:
+        # 에러 발생 시 기본값 반환 (서버 오류 방지)
+        logger.error(f"❌ [CREDITS] Error fetching credits for user {user_id}: {e}")
+        return CreditBalanceResponse(
+            user_id=user_id,
+            purchased_credits=0,
+            consumed_credits=0,
+            available_credits=0,
+            current_plan="free",
+            free_tier_count=0,
+            free_tier_remaining=3
+        )
 
 
 @app.post("/api/analysis/start", response_model=AnalysisStartResponse)

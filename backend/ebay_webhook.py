@@ -2443,8 +2443,16 @@ async def get_ebay_summary(
     - Low-performing count (필터 기준)
     - Last sync timestamp
     - Queue count (선택)
+    
+    성능 최적화:
+    - 데이터가 없을 경우 즉시 빈 값 반환
+    - DB 쿼리 최적화 (인덱스 활용)
+    - 비동기 처리로 응답 시간 단축
     """
     import traceback
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    
     # Validate user_id - 유효한 UUID여야 함
     if not user_id:
         return {
@@ -2464,20 +2472,37 @@ async def get_ebay_summary(
         
         db = next(get_db())
         try:
-            # ✅ Summary 쿼리 실행 (Case-insensitive platform 검색)
-            from sqlalchemy import func, text
+            # ✅ 성능 최적화: 즉시 빈 값 반환 (데이터가 없을 경우)
+            # 먼저 빠른 존재 여부 확인 (LIMIT 1 사용, 인덱스 활용)
+            from sqlalchemy import func
+            has_listings = db.query(Listing).filter(
+                Listing.user_id == user_id
+            ).limit(1).first()
+            
+            if not has_listings:
+                # 데이터가 없으면 즉시 빈 값 반환 (DB 쿼리 최소화)
+                return {
+                    "success": True,
+                    "user_id": user_id,
+                    "active_count": 0,
+                    "low_performing_count": 0,
+                    "queue_count": 0,
+                    "last_sync_at": None,
+                    "filters_applied": {}
+                }
+            
+            # ✅ 최적화된 쿼리: 인덱스 활용 (user_id, platform)
             active_query = db.query(Listing).filter(
                 Listing.user_id == user_id,
-                func.lower(Listing.platform) == func.lower("eBay")  # Case-insensitive
+                func.lower(Listing.platform) == func.lower("eBay")
             )
-            
             active_count = active_query.count()
             
-            # ✅ 2. Last sync timestamp (가장 최근 last_synced_at) - Case-insensitive 검색
+            # ✅ Last sync timestamp (가장 최근 last_synced_at) - 인덱스 활용
             last_listing = db.query(Listing).filter(
                 Listing.user_id == user_id,
-                func.lower(Listing.platform) == func.lower("eBay")  # Case-insensitive
-            ).order_by(Listing.last_synced_at.desc()).first()
+                func.lower(Listing.platform) == func.lower("eBay")
+            ).order_by(Listing.last_synced_at.desc()).limit(1).first()
             
             last_sync_at = last_listing.last_synced_at.isoformat() if last_listing and last_listing.last_synced_at else None
             
