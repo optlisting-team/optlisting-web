@@ -1067,10 +1067,7 @@ async def ebay_oauth_config():
 
 @router.get("/debug/tokens")
 async def debug_tokens(
-    # 디버그 엔드포인트는 JWT 인증 필요
-    # get_current_user를 import해야 하지만, router는 별도 파일이므로 Depends 사용
-    # 일단 Query로 유지하되, 기본값 제거
-    user_id: str = Query(..., description="User ID to check (required)")
+    user_id: str = Depends(get_current_user)  # JWT 인증으로 user_id 추출
 ):
     """
     🔍 디버그: 모든 토큰 정보 확인 (긴급 디버깅용)
@@ -1368,7 +1365,7 @@ async def get_ebay_listings(
 @router.post("/listings/sync")
 async def sync_ebay_listings(
     request: Request,
-    user_id: str = Query(..., description="User ID")
+    user_id: str = Depends(get_current_user)  # JWT 인증으로 user_id 추출
 ):
     """
     🔄 eBay Listings Sync - eBay 연결 후 자동으로 listings를 가져와 DB에 저장

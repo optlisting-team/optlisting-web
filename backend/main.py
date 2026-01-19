@@ -3022,7 +3022,7 @@ class CouponRedeemRequest(BaseModel):
 @app.post("/api/credits/redeem")
 def redeem_coupon(
     request: CouponRedeemRequest,
-    user_id: str = Query("default-user", description="User ID"),
+    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
     db: Session = Depends(get_db)
 ):
     """
