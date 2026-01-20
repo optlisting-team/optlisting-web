@@ -233,44 +233,18 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
       console.log('🔗 Attempting eBay OAuth connection with JWT')
       
       // Use apiClient to ensure JWT token is included and request goes to Railway
-      // Note: For OAuth redirects, we need to handle the redirect manually since AJAX can't follow redirects
-      try {
-        const response = await apiClient.post('/api/ebay/auth/start', {}, {
-          maxRedirects: 0,  // Don't follow redirects automatically
-          validateStatus: (status) => status >= 200 && status < 400  // Accept redirect status codes
-        })
-        
-        // If we get a redirect response, extract Location header
-        if (response.status === 302 || response.status === 301) {
-          const redirectUrl = response.headers.location || response.headers.Location || response.headers['location']
-          if (redirectUrl) {
-            console.log('✅ Redirecting to:', redirectUrl)
-            window.location.href = redirectUrl
-            return
-          }
-        }
-        
-        // If response contains redirect URL in data
-        if (response.data?.redirect_url || response.data?.url) {
-          const redirectUrl = response.data.redirect_url || response.data.url
-          console.log('✅ Redirecting to:', redirectUrl)
-          window.location.href = redirectUrl
-          return
-        }
-        
-        throw new Error('No redirect URL received from server')
-      } catch (err) {
-        // Axios throws an error for redirects, but we can extract the Location header
-        if (err.response && (err.response.status === 302 || err.response.status === 301)) {
-          const redirectUrl = err.response.headers.location || err.response.headers.Location || err.response.headers['location']
-          if (redirectUrl) {
-            console.log('✅ Redirecting to:', redirectUrl)
-            window.location.href = redirectUrl
-            return
-          }
-        }
-        throw err
+      // Backend returns JSON with URL in response body (200 OK) instead of redirect
+      const response = await apiClient.post('/api/ebay/auth/start', {})
+      
+      // Extract URL from response body
+      const authUrl = response.data?.url
+      if (!authUrl) {
+        throw new Error('No authorization URL received from server')
       }
+      
+      console.log('✅ Redirecting to eBay:', authUrl)
+      // Use window.location.assign for browser navigation (bypasses CORS)
+      window.location.assign(authUrl)
     } catch (err) {
       console.error('❌ Failed to start OAuth:', err)
       onError('Failed to start eBay connection. Please try again.', err)
@@ -466,44 +440,19 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
                   }
                   
                   // Use apiClient to ensure JWT token is included and request goes to Railway
-                  // Note: For OAuth redirects, we need to handle the redirect manually since AJAX can't follow redirects
-                  try {
-                    const oauthResponse = await apiClient.post('/api/ebay/auth/start', {}, {
-                      maxRedirects: 0,  // Don't follow redirects automatically
-                      validateStatus: (status) => status >= 200 && status < 400  // Accept redirect status codes
-                    })
-                    
-                    // If we get a redirect response, extract Location header
-                    if (oauthResponse.status === 302 || oauthResponse.status === 301) {
-                      const redirectUrl = oauthResponse.headers.location || oauthResponse.headers.Location || oauthResponse.headers['location']
-                      if (redirectUrl) {
-                        console.log(`   Redirecting to eBay: ${redirectUrl}`)
-                        window.location.href = redirectUrl
-                        return
-                      }
-                    }
-                    
-                    // If response contains redirect URL in data
-                    if (oauthResponse.data?.redirect_url || oauthResponse.data?.url) {
-                      const redirectUrl = oauthResponse.data.redirect_url || oauthResponse.data.url
-                      console.log(`   Redirecting to eBay: ${redirectUrl}`)
-                      window.location.href = redirectUrl
-                      return
-                    }
-                    
-                    throw new Error('No redirect URL received from server')
-                  } catch (oauthErr) {
-                    // Axios throws an error for redirects, but we can extract the Location header
-                    if (oauthErr.response && (oauthErr.response.status === 302 || oauthErr.response.status === 301)) {
-                      const redirectUrl = oauthErr.response.headers.location || oauthErr.response.headers.Location || oauthErr.response.headers['location']
-                      if (redirectUrl) {
-                        console.log(`   Redirecting to eBay: ${redirectUrl}`)
-                        window.location.href = redirectUrl
-                        return
-                      }
-                    }
-                    throw oauthErr
+                  // Backend returns JSON with URL in response body (200 OK) instead of redirect
+                  const oauthResponse = await apiClient.post('/api/ebay/auth/start', {})
+                  
+                  // Extract URL from response body
+                  const authUrl = oauthResponse.data?.url
+                  if (!authUrl) {
+                    throw new Error('No authorization URL received from server')
                   }
+                  
+                  console.log(`   Redirecting to eBay: ${authUrl}`)
+                  // Use window.location.assign for browser navigation (bypasses CORS)
+                  window.location.assign(authUrl)
+                  return
                 } catch (err) {
                   console.error(`❌ [${requestId}] Error in connect button handler:`, err)
                   console.error(`   Error details [${requestId}]:`, {

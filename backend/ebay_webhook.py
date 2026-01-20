@@ -512,16 +512,19 @@ async def ebay_auth_start(
     auth_url = f"{auth_url_base}?{urlencode(auth_params, quote_via=quote)}"
     
     logger.info(f"✅ Authorization URL generated")
-    logger.info(f"   Redirecting to: {auth_url[:100]}...")
+    logger.info(f"   URL: {auth_url[:100]}...")
     logger.info("=" * 60)
     
-    # eBay 로그인 페이지로 리다이렉트
-    # CORS 헤더 추가 (리다이렉트 시에도 필요)
-    response = RedirectResponse(url=auth_url, status_code=302)
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "*"
-    return response
+    # Return JSON response with URL instead of redirect to avoid CORS issues with AJAX
+    # Frontend will handle the redirect using window.location.href
+    return JSONResponse(
+        status_code=200,
+        content={
+            "url": auth_url,
+            "success": True,
+            "message": "Authorization URL generated successfully"
+        }
+    )
 
 
 @router.get("/auth/callback")
