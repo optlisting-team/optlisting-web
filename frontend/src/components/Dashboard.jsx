@@ -5,6 +5,7 @@ import axios from 'axios'
 import apiClient, { API_BASE_URL } from '../lib/api'
 import { useStore } from '../contexts/StoreContext'
 import { useAuth } from '../contexts/AuthContext'
+import { useAccount } from '../contexts/AccountContext'
 import SummaryCard from './SummaryCard'
 import ZombieTable from './ZombieTable'
 import FilterBar from './FilterBar'
@@ -21,8 +22,8 @@ import { Button } from './ui/button'
 import { AlertCircle, X, Loader2 } from 'lucide-react'
 import { getImageUrlFromListing, normalizeImageUrl } from '../utils/imageUtils'
 
-// API_BASE_URL은 api.js에서 import
-// JWT 인증이 필요한 요청은 apiClient 사용, 인증이 필요 없는 요청(health check 등)은 axios 사용
+// API_BASE_URL is imported from api.js
+// Use apiClient for requests requiring JWT authentication, use axios for requests without auth (e.g., health check)
 
 // Demo Mode - Set to true to use dummy data (false for production with real API)
 // Test mode: true = dummy data, false = real API
@@ -118,6 +119,7 @@ function Dashboard() {
 
   const { selectedStore } = useStore()
   const { user } = useAuth()
+  const { credits, refreshCredits } = useAccount()  // Use global credits from AccountContext
   const [searchParams] = useSearchParams()
   const viewParam = searchParams.get('view')
   
@@ -125,13 +127,13 @@ function Dashboard() {
   // If user is not logged in, API calls will fail with proper error messages
   const currentUserId = user?.id
   // Client state only
-  // NOTE: Dashboard에서는 제품 리스트 상태를 유지하지 않음 (카드 숫자만 관리)
+  // NOTE: Dashboard does not maintain product list state (only manages card numbers)
   const [isStoreConnected, setIsStoreConnected] = useState(false)
-  // allListings, zombies는 Dashboard에서 제거 (결과 화면에서만 관리)
+  // allListings, zombies removed from Dashboard (only managed in results screen)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [selectedIds, setSelectedIds] = useState([])
-  const [queue, setQueue] = useState([]) // Queue는 로컬 상태로 유지
+  const [queue, setQueue] = useState([]) // Queue maintained as local state
   const [viewMode, setViewModeRaw] = useState('total')
   
   const setViewMode = setViewModeRaw
@@ -150,7 +152,7 @@ function Dashboard() {
   const [totalDeleted, setTotalDeleted] = useState(0) // Start at 0, updates from history
   const [showFilter, setShowFilter] = useState(false) // Default: filter collapsed
   
-  // Summary statistics state (Dashboard 초기 로딩용)
+  // Summary statistics state (for Dashboard initial loading)
   const [summaryStats, setSummaryStats] = useState({
     activeCount: 0,
     lowPerformingCount: 0,
@@ -158,23 +160,22 @@ function Dashboard() {
     lastSyncAt: null
   })
   const [summaryLoading, setSummaryLoading] = useState(false)
-  const [isSyncingListings, setIsSyncingListings] = useState(false) // Sync 진행 중 상태
+  const [isSyncingListings, setIsSyncingListings] = useState(false) // Sync in progress state
   
-  // 결과 표시 여부 (Find 버튼 클릭 시에만 표시)
+  // Result display flag (only shown when Find button is clicked)
   const [showResults, setShowResults] = useState(false)
   const [resultsMode, setResultsMode] = useState('low') // 'all' or 'low'
   const [resultsFilters, setResultsFilters] = useState(null)
   
-  // 분석 결과 상태
+  // Analysis result state
   const [analysisResult, setAnalysisResult] = useState(null) // { count, items, requestId, filters }
   
-  // Confirm Modal 상태 (크레딧 소비 확인)
+  // Confirm Modal state (credit consumption confirmation)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [pendingAnalysisFilters, setPendingAnalysisFilters] = useState(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [requiredCredits, setRequiredCredits] = useState(1)  // quote에서 받아온 값
-  const [isFetchingQuote, setIsFetchingQuote] = useState(false)  // quote 호출 중 플래그
-  const [isToppingUp, setIsToppingUp] = useState(false)  // Dev top-up 진행 중 플래그
+  const [requiredCredits, setRequiredCredits] = useState(1)  // Value received from quote
+  const [isFetchingQuote, setIsFetchingQuote] = useState(false)  // Flag for quote call in progress
   
   // OAuth callback verification guard - prevent multiple simultaneous verifications
   const isVerifyingConnection = useRef(false)
@@ -197,7 +198,7 @@ function Dashboard() {
   const [showPlatformModal, setShowPlatformModal] = useState(false)
   const [isExportingCSV, setIsExportingCSV] = useState(false)
   
-  // 에러 유형별 메시지 생성 함수
+  // Error message generation function by error type
   const getErrorMessage = (err) => {
     if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
       return 'Network error. Please try again.'
@@ -206,7 +207,7 @@ function Dashboard() {
       return 'Please reconnect your eBay account.'
     }
     if (err.response?.status === 402) {
-      // 크레딧 부족
+      // Insufficient credits
       const errorData = err.response?.data?.detail || {}
       return errorData.message || 'Insufficient credits. Please purchase more credits.'
     }
@@ -219,19 +220,18 @@ function Dashboard() {
     return err.response?.data?.detail?.message || err.response?.data?.error || err.message || 'An error occurred. Please try again.'
   }
   
-  // Toast 표시 함수
+  // Toast display function
   const showToast = (message, type = 'error') => {
     setToast({ message, type })
-    setTimeout(() => setToast(null), 5000) // 5초 후 자동 제거
+    setTimeout(() => setToast(null), 5000) // Auto remove after 5 seconds
   }
   
-  // Filtering Modal State (레거시 - 필요시 유지)
+  // Filtering Modal State (legacy - maintain if needed)
   const [showFilteringModal, setShowFilteringModal] = useState(false)
   const [isFiltering, setIsFiltering] = useState(false)
   const [pendingFiltersForModal, setPendingFiltersForModal] = useState(null)
   
-  // User Credits & Plan State (from API)
-  const [userCredits, setUserCredits] = useState(0)
+  // User Credits & Plan State (from AccountContext)
   const [usedCredits, setUsedCredits] = useState(0)
   const [userPlan, setUserPlan] = useState('FREE')
   const [connectedStoresCount, setConnectedStoresCount] = useState(1)
@@ -248,24 +248,24 @@ function Dashboard() {
     supplier_filter: 'All'
   })
 
-  // Derived values only (summaryStats 사용)
-  // Dashboard에서는 allListings/zombies를 사용하지 않으므로 summaryStats만 사용
+  // Derived values only (using summaryStats)
+  // Dashboard does not use allListings/zombies, only uses summaryStats
   const totalListings = useMemo(() => summaryStats.activeCount || 0, [summaryStats.activeCount])
-  // LOW-PERFORMING 카드 숫자: analysisResult?.count ?? summaryStats.lowPerformingCount
+  // LOW-PERFORMING card number: analysisResult?.count ?? summaryStats.lowPerformingCount
   const totalZombies = useMemo(() => {
     return analysisResult?.count ?? summaryStats.lowPerformingCount ?? 0
   }, [analysisResult?.count, summaryStats.lowPerformingCount])
   
-  // Breakdown은 summary API에서 제공하지 않으므로 빈 객체
+  // Breakdown not provided by summary API, so use empty object
   const totalBreakdown = useMemo(() => ({}), [])
   const platformBreakdown = useMemo(() => ({ eBay: totalListings }), [totalListings])
   const zombieBreakdown = useMemo(() => ({}), [])
   
   // API Health Check - Check connection on mount
-  // Health check는 인증이 필요 없으므로 axios 사용
+  // Health check does not require authentication, so use axios
   const checkApiHealth = async () => {
     try {
-      // Health check는 인증이 필요 없으므로 axios 사용 (하지만 timeout은 60초로 증가)
+      // Health check does not require authentication, so use axios (but timeout increased to 60 seconds)
       const response = await axios.get(`${API_BASE_URL}/api/health`, { 
         timeout: 60000,
         headers: {
@@ -287,45 +287,22 @@ function Dashboard() {
       setApiConnected(false)
       // More specific message for 502 errors
       if (err.response?.status === 502) {
-        setApiError('백엔드 서버 오류 (502) - Railway 서버를 확인하세요')
+        setApiError('Backend server error (502) - Please check Railway server')
       } else if (err.code === 'ERR_NETWORK' || err.code === 'ECONNABORTED') {
-        setApiError('네트워크 오류 - 서버에 연결할 수 없습니다')
+        setApiError('Network error - Cannot connect to server')
       } else if (err.response?.status === 0 || err.message?.includes('CORS')) {
-        setApiError('CORS 오류 - 백엔드 서버를 재배포하세요')
+        setApiError('CORS error - Please redeploy backend server')
       } else {
-        setApiError(`연결 오류: ${err.message || '알 수 없는 오류'}`)
+        setApiError(`Connection error: ${err.message || 'Unknown error'}`)
       }
       return false
     }
     return false
   }
   
-  // Fetch user credits and plan info
-  const fetchUserCredits = async () => {
-    // CRITICAL: No fetch if user is not logged in
-    if (!currentUserId) {
-      console.warn('⚠️ [CREDITS] Cannot fetch: user is not logged in')
-      return
-    }
-    
-    try {
-      // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
-      // 이미 apiClient로 변경되었으므로 params에서 user_id 제거
-      const response = await apiClient.get(`/api/credits`, {
-        timeout: 60000,  // 60초로 증가 (API 응답 시간 초과 방지)
-      })
-      if (response.data) {
-        setUserCredits(response.data.available_credits || 0)
-        setUsedCredits(response.data.used_credits || 0)
-        setUserPlan(response.data.plan || 'FREE')
-      }
-    } catch (err) {
-      console.error('Failed to fetch credits:', err)
-      // Use default values on error
-    }
-  }
+  // Credits are now managed by AccountContext - no local fetchUserCredits needed
 
-  // Sync eBay listings (OAuth 연결 후 자동 호출)
+  // Sync eBay listings (automatically called after OAuth connection)
   const syncEbayListings = async () => {
     // CRITICAL: No sync if user is not logged in
     if (!currentUserId) {
@@ -339,78 +316,50 @@ function Dashboard() {
       console.log('🔄 [SYNC] Starting eBay listings sync...')
       console.log('   user_id:', currentUserId)
       
-      // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+      // Use apiClient for requests requiring JWT authentication (Authorization header automatically added)
+      // Fire and Forget pattern: Immediately receive 202 Accepted and sync in background
       const response = await apiClient.post(`/api/ebay/listings/sync`, null, {
-        timeout: 120000 // 2분 타임아웃 (대량 listings 동기화 고려)
+        timeout: 10000 // 10 second timeout (to quickly receive 202 response)
       })
       
-      if (response.data && response.data.success) {
-        // 1) /api/ebay/listings/sync 응답 JSON을 콘솔에 그대로 출력
+      // Handle 202 Accepted response (background job started)
+      // Distinguish between 202 (background job) and other success codes (200, 201)
+      if (response.status === 202) {
         console.log('='.repeat(60))
-        console.log('📊 [SYNC] /api/ebay/listings/sync 응답 JSON:')
+        console.log('📊 [SYNC] /api/ebay/listings/sync response (202 Accepted):')
         console.log(JSON.stringify(response.data, null, 2))
         console.log('='.repeat(60))
         
-        // sync 응답을 sessionStorage에 저장 (summary와 비교용)
+        // 202 response means background job has started (not completed)
+        showToast('Sync job started in background. Please wait a moment and refresh.', 'info')
+        
+        // Save sync response to sessionStorage (for comparison with summary)
         sessionStorage.setItem('last_sync_response', JSON.stringify(response.data))
         
-        const { fetched, upserted, pages, total_pages, ebay_user_id, page_stats } = response.data
+        // Background job, so no actual data yet
+        // Instead, fetch summary again after a moment to verify
         
-        // 🔍 STEP 1: eBay API에서 가져온 데이터 개수 로깅
-        console.log('🔍 [SYNC STEP 1] eBay API Fetch Count:')
-        console.log(`   - Total fetched from eBay API: ${fetched} listings`)
-        console.log(`   - Total pages: ${total_pages}`)
-        console.log(`   - Current user_id: ${currentUserId}`)
-        if (page_stats && page_stats.length > 0) {
-          console.log(`   - Page stats:`, page_stats)
-          page_stats.forEach((stat, idx) => {
-            console.log(`     Page ${stat.page}: fetched=${stat.fetched}, upserted=${stat.upserted}, total_entries=${stat.total_entries}`)
-          })
-        }
+        // Background job, so actual results will be checked later
+        console.log('🔄 [SYNC] Background sync job started. Waiting for completion...')
         
-        // 🔍 STEP 2: DB 저장 로직 점검 - upserted 개수 및 user_id 확인
-        console.log('🔍 [SYNC STEP 2] DB Upsert Count:')
-        console.log(`   - Total upserted to DB: ${upserted} listings`)
-        console.log(`   - Current user_id (should match DB user_id): ${currentUserId}`)
-        console.log(`   - eBay user_id (from eBay API): ${ebay_user_id || 'N/A'}`)
+        // Refetch summary stats after sync completes (waiting for background job to complete)
+        // Wait sufficient time for background job to complete (max 60 seconds)
+        console.log('🔄 [SYNC] Waiting for background sync to complete, then refetching summary stats...')
         
-        // 케이스 분기: fetched=0인 경우
-        if (fetched === 0) {
-          console.warn('⚠️ [SYNC] fetched=0 - Trading API에서 listings를 가져오지 못함')
-          console.warn('   백엔드 로그에서 Trading API 응답의 Ack/Errors/TotalNumberOfEntries를 확인하세요')
-          showToast('No listings found from eBay API. Check backend logs for details.', 'warning')
-        }
+        // ✅ 2. Refresh data after sync: Wait for background job to complete, then refetch summary
+        // Wait sufficient time for background sync to complete (typically 10-30 seconds)
+        await new Promise(resolve => setTimeout(resolve, 5000)) // Wait 5 seconds
         
-        // 케이스 분기: upserted와 fetched 비교
-        // ✅ 1. Frontend Sync Logic: upserted가 0이더라도 fetched가 0보다 크면 성공으로 처리
-        if (upserted > 0 && upserted !== fetched) {
-          console.warn(`⚠️ [SYNC] MISMATCH: fetched=${fetched} but upserted=${upserted}`)
-          console.warn('   가능한 원인: 중복 데이터로 인한 upsert (정상 동작)')
-        } else if (upserted === 0 && fetched > 0) {
-          // ✅ 수정: upserted=0이어도 fetched>0이면 성공으로 처리 (기존 데이터가 이미 DB에 있을 수 있음)
-          console.log(`ℹ️ [SYNC] fetched=${fetched} but upserted=0 - 기존 데이터가 이미 DB에 있거나 upsert 로직이 0을 반환했을 수 있음`)
-          console.log('   Summary API로 실제 DB 상태 확인 중...')
-        } else if (upserted > 0) {
-          console.log(`✅ [SYNC] ${upserted} listings upserted - verifying with summary API...`)
-        }
-        
-        // Sync 완료 후 summary stats 재호출 (네트워크 확인용)
-        console.log('🔄 [SYNC] Refetching summary stats after sync...')
-        
-        // ✅ 2. Sync 완료 후 데이터 리프레시: 약간의 딜레이 추가 후 summary 재호출
-        // DB 커밋이 완전히 완료될 때까지 잠시 대기 (PostgreSQL의 경우 즉시 반영되지만 안전을 위해)
-        await new Promise(resolve => setTimeout(resolve, 500))
-        
-        // Summary API 강제 재호출
+        // Force Summary API refetch
         try {
-          // fetchSummaryStats는 내부에서 summaryStats를 업데이트하므로, 
-          // 응답을 직접 확인하기 위해 API를 직접 호출
-          // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+          // fetchSummaryStats updates summaryStats internally, so
+          // call API directly to check response
+          // Use apiClient for requests requiring JWT authentication (Authorization header automatically added)
           const summaryResponse = await apiClient.get(`/api/ebay/summary`, {
             params: {
               filters: JSON.stringify(filters)
             },
-            timeout: 60000,  // 60초로 증가 (API 응답 시간 초과 방지)
+            timeout: 60000,  // Increased to 60 seconds (to prevent API response timeout)
           })
           
           if (summaryResponse.data && summaryResponse.data.success) {
@@ -422,7 +371,7 @@ function Dashboard() {
             console.log('✅ [SYNC] Summary stats refetch completed')
             console.log(`   - Active count from backend: ${activeCount}`)
             
-            // ✅ 2. State Force Refresh: Sync 작업이 끝나면 백엔드로부터 받은 active_count 값을 강제로 할당
+            // ✅ 2. State Force Refresh: Force assign active_count value from backend after sync completes
             setSummaryStats({
               activeCount: activeCount,
               lowPerformingCount: lowPerformingCount,
@@ -431,54 +380,62 @@ function Dashboard() {
             })
             console.log(`✅ [SYNC] State force updated: activeCount=${activeCount}`)
             
-            // Summary 결과 확인 및 불일치 시 경고 (로깅만, 에러 처리하지 않음)
-            if (upserted > 0 && activeCount === 0) {
-              console.warn('⚠️ [SYNC] MISMATCH AFTER REFETCH:')
-              console.warn(`   - Upserted: ${upserted} listings`)
-              console.warn(`   - Summary active_count: ${activeCount}`)
-              console.warn('   백엔드 로그에서 쿼리 조건 확인 필요 (user_id, platform 대소문자 등)')
-            } else if (fetched > 0 && activeCount > 0) {
-              console.log(`✅ [SYNC] Summary 업데이트 확인: ${activeCount} active listings`)
-              console.log(`   - Fetched: ${fetched}, Upserted: ${upserted}, Summary: ${activeCount}`)
+            // Check summary results (verify background job completion)
+            if (activeCount > 0) {
+              console.log(`✅ [SYNC] Background sync completed: ${activeCount} active listings found`)
+              showToast(`Sync completed: ${activeCount} active listings`, 'success')
+              // Also call fetchSummaryStats to update state (redundant but safe)
+              await fetchSummaryStats()
+            } else {
+              console.log(`ℹ️ [SYNC] Background sync may still be in progress or no listings found`)
+              // Wait additional time and check again (only once to prevent infinite loops)
+              await new Promise(resolve => setTimeout(resolve, 5000))
+              await fetchSummaryStats()
+              // Note: Only one retry to prevent infinite polling loops
             }
-            
-            // fetchSummaryStats도 호출하여 상태 업데이트 (중복이지만 안전을 위해)
-            await fetchSummaryStats()
           }
         } catch (refetchErr) {
-          console.error('❌ [SYNC] Summary refetch 실패:', refetchErr)
-          // Refetch 실패해도 fetchSummaryStats 시도
+          console.error('❌ [SYNC] Summary refetch failed:', refetchErr)
+          // Try fetchSummaryStats even if refetch fails
           fetchSummaryStats().catch(err => {
-            console.error('❌ [SYNC] fetchSummaryStats도 실패:', err)
+            console.error('❌ [SYNC] fetchSummaryStats also failed:', err)
           })
         }
         
-        showToast(`Successfully synced ${fetched} listings (${upserted} upserted)`, 'success')
+        // Note: fetched and upserted are not available in 202 response
+        // They will be available after background sync completes
+      } else if (response.status >= 200 && response.status < 300) {
+        // Handle other success codes (200, 201) - immediate completion
+        console.log('✅ [SYNC] Sync completed immediately (non-202 success):', response.data)
+        showToast('Sync completed successfully', 'success')
+        // Refresh summary stats immediately for non-202 responses
+        await fetchSummaryStats()
       } else {
-        throw new Error(response.data?.message || 'Sync failed')
+        // Handle error responses (4xx, 5xx)
+        throw new Error(response.data?.message || `Sync failed with status ${response.status}`)
       }
     } catch (err) {
       console.error('❌ [SYNC] Sync error:', err)
       
-      // ✅ 2. eBay 데이터 수집 이슈 해결: 토큰 오류 시 명확한 메시지 표시
+      // ✅ 2. eBay data collection issue resolution: Show clear message on token error
       let errorMessage = err.response?.data?.detail?.message || err.response?.data?.message || err.message || 'Failed to sync listings'
       
-      // 401/403 에러인 경우 재연결 필요 메시지
+      // Show reconnection message for 401/403 errors
       if (err.response?.status === 401 || err.response?.status === 403) {
-        errorMessage = 'eBay 연결이 만료되었습니다. "Connect eBay" 버튼을 클릭하여 다시 연결해주세요.'
+        errorMessage = 'eBay connection expired. Please click "Connect eBay" button to reconnect.'
         console.error('❌ [SYNC] Token expired or invalid - Reconnection required')
       }
-      // 토큰 관련 에러 메시지 확인
+      // Check for token-related error messages
       else if (errorMessage.toLowerCase().includes('token') || 
                errorMessage.toLowerCase().includes('expired') || 
                errorMessage.toLowerCase().includes('reconnect')) {
-        errorMessage = 'eBay 연결이 만료되었습니다. "Connect eBay" 버튼을 클릭하여 다시 연결해주세요.'
+        errorMessage = 'eBay connection expired. Please click "Connect eBay" button to reconnect.'
         console.error('❌ [SYNC] Token-related error detected - Reconnection required')
       }
       
       showToast(`Sync failed: ${errorMessage}`, 'error')
       
-      // Sync 실패해도 summary stats는 가져오기 (기존 데이터 표시)
+      // Fetch summary stats even if sync fails (to show existing data)
       fetchSummaryStats().catch(fetchErr => {
         console.error('Failed to fetch summary stats after sync error:', fetchErr)
       })
@@ -487,7 +444,7 @@ function Dashboard() {
     }
   }
 
-  // Fetch summary statistics (경량화된 통계만 가져오기)
+  // Fetch summary statistics (lightweight stats only)
   const fetchSummaryStats = async () => {
     // CRITICAL: No fetch if user is not logged in
     if (!currentUserId) {
@@ -508,7 +465,7 @@ function Dashboard() {
       console.log('   API URL:', `${API_BASE_URL}/api/ebay/summary`)
       
       if (DEMO_MODE) {
-        // Demo 모드에서는 더미 데이터 사용
+        // Use dummy data in demo mode
         setSummaryStats({
           activeCount: DUMMY_ALL_LISTINGS.length,
           lowPerformingCount: DUMMY_ZOMBIES.length,
@@ -519,26 +476,26 @@ function Dashboard() {
         return
       }
       
-      // ✅ 3. 필터 매칭 확인: 프론트엔드에서 보내는 필터 로깅
+      // ✅ 3. Filter matching verification: Log filters sent from frontend
       console.log('📊 [SUMMARY] Sending filters to backend:')
       console.log('   - filters object:', filters)
       console.log('   - filters JSON stringified:', JSON.stringify(filters))
       
-      // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+      // Use apiClient for requests requiring JWT authentication (Authorization header automatically added)
       const response = await apiClient.get(`/api/ebay/summary`, {
         params: {
-          filters: JSON.stringify(filters) // 필터 파라미터 전달
+          filters: JSON.stringify(filters) // Pass filter parameters
         },
-        // apiClient의 기본 timeout(60000) 사용, 여기서는 명시하지 않음
+        // Use apiClient's default timeout(60000), not specified here
       })
       
-      // 🔍 STEP 3: Summary 집계 로직 점검 - 쿼리 조건 및 결과 확인
+      // 🔍 STEP 3: Summary aggregation logic check - verify query conditions and results
       console.log('='.repeat(60))
-      console.log('📊 [SUMMARY] /api/ebay/summary 응답 JSON:')
+      console.log('📊 [SUMMARY] /api/ebay/summary response JSON:')
       console.log(JSON.stringify(response.data, null, 2))
       console.log('='.repeat(60))
       
-      // 케이스 분기: upserted>0인데 active_count=0인 경우
+      // Case branch: upserted>0 but active_count=0
       if (response.data && response.data.success) {
         const { active_count, user_id, low_performing_count } = response.data
         
@@ -549,7 +506,7 @@ function Dashboard() {
         console.log(`   - Query platform: eBay (assumed)`)
         console.log(`   - Low-performing count: ${low_performing_count}`)
         
-        // ✅ FIX: syncData를 먼저 정의한 후 사용
+        // ✅ FIX: Define syncData first before using
         const lastSyncResponse = sessionStorage.getItem('last_sync_response')
         let syncData = null
         let syncUpserted = 0
@@ -562,36 +519,36 @@ function Dashboard() {
           }
         }
         
-        console.log('🔍 [SUMMARY] Sync vs Summary 비교:')
+        console.log('🔍 [SUMMARY] Sync vs Summary comparison:')
         console.log(`   - eBay API Fetch Count: ${syncData?.fetched || 0}`)
         console.log(`   - DB Upsert Count: ${syncData?.upserted || 0}`)
         console.log(`   - Summary active_count: ${active_count}`)
         console.log(`   - Summary user_id: ${user_id}`)
         console.log(`   - Summary platform: eBay (assumed)`)
         
-        // 비교 분석
+        // Comparison analysis
         if (syncUpserted > 0 && active_count === 0) {
           console.error('❌ [COMPARISON] MISMATCH DETECTED:')
-          console.error(`   - DB에는 ${syncUpserted}개가 저장되었지만 summary 쿼리는 0개를 반환함`)
-          console.error('   가능한 원인:')
-          console.error('   1. user_id 불일치 (sync: ' + currentUserId + ', summary: ' + user_id + ')')
-          console.error('   2. platform 필드 불일치 (sync: eBay, summary query: eBay)')
-          console.error('   3. 쿼리 조건 문제 (status 필터링 등)')
+          console.error(`   - ${syncUpserted} items saved to DB but summary query returns 0`)
+          console.error('   Possible causes:')
+          console.error('   1. user_id mismatch (sync: ' + currentUserId + ', summary: ' + user_id + ')')
+          console.error('   2. platform field mismatch (sync: eBay, summary query: eBay)')
+          console.error('   3. Query condition issue (status filtering, etc.)')
         } else if (syncUpserted === active_count && syncUpserted > 0) {
-          console.log('✅ [COMPARISON] 일치: DB upsert count와 summary count가 동일함')
+          console.log('✅ [COMPARISON] Match: DB upsert count and summary count are identical')
         }
         
-        // upserted>0인데 active_count=0인 경우 디버그 엔드포인트 자동 호출
+        // Auto-call debug endpoint if upserted>0 but active_count=0
         if (lastSyncResponse && syncData) {
           console.log(`   - Last sync upserted: ${syncUpserted}`)
           
           if (syncUpserted > 0 && active_count === 0) {
             console.warn('⚠️ [SUMMARY] MISMATCH: upserted>0 but active_count=0')
-            console.warn('   디버그 엔드포인트를 호출하여 DB 상태 확인 중...')
+            console.warn('   Calling debug endpoint to check DB state...')
             
-            // 디버그 엔드포인트 호출
+            // Call debug endpoint
             try {
-              // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+              // Use apiClient for requests requiring JWT authentication (Authorization header automatically added)
               const debugResponse = await apiClient.get(`/api/debug/listings`, {
                 params: {
                   platform: 'eBay'
@@ -600,31 +557,31 @@ function Dashboard() {
               })
               
               console.log('='.repeat(60))
-              console.log('🔍 [DEBUG] /api/debug/listings 응답 JSON:')
+              console.log('🔍 [DEBUG] /api/debug/listings response JSON:')
               console.log(JSON.stringify(debugResponse.data, null, 2))
               console.log('='.repeat(60))
               
               if (debugResponse.data && debugResponse.data.count > 0) {
-                console.warn('⚠️ [DEBUG] DB에는 listings가 존재하지만 summary 쿼리가 0을 반환함')
-                console.warn('   쿼리 키 불일치 가능성 - keys_match:', debugResponse.data.keys_match)
+                console.warn('⚠️ [DEBUG] Listings exist in DB but summary query returns 0')
+                console.warn('   Possible query key mismatch - keys_match:', debugResponse.data.keys_match)
               } else {
-                console.warn('⚠️ [DEBUG] DB에도 listings가 없음 - sync upsert가 실제로 저장되지 않았을 가능성')
+                console.warn('⚠️ [DEBUG] No listings in DB either - sync upsert may not have actually saved')
               }
             } catch (debugErr) {
-              console.error('❌ [DEBUG] 디버그 엔드포인트 호출 실패:', debugErr)
+              console.error('❌ [DEBUG] Debug endpoint call failed:', debugErr)
             }
           }
         }
         
         console.log('✅ [SUMMARY] Successfully fetched summary:', response.data)
         
-        // ✅ 3. UI Sync: summary API 응답 데이터가 있으면 무조건 화면의 숫자를 업데이트
+        // ✅ 3. UI Sync: Always update screen numbers if summary API response data exists
         const activeCount = response.data.active_count || 0
         const lowPerformingCount = response.data.low_performing_count || 0
         const queueCount = response.data.queue_count || 0
         const lastSyncAt = response.data.last_sync_at || null
         
-        // 응답 데이터가 있으면 무조건 상태 업데이트 (0이어도 업데이트)
+        // Always update state if response data exists (update even if 0)
         setSummaryStats({
           activeCount: activeCount,
           lowPerformingCount: lowPerformingCount,
@@ -634,7 +591,7 @@ function Dashboard() {
         console.log(`✅ [SUMMARY] UI updated: activeCount=${activeCount}, lowPerformingCount=${lowPerformingCount}`)
       } else {
         console.warn('⚠️ fetchSummaryStats: Unexpected response format:', response.data)
-        // 응답 형식이 예상과 다르더라도, active_count가 있으면 업데이트 시도
+        // Try to update even if response format differs from expected, as long as active_count exists
         if (response.data && typeof response.data.active_count === 'number') {
           setSummaryStats({
             activeCount: response.data.active_count || 0,
@@ -656,7 +613,7 @@ function Dashboard() {
           lastSyncAt: null
         })
       } else {
-        // 에러 발생 시에도 기본값 설정
+        // Set default values even on error
         setSummaryStats({
           activeCount: 0,
           lowPerformingCount: 0,
@@ -969,11 +926,11 @@ function Dashboard() {
     return Math.max(0, Math.min(score, 100))
   }
 
-  // NOTE: applyLocalFilter는 Dashboard에서 제거됨
-  // 필터링은 /listings 페이지의 LowPerformingResults 컴포넌트에서 서버 측에서 수행
+  // NOTE: applyLocalFilter removed from Dashboard
+  // Filtering is performed server-side in LowPerformingResults component on /listings page
 
   // Handle store connection change
-  // 중복 호출 방지를 위한 플래그
+  // Flag to prevent duplicate calls
   const handleStoreConnectionInProgress = useRef(false)
   
   const handleStoreConnection = (connected, forceLoad = false) => {
@@ -983,7 +940,7 @@ function Dashboard() {
       return
     }
     
-    // 중복 실행 방지
+    // Prevent duplicate execution
     if (handleStoreConnectionInProgress.current) {
       console.warn('⚠️ handleStoreConnection already in progress, skipping duplicate call')
       return
@@ -1015,7 +972,7 @@ function Dashboard() {
         })
         handleStoreConnectionInProgress.current = false
       } else if (forceLoad) {
-        // forceLoad가 true여도 summary stats만 가져오기
+        // Even if forceLoad is true, only fetch summary stats
         console.log('📦 handleStoreConnection: forceLoad=true, calling fetchSummaryStats() only')
         setTimeout(() => {
           fetchSummaryStats().then(() => {
@@ -1026,7 +983,7 @@ function Dashboard() {
           })
         }, 200)
       } else {
-        // forceLoad가 false면 summary stats만 가져오기
+        // If forceLoad is false, only fetch summary stats
         fetchSummaryStats().then(() => {
           handleStoreConnectionInProgress.current = false
         }).catch(err => {
@@ -1037,13 +994,13 @@ function Dashboard() {
     }
   }
 
-  // NOTE: Dashboard에서는 절대 제품 리스트를 로드하지 않음
-  // fetchAllListings 함수는 /listings 페이지의 LowPerformingResults 컴포넌트에서 사용
+  // NOTE: Dashboard never loads product list
+  // fetchAllListings function is used in LowPerformingResults component on /listings page
 
   const fetchHistory = async () => {
     try {
       // Don't set loading to true here to avoid blocking other operations
-      // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+      // Use apiClient for requests requiring JWT authentication (Authorization header automatically added)
       const response = await apiClient.get(`/api/history`, {
         params: {
           skip: 0,
@@ -1067,8 +1024,8 @@ function Dashboard() {
   }
 
   const handleViewModeChange = (mode) => {
-    // 카드 클릭 비활성화 - 아무 동작도 하지 않음
-    // 이제 SummaryCard에서 onViewModeChange를 전달하지 않으므로 호출되지 않음
+    // Card click disabled - no action
+    // Not called anymore since SummaryCard no longer passes onViewModeChange
     console.log('⚠️ handleViewModeChange called but cards are now non-interactive:', mode)
   }
 
@@ -1077,12 +1034,12 @@ function Dashboard() {
   }
 
   const handleAnalyze = () => {
-    // 'Find Low-Performing SKUs' 버튼 클릭 시 Dashboard 내부에 결과 표시
+    // Show results in Dashboard when 'Find Low-Performing SKUs' button is clicked
     console.log('🔍 handleAnalyze: Showing results panel in Dashboard')
     setResultsMode('low')
     setResultsFilters(filters)
     setShowResults(true)
-    // 결과 섹션으로 스크롤
+    // Scroll to results section
     setTimeout(() => {
       const resultsSection = document.getElementById('results-section')
       if (resultsSection) {
@@ -1091,7 +1048,7 @@ function Dashboard() {
     }, 100)
   }
 
-  // Handle filter confirmation from modal (레거시 - 필요시 유지)
+  // Handle filter confirmation from modal (legacy - maintain if needed)
   const handleConfirmFiltering = async () => {
     if (!pendingFiltersForModal) return
     
@@ -1099,7 +1056,7 @@ function Dashboard() {
       console.log('🔍 handleConfirmFiltering: Applying filters and showing results...')
       setIsFiltering(true)
       
-      // 필터 상태 확정
+      // Confirm filter state
       setFilters(pendingFiltersForModal)
       setResultsFilters(pendingFiltersForModal)
       setSelectedIds([])
@@ -1107,11 +1064,11 @@ function Dashboard() {
       // Small delay to show the filtering state
       await new Promise(resolve => setTimeout(resolve, 300))
       
-      // Dashboard 내부에 결과 표시
+      // Show results in Dashboard
       setResultsMode('low')
       setShowResults(true)
       
-      // 결과 섹션으로 스크롤
+      // Scroll to results section
       setTimeout(() => {
         const resultsSection = document.getElementById('results-section')
         if (resultsSection) {
@@ -1121,7 +1078,7 @@ function Dashboard() {
       
     } catch (err) {
       console.error('Failed to apply filters:', err)
-      // 에러 발생 시에도 필터 상태는 저장
+      // Save filter state even on error
       setFilters(pendingFiltersForModal)
       setResultsFilters(pendingFiltersForModal)
       setSelectedIds([])
@@ -1132,7 +1089,7 @@ function Dashboard() {
     }
   }
 
-  // Apply filter - Confirm 모달 표시
+  // Apply filter - Show Confirm modal
   const handleApplyFilter = async (newFilters) => {
     console.log('🔍 handleApplyFilter: Fetching quote...')
     console.log('📋 Request details:', {
@@ -1153,7 +1110,7 @@ function Dashboard() {
     setPendingAnalysisFilters(newFilters)
     
     try {
-      // Step 1: Quote (preflight) 호출 - requiredCredits 계산
+      // Step 1: Call Quote (preflight) - calculate requiredCredits
       const requestBody = {
         days: newFilters.analytics_period_days || newFilters.min_days || 7,
         sales_lte: newFilters.max_sales || 0,
@@ -1162,7 +1119,7 @@ function Dashboard() {
         views_lte: newFilters.max_views || 10,
       }
       
-      // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+      // Use apiClient for requests requiring JWT authentication (Authorization header automatically added)
       const quoteResponse = await apiClient.post(`/api/analysis/low-performing/quote`, requestBody, {
         params: {
           store_id: selectedStore?.id || null
@@ -1177,13 +1134,12 @@ function Dashboard() {
         
         console.log(`📊 Quote received: estimatedCandidates=${estimatedCandidates}, requiredCredits=${quoteRequiredCredits}, remainingCredits=${remainingCredits}`)
         
-        // requiredCredits 설정 (모달에 표시)
+        // Set requiredCredits (display in modal)
         setRequiredCredits(quoteRequiredCredits)
         
-        // 크레딧 업데이트 (quote에서 받은 최신 값)
-        setUserCredits(remainingCredits)
+        // Credits updated via AccountContext refreshCredits() after operations
         
-        // Step 2: Confirm modal 표시
+        // Step 2: Show Confirm modal
         setShowConfirmModal(true)
       } else {
         throw new Error('Invalid quote response')
@@ -1226,11 +1182,11 @@ function Dashboard() {
     }
   }
   
-  // Confirm 모달에서 확인 클릭 시 실제 분석 실행
+  // Execute actual analysis when Confirm modal is clicked
   const handleConfirmAnalysis = async () => {
     if (!pendingAnalysisFilters || isAnalyzing) return
     
-    // Idempotency-Key 생성 (execute에서 사용)
+    // Generate Idempotency-Key (used in execute)
     const idempotencyKey = `execute_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
     try {
@@ -1239,8 +1195,8 @@ function Dashboard() {
       
       console.log(`📊 [${idempotencyKey}] Starting Low-Performing analysis execution...`, pendingAnalysisFilters)
       
-      // Step 3: Execute 호출 - 크레딧 차감 + 분석 수행
-      // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+      // Step 3: Call Execute - deduct credits + perform analysis
+      // Use apiClient for requests requiring JWT authentication (Authorization header automatically added)
       const response = await apiClient.post(`/api/analysis/low-performing/execute`, {
         days: pendingAnalysisFilters.analytics_period_days || pendingAnalysisFilters.min_days || 7,
         sales_lte: pendingAnalysisFilters.max_sales || 0,
@@ -1250,7 +1206,7 @@ function Dashboard() {
         idempotency_key: idempotencyKey
       }, {
         headers: {
-          'Idempotency-Key': idempotencyKey  // 헤더에도 포함 (표준 관행)
+          'Idempotency-Key': idempotencyKey  // Also include in header (standard practice)
         },
         timeout: 120000
       })
@@ -1263,7 +1219,7 @@ function Dashboard() {
       
       console.log(`✅ [${idempotencyKey}] Analysis completed: count=${count}, chargedCredits=${chargedCredits}, remainingCredits=${remainingCredits}`)
       
-      // 분석 결과 저장
+      // Save analysis results
       setAnalysisResult({
         count,
         items,
@@ -1271,19 +1227,18 @@ function Dashboard() {
         filters: returnedFilters || pendingAnalysisFilters
       })
       
-      // 필터 상태 확정
+      // Confirm filter state
       setFilters(pendingAnalysisFilters)
       setResultsFilters(pendingAnalysisFilters)
       setSelectedIds([])
       
-      // 크레딧 업데이트 (execute에서 받은 최신 값)
-      setUserCredits(remainingCredits)
+      // Credits updated via AccountContext refreshCredits() after operations
       
-      // Dashboard 내부에 결과 표시
+      // Show results in Dashboard
       setResultsMode('low')
       setShowResults(true)
       
-      // 결과 섹션으로 스크롤
+      // Scroll to results section
       setTimeout(() => {
         const resultsSection = document.getElementById('results-section')
         if (resultsSection) {
@@ -1300,11 +1255,11 @@ function Dashboard() {
       let showRetry = true
       
       if (err.response?.status === 402) {
-        // 크레딧 부족
+        // Insufficient credits
         const errorData = err.response?.data?.detail || {}
         errorMessage = errorData.message || 'Insufficient credits. Please purchase more credits.'
         showRetry = false
-        setUserCredits(errorData.available_credits || 0)
+        // Credits will be refreshed via AccountContext after error handling
       } else if (err.response?.status === 500) {
         errorMessage = err.response?.data?.detail?.message || 'Server error. Please try again later.'
       } else if (err.code === 'ECONNABORTED') {
@@ -1316,7 +1271,7 @@ function Dashboard() {
       setErrorModalMessage(errorMessage)
       setShowErrorModal(true)
       
-      // 크레딧 부족이 아닌 경우에만 pendingAnalysisFilters 유지 (retry 가능)
+      // Only maintain pendingAnalysisFilters if not insufficient credits (allows retry)
       if (!showRetry) {
         setPendingAnalysisFilters(null)
       }
@@ -1335,7 +1290,7 @@ function Dashboard() {
 
   const handleSelectAll = (checkedOrIds) => {
     // Support both boolean (legacy) and array (new pagination mode)
-    // NOTE: Dashboard에서는 listings가 없으므로 queue만 처리
+    // NOTE: Dashboard has no listings, so only process queue
     if (Array.isArray(checkedOrIds)) {
       setSelectedIds(checkedOrIds)
     } else {
@@ -1348,12 +1303,12 @@ function Dashboard() {
     }
   }
 
-  // NOTE: handleAddToQueue, handleMoveToZombies는 /listings 페이지에서 구현
-  // Dashboard에서는 queue만 관리
+  // NOTE: handleAddToQueue, handleMoveToZombies are implemented on /listings page
+  // Dashboard only manages queue
 
   const handleRemoveFromQueueBulk = () => {
     // Remove selected items from queue
-    // NOTE: Dashboard에서는 zombies를 관리하지 않으므로 queue에서만 제거
+    // NOTE: Dashboard does not manage zombies, so only remove from queue
     if (viewMode !== 'queue') return
     
     // Remove from queue
@@ -1365,16 +1320,16 @@ function Dashboard() {
     setQueue(queue.filter(item => item.id !== id))
   }
 
-  // Sync: summary stats + history (Dashboard에서는 제품 리스트를 절대 로드하지 않음)
+  // Sync: summary stats + history (Dashboard never loads product list)
   const handleSync = async () => {
     try {
       console.log('🔄 handleSync: Starting eBay listings sync...')
       setLoading(true)
       
-      // ✅ 강제 동기화: eBay API에서 데이터를 가져와 DB에 저장
+      // ✅ Force sync: Fetch data from eBay API and save to DB
       await syncEbayListings()
       
-      // Sync 완료 후 summary stats와 history 갱신
+      // Refresh summary stats and history after sync completes
       await Promise.all([
         fetchSummaryStats(),
         fetchHistory().catch(err => console.error('History fetch error:', err))
@@ -1395,14 +1350,14 @@ function Dashboard() {
         supplier: newSupplier
       })
 
-      // Step 2: Update in queue (Dashboard에서는 queue만 관리)
+      // Step 2: Update in queue (Dashboard only manages queue)
       const updateItemInList = (list) => {
         return list.map(item => 
           item.id === itemId ? { ...item, supplier: newSupplier, supplier_name: newSupplier } : item
         )
       }
 
-      // Queue에서만 업데이트 (Dashboard에서는 queue만 유지)
+      // Only update in queue (Dashboard only maintains queue)
       const itemInQueue = queue.find(item => item.id === itemId)
       if (itemInQueue) {
         setQueue(updateItemInList(queue))
@@ -1424,7 +1379,7 @@ function Dashboard() {
     // Handle payment success/cancel redirects
     if (paymentStatus === 'success') {
       // Refetch credits to show updated balance
-      fetchUserCredits()
+      refreshCredits()
       // Clean up URL parameter
       urlParams.delete('payment')
       const newUrl = window.location.pathname + (urlParams.toString() ? `?${urlParams.toString()}` : '')
@@ -1534,7 +1489,7 @@ function Dashboard() {
         console.log(`🔍 Verifying connection status from backend... (attempt ${verificationAttemptCount.current}/${MAX_VERIFICATION_ATTEMPTS})`)
         
         try {
-          // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+          // Use apiClient for requests requiring JWT authentication (Authorization header automatically added)
           const response = await apiClient.get(`/api/ebay/auth/status`, {
             timeout: 30000
           })
@@ -1559,16 +1514,16 @@ function Dashboard() {
             verificationAttemptCount.current = 0
             setIsStoreConnected(true)
             
-            // Performance mark: OAuth callback 완료 시점
+            // Performance mark: OAuth callback completion point
             if (typeof performance !== 'undefined' && performance.mark) {
               performance.mark('oauth_callback_complete')
             }
             
-            // CRITICAL: OAuth 콜백 성공 직후 listings sync 자동 실행
+            // CRITICAL: Automatically execute listings sync immediately after OAuth callback success
             console.log('🔄 Starting eBay listings sync after OAuth connection...')
             syncEbayListings().catch(err => {
               console.error('Failed to sync eBay listings after OAuth:', err)
-              // Sync 실패해도 summary stats는 가져오기
+              // Fetch summary stats even if sync fails
               fetchSummaryStats().catch(fetchErr => {
                 console.error('Failed to fetch summary stats after sync error:', fetchErr)
               })
@@ -1659,7 +1614,7 @@ function Dashboard() {
       try {
         const isHealthy = await checkApiHealth()
         if (isHealthy) {
-          await fetchUserCredits()
+          refreshCredits()
           fetchHistory().catch(err => {
             console.error('History fetch error on mount:', err)
           })
@@ -1675,7 +1630,7 @@ function Dashboard() {
               }
               
               console.log('🔍 Checking eBay connection status on mount...')
-              // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+              // Use apiClient for requests requiring JWT authentication (Authorization header automatically added)
               const response = await apiClient.get(`/api/ebay/auth/status`, {
                 timeout: 30000
               })
@@ -1697,7 +1652,7 @@ function Dashboard() {
               if (isConnected) {
                 console.log('✅ eBay is already connected - fetching summary stats...')
                 setIsStoreConnected(true)
-                // 연결되어 있으면 summary stats만 가져오기 (전체 listings는 가져오지 않음)
+                // If connected, only fetch summary stats (do not fetch full listings)
                 fetchSummaryStats().catch(err => {
                   console.error('Failed to fetch summary stats:', err)
                 })
@@ -1715,7 +1670,7 @@ function Dashboard() {
         }
       } catch (err) {
         console.warn('API Health Check failed (non-critical):', err)
-        await fetchUserCredits()
+        refreshCredits()
         fetchHistory().catch(err => {
           console.error('History fetch error on mount:', err)
         })
@@ -1754,14 +1709,14 @@ function Dashboard() {
     try {
       // Step 1: Log deletion to history BEFORE exporting
       try {
-        // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+        // Use apiClient for requests requiring JWT authentication (Authorization header automatically added)
         await apiClient.post(`/api/log-deletion`, {
           items: items
         }, {
           timeout: 30000 // Increased from 10s to 30s
         })
         // Refresh total deleted count
-        // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+        // Use apiClient for requests requiring JWT authentication (Authorization header automatically added)
         const historyResponse = await apiClient.get(`/api/history`, {
           params: { skip: 0, limit: 1 },
           timeout: 30000 // Increased from 10s to 30s
@@ -1858,7 +1813,7 @@ function Dashboard() {
   // Handle platform selection and export
   const handlePlatformSelect = async (platform) => {
     if (!analysisResult || !analysisResult.items || analysisResult.items.length === 0) {
-      showToast('내보낼 항목이 없습니다.', 'warning')
+      showToast('No items to export.', 'warning')
       setShowPlatformModal(false)
       return
     }
@@ -1883,13 +1838,13 @@ function Dashboard() {
       console.log(`📤 [EXPORT] Exporting ${itemsToExport.length} items to ${platform} (${targetTool})...`)
 
       // Call export API
-      // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+      // Use apiClient for requests requiring JWT authentication (Authorization header automatically added)
       const response = await apiClient.post(
         `/api/export-queue`,
         {
           items: itemsToExport,
           target_tool: targetTool,
-          platform: platform,  // platform 파라미터도 전달
+          platform: platform,  // Also pass platform parameter
           mode: 'delete_list'
         },
         {
@@ -1915,19 +1870,19 @@ function Dashboard() {
       link.remove()
       window.URL.revokeObjectURL(url)
 
-      showToast(`${platform.toUpperCase()} 형식으로 CSV를 내보냈습니다.`, 'success')
+      showToast(`CSV exported in ${platform.toUpperCase()} format.`, 'success')
     } catch (err) {
       console.error('Export CSV error:', err)
-      let errorMessage = 'CSV 내보내기 중 오류가 발생했습니다.'
+      let errorMessage = 'An error occurred while exporting CSV.'
       
       if (err.code === 'ECONNABORTED') {
-        errorMessage = '요청 시간 초과. 다시 시도해주세요.'
+        errorMessage = 'Request timeout. Please try again.'
       } else if (err.response) {
-        errorMessage = `서버 오류: ${err.response.status} - ${err.response.statusText || err.response.data?.detail || '알 수 없는 오류'}`
+        errorMessage = `Server error: ${err.response.status} - ${err.response.statusText || err.response.data?.detail || 'Unknown error'}`
       } else if (err.request) {
-        errorMessage = '서버에 연결할 수 없습니다. 네트워크 연결을 확인하세요.'
+        errorMessage = 'Cannot connect to server. Please check your network connection.'
       } else {
-        errorMessage = `CSV 내보내기 실패: ${err.message || '알 수 없는 오류'}`
+        errorMessage = `CSV export failed: ${err.message || 'Unknown error'}`
       }
       
       showToast(errorMessage, 'error')
@@ -1955,14 +1910,14 @@ function Dashboard() {
     try {
       // Step 1: Log deletion to history BEFORE exporting
       try {
-        // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+        // Use apiClient for requests requiring JWT authentication (Authorization header automatically added)
         await apiClient.post(`/api/log-deletion`, {
           items: items
         }, {
           timeout: 30000 // Increased from 10s to 30s
         })
         // Refresh total deleted count
-        // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+        // Use apiClient for requests requiring JWT authentication (Authorization header automatically added)
         const historyResponse = await apiClient.get(`/api/history`, {
           params: { skip: 0, limit: 1 },
           timeout: 30000 // Increased from 10s to 30s
@@ -2024,7 +1979,7 @@ function Dashboard() {
   return (
     <div className="font-sans bg-black dark:bg-black min-h-full">
       <div className="px-6 pt-4">
-        {/* Sync 진행 중 로딩 표시 */}
+        {/* Loading indicator while sync is in progress */}
         {isSyncingListings && (
           <div className="mb-4 p-4 bg-blue-900/20 border border-blue-500/30 rounded-xl">
             <div className="flex items-center gap-3">
@@ -2044,7 +1999,7 @@ function Dashboard() {
           zombieBreakdown={zombieBreakdown}
           queueCount={queue.length}
           totalDeleted={totalDeleted}
-          loading={summaryLoading}  // SummaryCard는 자체 로딩 상태만 사용 (전체 화면 블로킹 방지)
+          loading={summaryLoading}  // SummaryCard uses its own loading state (prevents full screen blocking)
           filters={filters}
           viewMode={viewMode}
           onViewModeChange={null}
@@ -2057,16 +2012,16 @@ function Dashboard() {
           apiConnected={apiConnected}
           apiError={apiError}
           userPlan={userPlan}
-          // Low-Performing items for Product Journey analysis (Dashboard에서는 사용하지 않음)
+          // Low-Performing items for Product Journey analysis (not used in Dashboard)
           zombies={[]}
-          userCredits={userCredits}
+          userCredits={credits || 0}
           usedCredits={usedCredits}
           // Store connection callback
           onConnectionChange={handleStoreConnection}
           // Supplier export callback
           onSupplierExport={handleSupplierExport}
           filterContent={null}
-          // Summary stats (새로 추가)
+          // Summary stats (newly added)
           summaryStats={summaryStats}
           // Analysis result (for filtered badge)
           analysisResult={analysisResult}
@@ -2076,71 +2031,8 @@ function Dashboard() {
           onError={(msg, err) => showToast(getErrorMessage(err || { message: msg }), 'error')}
         />
 
-        {/* Test Credits Top-up Button (Dev-only) */}
-        {/* 
-          NOTE: This button is controlled by VITE_ENABLE_TEST_CREDITS environment variable.
-          It will NOT be hidden based on NODE_ENV=production, but only when VITE_ENABLE_TEST_CREDITS is not 'true'.
-          This allows the button to be visible in production if explicitly enabled via environment variable.
-        */}
-        {import.meta.env.VITE_ENABLE_TEST_CREDITS === 'true' && (
-          <div className="mt-4 mb-4">
-            <button
-              onClick={async () => {
-                if (isToppingUp) return
-                
-                setIsToppingUp(true)
-                try {
-                  // Use admin grant endpoint with admin key from environment
-                  const adminKey = import.meta.env.VITE_ADMIN_API_KEY || ''
-                  const response = await axios.post(
-                    `${API_BASE_URL}/api/admin/credits/grant`,
-                    {
-                      user_id: currentUserId,
-                      amount: 1000,
-                      description: 'Test credits grant (dev-only)'
-                    },
-                    {
-                      params: {
-                        admin_key: adminKey
-                      },
-                      headers: {
-                        'Content-Type': 'application/json'
-                      },
-                      timeout: 30000
-                    }
-                  )
-                  
-                  if (response.data.success) {
-                    const { totalCredits, addedAmount } = response.data
-                    setUserCredits(totalCredits)
-                    showToast(`Test credits granted: +${addedAmount} credits (Total: ${totalCredits})`, 'success')
-                    
-                    // 크레딧 정보 다시 가져오기
-                    fetchUserCredits().catch(err => console.error('Failed to refresh credits:', err))
-                  } else {
-                    throw new Error(response.data.message || 'Grant failed')
-                  }
-                } catch (err) {
-                  console.error('Test credits grant failed:', err)
-                  
-                  if (err.response?.status === 403) {
-                    showToast('Test credits grant is not available. Check admin key configuration.', 'error')
-                  } else {
-                    showToast(getErrorMessage(err), 'error')
-                  }
-                } finally {
-                  setIsToppingUp(false)
-                }
-              }}
-              disabled={isToppingUp}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-800 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-            >
-              {isToppingUp ? 'Granting...' : '🧪 Grant Test Credits +1000'}
-            </button>
-          </div>
-        )}
 
-        {/* FilterBar - Find Low-Performing SKUs 버튼 */}
+        {/* FilterBar - Find Low-Performing SKUs button */}
         {isStoreConnected && summaryStats.activeCount > 0 && (
           <div className="mt-6">
             <FilterBar 
@@ -2162,7 +2054,7 @@ function Dashboard() {
           />
         )}
 
-        {/* Results Section - Find 버튼 클릭 시에만 표시 */}
+        {/* Results Section - Only shown when Find button is clicked */}
         {showResults && (
           <div id="results-section" className="mt-8">
             <div className="flex items-center justify-between mb-4">
@@ -2176,7 +2068,7 @@ function Dashboard() {
                 }}
                 className="px-4 py-2 text-sm text-zinc-400 hover:text-white transition-colors"
               >
-                ✕ 닫기
+                ✕ Close
               </button>
             </div>
             <LowPerformingResults 
@@ -2192,7 +2084,7 @@ function Dashboard() {
           </div>
         )}
         
-        {/* Queue View는 Dashboard에서 유지 (로컬 상태만 사용) */}
+        {/* Queue View maintained in Dashboard (local state only) */}
         {viewMode === 'queue' && queue.length > 0 && (
           <div className="mt-8">
             <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-4">
@@ -2216,7 +2108,7 @@ function Dashboard() {
         )}
       </div>
 
-      {/* Confirm Modal - 크레딧 소비 확인 */}
+      {/* Confirm Modal - Credit consumption confirmation */}
       <ConfirmModal
         isOpen={showConfirmModal}
         onClose={() => {
@@ -2227,11 +2119,11 @@ function Dashboard() {
         }}
         onConfirm={handleConfirmAnalysis}
         creditsRequired={requiredCredits}
-        currentCredits={userCredits}
+        currentCredits={credits || 0}
         isProcessing={isAnalyzing || isFetchingQuote}
       />
 
-      {/* Filtering Modal (레거시 - 필요시 유지) */}
+      {/* Filtering Modal (legacy - maintain if needed) */}
       <FilteringModal
         isOpen={showFilteringModal}
         onClose={() => {
@@ -2243,7 +2135,7 @@ function Dashboard() {
         }}
         onConfirm={handleConfirmFiltering}
         creditsRequired={summaryStats.activeCount || 0}
-        currentCredits={userCredits}
+        currentCredits={credits || 0}
         listingCount={summaryStats.activeCount || 0}
         isFiltering={isFiltering}
       />
@@ -2290,7 +2182,7 @@ function Dashboard() {
                   <button
                     onClick={() => {
                       setShowErrorModal(false)
-                      // Dashboard에서는 listings를 로드하지 않으므로 summary stats만 다시 가져오기
+                      // Dashboard does not load listings, so only refetch summary stats
                       fetchSummaryStats().catch(err => {
                         console.error('Failed to retry summary stats:', err)
                         showToast(getErrorMessage(err), 'error')

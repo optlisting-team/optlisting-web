@@ -3,13 +3,15 @@ import { useState } from 'react'
 import { Bell, RefreshCw, User, ChevronDown, Zap } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useAccount } from '../contexts/AccountContext'
+import apiClient from '../lib/api'
 
 function PageHeader() {
   const location = useLocation()
   const { user, isAuthenticated, signOut } = useAuth()
-  const { credits, setShowCreditModal } = useAccount()
+  const { credits, setShowCreditModal, refreshCredits } = useAccount()
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [showAuthMenu, setShowAuthMenu] = useState(false)
+  const [isGrantingTestCredits, setIsGrantingTestCredits] = useState(false)
 
   // Get page info based on route
   const getPageInfo = () => {
@@ -109,20 +111,71 @@ function PageHeader() {
 
             {/* My Credits */}
             {isAuthenticated && (
-              <button
-                onClick={() => setShowCreditModal(true)}
-                className="flex items-center gap-2 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-800 hover:border-amber-500/30 transition-all"
-              >
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
-                  <Zap className="w-4 h-4 text-white" />
-                </div>
-                <div className="text-left hidden md:block">
-                  <div className="text-xs text-zinc-500 text-[10px] uppercase tracking-wider">My Credits</div>
-                  <div className="text-sm font-bold text-white">
-                    {credits !== null ? credits.toLocaleString() : '...'}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowCreditModal(true)}
+                  className="flex items-center gap-2 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-800 hover:border-amber-500/30 transition-all"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                    <Zap className="w-4 h-4 text-white" />
                   </div>
-                </div>
-              </button>
+                  <div className="text-left hidden md:block">
+                    <div className="text-xs text-zinc-500 text-[10px] uppercase tracking-wider">My Credits</div>
+                    <div className="text-sm font-bold text-white">
+                      {credits !== null ? credits.toLocaleString() : '...'}
+                    </div>
+                  </div>
+                </button>
+                
+                {/* Grant Test Credits Button (Dev-only) - Only visible when VITE_ENABLE_TEST_CREDITS === 'true' */}
+                {import.meta.env.VITE_ENABLE_TEST_CREDITS === 'true' && (
+                  <button
+                    onClick={async () => {
+                      if (isGrantingTestCredits || !user?.id) return
+                      
+                      setIsGrantingTestCredits(true)
+                      try {
+                        const adminKey = import.meta.env.VITE_ADMIN_API_KEY || ''
+                        const response = await apiClient.post(
+                          '/api/admin/credits/grant',
+                          {
+                            user_id: user.id,
+                            amount: 1000,
+                            description: 'Test credits grant (dev-only)'
+                          },
+                          {
+                            params: {
+                              admin_key: adminKey
+                            },
+                            timeout: 30000
+                          }
+                        )
+                        
+                        if (response.data.success) {
+                          const { totalCredits, addedAmount } = response.data
+                          console.log(`Test credits granted: +${addedAmount} credits (Total: ${totalCredits})`)
+                          // Refresh credit information from AccountContext
+                          refreshCredits()
+                        } else {
+                          throw new Error(response.data.message || 'Grant failed')
+                        }
+                      } catch (err) {
+                        console.error('Test credits grant failed:', err)
+                        if (err.response?.status === 403) {
+                          console.error('Test credits grant is not available. Check admin key configuration.')
+                        }
+                      } finally {
+                        setIsGrantingTestCredits(false)
+                      }
+                    }}
+                    disabled={isGrantingTestCredits}
+                    className="px-3 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-800 disabled:cursor-not-allowed text-white text-xs font-medium rounded-xl transition-colors"
+                    title="Grant 1000 test credits (Dev-only)"
+                  >
+                    {isGrantingTestCredits ? 'Granting...' : '🧪 +1000'}
+                  </button>
+                )}
+              </div>
             )}
 
             {/* User Menu */}
