@@ -65,7 +65,7 @@ function PageHeader() {
   }
 
   return (
-    <div className="bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-800/50 py-4 sticky top-0 z-20">
+    <div className="bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-800/50 py-4 sticky top-0 z-30">
       <div className="px-6">
         <div className="flex items-center justify-between">
           {/* Left: Title & Subtitle */}
@@ -109,73 +109,74 @@ function PageHeader() {
               </span>
             </button>
 
+            {/* Grant Test Credits Button - FORCED VISIBLE FOR DEBUG */}
+            <button
+              onClick={async () => {
+                if (isGrantingTestCredits || !user?.id) {
+                  console.warn('Cannot grant credits: isGrantingTestCredits=', isGrantingTestCredits, 'user?.id=', user?.id)
+                  return
+                }
+                
+                setIsGrantingTestCredits(true)
+                try {
+                  const adminKey = import.meta.env.VITE_ADMIN_API_KEY || ''
+                  console.log('Granting test credits with adminKey:', adminKey ? 'SET' : 'MISSING')
+                  const response = await apiClient.post(
+                    '/api/admin/credits/grant',
+                    {
+                      user_id: user.id,
+                      amount: 1000,
+                      description: 'Test credits grant (dev-only)'
+                    },
+                    {
+                      params: {
+                        admin_key: adminKey
+                      },
+                      timeout: 30000
+                    }
+                  )
+                  
+                  if (response.data.success) {
+                    const { totalCredits, addedAmount } = response.data
+                    console.log(`✅ Test credits granted: +${addedAmount} credits (Total: ${totalCredits})`)
+                    // Refresh credit information from AccountContext
+                    refreshCredits()
+                  } else {
+                    throw new Error(response.data.message || 'Grant failed')
+                  }
+                } catch (err) {
+                  console.error('❌ Test credits grant failed:', err)
+                  if (err.response?.status === 403) {
+                    console.error('403: Test credits grant is not available. Check admin key configuration.')
+                  }
+                } finally {
+                  setIsGrantingTestCredits(false)
+                }
+              }}
+              disabled={isGrantingTestCredits}
+              className="px-4 py-2 bg-red-600 hover:bg-red-500 disabled:bg-red-800 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl border-2 border-yellow-400 shadow-lg shadow-red-500/50 transition-all relative z-30"
+              title="Grant 1000 test credits (DEBUG MODE - Always Visible)"
+              style={{ minWidth: '120px' }}
+            >
+              {isGrantingTestCredits ? 'Granting...' : '🧪 Grant +1000'}
+            </button>
+
             {/* My Credits */}
             {isAuthenticated && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowCreditModal(true)}
-                  className="flex items-center gap-2 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-800 hover:border-amber-500/30 transition-all"
-                >
-                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
-                    <Zap className="w-4 h-4 text-white" />
+              <button
+                onClick={() => setShowCreditModal(true)}
+                className="flex items-center gap-2 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-800 hover:border-amber-500/30 transition-all"
+              >
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                  <Zap className="w-4 h-4 text-white" />
+                </div>
+                <div className="text-left hidden md:block">
+                  <div className="text-xs text-zinc-500 text-[10px] uppercase tracking-wider">My Credits</div>
+                  <div className="text-sm font-bold text-white">
+                    {credits !== null ? credits.toLocaleString() : '...'}
                   </div>
-                  <div className="text-left hidden md:block">
-                    <div className="text-xs text-zinc-500 text-[10px] uppercase tracking-wider">My Credits</div>
-                    <div className="text-sm font-bold text-white">
-                      {credits !== null ? credits.toLocaleString() : '...'}
-                    </div>
-                  </div>
-                </button>
-                
-                {/* Grant Test Credits Button (Dev-only) - Only visible when VITE_ENABLE_TEST_CREDITS === 'true' */}
-                {import.meta.env.VITE_ENABLE_TEST_CREDITS === 'true' && (
-                  <button
-                    onClick={async () => {
-                      if (isGrantingTestCredits || !user?.id) return
-                      
-                      setIsGrantingTestCredits(true)
-                      try {
-                        const adminKey = import.meta.env.VITE_ADMIN_API_KEY || ''
-                        const response = await apiClient.post(
-                          '/api/admin/credits/grant',
-                          {
-                            user_id: user.id,
-                            amount: 1000,
-                            description: 'Test credits grant (dev-only)'
-                          },
-                          {
-                            params: {
-                              admin_key: adminKey
-                            },
-                            timeout: 30000
-                          }
-                        )
-                        
-                        if (response.data.success) {
-                          const { totalCredits, addedAmount } = response.data
-                          console.log(`Test credits granted: +${addedAmount} credits (Total: ${totalCredits})`)
-                          // Refresh credit information from AccountContext
-                          refreshCredits()
-                        } else {
-                          throw new Error(response.data.message || 'Grant failed')
-                        }
-                      } catch (err) {
-                        console.error('Test credits grant failed:', err)
-                        if (err.response?.status === 403) {
-                          console.error('Test credits grant is not available. Check admin key configuration.')
-                        }
-                      } finally {
-                        setIsGrantingTestCredits(false)
-                      }
-                    }}
-                    disabled={isGrantingTestCredits}
-                    className="px-3 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-800 disabled:cursor-not-allowed text-white text-xs font-medium rounded-xl transition-colors"
-                    title="Grant 1000 test credits (Dev-only)"
-                  >
-                    {isGrantingTestCredits ? 'Granting...' : '🧪 +1000'}
-                  </button>
-                )}
-              </div>
+                </div>
+              </button>
             )}
 
             {/* User Menu */}
