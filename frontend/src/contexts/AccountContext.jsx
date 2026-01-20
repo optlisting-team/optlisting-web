@@ -1,16 +1,12 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-
-// Use environment variable for Railway URL, fallback based on environment
-// CRITICAL: Production MUST use relative path /api (proxied by vercel.json) to avoid CORS issues
-// Only use VITE_API_URL in development if needed, production always uses relative path
-const API_BASE_URL = import.meta.env.DEV 
-  ? (import.meta.env.VITE_API_URL || '')  // Development: use env var or empty for Vite proxy
-  : ''  // Production: ALWAYS use relative path (vercel.json proxy handles routing to Railway)
+import apiClient from '../lib/api'
+import { supabase } from '../lib/supabase'
 
 const AccountContext = createContext({
   credits: null,
   plan: 'FREE',
   apiStatus: 'checking',
+  connectionError: null,
   showPlanModal: false,
   showCreditModal: false,
   setShowPlanModal: () => {},
@@ -22,74 +18,81 @@ export const AccountProvider = ({ children }) => {
   const [credits, setCredits] = useState(null)
   const [plan, setPlan] = useState('FREE')
   const [apiStatus, setApiStatus] = useState('checking')
+  const [connectionError, setConnectionError] = useState(null)
   const [showPlanModal, setShowPlanModal] = useState(false)
   const [showCreditModal, setShowCreditModal] = useState(false)
 
-  // Retry utility function
-  const retryFetch = async (url, options, maxRetries = 3, delay = 2000) => {
-    for (let i = 0; i < maxRetries; i++) {
-      try {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 30000) // Increased from 10s to 30s
-        
-        const response = await fetch(url, {
-          ...options,
-          signal: controller.signal,
-        })
-        
-        clearTimeout(timeoutId)
-        return response
-      } catch (err) {
-        const isLastAttempt = i === maxRetries - 1
-        if (isLastAttempt) {
-          throw err
-        }
-        // Wait before retry
-        await new Promise(resolve => setTimeout(resolve, delay * (i + 1)))
-      }
-    }
-  }
-
+  // Fetch credits using apiClient (goes directly to Railway in production)
   const fetchCredits = async () => {
     try {
-      const response = await retryFetch(
-        `${API_BASE_URL}/api/credits`,  // user_id는 JWT에서 추출됨
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-        }
-      )
+      const response = await apiClient.get('/api/credits', {
+        timeout: 60000  // 60 seconds timeout
+      })
       
-      if (response.ok) {
-        const data = await response.json()
-        setCredits(data.available_credits || 0)
-        setPlan(data.current_plan || 'FREE')
+      if (response.data) {
+        setCredits(response.data.available_credits || 0)
+        setPlan(response.data.current_plan || 'FREE')
         setApiStatus('connected')
+        setConnectionError(null)  // Clear any previous errors on success
       } else {
-        // Set 'error' status for server errors (502, 503, 504, etc.)
         setApiStatus('error')
-        // Keep default values (credits remains null)
       }
     } catch (err) {
-      // Handle all errors: network errors, timeouts, CORS errors, etc.
-      if (err.name === 'AbortError') {
+      // Handle 401 Unauthorized - attempt session refresh
+      if (err.response?.status === 401) {
+        console.warn('401 Unauthorized - attempting session refresh')
+        try {
+          const { data: { session }, error: refreshError } = await supabase.auth.refreshSession()
+          
+          if (refreshError || !session?.access_token) {
+            console.error('Session refresh failed:', refreshError)
+            setConnectionError('authentication_failed')
+            setApiStatus('error')
+            // Prompt user to re-login
+            return
+          }
+          
+          // Retry the request after successful refresh
+          try {
+            const retryResponse = await apiClient.get('/api/credits', {
+              timeout: 60000
+            })
+            if (retryResponse.data) {
+              setCredits(retryResponse.data.available_credits || 0)
+              setPlan(retryResponse.data.current_plan || 'FREE')
+              setApiStatus('connected')
+              setConnectionError(null)
+              return
+            }
+          } catch (retryErr) {
+            console.error('Retry after refresh failed:', retryErr)
+            setConnectionError('authentication_failed')
+            setApiStatus('error')
+            return
+          }
+        } catch (refreshErr) {
+          console.error('Failed to refresh session:', refreshErr)
+          setConnectionError('authentication_failed')
+          setApiStatus('error')
+          return
+        }
+      }
+      
+      // Handle all other errors: network errors, timeouts, CORS errors, etc.
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
         console.warn('Credits fetch timeout')
+        setApiStatus('error')
       } else {
         console.error('Failed to fetch credits:', err)
+        setApiStatus('error')
       }
-      setApiStatus('error')
       // Keep default values on error (so app continues to work)
     }
   }
 
+  // Fetch credits on mount only (no automatic polling)
   useEffect(() => {
     fetchCredits()
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchCredits, 30000)
-    return () => clearInterval(interval)
   }, [])
 
   return (
@@ -98,6 +101,7 @@ export const AccountProvider = ({ children }) => {
         credits,
         plan,
         apiStatus,
+        connectionError,
         showPlanModal,
         showCreditModal,
         setShowPlanModal,

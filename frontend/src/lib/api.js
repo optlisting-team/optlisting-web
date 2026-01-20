@@ -24,18 +24,21 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use(
   async (config) => {
     try {
-      // Get access_token from Supabase session (re-fetch to ensure fresh token)
+      // Always get fresh session before every request to ensure latest, non-expired JWT
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       
       if (sessionError) {
         console.warn('No Auth Token found for apiClient - session error:', sessionError.message)
-        // Try to refresh session once
+        // Try to refresh session once if getSession fails
         try {
-          const { data: { session: refreshedSession } } = await supabase.auth.refreshSession()
-          if (refreshedSession?.access_token) {
+          const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession()
+          if (refreshError) {
+            console.warn('Failed to refresh session:', refreshError.message)
+          } else if (refreshedSession?.access_token) {
             const token = refreshedSession.access_token
             config.headers.Authorization = `Bearer ${token}`
             console.log(`Sending request with Token: ${token.substring(0, 10)}...`)
+            console.log("Auth Header being sent:", config.headers.Authorization ? "YES" : "NO")
             return config
           }
         } catch (refreshErr) {
@@ -48,12 +51,15 @@ apiClient.interceptors.request.use(
         const token = session.access_token
         config.headers.Authorization = `Bearer ${token}`
         console.log(`Sending request with Token: ${token.substring(0, 10)}...`)
+        console.log("Auth Header being sent:", config.headers.Authorization ? "YES" : "NO")
       } else {
         // Some endpoints may not require authentication, so we don't redirect here
         console.warn('No Auth Token found for apiClient')
+        console.log("Auth Header being sent:", config.headers.Authorization ? "YES" : "NO")
       }
     } catch (error) {
       console.error('❌ [API] Failed to get session for request:', error)
+      console.log("Auth Header being sent:", config.headers.Authorization ? "YES" : "NO")
       // Continue with request even if error occurs (some endpoints may not require auth)
     }
     
