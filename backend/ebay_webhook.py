@@ -1463,6 +1463,11 @@ async def _sync_ebay_listings_background(
             pass
         
         try:
+            logger.info("=" * 60)
+            logger.info(f"🔄 [SYNC BACKGROUND] CRITICAL: Starting fetch_and_store_listings for user_id: {user_id}")
+            logger.info(f"   - eBay User ID: {ebay_user_id}")
+            logger.info("=" * 60)
+            
             # 기존 get_active_listings_trading_api 로직 재사용
             # 첫 페이지부터 모든 페이지를 순회하며 동기화
             page = 1
@@ -2014,14 +2019,18 @@ async def get_active_listings_trading_api_internal(
                 
                 # ✅ DB 저장: upsert_listings 호출 (user_id 전달)
                 logger.info(f"💾 [DB SAVE] upsert_listings 호출 시작...")
+                logger.info(f"   - Total listing objects to save: {len(listing_objects)}")
                 upserted_count = upsert_listings(db, listing_objects, expected_user_id=user_id)
+                logger.info(f"✅ [DB SAVE] upsert_listings completed: {upserted_count} items processed")
                 
-                # ✅ 추가 commit 확인
+                # ✅ 추가 commit 확인 (batch processing already commits, but ensure final state)
                 try:
                     db.flush()
                     db.commit()
+                    logger.info(f"✅ [DB SAVE] Final commit successful")
                 except Exception as extra_commit_err:
                     logger.warning(f"⚠️ [SYNC] 추가 commit 실패: {extra_commit_err}")
+                    db.rollback()
                 
                 # ✅ 저장 결과 확인
                 from sqlalchemy import text

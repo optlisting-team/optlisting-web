@@ -311,8 +311,18 @@ function Dashboard() {
       return
     }
     
+    // Set timeout for syncing state (60 seconds)
+    let syncTimeout = null
+    
     try {
       setIsSyncingListings(true)
+      
+      // Set timeout for syncing state (60 seconds)
+      syncTimeout = setTimeout(() => {
+        console.warn('⚠️ [SYNC] Sync is taking longer than expected (>60s)')
+        showToast('Sync is taking longer than expected. Please refresh in a moment.', 'warning')
+        setIsSyncingListings(false)
+      }, 60000) // 60 second timeout
       console.log('🔄 [SYNC] Starting eBay listings sync...')
       console.log('   user_id:', currentUserId)
       
@@ -440,7 +450,9 @@ function Dashboard() {
         console.error('Failed to fetch summary stats after sync error:', fetchErr)
       })
     } finally {
-      clearTimeout(syncTimeout)
+      if (syncTimeout) {
+        clearTimeout(syncTimeout)
+      }
       setIsSyncingListings(false)
     }
   }

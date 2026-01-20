@@ -1447,30 +1447,10 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 # Continue with next batch instead of failing completely
                 continue
         
-        # 🔍 STEP 2: DB upsert 실행 및 결과 로깅
-        import logging
-        logger = logging.getLogger(__name__)
-        
         logger.info(f"✅ [UPSERT] Completed: {total_processed}/{len(values_list)} items processed successfully")
         
-        # ✅ 2단계: 저장 ID 일치화 - 명확한 로깅
-        if listings and len(listings) > 0:
-            sample_user_id = listings[0].user_id if hasattr(listings[0], 'user_id') else None
-            if sample_user_id:
-                logger.info("=" * 60)
-                logger.info(f"💾 [UPSERT] Saving for user: {sample_user_id}")
-                logger.info(f"   - Total listings: {len(listings)}개")
-                logger.info(f"   - Platform: eBay (강제 설정)")
-                logger.info(f"   - user_id type: {type(sample_user_id).__name__}")
-                logger.info("=" * 60)
-        
-        # Execute the statement with error handling for UNIQUE CONSTRAINT
-        try:
-            result = db.execute(stmt)
-            # ✅ DB 저장 확정: flush와 commit 실행
-            db.flush()
-            db.commit()
-        except Exception as e:
+        # Return total processed count
+        return total_processed
             # UNIQUE CONSTRAINT 에러 처리: 기존 데이터를 덮어쓰는 방식으로 재시도
             error_str = str(e).lower()
             if 'unique' in error_str or 'duplicate' in error_str or 'constraint' in error_str:
