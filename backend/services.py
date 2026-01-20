@@ -1451,63 +1451,6 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
         
         # Return total processed count
         return total_processed
-                    try:
-                        # 기존 레코드 확인
-                        existing = db.query(Listing).filter(
-                            Listing.user_id == (expected_user_id if expected_user_id else listing.user_id),
-                            Listing.platform == "eBay",
-                            Listing.item_id == (getattr(listing, 'item_id', None) or getattr(listing, 'ebay_item_id', None))
-                        ).first()
-                        
-                        if existing:
-                            # 기존 레코드 업데이트
-                            for key, value in {
-                                'title': listing.title,
-                                'image_url': listing.image_url,
-                                'sku': listing.sku,
-                                'supplier_name': listing.supplier_name,
-                                'supplier_id': listing.supplier_id,
-                                'price': listing.price,
-                                'sold_qty': listing.sold_qty,
-                                'watch_count': listing.watch_count,
-                                'last_synced_at': listing.last_synced_at if listing.last_synced_at else datetime.utcnow(),
-                                'updated_at': datetime.utcnow()
-                            }.items():
-                                setattr(existing, key, value)
-                            upserted_count += 1
-                        else:
-                            # 새 레코드 삽입
-                            db.add(listing)
-                            upserted_count += 1
-                    except Exception as individual_err:
-                        logger.error(f"❌ [UPSERT] 개별 upsert 실패: {individual_err}")
-                        continue
-                
-                db.commit()
-                logger.info(f"✅ [UPSERT] 개별 upsert 완료: {upserted_count}개 처리됨")
-                return upserted_count
-            else:
-                # 다른 에러는 그대로 전파
-                db.rollback()
-                raise
-        
-        # ✅ 저장 결과 확인 (핵심만 로깅)
-        from sqlalchemy import text
-        if listings and len(listings) > 0:
-            sample_user_id = listings[0].user_id if hasattr(listings[0], 'user_id') else None
-            if sample_user_id:
-                actual_count = db.execute(
-                    text("SELECT COUNT(*) FROM listings WHERE user_id = :user_id AND platform = 'eBay'"),
-                    {"user_id": sample_user_id}
-                ).scalar()
-                logger.info(f"✅ [UPSERT] 저장 완료: {len(listings)}개 처리, DB count={actual_count} (user_id={sample_user_id}, platform=eBay)")
-                if actual_count == 0:
-                    logger.error(f"❌ [UPSERT] CRITICAL: {len(listings)}개 처리했지만 DB count=0!")
-        
-        # Return the total number of listings processed
-        upserted_count = len(listings)
-        
-        return upserted_count
     else:
         # SQLite: Use individual INSERT OR REPLACE (less efficient but compatible)
         for listing in listings:
