@@ -678,6 +678,9 @@ def get_credit_summary(db: Session, user_id: str) -> Dict[str, Any]:
         if has_free_tier_column:
             # Column exists, use normal query
             profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+            # Refresh profile to ensure real-time data accuracy before calculating available_credits
+            if profile:
+                db.refresh(profile)
         else:
             # Column doesn't exist, use raw SQL to get other columns
             result = db.execute(

@@ -2978,7 +2978,7 @@ def admin_grant_credits(
     
     if is_production or expected_admin_key:
         if not admin_key or admin_key != expected_admin_key:
-            logger.warning(f"⚠️ 관리자 인증 실패: admin_key 제공 여부={admin_key is not None}")
+            logger.warning(f"[ADMIN] Authentication failed: admin_key provided={admin_key is not None}")
             raise HTTPException(
                 status_code=403,
                 detail={
@@ -3006,9 +3006,9 @@ def admin_grant_credits(
             }
         )
     
-    logger.info(f"🔐 [ADMIN] 크레딧 부여 요청: user_id={request.user_id}, amount={request.amount}")
+    logger.info(f"[ADMIN] Credit grant request: user_id={request.user_id}, amount={request.amount}")
     
-    # 크레딧 부여
+    # Grant credits
     try:
         result = add_credits(
             db=db,
@@ -3020,7 +3020,7 @@ def admin_grant_credits(
         )
         
         if not result.success:
-            logger.error(f"❌ [ADMIN] 크레딧 부여 실패: {result.message}")
+            logger.error(f"[ADMIN] Credit grant failed: {result.message}")
             raise HTTPException(
                 status_code=500,
                 detail={
@@ -3029,7 +3029,7 @@ def admin_grant_credits(
                 }
             )
         
-        logger.info(f"✅ [ADMIN] 크레딧 부여 성공: user_id={request.user_id}, amount={request.amount}, total={result.total_credits}")
+        logger.info(f"SUCCESS: Granted {request.amount} credits to user {request.user_id}. New total: {result.total_credits}")
         
         return {
             "success": True,
@@ -3041,7 +3041,7 @@ def admin_grant_credits(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ [ADMIN] 크레딧 부여 실패: {str(e)}")
+        logger.error(f"[ADMIN] Credit grant failed: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail={
