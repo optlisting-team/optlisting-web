@@ -1955,7 +1955,6 @@ async def get_active_listings_trading_api_internal(
                     sold_qty=listing_data.get("quantity_sold", 0),
                     watch_count=listing_data.get("watch_count", 0),
                     view_count=listing_data.get("view_count", 0),
-                    impressions=listing_data.get("impressions", 0),
                     user_id=user_id,  # ✅ 프론트엔드에서 전달된 user_id 사용
                     supplier_name=listing_data.get("supplier_name"),
                     supplier_id=listing_data.get("supplier_id"),
@@ -2412,7 +2411,6 @@ async def get_active_listings_trading_api(
                         sold_qty=listing_data.get("quantity_sold", 0),
                         watch_count=listing_data.get("watch_count", 0),
                         view_count=listing_data.get("view_count", 0),
-                        impressions=listing_data.get("impressions", 0),
                         user_id=user_id,
                         supplier_name=listing_data.get("supplier_name"),
                         supplier_id=listing_data.get("supplier_id"),

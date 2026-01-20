@@ -30,6 +30,7 @@ class Listing(Base):
     date_listed = Column(Date, nullable=False)
     sold_qty = Column(Integer, default=0)
     watch_count = Column(Integer, default=0)
+    view_count = Column(Integer, default=0)  # Total view count from eBay API (HitCount)
     
     # JSONB fields (added via migration)
     metrics = Column(JSONB, default={}, nullable=True)
