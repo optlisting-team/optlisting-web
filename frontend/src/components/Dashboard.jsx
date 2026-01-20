@@ -440,6 +440,7 @@ function Dashboard() {
         console.error('Failed to fetch summary stats after sync error:', fetchErr)
       })
     } finally {
+      clearTimeout(syncTimeout)
       setIsSyncingListings(false)
     }
   }

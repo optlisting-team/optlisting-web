@@ -1372,8 +1372,13 @@ async def _sync_ebay_listings_background(
 ):
     """
     Actual sync logic executed in background
+    Wrapped in comprehensive error handling to prevent silent failures
     """
+    import traceback
     try:
+        logger.info("=" * 60)
+        logger.info(f"🔄 [SYNC BACKGROUND] Starting sync for user_id: {user_id}")
+        logger.info("=" * 60)
         # Get ebay_user_id from profile for logging and validation
         ebay_user_id = None
         profile = None
@@ -1525,15 +1530,32 @@ async def _sync_ebay_listings_background(
             # Standardized verification log: Only three lines remain
             logger.info(f"[FETCH] Collected {total_fetched} items from eBay.")
             logger.info(f"[STORE] Saved/updated {total_upserted} products for user {user_id} to DB.")
+            logger.info("=" * 60)
+            logger.info(f"✅ [SYNC BACKGROUND] Sync completed successfully for user_id: {user_id}")
+            logger.info("=" * 60)
             
         except Exception as e:
-            logger.error(f"❌ [SYNC] Sync error for user {user_id}: {e}")
-            import traceback
+            logger.error("=" * 60)
+            logger.error(f"❌ [SYNC BACKGROUND] CRITICAL ERROR during sync for user {user_id}")
+            logger.error(f"   - Error type: {type(e).__name__}")
+            logger.error(f"   - Error message: {str(e)}")
+            logger.error(f"   - Total fetched before error: {total_fetched}")
+            logger.error(f"   - Total upserted before error: {total_upserted}")
+            logger.error("   - Full traceback:")
             logger.error(traceback.format_exc())
+            logger.error("=" * 60)
+            # Re-raise to ensure error is logged to Railway
+            raise
     except Exception as e:
-        logger.error(f"❌ [SYNC] Background sync error for user {user_id}: {e}")
-        import traceback
+        logger.error("=" * 60)
+        logger.error(f"❌ [SYNC BACKGROUND] FATAL ERROR in background sync for user {user_id}")
+        logger.error(f"   - Error type: {type(e).__name__}")
+        logger.error(f"   - Error message: {str(e)}")
+        logger.error("   - Full traceback:")
         logger.error(traceback.format_exc())
+        logger.error("=" * 60)
+        # Re-raise to ensure error is logged to Railway
+        raise
 
 
 @router.post("/listings/sync")

@@ -1371,53 +1371,87 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 'date_listed': listing.date_listed,
                 'sold_qty': listing.sold_qty if listing.sold_qty is not None else 0,
                 'watch_count': listing.watch_count if listing.watch_count is not None else 0,
+                'view_count': listing.view_count if hasattr(listing, 'view_count') and listing.view_count is not None else 0,
             }
             values_list.append(values)
         
-        # Use PostgreSQL's INSERT ... ON CONFLICT DO UPDATE
-        stmt = insert(table).values(values_list)
+        # ✅ BATCH PROCESSING: Process in chunks of 20 to prevent memory spikes and container crashes
+        BATCH_SIZE = 20
+        total_processed = 0
         
-        # On conflict, update these fields (but preserve created_at)
-        # Use excluded table reference for PostgreSQL ON CONFLICT
-        # ✅ FIX: platform 필드가 없으면 marketplace 사용, item_id가 없으면 ebay_item_id 사용
-        conflict_columns = ['user_id']
-        if hasattr(Listing, 'platform'):
-            conflict_columns.append('platform')
-        elif hasattr(Listing, 'marketplace'):
-            conflict_columns.append('marketplace')
-        if hasattr(Listing, 'item_id'):
-            conflict_columns.append('item_id')
-        elif hasattr(Listing, 'ebay_item_id'):
-            conflict_columns.append('ebay_item_id')
+        logger.info(f"💾 [UPSERT] Processing {len(values_list)} listings in batches of {BATCH_SIZE}")
         
-        excluded = stmt.excluded
-        stmt = stmt.on_conflict_do_update(
-            index_elements=conflict_columns,
-            set_={
-                'platform': 'eBay',  # ✅ CRITICAL: platform 필드를 항상 "eBay"로 강제 설정 (eBay sync 전용)
-                'title': excluded.title,
-                'image_url': excluded.image_url,
-                'sku': excluded.sku,
-                'supplier_name': excluded.supplier_name,
-                'supplier_id': excluded.supplier_id,
-                'brand': excluded.brand,
-                'upc': excluded.upc,
-                'metrics': excluded.metrics,  # Shopify 경유 정보 포함
-                'raw_data': excluded.raw_data,
-                'analysis_meta': excluded.analysis_meta,  # Shopify 경유 정보 포함
-                'last_synced_at': excluded.last_synced_at,
-                'updated_at': datetime.utcnow(),
-                # Legacy fields
-                'price': excluded.price,
-                'date_listed': excluded.date_listed,
-                'sold_qty': excluded.sold_qty,
-                'watch_count': excluded.watch_count,
-            }
-        )
+        for i in range(0, len(values_list), BATCH_SIZE):
+            batch = values_list[i:i + BATCH_SIZE]
+            batch_num = (i // BATCH_SIZE) + 1
+            total_batches = (len(values_list) + BATCH_SIZE - 1) // BATCH_SIZE
+            
+            try:
+                logger.info(f"💾 [UPSERT] Processing batch {batch_num}/{total_batches} ({len(batch)} items)")
+                
+                # Use PostgreSQL's INSERT ... ON CONFLICT DO UPDATE
+                stmt = insert(table).values(batch)
+                
+                # On conflict, update these fields (but preserve created_at)
+                # Use excluded table reference for PostgreSQL ON CONFLICT
+                # ✅ FIX: platform 필드가 없으면 marketplace 사용, item_id가 없으면 ebay_item_id 사용
+                conflict_columns = ['user_id']
+                if hasattr(Listing, 'platform'):
+                    conflict_columns.append('platform')
+                elif hasattr(Listing, 'marketplace'):
+                    conflict_columns.append('marketplace')
+                if hasattr(Listing, 'item_id'):
+                    conflict_columns.append('item_id')
+                elif hasattr(Listing, 'ebay_item_id'):
+                    conflict_columns.append('ebay_item_id')
+                
+                excluded = stmt.excluded
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=conflict_columns,
+                    set_={
+                        'platform': 'eBay',  # ✅ CRITICAL: platform 필드를 항상 "eBay"로 강제 설정 (eBay sync 전용)
+                        'title': excluded.title,
+                        'image_url': excluded.image_url,
+                        'sku': excluded.sku,
+                        'supplier_name': excluded.supplier_name,
+                        'supplier_id': excluded.supplier_id,
+                        'brand': excluded.brand,
+                        'upc': excluded.upc,
+                        'metrics': excluded.metrics,  # Shopify 경유 정보 포함
+                        'raw_data': excluded.raw_data,
+                        'analysis_meta': excluded.analysis_meta,  # Shopify 경유 정보 포함
+                        'last_synced_at': excluded.last_synced_at,
+                        'updated_at': datetime.utcnow(),
+                        # Legacy fields
+                        'price': excluded.price,
+                        'date_listed': excluded.date_listed,
+                        'sold_qty': excluded.sold_qty,
+                        'watch_count': excluded.watch_count,
+                        'view_count': excluded.view_count if 'view_count' in [col.name for col in table.columns] else None,
+                    }
+                )
+                
+                # Execute batch
+                result = db.execute(stmt)
+                db.commit()
+                total_processed += len(batch)
+                logger.info(f"✅ [UPSERT] Batch {batch_num}/{total_batches} completed: {len(batch)} items saved")
+                
+            except Exception as batch_err:
+                db.rollback()
+                logger.error(f"❌ [UPSERT] Batch {batch_num}/{total_batches} failed: {str(batch_err)}")
+                logger.error(f"   - Batch size: {len(batch)}")
+                logger.error(f"   - Error type: {type(batch_err).__name__}")
+                import traceback
+                logger.error(f"   - Traceback: {traceback.format_exc()}")
+                # Continue with next batch instead of failing completely
+                continue
         
         # 🔍 STEP 2: DB upsert 실행 및 결과 로깅
         import logging
         logger = logging.getLogger(__name__)
+        
+        logger.info(f"✅ [UPSERT] Completed: {total_processed}/{len(values_list)} items processed successfully")
         
         # ✅ 2단계: 저장 ID 일치화 - 명확한 로깅
         if listings and len(listings) > 0:
