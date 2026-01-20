@@ -17,7 +17,7 @@ const INITIAL_STORES = [
 // ✅ FIX: API_BASE_URL은 이미 '../lib/api'에서 import하므로 중복 선언 제거
 
 // Store Selector Component
-function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onError, loading = false }) {
+function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onError, loading = false, onSync = null }) {
   const { user } = useAuth()
   // Get actual user ID from auth context - CRITICAL: No fallback (must be logged in)
   const currentUserId = user?.id
@@ -27,6 +27,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
   const [connecting, setConnecting] = useState(false)
   const [checkingConnection, setCheckingConnection] = useState(false) // Changed default to false - only check on button click
   const [ebayUserId, setEbayUserId] = useState(null) // Add eBay User ID state
+  const [isSyncing, setIsSyncing] = useState(false) // Sync button loading state
   const dropdownRef = useRef(null)
   
   // 중복 클릭 방지를 위한 플래그 및 debounce
@@ -269,6 +270,56 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
             </div>
             <ChevronDown className={`w-3 h-3 text-zinc-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
           </button>
+          
+          {/* Sync Now Button - Only show for eBay Store when connected, positioned next to store name */}
+          {selectedStore?.platform === 'eBay' && selectedStore?.connected && (
+            <button
+              onClick={async (e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                
+                if (isSyncing || !currentUserId) return
+                
+                setIsSyncing(true)
+                try {
+                  console.log('🔄 [SYNC] Manual sync triggered from SummaryCard')
+                  const response = await apiClient.post('/api/ebay/listings/sync', {}, {
+                    timeout: 10000 // 10 second timeout for 202 Accepted response
+                  })
+                  
+                  if (response.status === 202) {
+                    console.log('✅ [SYNC] Sync job started in background')
+                    // Call onSync callback if provided (to refresh summary stats in parent)
+                    if (onSync) {
+                      onSync()
+                    }
+                  }
+                } catch (err) {
+                  console.error('❌ [SYNC] Sync failed:', err)
+                  if (onError) {
+                    onError('Failed to start sync. Please try again.', err)
+                  }
+                } finally {
+                  setIsSyncing(false)
+                }
+              }}
+              disabled={isSyncing}
+              className="absolute left-full ml-2 px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1 whitespace-nowrap"
+              title="Sync Now"
+            >
+              {isSyncing ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>Syncing...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-3 h-3" />
+                  <span>Sync Now</span>
+                </>
+              )}
+            </button>
+          )}
 
           {/* Dropdown Menu */}
           {isOpen && (
@@ -698,6 +749,7 @@ function SummaryCard({ onError,
         onConnectionChange={onConnectionChange}
         onError={onError}
         loading={loading}
+        onSync={onSync}
       />
 
       {/* Stats Row - 2 Columns: Display only (non-interactive) */}
