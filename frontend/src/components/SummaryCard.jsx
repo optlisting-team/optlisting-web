@@ -233,8 +233,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
       console.log('🔗 Attempting eBay OAuth connection with JWT')
       
       // Use apiClient to ensure JWT token is included and request goes to Railway
-      // Note: For OAuth redirects, we need to handle the redirect manually
-      // Axios doesn't follow redirects by default, so we'll get the redirect response
+      // Note: For OAuth redirects, we need to handle the redirect manually since AJAX can't follow redirects
       try {
         const response = await apiClient.post('/api/ebay/auth/start', {}, {
           maxRedirects: 0,  // Don't follow redirects automatically
@@ -243,10 +242,10 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
         
         // If we get a redirect response, extract Location header
         if (response.status === 302 || response.status === 301) {
-          const redirectUrl = response.headers.location || response.headers.Location
+          const redirectUrl = response.headers.location || response.headers.Location || response.headers['location']
           if (redirectUrl) {
             console.log('✅ Redirecting to:', redirectUrl)
-            window.location.replace(redirectUrl)
+            window.location.href = redirectUrl
             return
           }
         }
@@ -255,7 +254,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
         if (response.data?.redirect_url || response.data?.url) {
           const redirectUrl = response.data.redirect_url || response.data.url
           console.log('✅ Redirecting to:', redirectUrl)
-          window.location.replace(redirectUrl)
+          window.location.href = redirectUrl
           return
         }
         
@@ -263,10 +262,10 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
       } catch (err) {
         // Axios throws an error for redirects, but we can extract the Location header
         if (err.response && (err.response.status === 302 || err.response.status === 301)) {
-          const redirectUrl = err.response.headers.location || err.response.headers.Location
+          const redirectUrl = err.response.headers.location || err.response.headers.Location || err.response.headers['location']
           if (redirectUrl) {
             console.log('✅ Redirecting to:', redirectUrl)
-            window.location.replace(redirectUrl)
+            window.location.href = redirectUrl
             return
           }
         }
@@ -467,7 +466,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
                   }
                   
                   // Use apiClient to ensure JWT token is included and request goes to Railway
-                  // Note: For OAuth redirects, we need to handle the redirect manually
+                  // Note: For OAuth redirects, we need to handle the redirect manually since AJAX can't follow redirects
                   try {
                     const oauthResponse = await apiClient.post('/api/ebay/auth/start', {}, {
                       maxRedirects: 0,  // Don't follow redirects automatically
@@ -476,10 +475,10 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
                     
                     // If we get a redirect response, extract Location header
                     if (oauthResponse.status === 302 || oauthResponse.status === 301) {
-                      const redirectUrl = oauthResponse.headers.location || oauthResponse.headers.Location
+                      const redirectUrl = oauthResponse.headers.location || oauthResponse.headers.Location || oauthResponse.headers['location']
                       if (redirectUrl) {
                         console.log(`   Redirecting to eBay: ${redirectUrl}`)
-                        window.location.replace(redirectUrl)
+                        window.location.href = redirectUrl
                         return
                       }
                     }
@@ -488,7 +487,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
                     if (oauthResponse.data?.redirect_url || oauthResponse.data?.url) {
                       const redirectUrl = oauthResponse.data.redirect_url || oauthResponse.data.url
                       console.log(`   Redirecting to eBay: ${redirectUrl}`)
-                      window.location.replace(redirectUrl)
+                      window.location.href = redirectUrl
                       return
                     }
                     
@@ -496,10 +495,10 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
                   } catch (oauthErr) {
                     // Axios throws an error for redirects, but we can extract the Location header
                     if (oauthErr.response && (oauthErr.response.status === 302 || oauthErr.response.status === 301)) {
-                      const redirectUrl = oauthErr.response.headers.location || oauthErr.response.headers.Location
+                      const redirectUrl = oauthErr.response.headers.location || oauthErr.response.headers.Location || oauthErr.response.headers['location']
                       if (redirectUrl) {
                         console.log(`   Redirecting to eBay: ${redirectUrl}`)
-                        window.location.replace(redirectUrl)
+                        window.location.href = redirectUrl
                         return
                       }
                     }

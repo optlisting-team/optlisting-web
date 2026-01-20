@@ -24,12 +24,30 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use(
   async (config) => {
     try {
-      // Get access_token from Supabase session
-      const { data: { session } } = await supabase.auth.getSession()
+      // Get access_token from Supabase session (re-fetch to ensure fresh token)
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError) {
+        console.warn('No Auth Token found for apiClient - session error:', sessionError.message)
+        // Try to refresh session once
+        try {
+          const { data: { session: refreshedSession } } = await supabase.auth.refreshSession()
+          if (refreshedSession?.access_token) {
+            const token = refreshedSession.access_token
+            config.headers.Authorization = `Bearer ${token}`
+            console.log(`Sending request with Token: ${token.substring(0, 10)}...`)
+            return config
+          }
+        } catch (refreshErr) {
+          console.warn('Failed to refresh session:', refreshErr)
+        }
+      }
       
       if (session?.access_token) {
         // Add Bearer token to Authorization header
-        config.headers.Authorization = `Bearer ${session.access_token}`
+        const token = session.access_token
+        config.headers.Authorization = `Bearer ${token}`
+        console.log(`Sending request with Token: ${token.substring(0, 10)}...`)
       } else {
         // Some endpoints may not require authentication, so we don't redirect here
         console.warn('No Auth Token found for apiClient')

@@ -1,6 +1,6 @@
 """
 eBay Integration Handler
-- OAuth 2.0 User Token Flow (원클릭 연결)
+- OAuth 2.0 User Token Flow (One-click connection)
 - Marketplace Account Deletion Notification
 - Challenge-Response Validation
 
@@ -24,6 +24,7 @@ import logging
 import base64
 import time as time_module  # time.sleep과 구분
 import requests
+import asyncio
 from datetime import datetime, timedelta, date
 from urllib.parse import urlencode, quote
 from typing import Optional, Dict, Any
@@ -33,11 +34,11 @@ from sqlalchemy.orm import Session
 from starlette.requests import Request as StarletteRequest
 from .auth import get_current_user
 
-# 로깅 설정
+# Logging configuration
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('ebay_webhook')
 
-# Router 생성
+# Create router
 router = APIRouter(prefix="/api/ebay", tags=["eBay Integration"])
 
 # =====================================================
@@ -49,8 +50,8 @@ EBAY_CLIENT_ID = os.getenv("EBAY_CLIENT_ID", "")
 EBAY_CLIENT_SECRET = os.getenv("EBAY_CLIENT_SECRET", "")
 EBAY_ENVIRONMENT = os.getenv("EBAY_ENVIRONMENT", "PRODUCTION")  # SANDBOX or PRODUCTION
 EBAY_RU_NAME = os.getenv("EBAY_RU_NAME", "")  # eBay Redirect URL Name (RuName)
-# FRONTEND_URL: Supabase Site URL과 일치해야 함
-# 기본값: optlisting.com (Supabase Site URL)
+# FRONTEND_URL: Must match Supabase Site URL
+# Default: optlisting.com (Supabase Site URL)
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://optlisting.com")
 logger.info(f"🌐 FRONTEND_URL configured: {FRONTEND_URL}")
 
@@ -66,7 +67,7 @@ EBAY_AUTH_ENDPOINTS = {
     }
 }
 
-# OAuth Scopes (필요한 권한들)
+# OAuth Scopes (required permissions)
 EBAY_SCOPES = [
     "https://api.ebay.com/oauth/api_scope",
     "https://api.ebay.com/oauth/api_scope/sell.inventory",
@@ -78,8 +79,8 @@ EBAY_SCOPES = [
 
 def get_verification_secret() -> str:
     """
-    환경변수에서 Verification Secret 동적으로 읽기
-    (배포 후 환경변수 변경 시에도 반영됨)
+    Dynamically read Verification Secret from environment variables
+    (Reflected even after deployment when environment variables are changed)
     """
     secret = os.getenv("EBAY_VERIFICATION_SECRET", "")
     if secret:
@@ -89,37 +90,37 @@ def get_verification_secret() -> str:
 
 def get_webhook_endpoint() -> str:
     """
-    환경변수에서 Webhook Endpoint URL 동적으로 읽기
+    Dynamically read Webhook Endpoint URL from environment variables
     """
     endpoint = os.getenv("EBAY_WEBHOOK_ENDPOINT", "")
     if endpoint:
         endpoint = endpoint.strip()
-        # Trailing slash 제거 (eBay는 정확한 URL 일치 요구)
+        # Remove trailing slash (eBay requires exact URL match)
         endpoint = endpoint.rstrip('/')
     return endpoint
 
 
 def compute_challenge_response(challenge_code: str, verification_token: str, endpoint_url: str) -> str:
     """
-    eBay Challenge Response 계산
+    Calculate eBay Challenge Response
     
-    ⚠️ eBay 공식 문서 기준 정확한 계산:
+    ⚠️ Accurate calculation based on eBay official documentation:
     1. hash_input = challenge_code + verification_token + endpoint_url
     2. challenge_response = SHA256(hash_input).hexdigest()
     
-    순서: challenge_code → verification_token → endpoint_url
-    인코딩: UTF-8
+    Order: challenge_code → verification_token → endpoint_url
+    Encoding: UTF-8
     """
     
-    # 1. 문자열 결합 (순서 중요!)
+    # 1. String concatenation (order is important!)
     hash_input = f"{challenge_code}{verification_token}{endpoint_url}"
     
-    # 2. UTF-8 인코딩 후 SHA256 해시 계산
+    # 2. Calculate SHA256 hash after UTF-8 encoding
     hash_bytes = hash_input.encode('utf-8')
     hash_object = hashlib.sha256(hash_bytes)
     challenge_response = hash_object.hexdigest()
     
-    # 디버그 로깅 (프로덕션에서는 민감정보 마스킹)
+    # Debug logging (mask sensitive info in production)
     logger.info(f"🔐 Challenge Response Calculation:")
     logger.info(f"   challenge_code: {challenge_code}")
     logger.info(f"   verification_token: {verification_token[:10]}...{verification_token[-4:] if len(verification_token) > 14 else ''}")
@@ -148,7 +149,7 @@ async def ebay_deletion_challenge(
     logger.info(f"   Query params: {dict(request.query_params)}")
     logger.info(f"   Headers: {dict(request.headers)}")
     
-    # Challenge code 확인
+    # Check challenge code
     if not challenge_code:
         logger.warning("⚠️ No challenge_code in request - returning ready status")
         return JSONResponse(
@@ -156,7 +157,7 @@ async def ebay_deletion_challenge(
             content={"status": "ok", "message": "eBay Webhook endpoint ready"}
         )
     
-    # 환경변수에서 동적으로 읽기
+    # Dynamically read from environment variables
     verification_secret = get_verification_secret()
     webhook_endpoint = get_webhook_endpoint()
     
@@ -164,7 +165,7 @@ async def ebay_deletion_challenge(
     logger.info(f"   EBAY_VERIFICATION_SECRET configured: {bool(verification_secret)}")
     logger.info(f"   EBAY_WEBHOOK_ENDPOINT configured: {bool(webhook_endpoint)}")
     
-    # Verification Secret 확인
+    # Check Verification Secret
     if not verification_secret:
         logger.error("❌ EBAY_VERIFICATION_SECRET not configured!")
         raise HTTPException(
@@ -172,16 +173,16 @@ async def ebay_deletion_challenge(
             detail="Webhook verification not configured"
         )
     
-    # Endpoint URL 결정
+    # Determine Endpoint URL
     if webhook_endpoint:
         endpoint_url = webhook_endpoint
         logger.info(f"   Using configured endpoint: {endpoint_url}")
     else:
-        # Request에서 URL 추출 (fallback)
+        # Extract URL from request (fallback)
         endpoint_url = str(request.url).split("?")[0].rstrip('/')
         logger.info(f"   Using request URL as endpoint: {endpoint_url}")
     
-    # Challenge Response 계산
+    # Calculate Challenge Response
     challenge_response = compute_challenge_response(
         challenge_code=challenge_code,
         verification_token=verification_secret,
@@ -191,7 +192,7 @@ async def ebay_deletion_challenge(
     logger.info(f"✅ Returning challenge response")
     logger.info("=" * 60)
     
-    # eBay가 요구하는 정확한 응답 형식
+    # Exact response format required by eBay
     return JSONResponse(
         status_code=200,
         content={"challengeResponse": challenge_response}
@@ -453,7 +454,7 @@ async def test_challenge(
 # eBay OAuth 2.0 Endpoints - 원클릭 연결
 # =====================================================
 
-@router.get("/auth/start")
+@router.post("/auth/start")
 async def ebay_auth_start(
     request: Request,
     # JWT 인증으로 user_id 추출 (쿼리 파라미터 제거)
@@ -1362,20 +1363,165 @@ async def get_ebay_listings(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+async def _sync_ebay_listings_background(
+    request: Request,
+    user_id: str
+):
+    """
+    Actual sync logic executed in background
+    """
+    try:
+        # Get ebay_user_id from profile for logging
+        ebay_user_id = None
+        try:
+            from .models import get_db, Profile
+            db = next(get_db())
+            profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+            if profile:
+                ebay_user_id = profile.ebay_user_id
+            db.close()
+        except Exception as e:
+            pass
+        
+        # ✅ 2. Auto cleanup logic: Clean invalid user_id data and fix platform
+        try:
+            from .models import get_db, Listing, Profile
+            from sqlalchemy import func, text
+            db = next(get_db())
+            try:
+                # 2-1. Delete listings with invalid user_id (default-user, None, or user_id not in Profile)
+                invalid_count = db.execute(
+                    text("""
+                        DELETE FROM listings 
+                        WHERE user_id IS NULL 
+                        OR user_id = 'default-user'
+                        OR user_id NOT IN (SELECT user_id FROM profiles WHERE user_id IS NOT NULL)
+                    """)
+                ).rowcount
+                
+                if invalid_count > 0:
+                    logger.info(f"🧹 [CLEANUP] Deleted {invalid_count} listings with invalid user_id")
+                    db.commit()
+                
+                # 2-2. Platform fix: Update "ebay" (lowercase) to "eBay"
+                platform_fixed = db.execute(
+                    text("""
+                        UPDATE listings 
+                        SET platform = 'eBay', updated_at = NOW()
+                        WHERE user_id = :user_id 
+                        AND LOWER(platform) = 'ebay'
+                        AND platform != 'eBay'
+                    """),
+                    {"user_id": user_id}
+                ).rowcount
+                
+                if platform_fixed > 0:
+                    logger.info(f"🔧 [CLEANUP] platform 보정: {platform_fixed}개 listings 업데이트됨")
+                    db.commit()
+            except Exception as cleanup_err:
+                logger.warning(f"⚠️ [CLEANUP] 정리 로직 실행 중 오류: {cleanup_err}")
+                db.rollback()
+            finally:
+                db.close()
+        except Exception as db_err:
+            logger.warning(f"⚠️ [CLEANUP] DB 연결 실패: {db_err}")
+            pass
+        
+        try:
+            # 기존 get_active_listings_trading_api 로직 재사용
+            # 첫 페이지부터 모든 페이지를 순회하며 동기화
+            page = 1
+            entries_per_page = 200  # 최대값 사용
+            total_fetched = 0
+            total_upserted = 0
+            total_pages = 1
+            page_stats = []  # 각 페이지별 통계
+            
+            while page <= total_pages:
+                # get_active_listings_trading_api의 로직을 직접 호출
+                result = await get_active_listings_trading_api_internal(
+                    request=request,
+                    user_id=user_id,
+                    page=page,
+                    entries_per_page=entries_per_page
+                )
+                
+                if result and result.get("success"):
+                    fetched_count = len(result.get("listings", []))
+                    upserted_count = result.get("upserted", 0)
+                    total_entries = result.get("total", 0)
+                    total_pages = result.get("total_pages", 1)
+                    
+                    total_fetched += fetched_count
+                    total_upserted += upserted_count
+                    
+                    page_stat = {
+                        "page": page,
+                        "fetched": fetched_count,
+                        "upserted": upserted_count,
+                        "total_entries": total_entries
+                    }
+                    page_stats.append(page_stat)
+                    
+                    # 다음 페이지로
+                    page += 1
+                else:
+                    break
+            
+            # ✅ 3. last_sync_at 강제 업데이트: Sync 완료 후 해당 user_id의 listings의 last_synced_at을 현재 시간으로 강제 업데이트 및 commit
+            sync_timestamp = datetime.utcnow()
+            if total_upserted > 0:
+                try:
+                    from .models import get_db, Listing
+                    from sqlalchemy import func
+                    db = next(get_db())
+                    try:
+                        # Case-insensitive로 platform="eBay"인 listings의 last_synced_at 업데이트
+                        updated_count = db.query(Listing).filter(
+                            Listing.user_id == user_id,
+                            func.lower(Listing.platform) == func.lower("eBay")
+                        ).update(
+                            {"last_synced_at": sync_timestamp},
+                            synchronize_session=False
+                        )
+                        db.commit()
+                    except Exception as update_err:
+                        db.rollback()
+                    finally:
+                        db.close()
+                except Exception as db_err:
+                    pass
+            
+            # Standardized verification log: Only three lines remain
+            logger.info(f"[FETCH] Collected {total_fetched} items from eBay.")
+            logger.info(f"[STORE] Saved/updated {total_upserted} products for user {user_id} to DB.")
+            
+        except Exception as e:
+            logger.error(f"❌ [SYNC] Sync error for user {user_id}: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+    except Exception as e:
+        logger.error(f"❌ [SYNC] Background sync error for user {user_id}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+
+
 @router.post("/listings/sync")
 async def sync_ebay_listings(
     request: Request,
-    user_id: str = Depends(get_current_user)  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user)  # Extract user_id from JWT authentication
 ):
     """
-    🔄 eBay Listings Sync - eBay 연결 후 자동으로 listings를 가져와 DB에 저장
+    🔄 eBay Listings Sync - Automatically fetch listings and save to DB after eBay connection
     
-    OAuth 연결 성공 직후 자동으로 호출되어 사용자의 eBay listings를 가져와 DB에 저장합니다.
-    - Trading API를 사용하여 활성 listings 가져오기
-    - DB에 upsert (중복 시 업데이트)
-    - Summary stats 갱신을 위해 프론트엔드에서 fetchSummaryStats() 재호출 필요
+    Fire and Forget pattern: Immediately return 202 Accepted and execute sync job in background.
+    - Async processing to bypass Vercel timeout (30 seconds) issue
+    - Actual sync runs in background, frontend does not wait for response
+    - Fetch active listings using Trading API
+    - Upsert to DB (update on duplicate)
+    - Frontend needs to call fetchSummaryStats() again to refresh summary stats
     """
-    # Validate user_id - 유효한 UUID여야 함
+    # Validate user_id - must be valid UUID
     if not user_id:
         raise HTTPException(
             status_code=400,
@@ -1385,150 +1531,19 @@ async def sync_ebay_listings(
             }
         )
     
-    # Get ebay_user_id from profile for response
-    ebay_user_id = None
-    try:
-        from .models import get_db, Profile
-        db = next(get_db())
-        profile = db.query(Profile).filter(Profile.user_id == user_id).first()
-        if profile:
-            ebay_user_id = profile.ebay_user_id
-        db.close()
-    except Exception as e:
-        pass
+    # Start sync job in background (Fire and Forget)
+    asyncio.create_task(_sync_ebay_listings_background(request, user_id))
     
-    # ✅ 2. 자동 정리 로직: 유효하지 않은 user_id 데이터 정리 및 platform 보정
-    try:
-        from .models import get_db, Listing, Profile
-        from sqlalchemy import func, text
-        db = next(get_db())
-        try:
-            # 2-1. 유효하지 않은 user_id를 가진 listings 삭제 (default-user, None, 또는 Profile에 없는 user_id)
-            invalid_count = db.execute(
-                text("""
-                    DELETE FROM listings 
-                    WHERE user_id IS NULL 
-                    OR user_id = 'default-user'
-                    OR user_id NOT IN (SELECT user_id FROM profiles WHERE user_id IS NOT NULL)
-                """)
-            ).rowcount
-            
-            if invalid_count > 0:
-                logger.info(f"🧹 [CLEANUP] 유효하지 않은 user_id를 가진 {invalid_count}개 listings 삭제됨")
-                db.commit()
-            
-            # 2-2. platform 보정: "ebay" (소문자)를 "eBay"로 업데이트
-            platform_fixed = db.execute(
-                text("""
-                    UPDATE listings 
-                    SET platform = 'eBay', updated_at = NOW()
-                    WHERE user_id = :user_id 
-                    AND LOWER(platform) = 'ebay'
-                    AND platform != 'eBay'
-                """),
-                {"user_id": user_id}
-            ).rowcount
-            
-            if platform_fixed > 0:
-                logger.info(f"🔧 [CLEANUP] platform 보정: {platform_fixed}개 listings 업데이트됨")
-                db.commit()
-        except Exception as cleanup_err:
-            logger.warning(f"⚠️ [CLEANUP] 정리 로직 실행 중 오류: {cleanup_err}")
-            db.rollback()
-        finally:
-            db.close()
-    except Exception as db_err:
-        logger.warning(f"⚠️ [CLEANUP] DB 연결 실패: {db_err}")
-        pass
-    
-    try:
-        # 기존 get_active_listings_trading_api 로직 재사용
-        # 첫 페이지부터 모든 페이지를 순회하며 동기화
-        page = 1
-        entries_per_page = 200  # 최대값 사용
-        total_fetched = 0
-        total_upserted = 0
-        total_pages = 1
-        page_stats = []  # 각 페이지별 통계
-        
-        while page <= total_pages:
-            # get_active_listings_trading_api의 로직을 직접 호출
-            result = await get_active_listings_trading_api_internal(
-                request=request,
-                user_id=user_id,
-                page=page,
-                entries_per_page=entries_per_page
-            )
-            
-            if result and result.get("success"):
-                fetched_count = len(result.get("listings", []))
-                upserted_count = result.get("upserted", 0)
-                total_entries = result.get("total", 0)
-                total_pages = result.get("total_pages", 1)
-                
-                total_fetched += fetched_count
-                total_upserted += upserted_count
-                
-                page_stat = {
-                    "page": page,
-                    "fetched": fetched_count,
-                    "upserted": upserted_count,
-                    "total_entries": total_entries
-                }
-                page_stats.append(page_stat)
-                
-                # 다음 페이지로
-                page += 1
-            else:
-                break
-        
-        # ✅ 3. last_sync_at 강제 업데이트: Sync 완료 후 해당 user_id의 listings의 last_synced_at을 현재 시간으로 강제 업데이트 및 commit
-        sync_timestamp = datetime.utcnow()
-        if total_upserted > 0:
-            try:
-                from .models import get_db, Listing
-                from sqlalchemy import func
-                db = next(get_db())
-                try:
-                    # Case-insensitive로 platform="eBay"인 listings의 last_synced_at 업데이트
-                    updated_count = db.query(Listing).filter(
-                        Listing.user_id == user_id,
-                        func.lower(Listing.platform) == func.lower("eBay")
-                    ).update(
-                        {"last_synced_at": sync_timestamp},
-                        synchronize_session=False
-                    )
-                    db.commit()
-                except Exception as update_err:
-                    db.rollback()
-                finally:
-                    db.close()
-            except Exception as db_err:
-                pass
-        
-        # 검증 로그 표준화: 세 줄만 남김
-        logger.info(f"[FETCH] eBay로부터 {total_fetched}개 수집 완료.")
-        logger.info(f"[STORE] 유저 {user_id}의 상품 {total_upserted}개 DB 저장/업데이트 완료.")
-        
-        return {
+    # Immediately return 202 Accepted (job continues running in background)
+    return JSONResponse(
+        status_code=202,
+        content={
             "success": True,
+            "message": "Sync job started in background",
             "user_id": user_id,
-            "ebay_user_id": ebay_user_id,
-            "fetched": total_fetched,
-            "upserted": total_upserted,
-            "pages": len(page_stats),
-            "total_pages": total_pages,
-            "page_stats": page_stats,
-            "message": f"Successfully synced {total_fetched} listings (upserted: {total_upserted})"
+            "status": "accepted"
         }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ [SYNC] Sync error for user {user_id}: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=str(e))
+    )
 
 
 async def get_active_listings_trading_api_internal(
