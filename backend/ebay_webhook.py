@@ -1374,17 +1374,44 @@ async def _sync_ebay_listings_background(
     Actual sync logic executed in background
     """
     try:
-        # Get ebay_user_id from profile for logging
+        # Get ebay_user_id from profile for logging and validation
         ebay_user_id = None
+        profile = None
         try:
             from .models import get_db, Profile
             db = next(get_db())
             profile = db.query(Profile).filter(Profile.user_id == user_id).first()
-            if profile:
-                ebay_user_id = profile.ebay_user_id
+            
+            if not profile:
+                logger.error(f"❌ [SYNC] Profile not found for Supabase user_id: {user_id}")
+                logger.error(f"   - This means the eBay OAuth connection was not completed")
+                logger.error(f"   - User must click 'Connect eBay' button to complete OAuth flow")
+                db.close()
+                return
+            
+            ebay_user_id = profile.ebay_user_id if hasattr(profile, 'ebay_user_id') else None
+            
+            # DEBUG: Log user_id and ebay_user_id mapping
+            logger.info(f"🔍 [SYNC] DEBUG: Attempting sync for Supabase User {user_id} with stored eBay ID {ebay_user_id}")
+            
+            if not ebay_user_id:
+                logger.error(f"❌ [SYNC] eBay account not fully linked in database")
+                logger.error(f"   - Profile exists for user_id: {user_id}")
+                logger.error(f"   - But ebay_user_id is NULL")
+                logger.error(f"   - This means the OAuth callback did not save the eBay User ID")
+                logger.error(f"   - User must reconnect eBay account to fix this")
+                db.close()
+                return
+            
+            logger.info(f"✅ [SYNC] Profile found: user_id={user_id}, ebay_user_id={ebay_user_id}")
             db.close()
         except Exception as e:
-            pass
+            logger.error(f"❌ [SYNC] Error querying profile: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            if db:
+                db.close()
+            return
         
         # ✅ 2. Auto cleanup logic: Clean invalid user_id data and fix platform
         try:
