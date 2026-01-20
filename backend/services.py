@@ -1451,15 +1451,6 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
         
         # Return total processed count
         return total_processed
-            # UNIQUE CONSTRAINT 에러 처리: 기존 데이터를 덮어쓰는 방식으로 재시도
-            error_str = str(e).lower()
-            if 'unique' in error_str or 'duplicate' in error_str or 'constraint' in error_str:
-                logger.warning(f"⚠️ [UPSERT] UNIQUE CONSTRAINT 에러 발생, 개별 upsert로 재시도: {e}")
-                db.rollback()
-                
-                # 개별 upsert로 재시도 (더 안전한 방식)
-                upserted_count = 0
-                for listing in listings:
                     try:
                         # 기존 레코드 확인
                         existing = db.query(Listing).filter(
