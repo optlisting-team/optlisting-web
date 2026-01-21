@@ -35,6 +35,7 @@ class Listing(Base):
     # JSONB fields (added via migration)
     metrics = Column(JSONB, default={}, nullable=True)
     analysis_meta = Column(JSONB, default={}, nullable=True)
+    raw_data = Column(JSONB, default={}, nullable=True)  # Raw JSON data from eBay API
     
     # Additional fields (added via migration)
     item_id = Column(String, nullable=True)  # Generic item ID (ebay_item_id와 별도)

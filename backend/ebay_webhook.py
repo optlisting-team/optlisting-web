@@ -845,6 +845,17 @@ async def ebay_auth_callback(
             error_redirect = f"{FRONTEND_URL}/dashboard?ebay_error=db_save&message=Failed to save tokens: {str(e)}"
             return RedirectResponse(url=error_redirect, status_code=302)
         
+        # ✅ CRITICAL: OAuth callback must complete successfully even if sync fails later
+        # Profile and tokens are now saved, redirect to dashboard
+        # Any listing sync errors will be handled separately and won't cause redirect loop
+        logger.info("=" * 60)
+        logger.info(f"✅ OAuth callback completed successfully")
+        logger.info(f"   - User ID: {user_id}")
+        logger.info(f"   - eBay User ID: {ebay_user_id}")
+        logger.info(f"   - Profile saved: Yes")
+        logger.info(f"   - Tokens saved: Yes")
+        logger.info("=" * 60)
+        
         # 성공! 프론트엔드로 리다이렉트
         # Dashboard로 리다이렉트 (settings 대신)
         success_redirect = f"{FRONTEND_URL}/dashboard?ebay_connected=true&message=eBay account connected successfully"
@@ -862,7 +873,7 @@ async def ebay_auth_callback(
         import traceback
         logger.error(traceback.format_exc())
         
-        error_redirect = f"{FRONTEND_URL}/settings?ebay_error=unknown&message={str(e)}"
+        error_redirect = f"{FRONTEND_URL}/dashboard?ebay_error=unknown&message={str(e)}"
         return RedirectResponse(url=error_redirect, status_code=302)
 
 

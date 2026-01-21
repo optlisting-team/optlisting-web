@@ -1362,7 +1362,7 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 'brand': listing.brand,
                 'upc': listing.upc,
                 'metrics': metrics,  # Shopify 경유 정보 포함
-                'raw_data': listing.raw_data if listing.raw_data else {},
+                'raw_data': listing.raw_data if hasattr(listing, 'raw_data') and listing.raw_data else {},
                 'analysis_meta': analysis_meta,  # Shopify 경유 정보 포함
                 'last_synced_at': listing.last_synced_at if listing.last_synced_at else datetime.utcnow(),
                 'updated_at': datetime.utcnow(),
@@ -1535,7 +1535,7 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 existing.brand = listing.brand
                 existing.upc = listing.upc
                 existing.metrics = listing.metrics if listing.metrics else {}  # Shopify 경유 정보 포함
-                existing.raw_data = listing.raw_data if listing.raw_data else {}
+                existing.raw_data = listing.raw_data if hasattr(listing, 'raw_data') and listing.raw_data else {}
                 existing.analysis_meta = listing.analysis_meta if listing.analysis_meta else {}  # Shopify 경유 정보 포함
                 existing.last_synced_at = listing.last_synced_at if listing.last_synced_at else datetime.utcnow()
                 existing.updated_at = datetime.utcnow()
