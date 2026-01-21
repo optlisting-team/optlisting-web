@@ -1999,6 +1999,7 @@ async def get_active_listings_trading_api_internal(
                     source=listing_data.get("supplier_name", "Unknown"),
                     marketplace="eBay",
                     platform="eBay",  # CRITICAL: Must match summary query key (platform == "eBay") - Case sensitive!
+                    raw_data=listing_data.get("raw_data", {}),  # Ensure raw_data is set
                     last_synced_at=datetime.utcnow()
                 )
                 # ✅ CASE SENSITIVITY 확인: platform 값 로깅
@@ -2459,6 +2460,7 @@ async def get_active_listings_trading_api(
                         source=listing_data.get("supplier_name", "Unknown"),
                         marketplace="eBay",
                         platform="eBay",
+                        raw_data=listing_data.get("raw_data", {}),  # Ensure raw_data is set
                         last_synced_at=datetime.utcnow()
                     )
                     listing_objects.append(listing_obj)
