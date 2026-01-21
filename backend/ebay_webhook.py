@@ -2035,6 +2035,14 @@ async def get_active_listings_trading_api_internal(
                 upserted_count = upsert_listings(db, listing_objects, expected_user_id=user_id)
                 logger.info(f"✅ [DB SAVE] upsert_listings completed: {upserted_count} items processed")
                 
+                # ✅ Verify actual database count after save
+                after_count = db.query(Listing).filter(Listing.user_id == user_id).count()
+                logger.info(f"✅ [DB SAVE] Database verification: {after_count} listings now in DB for user_id='{user_id}'")
+                
+                if after_count == 0 and upserted_count > 0:
+                    logger.error(f"❌ [DB SAVE] CRITICAL: upsert_listings reported {upserted_count} items, but DB count is 0!")
+                    logger.error(f"   - This indicates a database transaction or commit issue")
+                
                 # ✅ 추가 commit 확인 (batch processing already commits, but ensure final state)
                 try:
                     db.flush()

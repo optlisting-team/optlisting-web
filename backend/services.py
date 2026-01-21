@@ -1350,6 +1350,15 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 logger.error(f"   - listing.title: {getattr(listing, 'title', 'N/A')[:50]}")
                 raise ValueError(f"user_id가 유효하지 않습니다: {listing_user_id}. user_id는 필수입니다.")
             
+            # ✅ FIX: Don't access listing.raw_data - use empty dict directly to avoid AttributeError
+            # Extract raw_data safely without accessing the attribute
+            raw_data_value = {}
+            try:
+                if hasattr(listing, 'raw_data'):
+                    raw_data_value = listing.raw_data if listing.raw_data else {}
+            except (AttributeError, TypeError):
+                raw_data_value = {}
+            
             values = {
                 'user_id': listing_user_id,  # ✅ CRITICAL: expected_user_id 우선 사용
                 'platform': platform,  # 정규화된 platform 값 사용
@@ -1362,7 +1371,7 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 'brand': listing.brand,
                 'upc': listing.upc,
                 'metrics': metrics,  # Shopify 경유 정보 포함
-                'raw_data': getattr(listing, 'raw_data', {}) or {},
+                'raw_data': raw_data_value,  # Use safe extracted value
                 'analysis_meta': analysis_meta,  # Shopify 경유 정보 포함
                 'last_synced_at': listing.last_synced_at if listing.last_synced_at else datetime.utcnow(),
                 'updated_at': datetime.utcnow(),
@@ -1378,6 +1387,7 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
         # ✅ BATCH PROCESSING: Process in chunks of 20 to prevent memory spikes and container crashes
         BATCH_SIZE = 20
         total_processed = 0
+        failed_batches = 0
         
         logger.info(f"💾 [UPSERT] Processing {len(values_list)} listings in batches of {BATCH_SIZE}")
         
@@ -1438,6 +1448,7 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 logger.info(f"✅ [UPSERT] Batch {batch_num}/{total_batches} completed: {len(batch)} items saved")
                 
             except Exception as batch_err:
+                failed_batches += 1
                 db.rollback()
                 logger.error(f"❌ [UPSERT] Batch {batch_num}/{total_batches} failed: {str(batch_err)}")
                 logger.error(f"   - Batch size: {len(batch)}")
@@ -1445,6 +1456,22 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 import traceback
                 logger.error(f"   - Traceback: {traceback.format_exc()}")
                 # Continue with next batch instead of failing completely
+                # Try to save individual items from this batch
+                logger.warning(f"⚠️ [UPSERT] Attempting to save batch {batch_num} items individually...")
+                for item_idx, item in enumerate(batch):
+                    try:
+                        stmt_single = insert(table).values(item)
+                        stmt_single = stmt_single.on_conflict_do_update(
+                            index_elements=conflict_columns,
+                            set_=stmt_single.excluded
+                        )
+                        db.execute(stmt_single)
+                        db.commit()
+                        total_processed += 1
+                    except Exception as item_err:
+                        logger.error(f"❌ [UPSERT] Failed to save item {item_idx} in batch {batch_num}: {str(item_err)}")
+                        db.rollback()
+                        continue
                 continue
         
         logger.info(f"✅ [UPSERT] Completed: {total_processed}/{len(values_list)} items processed successfully")
@@ -1535,7 +1562,14 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 existing.brand = listing.brand
                 existing.upc = listing.upc
                 existing.metrics = listing.metrics if listing.metrics else {}  # Shopify 경유 정보 포함
-                existing.raw_data = getattr(listing, 'raw_data', None) or {}
+                # ✅ FIX: Don't access listing.raw_data - use empty dict directly to avoid AttributeError
+                try:
+                    if hasattr(listing, 'raw_data') and listing.raw_data:
+                        existing.raw_data = listing.raw_data
+                    else:
+                        existing.raw_data = {}
+                except (AttributeError, TypeError):
+                    existing.raw_data = {}
                 existing.analysis_meta = listing.analysis_meta if listing.analysis_meta else {}  # Shopify 경유 정보 포함
                 existing.last_synced_at = listing.last_synced_at if listing.last_synced_at else datetime.utcnow()
                 existing.updated_at = datetime.utcnow()
