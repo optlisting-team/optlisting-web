@@ -326,11 +326,12 @@ function Dashboard() {
       console.log('🔄 [SYNC] Starting eBay listings sync...')
       console.log('   user_id:', currentUserId)
       
-      // Use apiClient for requests requiring JWT authentication (Authorization header automatically added)
-      // Fire and Forget pattern: Immediately receive 202 Accepted and sync in background
-      const response = await apiClient.post(`/api/ebay/listings/sync`, null, {
-        timeout: 10000 // 10 second timeout (to quickly receive 202 response)
-      })
+          // Use apiClient for requests requiring JWT authentication (Authorization header automatically added)
+          // Fire and Forget pattern: Immediately receive 202 Accepted and sync in background
+          // Use 30 second timeout (should receive 202 response within 1-2 seconds, but allow buffer)
+          const response = await apiClient.post(`/api/ebay/listings/sync`, null, {
+            timeout: 30000 // 30 second timeout (should receive 202 response quickly, but allow buffer for network issues)
+          })
       
       // Handle 202 Accepted response (background job started)
       // Distinguish between 202 (background job) and other success codes (200, 201)
@@ -341,76 +342,92 @@ function Dashboard() {
         console.log('='.repeat(60))
         
         // 202 response means background job has started (not completed)
-        showToast('Sync job started in background. Please wait a moment and refresh.', 'info')
+        showToast('Sync in progress... This may take a minute.', 'info')
         
         // Save sync response to sessionStorage (for comparison with summary)
         sessionStorage.setItem('last_sync_response', JSON.stringify(response.data))
         
-        // Background job, so no actual data yet
-        // Instead, fetch summary again after a moment to verify
+        // Background job started - start polling for completion
+        console.log('🔄 [SYNC] Background sync job started. Starting polling...')
         
-        // Background job, so actual results will be checked later
-        console.log('🔄 [SYNC] Background sync job started. Waiting for completion...')
+        // ✅ Smooth UI Polling: Poll every 5 seconds until sync completes or timeout
+        const MAX_POLL_ATTEMPTS = 12 // 12 attempts * 5 seconds = 60 seconds max
+        let pollAttempts = 0
+        let syncCompleted = false
         
-        // Refetch summary stats after sync completes (waiting for background job to complete)
-        // Wait sufficient time for background job to complete (max 60 seconds)
-        console.log('🔄 [SYNC] Waiting for background sync to complete, then refetching summary stats...')
-        
-        // ✅ 2. Refresh data after sync: Wait for background job to complete, then refetch summary
-        // Wait sufficient time for background sync to complete (typically 10-30 seconds)
-        await new Promise(resolve => setTimeout(resolve, 5000)) // Wait 5 seconds
-        
-        // Force Summary API refetch
-        try {
-          // fetchSummaryStats updates summaryStats internally, so
-          // call API directly to check response
-          // Use apiClient for requests requiring JWT authentication (Authorization header automatically added)
-          const summaryResponse = await apiClient.get(`/api/ebay/summary`, {
-            params: {
-              filters: JSON.stringify(filters)
-            },
-            timeout: 60000,  // Increased to 60 seconds (to prevent API response timeout)
-          })
+        const pollForCompletion = async () => {
+          if (pollAttempts >= MAX_POLL_ATTEMPTS) {
+            console.warn('⚠️ [SYNC] Polling timeout reached (60 seconds)')
+            showToast('Sync is taking longer than expected. Please refresh in a moment.', 'warning')
+            setIsSyncingListings(false)
+            // Final attempt to fetch stats
+            await fetchSummaryStats()
+            return
+          }
           
-          if (summaryResponse.data && summaryResponse.data.success) {
-            const activeCount = summaryResponse.data.active_count || 0
-            const lowPerformingCount = summaryResponse.data.low_performing_count || 0
-            const queueCount = summaryResponse.data.queue_count || 0
-            const lastSyncAt = summaryResponse.data.last_sync_at || null
-            
-            console.log('✅ [SYNC] Summary stats refetch completed')
-            console.log(`   - Active count from backend: ${activeCount}`)
-            
-            // ✅ 2. State Force Refresh: Force assign active_count value from backend after sync completes
-            setSummaryStats({
-              activeCount: activeCount,
-              lowPerformingCount: lowPerformingCount,
-              queueCount: queueCount,
-              lastSyncAt: lastSyncAt
+          pollAttempts++
+          console.log(`🔄 [SYNC] Polling attempt ${pollAttempts}/${MAX_POLL_ATTEMPTS}...`)
+          
+          try {
+            // Poll summary stats to check if sync completed
+            const summaryResponse = await apiClient.get(`/api/ebay/summary`, {
+              params: {
+                filters: JSON.stringify(filters)
+              },
+              timeout: 60000,  // 60 seconds timeout
             })
-            console.log(`✅ [SYNC] State force updated: activeCount=${activeCount}`)
             
-            // Check summary results (verify background job completion)
-            if (activeCount > 0) {
-              console.log(`✅ [SYNC] Background sync completed: ${activeCount} active listings found`)
-              showToast(`Sync completed: ${activeCount} active listings`, 'success')
-              // Also call fetchSummaryStats to update state (redundant but safe)
-              await fetchSummaryStats()
+            if (summaryResponse.data && summaryResponse.data.success) {
+              const activeCount = summaryResponse.data.active_count || 0
+              const lowPerformingCount = summaryResponse.data.low_performing_count || 0
+              const queueCount = summaryResponse.data.queue_count || 0
+              const lastSyncAt = summaryResponse.data.last_sync_at || null
+              
+              // Update state
+              setSummaryStats({
+                activeCount: activeCount,
+                lowPerformingCount: lowPerformingCount,
+                queueCount: queueCount,
+                lastSyncAt: lastSyncAt
+              })
+              
+              // Check if sync completed (activeCount > 0 or lastSyncAt updated)
+              if (activeCount > 0 || (lastSyncAt && new Date(lastSyncAt) > new Date(Date.now() - 120000))) {
+                // Sync completed (has listings or recent sync timestamp)
+                console.log(`✅ [SYNC] Background sync completed: ${activeCount} active listings found`)
+                showToast(`Sync completed: ${activeCount} active listings`, 'success')
+                syncCompleted = true
+                setIsSyncingListings(false)
+                // Final refresh
+                await fetchSummaryStats()
+                return
+              } else {
+                // Still syncing, continue polling
+                console.log(`ℹ️ [SYNC] Sync in progress... (activeCount: ${activeCount}, attempt ${pollAttempts})`)
+                setTimeout(pollForCompletion, 5000) // Poll again in 5 seconds
+              }
             } else {
-              console.log(`ℹ️ [SYNC] Background sync may still be in progress or no listings found`)
-              // Wait additional time and check again (only once to prevent infinite loops)
-              await new Promise(resolve => setTimeout(resolve, 5000))
+              // Invalid response, continue polling
+              console.warn(`⚠️ [SYNC] Invalid summary response, continuing to poll...`)
+              setTimeout(pollForCompletion, 5000)
+            }
+          } catch (pollErr) {
+            console.error(`❌ [SYNC] Polling error (attempt ${pollAttempts}):`, pollErr)
+            // Continue polling on error (network issues, etc.)
+            if (pollAttempts < MAX_POLL_ATTEMPTS) {
+              setTimeout(pollForCompletion, 5000)
+            } else {
+              // Max attempts reached
+              console.error('❌ [SYNC] Max polling attempts reached')
+              showToast('Sync status check failed. Please refresh manually.', 'error')
+              setIsSyncingListings(false)
               await fetchSummaryStats()
-              // Note: Only one retry to prevent infinite polling loops
             }
           }
-        } catch (refetchErr) {
-          console.error('❌ [SYNC] Summary refetch failed:', refetchErr)
-          // Try fetchSummaryStats even if refetch fails
-          fetchSummaryStats().catch(err => {
-            console.error('❌ [SYNC] fetchSummaryStats also failed:', err)
-          })
         }
+        
+        // Start polling after initial 5 second delay
+        setTimeout(pollForCompletion, 5000)
         
         // Note: fetched and upserted are not available in 202 response
         // They will be available after background sync completes
