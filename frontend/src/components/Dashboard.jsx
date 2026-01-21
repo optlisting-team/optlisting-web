@@ -328,9 +328,9 @@ function Dashboard() {
       
           // Use apiClient for requests requiring JWT authentication (Authorization header automatically added)
           // Fire and Forget pattern: Immediately receive 202 Accepted and sync in background
-          // Use 30 second timeout (should receive 202 response within 1-2 seconds, but allow buffer)
+          // Use 60 second timeout (should receive 202 response within 1-2 seconds, but allow buffer for network issues)
           const response = await apiClient.post(`/api/ebay/listings/sync`, null, {
-            timeout: 30000 // 30 second timeout (should receive 202 response quickly, but allow buffer for network issues)
+            timeout: 60000 // 60 second timeout (should receive 202 response quickly, but allow buffer for network issues)
           })
       
       // Handle 202 Accepted response (background job started)

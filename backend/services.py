@@ -1350,15 +1350,8 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 logger.error(f"   - listing.title: {getattr(listing, 'title', 'N/A')[:50]}")
                 raise ValueError(f"user_id가 유효하지 않습니다: {listing_user_id}. user_id는 필수입니다.")
             
-            # ✅ FIX: Don't access listing.raw_data - use empty dict directly to avoid AttributeError
-            # Extract raw_data safely without accessing the attribute
-            raw_data_value = {}
-            try:
-                if hasattr(listing, 'raw_data'):
-                    raw_data_value = listing.raw_data if listing.raw_data else {}
-            except (AttributeError, TypeError):
-                raw_data_value = {}
-            
+            # ✅ FIX: Never access listing.raw_data - use empty dict directly to avoid AttributeError
+            # SQLAlchemy objects may not have raw_data initialized, so always use empty dict
             values = {
                 'user_id': listing_user_id,  # ✅ CRITICAL: expected_user_id 우선 사용
                 'platform': platform,  # 정규화된 platform 값 사용
@@ -1371,7 +1364,7 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 'brand': listing.brand,
                 'upc': listing.upc,
                 'metrics': metrics,  # Shopify 경유 정보 포함
-                'raw_data': raw_data_value,  # Use safe extracted value
+                'raw_data': {},  # Always use empty dict - avoid AttributeError completely
                 'analysis_meta': analysis_meta,  # Shopify 경유 정보 포함
                 'last_synced_at': listing.last_synced_at if listing.last_synced_at else datetime.utcnow(),
                 'updated_at': datetime.utcnow(),
@@ -1573,14 +1566,9 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 existing.brand = listing.brand
                 existing.upc = listing.upc
                 existing.metrics = listing.metrics if listing.metrics else {}  # Shopify 경유 정보 포함
-                # ✅ FIX: Don't access listing.raw_data - use empty dict directly to avoid AttributeError
-                try:
-                    if hasattr(listing, 'raw_data') and listing.raw_data:
-                        existing.raw_data = listing.raw_data
-                    else:
-                        existing.raw_data = {}
-                except (AttributeError, TypeError):
-                    existing.raw_data = {}
+                # ✅ FIX: Never access listing.raw_data - use empty dict directly to avoid AttributeError
+                # SQLAlchemy objects may not have raw_data initialized, so always use empty dict
+                existing.raw_data = {}
                 existing.analysis_meta = listing.analysis_meta if listing.analysis_meta else {}  # Shopify 경유 정보 포함
                 existing.last_synced_at = listing.last_synced_at if listing.last_synced_at else datetime.utcnow()
                 existing.updated_at = datetime.utcnow()
