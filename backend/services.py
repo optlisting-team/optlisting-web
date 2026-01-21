@@ -1458,11 +1458,22 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 # Continue with next batch instead of failing completely
                 # Try to save individual items from this batch
                 logger.warning(f"⚠️ [UPSERT] Attempting to save batch {batch_num} items individually...")
+                # Re-define conflict_columns for individual retry
+                retry_conflict_columns = ['user_id']
+                if hasattr(Listing, 'platform'):
+                    retry_conflict_columns.append('platform')
+                elif hasattr(Listing, 'marketplace'):
+                    retry_conflict_columns.append('marketplace')
+                if hasattr(Listing, 'item_id'):
+                    retry_conflict_columns.append('item_id')
+                elif hasattr(Listing, 'ebay_item_id'):
+                    retry_conflict_columns.append('ebay_item_id')
+                
                 for item_idx, item in enumerate(batch):
                     try:
                         stmt_single = insert(table).values(item)
                         stmt_single = stmt_single.on_conflict_do_update(
-                            index_elements=conflict_columns,
+                            index_elements=retry_conflict_columns,
                             set_=stmt_single.excluded
                         )
                         db.execute(stmt_single)
