@@ -976,7 +976,7 @@ def analyze_zombie_listings(
         except Exception as e:
             # If commit fails due to missing columns, rollback and continue
             db.rollback()
-            print(f"Warning: Could not update flags (columns may not exist): {e}")
+            logger.warning(f"Could not update flags (columns may not exist): {e}")
     
     # Sort zombies: Primary by is_active_elsewhere (DESC - True first), Secondary by age (oldest first)
     def sort_key(z):
@@ -1234,6 +1234,32 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
     For SQLite: Falls back to individual INSERT OR REPLACE (less efficient but compatible)
     
     Args:
+        db: Database session (managed by caller)
+        listings: List of Listing objects to upsert
+        expected_user_id: Optional user_id to enforce on all listings
+        
+    Returns:
+        Number of listings processed successfully
+        
+    Performance:
+        - Processes in batches of 20 to prevent memory spikes
+        - Logs execution time for monitoring
+    """
+    from datetime import datetime as dt
+    upsert_start_time = dt.utcnow()
+    """
+    UPSERT listings using PostgreSQL's ON CONFLICT DO UPDATE.
+    
+    This function handles duplicate key conflicts by updating existing records
+    instead of raising IntegrityError. Uses the unique index 'idx_user_platform_item'
+    which is on (user_id, platform, item_id).
+    
+    **공급처 자동 감지**: supplier_name과 supplier_id가 없으면 SKU, image_url, title, brand, upc를 기반으로 자동 감지합니다.
+    
+    For PostgreSQL: Uses INSERT ... ON CONFLICT DO UPDATE
+    For SQLite: Falls back to individual INSERT OR REPLACE (less efficient but compatible)
+    
+    Args:
         db: Database session
         listings: List of Listing objects to upsert
         
@@ -1478,7 +1504,13 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                         continue
                 continue
         
+        upsert_end_time = dt.utcnow()
+        upsert_duration = (upsert_end_time - upsert_start_time).total_seconds()
+        
         logger.info(f"✅ [UPSERT] Completed: {total_processed}/{len(values_list)} items processed successfully")
+        logger.info(f"⏱️ [UPSERT] Execution time: {upsert_duration:.2f} seconds ({upsert_duration/60:.2f} minutes)")
+        if failed_batches > 0:
+            logger.warning(f"⚠️ [UPSERT] {failed_batches} batches failed but processing continued")
         
         # Return total processed count
         return total_processed
@@ -1661,7 +1693,7 @@ def extract_csv_fields(listing: Listing) -> Dict[str, any]:
                         action = recommendation.get('action', None)
     except Exception as e:
         # 안정성: 예외 발생 시 None 반환 (500 에러 방지)
-        print(f"Warning: Failed to extract action from analysis_meta: {e}")
+        logger.warning(f"Failed to extract action from analysis_meta: {e}")
         action = None
     
     return {

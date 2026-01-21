@@ -147,12 +147,16 @@ DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 if DATABASE_URL:
     DATABASE_URL = DATABASE_URL.strip('"').strip("'").lstrip('=').strip()
 
-# Debug: Print DATABASE_URL status
-print(f"DEBUG: DATABASE_URL exists: {bool(DATABASE_URL)}")
-print(f"DEBUG: DATABASE_URL starts with postgresql: {DATABASE_URL.startswith(('postgresql://', 'postgres://')) if DATABASE_URL else False}")
+# Initialize logger for database configuration
+import logging
+db_logger = logging.getLogger(__name__)
+
+# Debug: Log DATABASE_URL status
+db_logger.debug(f"DATABASE_URL exists: {bool(DATABASE_URL)}")
+db_logger.debug(f"DATABASE_URL starts with postgresql: {DATABASE_URL.startswith(('postgresql://', 'postgres://')) if DATABASE_URL else False}")
 if DATABASE_URL:
-    # Print first 50 chars only (hide password)
-    print(f"DEBUG: DATABASE_URL prefix: {DATABASE_URL[:50]}...")
+    # Log first 50 chars only (hide password)
+    db_logger.debug(f"DATABASE_URL prefix: {DATABASE_URL[:50]}...")
 
 # ✅ FIX: DATABASE_URL 검증 강화 (빈 문자열, None, 잘못된 형식 체크)
 if DATABASE_URL and DATABASE_URL.startswith(("postgresql://", "postgres://")):
@@ -164,12 +168,12 @@ if DATABASE_URL and DATABASE_URL.startswith(("postgresql://", "postgres://")):
     use_pooling = False
     if ":6543/" in SQLALCHEMY_DATABASE_URL or "pooler.supabase.com" in SQLALCHEMY_DATABASE_URL:
         use_pooling = True
-        print("DEBUG: Using Supabase Connection Pooling (port 6543)")
+        db_logger.debug("Using Supabase Connection Pooling (port 6543)")
     else:
-        print("DEBUG: Using direct Supabase connection")
+        db_logger.debug("Using direct Supabase connection")
         # Connection Pooling 포트로 변경 제안
         if "supabase.co" in SQLALCHEMY_DATABASE_URL and ":5432/" in SQLALCHEMY_DATABASE_URL:
-            print("INFO: Consider using Connection Pooling port 6543 for better performance")
+            db_logger.info("Consider using Connection Pooling port 6543 for better performance")
     
     # Connection Pool 설정
     engine_kwargs = {
@@ -186,7 +190,7 @@ if DATABASE_URL and DATABASE_URL.startswith(("postgresql://", "postgres://")):
             "sslmode": "require"
         }
     
-    print(f"DEBUG: Engine kwargs: pool_pre_ping={engine_kwargs['pool_pre_ping']}, pool_recycle={engine_kwargs['pool_recycle']}")
+    db_logger.debug(f"Engine kwargs: pool_pre_ping={engine_kwargs['pool_pre_ping']}, pool_recycle={engine_kwargs['pool_recycle']}")
     
     try:
         engine = create_engine(
@@ -195,8 +199,8 @@ if DATABASE_URL and DATABASE_URL.startswith(("postgresql://", "postgres://")):
         )
     except Exception as e:
         # ✅ FIX: DATABASE_URL 파싱 실패 시 SQLite로 폴백
-        print(f"Warning: Failed to create PostgreSQL engine: {e}")
-        print("Falling back to SQLite...")
+        db_logger.warning(f"Failed to create PostgreSQL engine: {e}")
+        db_logger.warning("Falling back to SQLite...")
         SQLALCHEMY_DATABASE_URL = "sqlite:///./optlisting.db"
         engine = create_engine(
             SQLALCHEMY_DATABASE_URL, 
@@ -205,8 +209,8 @@ if DATABASE_URL and DATABASE_URL.startswith(("postgresql://", "postgres://")):
 else:
     # Fallback to SQLite for local development
     if DATABASE_URL:
-        print(f"Warning: DATABASE_URL is set but invalid format: {DATABASE_URL[:50]}...")
-        print("Falling back to SQLite...")
+        db_logger.warning(f"DATABASE_URL is set but invalid format: {DATABASE_URL[:50]}...")
+        db_logger.warning("Falling back to SQLite...")
     SQLALCHEMY_DATABASE_URL = "sqlite:///./optlisting.db"
     engine = create_engine(
         SQLALCHEMY_DATABASE_URL, 

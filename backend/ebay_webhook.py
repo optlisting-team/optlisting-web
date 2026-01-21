@@ -1386,9 +1386,13 @@ async def _sync_ebay_listings_background(
     Wrapped in comprehensive error handling to prevent silent failures
     """
     import traceback
+    from datetime import datetime as dt
+    
+    sync_start_time = dt.utcnow()
     try:
         logger.info("=" * 60)
         logger.info(f"🔄 [SYNC BACKGROUND] Starting sync for user_id: {user_id}")
+        logger.info(f"   - Start time: {sync_start_time.isoformat()}")
         logger.info("=" * 60)
         # Get ebay_user_id from profile for logging and validation
         ebay_user_id = None
@@ -1965,49 +1969,18 @@ async def get_active_listings_trading_api_internal(
             before_count = db.query(Listing).filter(Listing.user_id == user_id).count()
             logger.info(f"   - DB에 저장된 기존 listings 개수 (user_id='{user_id}'): {before_count}")
             
+            # Use consolidated parser utility
+            from .listing_parser import parse_listing_from_data
+            
             listing_objects = []
             for listing_data in listings:
-                date_listed = date.today()
-                if listing_data.get("start_time"):
-                    try:
-                        start_date = parser.parse(listing_data["start_time"])
-                        date_listed = start_date.date()
-                    except:
-                        pass
-                
-                # ✅ CRITICAL: user_id 검증
-                if not user_id or user_id == "default-user":
-                    logger.error(f"❌ [INTERNAL] CRITICAL: user_id가 유효하지 않습니다!")
-                    logger.error(f"   - user_id: {user_id}")
+                try:
+                    listing_obj = parse_listing_from_data(listing_data, user_id, platform="eBay")
+                    listing_objects.append(listing_obj)
+                except ValueError as e:
+                    logger.error(f"❌ [DB SAVE] Failed to parse listing: {e}")
                     logger.error(f"   - item_id: {listing_data.get('item_id')}")
-                    raise ValueError(f"user_id가 유효하지 않습니다: {user_id}. 'default-user'로 저장할 수 없습니다.")
-                
-                listing_obj = Listing(
-                    ebay_item_id=listing_data["item_id"],
-                    item_id=listing_data["item_id"],
-                    title=listing_data["title"],
-                    sku=listing_data.get("sku", ""),
-                    image_url=listing_data.get("image_url") or listing_data.get("picture_url") or listing_data.get("thumbnail_url") or "",
-                    price=listing_data.get("price", 0),
-                    date_listed=date_listed,
-                    sold_qty=listing_data.get("quantity_sold", 0),
-                    watch_count=listing_data.get("watch_count", 0),
-                    view_count=listing_data.get("view_count", 0),
-                    user_id=user_id,  # ✅ 프론트엔드에서 전달된 user_id 사용
-                    supplier_name=listing_data.get("supplier_name"),
-                    supplier_id=listing_data.get("supplier_id"),
-                    source=listing_data.get("supplier_name", "Unknown"),
-                    marketplace="eBay",
-                    platform="eBay",  # CRITICAL: Must match summary query key (platform == "eBay") - Case sensitive!
-                    raw_data=listing_data.get("raw_data", {}),  # Ensure raw_data is set
-                    last_synced_at=datetime.utcnow()
-                )
-                # ✅ CASE SENSITIVITY 확인: platform 값 로깅
-                actual_platform = getattr(listing_obj, 'platform', None)
-                logger.debug(f"📝 [INTERNAL] Created Listing object: user_id={user_id}, platform='{actual_platform}' (type: {type(actual_platform).__name__}), item_id={listing_data['item_id']}")
-                if actual_platform != "eBay":
-                    logger.error(f"❌ [CASE CHECK] platform 값 불일치: '{actual_platform}' != 'eBay'")
-                listing_objects.append(listing_obj)
+                    continue  # Skip invalid listings
             
             if listing_objects:
                 # ✅ 2단계: 저장 ID 일치화 - 명확한 로깅
@@ -2059,7 +2032,11 @@ async def get_active_listings_trading_api_internal(
                     Listing.platform == "eBay"
                 ).count()
                 
+                sync_end_time = dt.utcnow()
+                sync_duration = (sync_end_time - sync_start_time).total_seconds()
+                
                 logger.info(f"✅ [SYNC] 저장 완료: upserted={upserted_count}, DB count={after_count} (user_id={user_id}, platform=eBay)")
+                logger.info(f"⏱️ [SYNC] Execution time: {sync_duration:.2f} seconds ({sync_duration/60:.2f} minutes)")
                 
                 if after_count == 0 and upserted_count > 0:
                     logger.error(f"❌ [SYNC] CRITICAL: upserted={upserted_count}개 처리했지만 DB count=0!")
@@ -2451,26 +2428,9 @@ async def get_active_listings_trading_api(
                             pass
                     
                     # Listing 객체 생성
-                    listing_obj = Listing(
-                        ebay_item_id=listing_data["item_id"],
-                        item_id=listing_data["item_id"],
-                        title=listing_data["title"],
-                        sku=listing_data.get("sku", ""),
-                        image_url=listing_data.get("image_url") or listing_data.get("picture_url") or listing_data.get("thumbnail_url") or "",
-                        price=listing_data.get("price", 0),
-                        date_listed=date_listed,
-                        sold_qty=listing_data.get("quantity_sold", 0),
-                        watch_count=listing_data.get("watch_count", 0),
-                        view_count=listing_data.get("view_count", 0),
-                        user_id=user_id,
-                        supplier_name=listing_data.get("supplier_name"),
-                        supplier_id=listing_data.get("supplier_id"),
-                        source=listing_data.get("supplier_name", "Unknown"),
-                        marketplace="eBay",
-                        platform="eBay",
-                        raw_data=listing_data.get("raw_data", {}),  # Ensure raw_data is set
-                        last_synced_at=datetime.utcnow()
-                    )
+                    # Use consolidated parser utility
+                    from .listing_parser import parse_listing_from_data
+                    listing_obj = parse_listing_from_data(listing_data, user_id, platform="eBay")
                     listing_objects.append(listing_obj)
                 
                 # Upsert (중복 시 업데이트)
