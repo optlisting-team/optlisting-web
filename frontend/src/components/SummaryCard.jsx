@@ -760,7 +760,22 @@ function SummaryCard({ onError,
         >
           <div className="text-4xl font-black text-white">{loading ? '...' : (totalListings || 0).toLocaleString()}</div>
           <div className="text-sm text-zinc-500 uppercase mt-1">Active</div>
-          {onSync && (
+          {/* Manual Refresh Button - Always visible when not loading */}
+          {!loading && (
+            <button
+              onClick={async (e) => { 
+                e.stopPropagation()
+                if (onSync) {
+                  onSync()
+                }
+              }}
+              className="absolute top-2 right-2 p-2 text-zinc-500 hover:text-white transition-all hover:bg-zinc-800/50 rounded-lg"
+              title="Manual Refresh"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          )}
+          {onSync && loading && (
             <button
               onClick={(e) => { e.stopPropagation(); onSync(); }}
               disabled={loading}

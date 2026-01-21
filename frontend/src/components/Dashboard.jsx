@@ -351,17 +351,21 @@ function Dashboard() {
         console.log('🔄 [SYNC] Background sync job started. Starting polling...')
         
         // ✅ Smooth UI Polling: Poll every 5 seconds until sync completes or timeout
-        const MAX_POLL_ATTEMPTS = 12 // 12 attempts * 5 seconds = 60 seconds max
+        const MAX_POLL_ATTEMPTS = 24 // 24 attempts * 5 seconds = 120 seconds max
         let pollAttempts = 0
         let syncCompleted = false
         
         const pollForCompletion = async () => {
           if (pollAttempts >= MAX_POLL_ATTEMPTS) {
-            console.warn('⚠️ [SYNC] Polling timeout reached (60 seconds)')
-            showToast('Sync is taking longer than expected. Please refresh in a moment.', 'warning')
-            setIsSyncingListings(false)
+            console.warn('⚠️ [SYNC] Polling timeout reached (120 seconds)')
+            showToast('Sync is taking longer than expected. Use "Manual Refresh" button to check status.', 'warning')
+            // Keep syncing state active - don't clear it yet
             // Final attempt to fetch stats
-            await fetchSummaryStats()
+            try {
+              await fetchSummaryStats()
+            } catch (err) {
+              console.error('❌ [SYNC] Final fetch failed:', err)
+            }
             return
           }
           
@@ -370,11 +374,12 @@ function Dashboard() {
           
           try {
             // Poll summary stats to check if sync completed
+            // Increased timeout to 120 seconds to prevent ECONNABORTED errors
             const summaryResponse = await apiClient.get(`/api/ebay/summary`, {
               params: {
                 filters: JSON.stringify(filters)
               },
-              timeout: 60000,  // 60 seconds timeout
+              timeout: 120000,  // 120 seconds timeout (2 minutes)
             })
             
             if (summaryResponse.data && summaryResponse.data.success) {
@@ -391,9 +396,9 @@ function Dashboard() {
                 lastSyncAt: lastSyncAt
               })
               
-              // Check if sync completed (activeCount > 0 or lastSyncAt updated)
-              if (activeCount > 0 || (lastSyncAt && new Date(lastSyncAt) > new Date(Date.now() - 120000))) {
-                // Sync completed (has listings or recent sync timestamp)
+              // Check if sync completed (REAL count > 0 - this is the critical check)
+              if (activeCount > 0) {
+                // Sync completed - REAL count > 0
                 console.log(`✅ [SYNC] Background sync completed: ${activeCount} active listings found`)
                 showToast(`Sync completed: ${activeCount} active listings`, 'success')
                 syncCompleted = true
@@ -402,8 +407,9 @@ function Dashboard() {
                 await fetchSummaryStats()
                 return
               } else {
-                // Still syncing, continue polling
+                // Still syncing (count is still 0), continue polling
                 console.log(`ℹ️ [SYNC] Sync in progress... (activeCount: ${activeCount}, attempt ${pollAttempts})`)
+                // Keep syncing state active until count > 0
                 setTimeout(pollForCompletion, 5000) // Poll again in 5 seconds
               }
             } else {
@@ -412,16 +418,43 @@ function Dashboard() {
               setTimeout(pollForCompletion, 5000)
             }
           } catch (pollErr) {
-            console.error(`❌ [SYNC] Polling error (attempt ${pollAttempts}):`, pollErr)
-            // Continue polling on error (network issues, etc.)
-            if (pollAttempts < MAX_POLL_ATTEMPTS) {
-              setTimeout(pollForCompletion, 5000)
+            // Handle ECONNABORTED and other errors gracefully
+            const isTimeout = pollErr.code === 'ECONNABORTED' || pollErr.message?.includes('timeout')
+            const isNetworkError = pollErr.message?.includes('Network Error') || !pollErr.response
+            
+            if (isTimeout || isNetworkError) {
+              console.warn(`⚠️ [SYNC] Polling timeout/network error (attempt ${pollAttempts}):`, pollErr.message || pollErr.code)
+              // Continue polling on timeout/network errors
+              if (pollAttempts < MAX_POLL_ATTEMPTS) {
+                console.log(`🔄 [SYNC] Retrying poll in 5 seconds...`)
+                setTimeout(pollForCompletion, 5000)
+              } else {
+                // Max attempts reached
+                console.error('❌ [SYNC] Max polling attempts reached after timeout/network errors')
+                showToast('Sync status check timed out. Use "Manual Refresh" button to check status.', 'warning')
+                // Keep syncing state - don't clear it
+                try {
+                  await fetchSummaryStats()
+                } catch (err) {
+                  console.error('❌ [SYNC] Final fetch failed:', err)
+                }
+              }
             } else {
-              // Max attempts reached
-              console.error('❌ [SYNC] Max polling attempts reached')
-              showToast('Sync status check failed. Please refresh manually.', 'error')
-              setIsSyncingListings(false)
-              await fetchSummaryStats()
+              // Other errors (4xx, 5xx)
+              console.error(`❌ [SYNC] Polling error (attempt ${pollAttempts}):`, pollErr)
+              // Continue polling on other errors too (backend might be busy)
+              if (pollAttempts < MAX_POLL_ATTEMPTS) {
+                setTimeout(pollForCompletion, 5000)
+              } else {
+                console.error('❌ [SYNC] Max polling attempts reached')
+                showToast('Sync status check failed. Use "Manual Refresh" button.', 'error')
+                // Keep syncing state - don't clear it
+                try {
+                  await fetchSummaryStats()
+                } catch (err) {
+                  console.error('❌ [SYNC] Final fetch failed:', err)
+                }
+              }
             }
           }
         }
@@ -512,11 +545,12 @@ function Dashboard() {
       console.log('   - filters JSON stringified:', JSON.stringify(filters))
       
       // Use apiClient for requests requiring JWT authentication (Authorization header automatically added)
+      // Increased timeout to 120 seconds to prevent ECONNABORTED errors during sync
       const response = await apiClient.get(`/api/ebay/summary`, {
         params: {
           filters: JSON.stringify(filters) // Pass filter parameters
         },
-        // Use apiClient's default timeout(60000), not specified here
+        timeout: 120000,  // 120 seconds timeout (2 minutes) - prevent timeout during background sync
       })
       
       // 🔍 STEP 3: Summary aggregation logic check - verify query conditions and results
