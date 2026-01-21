@@ -1704,22 +1704,10 @@ def export_zombies_to_csv(zombie_listings: List[Listing]) -> str:
         # Extract supplier_name (uppercase for consistency)
         supplier_name = (listing.supplier_name if hasattr(listing, 'supplier_name') else "Unknown").upper()
         
-        # Generate listing_url: Try to extract from raw_data first, otherwise generate eBay URL
+        # Generate listing_url: Always generate eBay URL (don't access raw_data to avoid AttributeError)
         listing_url = ""
         if item_id:
-            # Try to get URL from raw_data if available
-            if hasattr(listing, 'raw_data') and listing.raw_data:
-                raw_data = listing.raw_data
-                if isinstance(raw_data, dict):
-                    listing_url = raw_data.get('listing_url') or raw_data.get('url') or raw_data.get('viewItemURL') or ""
-                elif isinstance(raw_data, str):
-                    try:
-                        parsed_data = json.loads(raw_data)
-                        listing_url = parsed_data.get('listing_url') or parsed_data.get('url') or parsed_data.get('viewItemURL') or ""
-                    except:
-                        pass
-            
-            # If no URL found in raw_data, generate eBay URL
+            # Always generate eBay URL (raw_data access removed to prevent AttributeError)
             if not listing_url:
                 # Format: https://www.ebay.com/itm/{item_id}
                 listing_url = f"https://www.ebay.com/itm/{item_id}"
@@ -1939,14 +1927,8 @@ def generate_export_csv(
             supplier_id = (listing.supplier_id if hasattr(listing, 'supplier_id') and listing.supplier_id else None) or ""
             supplier_name = (listing.supplier_name if hasattr(listing, 'supplier_name') and listing.supplier_name else None) or (listing.supplier if hasattr(listing, 'supplier') and listing.supplier else None) or (listing.source if hasattr(listing, 'source') and listing.source else None) or "Unknown"
             platform = (listing.platform if hasattr(listing, 'platform') and listing.platform else None) or (listing.marketplace if hasattr(listing, 'marketplace') and listing.marketplace else None) or ""
-            # Try to get handle from raw_data
-            raw_data = listing.raw_data if hasattr(listing, 'raw_data') and listing.raw_data else {}
-            if isinstance(raw_data, str):
-                try:
-                    raw_data = json.loads(raw_data)
-                except:
-                    raw_data = {}
-            handle = (raw_data.get("handle") if raw_data and isinstance(raw_data, dict) else None) or sku
+            # Use SKU as handle (raw_data access removed to prevent AttributeError)
+            handle = sku
         
         # Build row data based on format schema mappings
         row = {}
