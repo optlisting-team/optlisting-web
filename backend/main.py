@@ -44,8 +44,9 @@ def validate_supabase_env():
     import logging
     logger = logging.getLogger(__name__)
     
-    supabase_url = os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL")
-    supabase_key = os.getenv("SUPABASE_ANON_KEY") or os.getenv("VITE_SUPABASE_ANON_KEY")
+    # Environment variables with safe fallbacks to prevent crashes
+    supabase_url = os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL") or ""
+    supabase_key = os.getenv("SUPABASE_ANON_KEY") or os.getenv("VITE_SUPABASE_ANON_KEY") or ""
     
     if not supabase_url or not supabase_key:
         error_msg = (
@@ -93,8 +94,9 @@ def run_supabase_self_test():
         print("[BOOT] Starting Supabase write self-test...")
         
         # Log SUPABASE_URL / DATABASE_URL (masked for security)
-        DATABASE_URL = os.getenv("DATABASE_URL", "")
-        SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+        # Environment variables with safe fallbacks
+        DATABASE_URL = os.getenv("DATABASE_URL", "") or ""
+        SUPABASE_URL = os.getenv("SUPABASE_URL", "") or ""
         
         if DATABASE_URL:
             # Mask password in URL for logging
@@ -252,7 +254,8 @@ allowed_origins = [
 ]
 
 # Add environment variable for additional frontend URLs if provided
-frontend_url = os.getenv("FRONTEND_URL", "")
+# Environment variables with safe fallbacks
+frontend_url = os.getenv("FRONTEND_URL", "") or ""
 if frontend_url:
     # Remove trailing slash for consistency
     frontend_url_clean = frontend_url.rstrip("/")
@@ -2501,6 +2504,7 @@ async def create_checkout(
     import requests
     logger = logging.getLogger(__name__)
     variant_id = request.variant_id
+    # user_id is extracted from JWT via Depends(get_current_user), not from request body
     
     # Environment variables with safe fallbacks to prevent crashes
     LS_API_KEY = os.getenv("LEMON_SQUEEZY_API_KEY") or ""
