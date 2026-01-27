@@ -7,19 +7,17 @@ import { Check } from 'lucide-react'
 const LEMON_SQUEEZY_STORE = import.meta.env.VITE_LEMON_SQUEEZY_STORE || 'https://optlisting.lemonsqueezy.com'
 
 // Professional Plan - $120/month
-// IMPORTANT: Update these IDs with actual values from Lemon Squeezy Dashboard
-// Get product_id and variant_id from: Lemon Squeezy Dashboard > Products > Professional Plan
+// CRITICAL: Use numeric IDs only (no string slugs) to avoid 404 errors
+// Product ID: 795931, Variant ID: 1255285
 const PROFESSIONAL_PLAN = {
   id: 'professional',
   name: 'Professional Plan',
   price: 120,
   billing: 'month',
-  // Environment variables for Lemon Squeezy product and variant IDs
-  // Set these in Vercel/Railway environment variables:
-  // VITE_LEMON_SQUEEZY_PRODUCT_ID=your_product_id
-  // VITE_LEMON_SQUEEZY_VARIANT_ID=your_variant_id
-  product_id: import.meta.env.VITE_LEMON_SQUEEZY_PRODUCT_ID || '',
-  variant_id: import.meta.env.VITE_LEMON_SQUEEZY_VARIANT_ID || '',
+  // Numeric IDs with fallback to hardcoded values (prevents 404 errors)
+  // Environment variables override, but fallback ensures checkout always works
+  product_id: import.meta.env.VITE_LEMON_SQUEEZY_PRODUCT_ID || '795931',
+  variant_id: import.meta.env.VITE_LEMON_SQUEEZY_VARIANT_ID || '1255285',
   features: [
     'Unlimited eBay listings analysis',
     'Advanced zombie detection algorithms',
@@ -48,18 +46,28 @@ export default function Pricing() {
       return null
     }
     
-    // Validate product_id and variant_id are configured
-    if (!PROFESSIONAL_PLAN.product_id || !PROFESSIONAL_PLAN.variant_id) {
-      console.error('❌ [CHECKOUT] Lemon Squeezy product_id or variant_id not configured')
-      console.error('   Please set VITE_LEMON_SQUEEZY_PRODUCT_ID and VITE_LEMON_SQUEEZY_VARIANT_ID environment variables')
-      return null
+    // CRITICAL: Force numeric IDs with fallback to prevent 404 errors
+    // Always use numeric product_id (795931) in URL path, NOT a string slug
+    let productId = String(PROFESSIONAL_PLAN.product_id || '795931').trim()
+    let variantId = String(PROFESSIONAL_PLAN.variant_id || '1255285').trim()
+    
+    // Verify IDs are numeric (not string slugs) - use fallback if invalid
+    if (isNaN(Number(productId)) || productId === '') {
+      console.warn('⚠️ [CHECKOUT] Product ID is not numeric, using fallback: 795931')
+      productId = '795931'
+    }
+    if (isNaN(Number(variantId)) || variantId === '') {
+      console.warn('⚠️ [CHECKOUT] Variant ID is not numeric, using fallback: 1255285')
+      variantId = '1255285'
     }
     
     // Lemon Squeezy checkout URL format for subscriptions
+    // Final URL format: https://optlisting.lemonsqueezy.com/checkout/buy/795931?checkout[variant_id]=1255285&checkout[custom][user_id]=...
     // Documentation: https://docs.lemonsqueezy.com/help/checkout/checkout-custom-fields
-    const baseUrl = `${LEMON_SQUEEZY_STORE}/checkout/buy/${PROFESSIONAL_PLAN.product_id}`
+    
+    const baseUrl = `${LEMON_SQUEEZY_STORE}/checkout/buy/${productId}`
     const params = new URLSearchParams({
-      'checkout[variant_id]': PROFESSIONAL_PLAN.variant_id,
+      'checkout[variant_id]': variantId,
       'checkout[custom][user_id]': userId,
     })
     
@@ -70,10 +78,11 @@ export default function Pricing() {
     
     const checkoutUrl = `${baseUrl}?${params.toString()}`
     console.log('🔗 [CHECKOUT] Generated checkout URL:', checkoutUrl)
-    console.log('   Product ID:', PROFESSIONAL_PLAN.product_id)
-    console.log('   Variant ID:', PROFESSIONAL_PLAN.variant_id)
+    console.log('   Product ID (numeric):', productId)
+    console.log('   Variant ID (numeric):', variantId)
     console.log('   User ID:', userId)
     console.log('   Email:', userEmail || 'not provided')
+    console.log('   URL Structure:', `checkout/buy/${productId}?checkout[variant_id]=${variantId}`)
     return checkoutUrl
   }
 
@@ -84,12 +93,8 @@ export default function Pricing() {
       return
     }
     
-    // Check if IDs are configured before attempting checkout
-    if (!PROFESSIONAL_PLAN.product_id || !PROFESSIONAL_PLAN.variant_id) {
-      console.error('❌ [CHECKOUT] Lemon Squeezy product_id or variant_id not configured')
-      alert('Checkout configuration error. Please contact support.')
-      return
-    }
+    // IDs are always available due to fallback values (795931, 1255285)
+    // No need to check - fallback ensures checkout always works
     
     setLoading(true)
     const checkoutUrl = generateCheckoutUrl()
