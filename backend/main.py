@@ -48,6 +48,12 @@ def validate_supabase_env():
     supabase_url = os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL") or ""
     supabase_key = os.getenv("SUPABASE_ANON_KEY") or os.getenv("VITE_SUPABASE_ANON_KEY") or ""
     
+    # Warning logs for missing critical configuration
+    if not supabase_url:
+        logger.warning("⚠️ [CONFIG] SUPABASE_URL and VITE_SUPABASE_URL are not set. Authentication will fail.")
+    if not supabase_key:
+        logger.warning("⚠️ [CONFIG] SUPABASE_ANON_KEY and VITE_SUPABASE_ANON_KEY are not set. Authentication will fail.")
+    
     if not supabase_url or not supabase_key:
         error_msg = (
             "❌ CRITICAL: Supabase credentials not configured!\n"
@@ -2510,6 +2516,12 @@ async def create_checkout(
     LS_API_KEY = os.getenv("LEMON_SQUEEZY_API_KEY") or ""
     LS_STORE_ID = os.getenv("LEMON_SQUEEZY_STORE_ID") or ""
     APP_URL = os.getenv("APP_URL", "https://optlisting.com")
+    
+    # Warning logs for missing critical configuration
+    if not LS_API_KEY:
+        logger.warning("⚠️ [CONFIG] LEMON_SQUEEZY_API_KEY is not set. Checkout creation will fail.")
+    if not LS_STORE_ID:
+        logger.warning("⚠️ [CONFIG] LEMON_SQUEEZY_STORE_ID is not set. Checkout creation will fail.")
     
     if not LS_API_KEY or not LS_STORE_ID:
         raise HTTPException(

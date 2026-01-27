@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 # Environment variables with safe fallbacks
 LS_WEBHOOK_SECRET = os.getenv("LEMON_SQUEEZY_WEBHOOK_SECRET") or os.getenv("LS_WEBHOOK_SECRET") or ""
 
+# Warning log for missing webhook secret
+if not LS_WEBHOOK_SECRET:
+    logger.warning("⚠️ [CONFIG] LEMON_SQUEEZY_WEBHOOK_SECRET is not set. Webhook signature verification will fail.")
+
 # 플랜별 리스팅 제한
 PLAN_LIMITS = {
     "pro": 999999,  # Pro 플랜: 실질적으로 무제한
@@ -181,13 +185,28 @@ def handle_subscription_created(db: Session, event_data: Dict) -> bool:
         subscription_id = subscription.get('id') or event_data.get('data', {}).get('id')
         
         # Extract user_id from custom_data or meta
-        # LS typically includes user_id in custom_data
+        # LS typically includes user_id in custom_data passed during checkout
+        # Check multiple paths: data.attributes.custom_data, meta.custom_data, checkout_data.custom
         custom_data = subscription.get('custom_data', {})
-        user_id = custom_data.get('user_id') or subscription.get('user_id')
+        if isinstance(custom_data, str):
+            try:
+                custom_data = json.loads(custom_data)
+            except:
+                custom_data = {}
+        
+        user_id = (
+            custom_data.get('user_id') or 
+            subscription.get('user_id') or
+            event_data.get('meta', {}).get('custom_data', {}).get('user_id')
+        )
         
         if not user_id:
-            logger.error("subscription_created: user_id not found in webhook payload")
+            logger.error("❌ [WEBHOOK] subscription_created: user_id not found in webhook payload")
+            logger.error(f"   Payload structure: data.attributes.custom_data={subscription.get('custom_data')}")
+            logger.error(f"   Payload structure: meta.custom_data={event_data.get('meta', {}).get('custom_data')}")
             return False
+        
+        logger.info(f"✅ [WEBHOOK] subscription_created: Extracted user_id={user_id} from webhook payload")
         
         # Get or create profile
         profile = get_or_create_profile(db, user_id)
@@ -200,7 +219,10 @@ def handle_subscription_created(db: Session, event_data: Dict) -> bool:
         profile.total_listings_limit = PLAN_LIMITS['pro']
         
         db.commit()
-        logger.info(f"✅ Subscription created successfully: user_id={user_id}, subscription_id={subscription_id}, plan=professional")
+        db.refresh(profile)  # Refresh to ensure changes are visible
+        
+        logger.info(f"✅ [WEBHOOK] Subscription created successfully: user_id={user_id}, subscription_id={subscription_id}, plan=professional, status=active")
+        logger.info(f"   Profile updated: subscription_plan={profile.subscription_plan}, subscription_status={profile.subscription_status}")
         return True
         
     except SQLAlchemyError as e:
