@@ -227,6 +227,11 @@ def get_db():
 
 
 def init_db():
-    """Initialize database tables"""
-    Base.metadata.create_all(bind=engine)
-    db_logger.info("Database tables initialized successfully")
+    """Initialize database tables with error handling"""
+    try:
+        Base.metadata.create_all(bind=engine)
+        db_logger.info("Database tables initialized successfully")
+    except Exception as e:
+        db_logger.error(f"❌ CRITICAL: Database initialization failed: {str(e)}", exc_info=True)
+        # Re-raise to allow caller to handle
+        raise

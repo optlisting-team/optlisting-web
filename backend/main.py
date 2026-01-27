@@ -412,9 +412,17 @@ def startup_event():
         # Create tables if they don't exist (works for both SQLite and Supabase)
         print("Creating database tables if they don't exist...")
         logger.info("[STARTUP] Creating database tables if they don't exist...")
-        Base.metadata.create_all(bind=engine)
-        print("Database tables created/verified successfully")
-        logger.info("[STARTUP] Database tables created/verified successfully")
+        try:
+            Base.metadata.create_all(bind=engine)
+            print("Database tables created/verified successfully")
+            logger.info("[STARTUP] Database tables created/verified successfully")
+        except Exception as db_init_error:
+            error_msg = f"[STARTUP] ❌ CRITICAL: Database initialization failed: {str(db_init_error)}"
+            logger.error(error_msg, exc_info=True)
+            print(error_msg)
+            # Don't crash - allow server to start but log the error
+            # The database connection will be tested on first request
+            logger.warning("[STARTUP] Server will continue to start, but database operations may fail")
         
         # ✅ 자동 정리 로직: 서버 시작 시 유효하지 않은 user_id 데이터 정리
         try:
@@ -1776,7 +1784,17 @@ def create_dummy_data(
 ):
     """Generate dummy listings for testing with new hybrid schema"""
     # Ensure tables exist before attempting to delete
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as db_init_error:
+        logger.error(f"❌ Database initialization failed in dummy data endpoint: {str(db_init_error)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "database_initialization_failed",
+                "message": f"Failed to initialize database: {str(db_init_error)}"
+            }
+        )
     
     # Clear all existing listings before generating new dummy data
     db.query(Listing).delete()
