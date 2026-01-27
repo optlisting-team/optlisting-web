@@ -72,7 +72,8 @@ function LandingPage() {
     // Final URL format: https://optlisting.lemonsqueezy.com/buy/795931?checkout[variant_id]=1255285&checkout[custom][user_id]=...
     // Documentation: https://docs.lemonsqueezy.com/help/checkout/checkout-custom-fields
     
-    const baseUrl = `${LEMON_SQUEEZY_STORE}/checkout/buy/${productId}`
+    // Use /buy/{product_id} for hosted checkout (direct redirect, no overlay)
+    const baseUrl = `${LEMON_SQUEEZY_STORE}/buy/${productId}`
     const params = new URLSearchParams({
       'checkout[variant_id]': variantId,
       'checkout[custom][user_id]': userId,
