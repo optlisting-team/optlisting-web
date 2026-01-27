@@ -2,10 +2,12 @@ import { useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import { Bell, RefreshCw, User, ChevronDown } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useAccount } from '../contexts/AccountContext'
 
 function PageHeader() {
   const location = useLocation()
   const { user, isAuthenticated, signOut } = useAuth()
+  const { subscriptionStatus, plan } = useAccount()
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [showAuthMenu, setShowAuthMenu] = useState(false)
 
@@ -105,8 +107,8 @@ function PageHeader() {
               </span>
             </button>
 
-            {/* Pro Plan: Active Badge */}
-            {isAuthenticated && (
+            {/* Pro Plan: Active Badge - Show only when subscription is active */}
+            {isAuthenticated && subscriptionStatus === 'active' && plan === 'PROFESSIONAL' && (
               <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 border border-emerald-500/30 rounded-xl shadow-lg">
                 <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
                 <span className="text-sm font-bold text-white">Pro Plan: Active</span>

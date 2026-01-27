@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useAccount } from '../contexts/AccountContext'
 import { Check } from 'lucide-react'
 
 // Lemon Squeezy Store URL
@@ -33,6 +34,7 @@ const PROFESSIONAL_PLAN = {
 
 export default function Pricing() {
   const { user } = useAuth()
+  const { subscriptionStatus, plan, refreshSubscription } = useAccount()
   const [loading, setLoading] = useState(false)
 
   // Generate Lemon Squeezy Checkout link for $120/month Professional subscription
@@ -149,20 +151,26 @@ export default function Pricing() {
               ))}
             </ul>
 
-            {/* Subscribe Button */}
-            <button
-              onClick={handleSubscribe}
-              disabled={loading || !user}
-              className={`
-                w-full py-4 rounded-xl font-bold text-lg transition-all duration-200
-                ${loading || !user
-                  ? 'bg-zinc-700 text-zinc-400 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02]'
-                }
-              `}
-            >
-              {loading ? 'Processing...' : !user ? 'Please log in to subscribe' : 'Subscribe to Professional Plan - $120/month'}
-            </button>
+            {/* Subscribe Button or Active Status */}
+            {subscriptionStatus === 'active' && plan === 'PROFESSIONAL' ? (
+              <div className="w-full py-4 rounded-xl font-bold text-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg text-center">
+                ✓ Active Plan - Professional
+              </div>
+            ) : (
+              <button
+                onClick={handleSubscribe}
+                disabled={loading || !user}
+                className={`
+                  w-full py-4 rounded-xl font-bold text-lg transition-all duration-200
+                  ${loading || !user
+                    ? 'bg-zinc-700 text-zinc-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02]'
+                  }
+                `}
+              >
+                {loading ? 'Processing...' : !user ? 'Please log in to subscribe' : 'Subscribe to Professional Plan - $120/month'}
+              </button>
+            )}
 
             {/* Notice */}
             <div className="mt-6 text-center text-zinc-400 text-sm">

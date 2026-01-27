@@ -2471,22 +2471,25 @@ async def lemonsqueezy_webhook(request: Request, db: Session = Depends(get_db)):
                 content={"status": "error", "message": "Invalid JSON"}
             )
         
-        # 이벤트 처리
+        # Event processing with enhanced logging
         try:
+            event_name = event_data.get('meta', {}).get('event_name', 'unknown')
+            logger.info(f"🔄 [WEBHOOK] Processing event: {event_name}")
+            
             success = process_webhook_event(db, event_data)
             
             if success:
-                logger.info("웹훅 이벤트 처리 성공")
+                logger.info(f"✅ [WEBHOOK] Event processed successfully: {event_name}")
                 return JSONResponse(
                     status_code=200,
-                    content={"status": "success", "message": "Webhook processed"}
+                    content={"status": "success", "message": "Webhook processed", "event": event_name}
                 )
             else:
-                logger.warning("웹훅 이벤트 처리 실패 (로깅됨)")
-                # 안정성: 처리 실패해도 200 OK 반환 (에러는 로깅됨)
+                logger.warning(f"⚠️ [WEBHOOK] Event processing failed (logged): {event_name}")
+                # Stability: Return 200 OK even on failure (errors are logged)
                 return JSONResponse(
                     status_code=200,
-                    content={"status": "error", "message": "Processing failed (logged)"}
+                    content={"status": "error", "message": "Processing failed (logged)", "event": event_name}
                 )
                 
         except Exception as e:

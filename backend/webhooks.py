@@ -201,12 +201,20 @@ def handle_subscription_created(db: Session, event_data: Dict) -> bool:
         )
         
         if not user_id:
-            logger.error("❌ [WEBHOOK] subscription_created: user_id not found in webhook payload")
-            logger.error(f"   Payload structure: data.attributes.custom_data={subscription.get('custom_data')}")
-            logger.error(f"   Payload structure: meta.custom_data={event_data.get('meta', {}).get('custom_data')}")
+            # HIGH-PRIORITY ERROR: Full payload logging for manual intervention
+            logger.error("🚨 [WEBHOOK] CRITICAL: subscription_created - user_id not found in webhook payload")
+            logger.error("🚨 [WEBHOOK] FULL PAYLOAD DUMP (for manual user_id extraction):")
+            logger.error(f"   Full event_data: {json.dumps(event_data, indent=2, default=str)}")
+            logger.error(f"   data.attributes.custom_data: {subscription.get('custom_data')}")
+            logger.error(f"   meta.custom_data: {event_data.get('meta', {}).get('custom_data')}")
+            logger.error(f"   subscription_id: {subscription_id}")
+            logger.error(f"   customer_id: {customer_id}")
+            logger.error("🚨 [WEBHOOK] ACTION REQUIRED: Manually extract user_id from payload above and update profile")
             return False
         
         logger.info(f"✅ [WEBHOOK] subscription_created: Extracted user_id={user_id} from webhook payload")
+        logger.info(f"   Product ID: 795931, Variant ID: 1255285 (for verification)")
+        logger.info(f"   subscription_id: {subscription_id}, customer_id: {customer_id}")
         
         # Get or create profile
         profile = get_or_create_profile(db, user_id)
@@ -221,8 +229,21 @@ def handle_subscription_created(db: Session, event_data: Dict) -> bool:
         db.commit()
         db.refresh(profile)  # Refresh to ensure changes are visible
         
+        # Database verification: Confirm the update was successful
         logger.info(f"✅ [WEBHOOK] Subscription created successfully: user_id={user_id}, subscription_id={subscription_id}, plan=professional, status=active")
         logger.info(f"   Profile updated: subscription_plan={profile.subscription_plan}, subscription_status={profile.subscription_status}")
+        logger.info(f"   Database verification: ls_subscription_id={profile.ls_subscription_id}, ls_customer_id={profile.ls_customer_id}")
+        
+        # Verify database update was successful
+        verification_profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+        if verification_profile:
+            if verification_profile.subscription_plan == 'professional' and verification_profile.subscription_status == 'active':
+                logger.info(f"✅ [WEBHOOK] Database verification PASSED: Profile correctly updated in database")
+            else:
+                logger.error(f"❌ [WEBHOOK] Database verification FAILED: subscription_plan={verification_profile.subscription_plan}, subscription_status={verification_profile.subscription_status}")
+        else:
+            logger.error(f"❌ [WEBHOOK] Database verification FAILED: Profile not found after update")
+        
         return True
         
     except SQLAlchemyError as e:
