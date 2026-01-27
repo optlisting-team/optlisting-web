@@ -1870,7 +1870,7 @@ async def upload_supplier_csv(
                 file_name=file.filename,
                 file_size=len(content),
                 estimated_rows=estimated_rows,
-                metadata={'dry_run': dry_run}
+                task_metadata={'dry_run': dry_run}
             )
             db.add(task)
             db.commit()

@@ -177,8 +177,8 @@ class CSVProcessingTask(Base):
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     
-    # Metadata
-    metadata = Column(JSONB, nullable=True)  # Additional task metadata
+    # Task metadata (renamed from 'metadata' to avoid SQLAlchemy reserved keyword conflict)
+    task_metadata = Column(JSONB, nullable=True)  # Additional task metadata
 
     def __repr__(self):
         return f"<CSVProcessingTask(task_id={self.task_id}, status={self.status}, user_id={self.user_id})>"
