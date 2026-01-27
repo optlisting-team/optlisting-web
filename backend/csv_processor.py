@@ -150,9 +150,9 @@ class SupplierCSVParser:
         errors: List[Dict[str, Any]] = []
         
         try:
-            # 인코딩 시도 (UTF-8 -> CP949 -> Latin-1)
+            # Encoding detection: UTF-8-BOM, UTF-8, Latin-1 (optimized for US eBay data)
             content_str = None
-            for enc in ['utf-8', 'utf-8-sig', 'cp949', 'euc-kr', 'latin-1']:
+            for enc in ['utf-8-sig', 'utf-8', 'latin-1', 'cp949', 'euc-kr']:
                 try:
                     content_str = self.file_content.decode(enc)
                     self.encoding = enc

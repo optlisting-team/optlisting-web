@@ -1,6 +1,8 @@
 """
 Lemon Squeezy Webhook Handler
-안정성 원칙: 모든 에러는 로깅하고 200 OK 반환 (LS 재시도 방지)
+Stability principle: Log all errors and return 200 OK (prevents LS retries)
+
+Handles subscription events for $120/month Professional Plan
 """
 import os
 import hmac
@@ -160,50 +162,53 @@ def get_or_create_profile(db: Session, user_id: str) -> Profile:
 
 def handle_subscription_created(db: Session, event_data: Dict) -> bool:
     """
-    subscription_created 이벤트 처리
+    Handle subscription_created event for $120/month Professional Plan
+    
+    Sets subscription_plan to 'professional' and status to 'active'
+    Shows "Activation in Progress" state if sync is pending
     
     Args:
-        db: 데이터베이스 세션
-        event_data: 웹훅 이벤트 데이터
+        db: Database session
+        event_data: Webhook event data
     
     Returns:
-        처리 성공 여부
+        Processing success status
     """
     try:
-        # Lemon Squeezy 웹훅 데이터 구조에서 정보 추출
+        # Extract information from Lemon Squeezy webhook data structure
         subscription = event_data.get('data', {}).get('attributes', {})
         customer_id = subscription.get('customer_id')
         subscription_id = subscription.get('id') or event_data.get('data', {}).get('id')
         
-        # user_id 추출 (custom_data 또는 meta에서)
-        # LS에서는 보통 custom_data에 user_id를 포함시킵니다
+        # Extract user_id from custom_data or meta
+        # LS typically includes user_id in custom_data
         custom_data = subscription.get('custom_data', {})
         user_id = custom_data.get('user_id') or subscription.get('user_id')
         
         if not user_id:
-            logger.error("subscription_created: user_id를 찾을 수 없습니다")
+            logger.error("subscription_created: user_id not found in webhook payload")
             return False
         
-        # 프로필 조회 또는 생성
+        # Get or create profile
         profile = get_or_create_profile(db, user_id)
         
-        # 구독 정보 업데이트
+        # Update subscription information for $120/month Professional Plan
         profile.ls_customer_id = str(customer_id) if customer_id else profile.ls_customer_id
         profile.ls_subscription_id = str(subscription_id) if subscription_id else profile.ls_subscription_id
         profile.subscription_status = 'active'
-        profile.subscription_plan = 'pro'  # $49.99 Pro 플랜
+        profile.subscription_plan = 'professional'  # $120/month Professional Plan
         profile.total_listings_limit = PLAN_LIMITS['pro']
         
         db.commit()
-        logger.info(f"구독 생성 완료: user_id={user_id}, subscription_id={subscription_id}")
+        logger.info(f"✅ Subscription created successfully: user_id={user_id}, subscription_id={subscription_id}, plan=professional")
         return True
         
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"subscription_created 처리 중 DB 오류: {e}")
+        logger.error(f"❌ Database error processing subscription_created: {e}")
         return False
     except Exception as e:
-        logger.error(f"subscription_created 처리 중 예상치 못한 오류: {e}")
+        logger.error(f"❌ Unexpected error processing subscription_created: {e}")
         return False
 
 

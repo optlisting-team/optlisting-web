@@ -1883,11 +1883,29 @@ async def upload_supplier_csv(
         # Quick row count estimation (rough: ~100 bytes per row average)
         estimated_rows = len(content) // 100
         
-        # For large files (>= 1000 rows), process asynchronously
+        # For large files (>= 1000 rows), process asynchronously with persistent queue
         if estimated_rows >= 1000:
-            # Start background task
-            task_id = f"csv_{user_id}_{dt.utcnow().timestamp()}"
-            asyncio.create_task(_process_csv_background(content, user_id, dry_run, task_id))
+            from .models import CSVProcessingTask
+            from uuid import uuid4
+            
+            # Create persistent task record in database
+            task_id = f"csv_{user_id}_{uuid4().hex[:8]}"
+            task = CSVProcessingTask(
+                task_id=task_id,
+                user_id=user_id,
+                status='queued',
+                file_name=file.filename,
+                file_size=len(content),
+                estimated_rows=estimated_rows,
+                metadata={'dry_run': dry_run}
+            )
+            db.add(task)
+            db.commit()
+            db.refresh(task)
+            
+            # Start background task (will update task status in DB)
+            # Note: Pass None for db parameter - background task creates its own session
+            asyncio.create_task(_process_csv_background(content, user_id, dry_run, task_id, None))
             
             return CSVUploadResponse(
                 success=True,
@@ -1961,33 +1979,129 @@ async def _process_csv_background(
     file_content: bytes,
     user_id: str,
     dry_run: bool,
-    task_id: str
+    task_id: str,
+    db: Optional[Session] = None
 ):
     """
     Background CSV processing task for large files
     
-    Processes CSV asynchronously and logs results
+    Processes CSV asynchronously and updates persistent task state in database
+    Allows task recovery after server restarts
+    
+    Args:
+        file_content: CSV file content (bytes)
+        user_id: User ID
+        dry_run: Whether to perform dry run
+        task_id: Unique task identifier
+        db: Optional database session (creates new one if None)
     """
     import logging
+    from datetime import datetime as dt
+    from .models import CSVProcessingTask, SessionLocal
+    
     logger = logging.getLogger(__name__)
     
+    # Use a new database session for background task
+    task_db = SessionLocal() if db is None else db
+    
     try:
+        # Update task status to 'processing'
+        task = task_db.query(CSVProcessingTask).filter(CSVProcessingTask.task_id == task_id).first()
+        if task:
+            task.status = 'processing'
+            task.started_at = dt.utcnow()
+            task_db.commit()
+        else:
+            logger.warning(f"⚠️ [CSV QUEUE] Task {task_id} not found in database")
+        
         logger.info(f"🔄 [CSV QUEUE] Starting background processing for task {task_id}")
+        
+        # Process CSV
         result = process_supplier_csv(
             file_content=file_content,
             user_id=user_id,
             dry_run=dry_run
         )
+        
+        # Update task with results
+        if task:
+            task.status = 'completed'
+            task.completed_at = dt.utcnow()
+            task.total_rows = result.total_rows
+            task.valid_rows = result.valid_rows
+            task.invalid_rows = result.invalid_rows
+            task.matched_listings = result.matched_listings
+            task.updated_listings = result.updated_listings
+            task.processing_time_ms = result.processing_time_ms
+            task.error_details = {'errors': result.errors[:10]} if result.errors else None
+            task_db.commit()
+        
         logger.info(f"✅ [CSV QUEUE] Background processing complete for task {task_id}: {result.updated_listings} updated")
+        
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
         logger.error(f"❌ [CSV QUEUE] Background processing failed for task {task_id}: {str(e)}")
+        logger.error(f"❌ [CSV QUEUE] Error trace:\n{error_trace}")
+        
+        # Update task with error
+        if task:
+            task.status = 'failed'
+            task.completed_at = dt.utcnow()
+            task.error_message = str(e)
+            task.error_details = {'traceback': error_trace}
+            task_db.commit()
+    finally:
+        if db is None:  # Only close if we created the session
+            task_db.close()
+
+
+@app.get("/api/csv/task/{task_id}")
+def get_csv_task_status(
+    task_id: str,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get CSV processing task status
+    
+    Returns task status and results for async processing
+    """
+    from .models import CSVProcessingTask
+    
+    task = db.query(CSVProcessingTask).filter(
+        CSVProcessingTask.task_id == task_id,
+        CSVProcessingTask.user_id == user_id
+    ).first()
+    
+    if not task:
+        raise HTTPException(
+            status_code=404,
+            detail="Task not found"
+        )
+    
+    return {
+        "task_id": task.task_id,
+        "status": task.status,
+        "total_rows": task.total_rows,
+        "valid_rows": task.valid_rows,
+        "invalid_rows": task.invalid_rows,
+        "matched_listings": task.matched_listings,
+        "updated_listings": task.updated_listings,
+        "processing_time_ms": task.processing_time_ms,
+        "error_message": task.error_message,
+        "error_details": task.error_details,
+        "created_at": task.created_at.isoformat() if task.created_at else None,
+        "started_at": task.started_at.isoformat() if task.started_at else None,
+        "completed_at": task.completed_at.isoformat() if task.completed_at else None
+    }
 
 
 @app.get("/api/csv-template")
 def download_csv_template():
     """
-    공급처 CSV 템플릿 다운로드
-    사용자가 업로드할 CSV 형식 예시
+    Supplier CSV template download
+    Example CSV format for user uploads
     """
     template = generate_csv_template()
     

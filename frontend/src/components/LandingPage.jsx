@@ -6,21 +6,28 @@ import { useAuth } from '../contexts/AuthContext'
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from './ui/card'
 import { Button } from './ui/button'
 
-// Credit Pack Options - Each is a fixed price product for PG approval
-const CREDIT_PACKS = [
-  { id: 'credit-5', price: 5, credits: 1000, perScan: 0.005, discount: 0, label: 'Starter' },
-  { id: 'credit-10', price: 10, credits: 2200, perScan: 0.0045, discount: 10, label: 'Popular', popular: true },
-  { id: 'credit-15', price: 15, credits: 3400, perScan: 0.0044, discount: 13, label: 'Value' },
-  { id: 'credit-20', price: 20, credits: 5600, perScan: 0.0036, discount: 29, label: 'Best', best: true },
-  { id: 'credit-25', price: 25, credits: 7200, perScan: 0.0035, discount: 31, label: 'Pro' },
-  { id: 'credit-50', price: 50, credits: 16000, perScan: 0.0031, discount: 37, label: 'Business' },
-]
+// Professional Plan - $120/month
+const PROFESSIONAL_PLAN = {
+  id: 'professional',
+  name: 'Professional Plan',
+  price: 120,
+  billing: 'month',
+  features: [
+    'Unlimited eBay listings analysis',
+    'Advanced zombie detection algorithms',
+    'CSV export with supplier matching',
+    'Real-time sync with eBay API',
+    'Priority support',
+    'US market optimization',
+    'Asynchronous processing queue',
+    'Account health protection',
+    'Automated inventory cleaning'
+  ]
+}
 
 function LandingPage() {
   const { user, isAuthenticated, signOut } = useAuth()
   const navigate = useNavigate()
-  const [selectedPack, setSelectedPack] = useState(CREDIT_PACKS[0]) // Default to $5 Starter
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const profileRef = useRef(null)
 
@@ -508,7 +515,7 @@ function LandingPage() {
                 className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-sm font-semibold mb-6"
               >
                 <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                Hybrid Pricing
+                Premium Subscription
               </motion.span>
               <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
                 1 Hour → 5 Minutes
@@ -518,12 +525,7 @@ function LandingPage() {
               </p>
             </div>
 
-            {/* ═══════════════════════════════════════════════════════════════════ */}
-            {/* P1: Credit Pack Section (Pay-Per-Scan) - Volume Discount */}
-            {/* ═══════════════════════════════════════════════════════════════════ */}
-            {/* ═══════════════════════════════════════════════════════════════════ */}
-            {/* MVP: Credit Packs Only - Centered Layout */}
-            {/* ═══════════════════════════════════════════════════════════════════ */}
+            {/* Professional Plan - Single Tier */}
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -531,104 +533,47 @@ function LandingPage() {
               transition={{ delay: 0.2 }}
               className="flex justify-center"
             >
-              {/* Credit Packs Only - Centered, Larger Size */}
-              <div className="w-full max-w-2xl border-2 border-dashed border-amber-500/30 rounded-3xl p-8 md:p-10 bg-amber-500/5">
-                  {/* Credit Pack Header */}
-                  <div className="text-center mb-6">
-                    <div className="inline-flex items-center gap-2 px-5 py-2 bg-amber-500/20 rounded-full">
-                      <span className="text-base">💰</span>
-                      <span className="text-base font-bold text-amber-400">CREDIT PACKS</span>
-                    </div>
-                    <p className="text-zinc-400 text-sm mt-3">No subscription • Pay as you go</p>
+              <div className="w-full max-w-2xl border-2 border-emerald-500/50 rounded-3xl p-8 md:p-10 bg-gradient-to-br from-zinc-900 to-zinc-800 shadow-2xl">
+                {/* Professional Badge */}
+                <div className="text-center mb-8">
+                  <div className="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 rounded-full mb-4">
+                    <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                    <span className="text-base font-bold text-emerald-400">PROFESSIONAL PLAN</span>
                   </div>
-
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: 0.25 }}
-                    className="max-w-lg mx-auto"
-                  >
-                    <div className="bg-gradient-to-b from-amber-500/10 to-zinc-800/80 border-2 border-amber-500/40 rounded-2xl p-8 shadow-xl shadow-amber-500/10">
-                    {/* Dropdown Selector */}
-                    <div className="mb-6">
-                      <div className="relative">
-                        <button
-                          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                          className="w-full flex items-center justify-center gap-3 px-4 py-4 bg-zinc-900/80 border border-amber-500/30 rounded-xl text-white font-bold hover:border-amber-500/50 transition-all"
-                        >
-                          <span className="text-2xl font-black text-amber-400">${selectedPack.price}</span>
-                          <span className="text-base text-zinc-300">({selectedPack.credits.toLocaleString()})</span>
-                          <ChevronDown className={`w-5 h-5 text-zinc-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                        </button>
-
-                        {/* Dropdown Menu */}
-                        {isDropdownOpen && (
-                          <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl shadow-black/50 z-50 overflow-hidden">
-                            {CREDIT_PACKS.map((pack) => (
-                              <button
-                                key={pack.id}
-                                onClick={() => {
-                                  setSelectedPack(pack)
-                                  setIsDropdownOpen(false)
-                                }}
-                                className={`w-full flex items-center justify-between px-3 py-2 hover:bg-amber-500/10 transition-all border-b border-zinc-800 last:border-b-0 text-sm ${
-                                  selectedPack.id === pack.id ? 'bg-amber-500/15' : ''
-                                }`}
-                              >
-                                <span className="flex items-center gap-2">
-                                  <span className="font-bold text-amber-400">${pack.price}</span>
-                                  <span className="text-zinc-400">{pack.credits.toLocaleString()}</span>
-                                </span>
-                                {pack.discount > 0 && (
-                                  <span className="text-emerald-400 text-xs">{pack.discount}% OFF</span>
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Selected Pack Display */}
-                    <div className="text-center mb-5 p-4 bg-amber-500/10 rounded-lg">
-                      <div className="flex items-center justify-center gap-3">
-                        <span className="text-4xl font-black text-white">{selectedPack.credits.toLocaleString()}</span>
-                        <span className="text-base text-zinc-400">Credits</span>
-                        {selectedPack.discount > 0 && (
-                          <span className="text-emerald-400 text-sm font-bold">-{selectedPack.discount}%</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* 1 Credit = 1 Scan Notice */}
-                    <div className="text-center mb-5 py-3 px-4 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
-                      <span className="text-base text-zinc-400">💡</span>
-                      <span className="text-base font-semibold text-amber-400"> 1 Credit = 1 Scan</span>
-                    </div>
-
-                    {/* Features */}
-                    <div className="space-y-3 mb-6 text-sm">
-                      <div className="flex items-center gap-3">
-                        <Check className="w-5 h-5 text-amber-400 flex-shrink-0" />
-                        <span className="text-zinc-300">All Stores (We Support)</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Check className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-                        <span className="text-emerald-300">Never Expires ✨</span>
-                      </div>
-                    </div>
-
-                    {/* Purchase Button */}
-                    <a
-                      href={`https://optlisting.lemonsqueezy.com/checkout/${selectedPack.id}`}
-                      className="block w-full py-4 bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-white font-bold rounded-xl text-center text-base transition-all shadow-lg shadow-amber-500/20"
-                    >
-                      Get Credits — ${selectedPack.price}
-                    </a>
-                    </div>
-                  </motion.div>
+                  <h3 className="text-3xl font-bold text-white mb-2">{PROFESSIONAL_PLAN.name}</h3>
+                  <div className="mb-4">
+                    <span className="text-6xl font-black text-white">${PROFESSIONAL_PLAN.price}</span>
+                    <span className="text-xl text-zinc-400 ml-2">/{PROFESSIONAL_PLAN.billing}</span>
+                  </div>
+                  <p className="text-zinc-400 text-lg">
+                    Account Health Protection & Automated Inventory Cleaning for US eBay Professionals
+                  </p>
                 </div>
+
+                {/* Features List */}
+                <div className="space-y-4 mb-8">
+                  {PROFESSIONAL_PLAN.features.map((feature, index) => (
+                    <div key={index} className="flex items-start gap-3">
+                      <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                      <span className="text-zinc-300">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Subscribe Button */}
+                <a
+                  href="https://optlisting.lemonsqueezy.com/checkout/buy/professional-plan"
+                  className="block w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl text-center text-lg transition-all shadow-lg shadow-emerald-500/20 hover:shadow-xl hover:scale-[1.02]"
+                >
+                  Subscribe Now — ${PROFESSIONAL_PLAN.price}/month
+                </a>
+
+                {/* Trust Elements */}
+                <div className="mt-6 text-center text-zinc-400 text-sm">
+                  <p>Secure payment processing through Lemon Squeezy.</p>
+                  <p className="mt-1">Cancel anytime. No long-term commitment.</p>
+                </div>
+              </div>
             </motion.div>
 
             {/* FAQ / Trust Elements */}

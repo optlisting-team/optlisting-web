@@ -42,23 +42,26 @@ class Listing(Base):
     platform = Column(String, nullable=True)  # Generic platform (marketplace와 별도)
     user_id = Column(String, nullable=True, index=True)
     supplier_id = Column(String, nullable=True)
-    supplier_name = Column(String, nullable=True)
-    last_synced_at = Column(DateTime, nullable=True)
-    is_zombie = Column(Boolean, default=False, nullable=True)
-    zombie_score = Column(Float, nullable=True)
+    supplier_name = Column(String, nullable=True)  # Supplier name from CSV matching
+    last_synced_at = Column(DateTime, nullable=True)  # Last sync timestamp
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def __repr__(self):
-        return f"<Listing(ebay_item_id={self.ebay_item_id}, title={self.title}, source={self.source})>"
+        return f"<Listing(id={self.id}, title={self.title[:50]}, user_id={self.user_id})>"
 
 
 class DeletionLog(Base):
     __tablename__ = "deletion_logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    item_id = Column(String, nullable=False, index=True)  # ebay_item_id or similar
+    item_id = Column(String, nullable=False, index=True)  # eBay Item ID or generic item ID
     title = Column(String, nullable=False)
-    platform = Column(String, nullable=True)  # marketplace: "eBay", "Amazon", "Shopify", "Walmart"
-    source = Column(String, nullable=False)  # "Amazon", "Walmart", etc.
+    sku = Column(String, nullable=True)
+    user_id = Column(String, nullable=True, index=True)
+    platform = Column(String, nullable=True)  # "eBay", "Amazon", "Shopify", "Walmart"
+    marketplace = Column(String, nullable=True)  # "eBay", "Amazon", etc.
+    source = Column(String, nullable=True)  # "Amazon", "Walmart", etc.
     deleted_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     # 멀티테넌시: user_id 필드 추가 (기존 데이터는 nullable로 유지, 마이그레이션 필요)
     user_id = Column(String, nullable=True, index=True)
@@ -79,7 +82,7 @@ class Profile(Base):
     ls_customer_id = Column(String, nullable=True, index=True)  # Lemon Squeezy Customer ID
     ls_subscription_id = Column(String, nullable=True, index=True)  # Lemon Squeezy Subscription ID
     subscription_status = Column(String, default='inactive')  # 'active', 'cancelled', 'expired', 'inactive'
-    subscription_plan = Column(String, nullable=True)  # 'pro', 'free', etc.
+    subscription_plan = Column(String, nullable=True)  # 'professional', 'free', etc.
     
     # 플랜 제한
     total_listings_limit = Column(Integer, default=100)  # Pro 플랜: 무제한 또는 큰 수, Free: 100
@@ -98,6 +101,7 @@ class Profile(Base):
     ebay_token_expires_at = Column(DateTime, nullable=True)  # Access Token 만료 시간
     ebay_user_id = Column(String, nullable=True)  # eBay User ID
     ebay_token_updated_at = Column(DateTime, nullable=True)  # 토큰 마지막 갱신 시간
+    ebay_connected = Column(Boolean, default=False)  # eBay 연결 상태
     
     # 메타데이터
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -139,6 +143,47 @@ class CSVFormat(Base):
         return f"<CSVFormat(supplier_name={self.supplier_name}, display_name={self.display_name})>"
 
 
+class CSVProcessingTask(Base):
+    """
+    CSV Processing Task Queue - Persistent task state for async processing
+    Allows task recovery after server restarts
+    """
+    __tablename__ = "csv_processing_tasks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(String, unique=True, nullable=False, index=True)  # Unique task identifier
+    user_id = Column(String, nullable=False, index=True)  # User who uploaded the file
+    status = Column(String, default='queued', nullable=False)  # 'queued', 'processing', 'completed', 'failed'
+    
+    # File metadata
+    file_name = Column(String, nullable=True)
+    file_size = Column(Integer, nullable=True)  # File size in bytes
+    estimated_rows = Column(Integer, nullable=True)
+    
+    # Processing results
+    total_rows = Column(Integer, default=0)
+    valid_rows = Column(Integer, default=0)
+    invalid_rows = Column(Integer, default=0)
+    matched_listings = Column(Integer, default=0)
+    updated_listings = Column(Integer, default=0)
+    processing_time_ms = Column(Float, nullable=True)
+    
+    # Error tracking
+    error_message = Column(String, nullable=True)
+    error_details = Column(JSONB, nullable=True)  # Detailed error information
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    
+    # Metadata
+    metadata = Column(JSONB, nullable=True)  # Additional task metadata
+
+    def __repr__(self):
+        return f"<CSVProcessingTask(task_id={self.task_id}, status={self.status}, user_id={self.user_id})>"
+
+
 # Database setup
 # Use Supabase PostgreSQL if DATABASE_URL is set, otherwise fall back to SQLite
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
@@ -158,84 +203,30 @@ if DATABASE_URL:
     # Log first 50 chars only (hide password)
     db_logger.debug(f"DATABASE_URL prefix: {DATABASE_URL[:50]}...")
 
-# ✅ FIX: DATABASE_URL 검증 강화 (빈 문자열, None, 잘못된 형식 체크)
-if DATABASE_URL and DATABASE_URL.startswith(("postgresql://", "postgres://")):
-    # Supabase PostgreSQL connection
-    SQLALCHEMY_DATABASE_URL = DATABASE_URL
-    
-    # ✅ 3. Supabase 연결 설정 최적화: Connection Pooling 및 재연결 설정
-    # Supabase Connection Pooling 포트(6543) 사용 여부 확인
-    use_pooling = False
-    if ":6543/" in SQLALCHEMY_DATABASE_URL or "pooler.supabase.com" in SQLALCHEMY_DATABASE_URL:
-        use_pooling = True
-        db_logger.debug("Using Supabase Connection Pooling (port 6543)")
-    else:
-        db_logger.debug("Using direct Supabase connection")
-        # Connection Pooling 포트로 변경 제안
-        if "supabase.co" in SQLALCHEMY_DATABASE_URL and ":5432/" in SQLALCHEMY_DATABASE_URL:
-            db_logger.info("Consider using Connection Pooling port 6543 for better performance")
-    
-    # Connection Pool 설정
-    engine_kwargs = {
-        "pool_pre_ping": True,   # 연결이 끊겼는지 확인 후 재연결
-        "pool_recycle": 3600,    # 1시간마다 연결 재생성 (Supabase 권장)
-        "pool_size": 5,          # 기본 풀 크기
-        "max_overflow": 10,      # 최대 오버플로우 연결 수
-        "echo": False            # SQL 쿼리 로깅 (디버깅 시 True)
-    }
-    
-    # Supabase Connection Pooling 사용 시 추가 설정
-    if use_pooling:
-        engine_kwargs["connect_args"] = {
-            "sslmode": "require"
-        }
-    
-    db_logger.debug(f"Engine kwargs: pool_pre_ping={engine_kwargs['pool_pre_ping']}, pool_recycle={engine_kwargs['pool_recycle']}")
-    
-    try:
-        engine = create_engine(
-            SQLALCHEMY_DATABASE_URL,
-            **engine_kwargs
-        )
-    except Exception as e:
-        # ✅ FIX: DATABASE_URL 파싱 실패 시 SQLite로 폴백
-        db_logger.warning(f"Failed to create PostgreSQL engine: {e}")
-        db_logger.warning("Falling back to SQLite...")
-        SQLALCHEMY_DATABASE_URL = "sqlite:///./optlisting.db"
-        engine = create_engine(
-            SQLALCHEMY_DATABASE_URL, 
-            connect_args={"check_same_thread": False}
-        )
+if DATABASE_URL and DATABASE_URL.startswith(('postgresql://', 'postgres://')):
+    # Use Supabase PostgreSQL
+    db_logger.info("Using Supabase PostgreSQL database")
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=5, max_overflow=10)
 else:
     # Fallback to SQLite for local development
-    if DATABASE_URL:
-        db_logger.warning(f"DATABASE_URL is set but invalid format: {DATABASE_URL[:50]}...")
-        db_logger.warning("Falling back to SQLite...")
-    SQLALCHEMY_DATABASE_URL = "sqlite:///./optlisting.db"
-    engine = create_engine(
-        SQLALCHEMY_DATABASE_URL, 
-        connect_args={"check_same_thread": False}
-    )
+    db_logger.warning("DATABASE_URL not set or invalid, falling back to SQLite")
+    db_logger.warning("SQLite is for local development only. Use PostgreSQL in production.")
+    SQLITE_DB_PATH = "optlisting.db"
+    engine = create_engine(f"sqlite:///{SQLITE_DB_PATH}", connect_args={"check_same_thread": False})
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def init_db():
-    """Initialize database and create tables"""
-    # Note: For Supabase, tables are managed via migrations
-    # This function is kept for SQLite compatibility
-    if not DATABASE_URL:  # Only create tables if using SQLite
-        # Drop and recreate tables to ensure schema is up to date
-        # This is safe for development with dummy data
-        Base.metadata.drop_all(bind=engine)
-        Base.metadata.create_all(bind=engine)
-
-
 def get_db():
-    """Dependency for getting database session"""
+    """Database session dependency for FastAPI"""
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
 
+
+def init_db():
+    """Initialize database tables"""
+    Base.metadata.create_all(bind=engine)
+    db_logger.info("Database tables initialized successfully")
