@@ -77,6 +77,7 @@ function LandingPage() {
     const params = new URLSearchParams({
       'checkout[variant_id]': variantId,
       'checkout[custom][user_id]': userId,
+      'test_mode': 'true', // Enable test mode for hosted checkout
     })
     
     // Add email if available for webhook synchronization
