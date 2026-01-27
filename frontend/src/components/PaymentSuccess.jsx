@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { CheckCircle, Loader2, RefreshCw, AlertCircle } from 'lucide-react'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { useAccount } from '../contexts/AccountContext'
 
 // Use environment variable for Railway URL, fallback based on environment
 // CRITICAL: Production MUST use relative path /api (proxied by vercel.json) to avoid CORS issues
@@ -16,89 +17,66 @@ const MAX_POLLING_TIME = 30000 // 30초
 
 function PaymentSuccess() {
   const navigate = useNavigate()
+  const { subscriptionStatus, plan, refreshSubscription } = useAccount()
   const [status, setStatus] = useState('polling') // 'polling', 'success', 'timeout'
-  const [initialCredits, setInitialCredits] = useState(null)
-  const [currentCredits, setCurrentCredits] = useState(null)
+  const [initialSubscriptionStatus, setInitialSubscriptionStatus] = useState(null)
   const [pollingStartTime, setPollingStartTime] = useState(null)
   const pollingIntervalRef = useRef(null)
   const timeoutRef = useRef(null)
 
-  // 초기 크레딧 잔액 조회
+  // Refresh subscription status immediately when returning from payment
   useEffect(() => {
-    const fetchInitialCredits = async () => {
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/credits`,  // user_id는 JWT에서 추출됨
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            credentials: 'include',
-          }
-        )
-        
-        if (response.ok) {
-          const data = await response.json()
-          setInitialCredits(data.available_credits || 0)
-          setCurrentCredits(data.available_credits || 0)
-          setPollingStartTime(Date.now())
-        }
-      } catch (error) {
-        console.error('Failed to fetch initial credits:', error)
-      }
-    }
+    console.log('🔄 [PAYMENT SUCCESS] Refreshing subscription status after payment...')
+    refreshSubscription()
+    
+    // Also refresh after a short delay to ensure webhook has processed
+    const delayedRefresh = setTimeout(() => {
+      console.log('🔄 [PAYMENT SUCCESS] Delayed refresh to catch webhook updates...')
+      refreshSubscription()
+    }, 3000) // 3 second delay to allow webhook processing
+    
+    return () => clearTimeout(delayedRefresh)
+  }, [refreshSubscription])
 
-    fetchInitialCredits()
+  // Initial subscription status check
+  useEffect(() => {
+    setInitialSubscriptionStatus(subscriptionStatus)
+    setPollingStartTime(Date.now())
   }, [])
 
-  // Polling 시작
+  // Polling for subscription activation
   useEffect(() => {
-    if (initialCredits === null || pollingStartTime === null) {
+    if (initialSubscriptionStatus === null || pollingStartTime === null) {
       return
     }
 
-    const checkCredits = async () => {
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/credits`,  // user_id는 JWT에서 추출됨
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            credentials: 'include',
-          }
-        )
-        
-        if (response.ok) {
-          const data = await response.json()
-          const newCredits = data.available_credits || 0
-          setCurrentCredits(newCredits)
-
-          // 크레딧이 증가했으면 성공으로 처리
-          if (newCredits > initialCredits) {
-            setStatus('success')
-            if (pollingIntervalRef.current) {
-              clearInterval(pollingIntervalRef.current)
-            }
-            if (timeoutRef.current) {
-              clearTimeout(timeoutRef.current)
-            }
-          }
+    const checkSubscription = () => {
+      // Refresh subscription status
+      refreshSubscription()
+      
+      // Check if subscription became active
+      if (subscriptionStatus === 'active' && plan === 'PROFESSIONAL') {
+        console.log('✅ [PAYMENT SUCCESS] Subscription activated!')
+        setStatus('success')
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current)
         }
-      } catch (error) {
-        console.error('Failed to fetch credits during polling:', error)
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current)
+        }
       }
     }
 
-    // 즉시 한 번 체크
-    checkCredits()
+    // Check immediately
+    checkSubscription()
 
-    // Polling 시작
-    pollingIntervalRef.current = setInterval(checkCredits, POLLING_INTERVAL)
+    // Polling: Refresh subscription status every 1.5 seconds
+    pollingIntervalRef.current = setInterval(() => {
+      refreshSubscription()
+      checkSubscription()
+    }, POLLING_INTERVAL)
 
-    // 30초 타임아웃 설정
+    // 30 second timeout
     timeoutRef.current = setTimeout(() => {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current)
@@ -115,7 +93,7 @@ function PaymentSuccess() {
         clearTimeout(timeoutRef.current)
       }
     }
-  }, [initialCredits, pollingStartTime])
+  }, [initialSubscriptionStatus, pollingStartTime, subscriptionStatus, plan, refreshSubscription])
 
   const handleRefresh = () => {
     window.location.reload()
@@ -134,7 +112,7 @@ function PaymentSuccess() {
       <Card className="w-full max-w-md bg-zinc-900 dark:bg-zinc-900 border-zinc-800 dark:border-zinc-800">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold text-white dark:text-white">
-            결제 처리 중
+            Payment Processing
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -143,7 +121,7 @@ function PaymentSuccess() {
               <div className="flex flex-col items-center justify-center space-y-4">
                 <Loader2 className="h-12 w-12 text-blue-500 animate-spin" />
                 <p className="text-zinc-400 dark:text-zinc-400 text-center">
-                  결제가 완료되었습니다. 크레딧 반영을 확인하고 있습니다...
+                  Payment completed. Activating your Professional Plan...
                 </p>
                 <p className="text-sm text-zinc-500 dark:text-zinc-500">
                   {elapsedTime}초 / {MAX_POLLING_TIME / 1000}초
@@ -157,21 +135,22 @@ function PaymentSuccess() {
               <div className="flex flex-col items-center justify-center space-y-4">
                 <CheckCircle className="h-16 w-16 text-green-500" />
                 <p className="text-white dark:text-white text-lg font-semibold text-center">
-                  결제가 성공적으로 완료되었습니다!
+                  Payment completed successfully!
                 </p>
                 <p className="text-zinc-400 dark:text-zinc-400 text-center">
-                  크레딧이 계정에 반영되었습니다.
+                  Your Professional Plan is now active.
                 </p>
-                {currentCredits !== null && (
-                  <div className="mt-4 p-4 bg-zinc-800 dark:bg-zinc-800 rounded-lg">
-                    <p className="text-sm text-zinc-400 dark:text-zinc-400">
-                      현재 크레딧 잔액
-                    </p>
-                    <p className="text-2xl font-bold text-white dark:text-white">
-                      {currentCredits.toLocaleString()} 크레딧
-                    </p>
-                  </div>
-                )}
+                <div className="mt-4 p-4 bg-zinc-800 dark:bg-zinc-800 rounded-lg">
+                  <p className="text-sm text-zinc-400 dark:text-zinc-400">
+                    Subscription Status
+                  </p>
+                  <p className="text-2xl font-bold text-white dark:text-white">
+                    {plan === 'PROFESSIONAL' ? 'Professional Plan' : plan}
+                  </p>
+                  <p className="text-sm text-emerald-400 mt-1">
+                    {subscriptionStatus === 'active' ? '✓ Active' : subscriptionStatus}
+                  </p>
+                </div>
                 <Button
                   onClick={handleGoToDashboard}
                   className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white"
@@ -187,11 +166,11 @@ function PaymentSuccess() {
               <div className="flex flex-col items-center justify-center space-y-4">
                 <AlertCircle className="h-12 w-12 text-yellow-500" />
                 <p className="text-white dark:text-white text-lg font-semibold text-center">
-                  결제는 완료되었으나 반영이 지연되고 있습니다
+                  Payment completed but activation is delayed
                 </p>
                 <p className="text-zinc-400 dark:text-zinc-400 text-center text-sm">
-                  결제는 정상적으로 처리되었습니다. 크레딧 반영에 시간이 걸릴 수 있습니다.
-                  잠시 후 새로고침하여 확인해주세요.
+                  Your payment was processed successfully. Subscription activation may take a few moments.
+                  Please refresh in a moment to check your status.
                 </p>
                 <div className="flex flex-col space-y-2 w-full mt-4">
                   <Button
@@ -199,7 +178,7 @@ function PaymentSuccess() {
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                   >
                     <RefreshCw className="h-4 w-4 mr-2" />
-                    새로고침
+                    Refresh
                   </Button>
                   <Button
                     onClick={handleGoToDashboard}
