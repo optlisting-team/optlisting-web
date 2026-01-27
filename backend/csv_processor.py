@@ -1,6 +1,11 @@
 """
 OptListing - Supplier CSV Data Pipeline
-공급처 CSV 데이터 파싱 및 DB 연동 모듈
+Supplier CSV data parsing and database integration module
+
+Optimized for US eBay market:
+- Date format: MM/DD/YYYY
+- Currency: USD
+- Asynchronous processing queue for large files
 """
 
 import csv
@@ -156,7 +161,7 @@ class SupplierCSVParser:
                     continue
             
             if content_str is None:
-                raise ValueError("CSV 파일 인코딩을 감지할 수 없습니다")
+                raise ValueError("Unable to detect CSV file encoding. Please ensure the file is UTF-8, CP949, or Latin-1 encoded.")
             
             # 구분자 감지
             sample = content_str[:2000]
@@ -167,20 +172,26 @@ class SupplierCSVParser:
             headers = reader.fieldnames or []
             
             if not headers:
-                raise ValueError("CSV 파일에 헤더가 없습니다")
+                raise ValueError("CSV file is missing headers. Please ensure the first row contains column names.")
             
-            # 컬럼 매핑
+            # Column mapping
             self.detected_columns = self.map_columns(headers)
             
             if 'supplier_name' not in self.detected_columns:
-                raise ValueError("필수 컬럼 'supplier_name'을 찾을 수 없습니다. "
-                               f"감지된 컬럼: {headers}")
+                raise ValueError(
+                    f"Required column 'SupplierName' not found. "
+                    f"Detected columns: {', '.join(headers)}. "
+                    f"Please add a 'SupplierName' column to your CSV."
+                )
             
-            # SKU, UPC, EAN 중 하나는 있어야 함
+            # At least one of SKU, UPC, EAN must exist
             has_identifier = any(k in self.detected_columns for k in ['sku', 'upc', 'ean'])
             if not has_identifier:
-                raise ValueError("SKU, UPC, EAN 중 하나의 컬럼이 필요합니다. "
-                               f"감지된 컬럼: {headers}")
+                raise ValueError(
+                    f"At least one identifier column (SKU, UPC, or EAN) is required. "
+                    f"Detected columns: {', '.join(headers)}. "
+                    f"Please add at least one of these columns to your CSV."
+                )
             
             # 각 행 파싱
             for row_num, row in enumerate(reader, start=2):  # 헤더가 1행
@@ -193,9 +204,9 @@ class SupplierCSVParser:
                     # Pydantic 검증
                     validated_row = SupplierCSVRow(**row_data)
                     
-                    # SKU/UPC/EAN 중 하나라도 있는지 확인
+                    # Verify at least one identifier exists
                     if not validated_row.sku and not validated_row.upc and not validated_row.ean:
-                        raise ValueError("SKU, UPC, EAN 중 하나는 필수입니다")
+                        raise ValueError("At least one identifier (SKU, UPC, or EAN) is required for each row.")
                     
                     valid_rows.append(validated_row)
                     
@@ -212,7 +223,7 @@ class SupplierCSVParser:
             errors.append({
                 'row': 0,
                 'data': None,
-                'error': f"파일 파싱 실패: {str(e)}"
+                'error': f"File parsing failed: {str(e)}. Please check your CSV format. For US market, ensure dates are in MM/DD/YYYY format."
             })
             return [], errors
 

@@ -3,35 +3,32 @@ import apiClient from '../lib/api'
 import { supabase } from '../lib/supabase'
 
 const AccountContext = createContext({
-  credits: null,
+  subscriptionStatus: 'inactive',
   plan: 'FREE',
   apiStatus: 'checking',
   connectionError: null,
   showPlanModal: false,
-  showCreditModal: false,
   setShowPlanModal: () => {},
-  setShowCreditModal: () => {},
-  refreshCredits: () => {}
+  refreshSubscription: () => {}
 })
 
 export const AccountProvider = ({ children }) => {
-  const [credits, setCredits] = useState(null)
+  const [subscriptionStatus, setSubscriptionStatus] = useState('inactive')
   const [plan, setPlan] = useState('FREE')
   const [apiStatus, setApiStatus] = useState('checking')
   const [connectionError, setConnectionError] = useState(null)
   const [showPlanModal, setShowPlanModal] = useState(false)
-  const [showCreditModal, setShowCreditModal] = useState(false)
 
-  // Fetch credits using apiClient (goes directly to Railway in production)
-  const fetchCredits = async () => {
+  // Fetch subscription status using apiClient (goes directly to Railway in production)
+  const fetchSubscription = async () => {
     try {
-      const response = await apiClient.get('/api/credits', {
+      const response = await apiClient.get('/api/subscription/status', {
         timeout: 60000  // 60 seconds timeout
       })
       
       if (response.data) {
-        setCredits(response.data.available_credits || 0)
-        setPlan(response.data.current_plan || 'FREE')
+        setSubscriptionStatus(response.data.status || 'inactive')
+        setPlan(response.data.plan || 'FREE')
         setApiStatus('connected')
         setConnectionError(null)  // Clear any previous errors on success
       } else {
@@ -48,18 +45,17 @@ export const AccountProvider = ({ children }) => {
             console.error('Session refresh failed:', refreshError)
             setConnectionError('authentication_failed')
             setApiStatus('error')
-            // Prompt user to re-login
             return
           }
           
           // Retry the request after successful refresh
           try {
-            const retryResponse = await apiClient.get('/api/credits', {
+            const retryResponse = await apiClient.get('/api/subscription/status', {
               timeout: 60000
             })
             if (retryResponse.data) {
-              setCredits(retryResponse.data.available_credits || 0)
-              setPlan(retryResponse.data.current_plan || 'FREE')
+              setSubscriptionStatus(retryResponse.data.status || 'inactive')
+              setPlan(retryResponse.data.plan || 'FREE')
               setApiStatus('connected')
               setConnectionError(null)
               return
@@ -80,33 +76,31 @@ export const AccountProvider = ({ children }) => {
       
       // Handle all other errors: network errors, timeouts, CORS errors, etc.
       if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
-        console.warn('Credits fetch timeout')
+        console.warn('Subscription status fetch timeout')
         setApiStatus('error')
       } else {
-        console.error('Failed to fetch credits:', err)
+        console.error('Failed to fetch subscription status:', err)
         setApiStatus('error')
       }
       // Keep default values on error (so app continues to work)
     }
   }
 
-  // Fetch credits on mount only (no automatic polling)
+  // Fetch subscription status on mount only (no automatic polling)
   useEffect(() => {
-    fetchCredits()
+    fetchSubscription()
   }, [])
 
   return (
     <AccountContext.Provider
       value={{
-        credits,
+        subscriptionStatus,
         plan,
         apiStatus,
         connectionError,
         showPlanModal,
-        showCreditModal,
         setShowPlanModal,
-        setShowCreditModal,
-        refreshCredits: fetchCredits
+        refreshSubscription: fetchSubscription
       }}
     >
       {children}

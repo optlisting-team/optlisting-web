@@ -1,17 +1,13 @@
 import { useLocation } from 'react-router-dom'
 import { useState } from 'react'
-import { Bell, RefreshCw, User, ChevronDown, Zap } from 'lucide-react'
+import { Bell, RefreshCw, User, ChevronDown } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { useAccount } from '../contexts/AccountContext'
-import apiClient from '../lib/api'
 
 function PageHeader() {
   const location = useLocation()
   const { user, isAuthenticated, signOut } = useAuth()
-  const { credits, setShowCreditModal, refreshCredits } = useAccount()
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [showAuthMenu, setShowAuthMenu] = useState(false)
-  const [isGrantingTestCredits, setIsGrantingTestCredits] = useState(false)
 
   // Get page info based on route
   const getPageInfo = () => {
@@ -109,74 +105,12 @@ function PageHeader() {
               </span>
             </button>
 
-            {/* Grant Test Credits Button - FORCED VISIBLE FOR DEBUG */}
-            <button
-              onClick={async () => {
-                if (isGrantingTestCredits || !user?.id) {
-                  console.warn('Cannot grant credits: isGrantingTestCredits=', isGrantingTestCredits, 'user?.id=', user?.id)
-                  return
-                }
-                
-                setIsGrantingTestCredits(true)
-                try {
-                  const adminKey = import.meta.env.VITE_ADMIN_API_KEY || ''
-                  console.log('Granting test credits with adminKey:', adminKey ? 'SET' : 'MISSING')
-                  const response = await apiClient.post(
-                    '/api/admin/credits/grant',
-                    {
-                      user_id: user.id,
-                      amount: 1000,
-                      description: 'Test credits grant (dev-only)'
-                    },
-                    {
-                      params: {
-                        admin_key: adminKey
-                      },
-                      timeout: 30000
-                    }
-                  )
-                  
-                  if (response.data.success) {
-                    const { totalCredits, addedAmount } = response.data
-                    console.log(`✅ Test credits granted: +${addedAmount} credits (Total: ${totalCredits})`)
-                    // Refresh credit information from AccountContext
-                    refreshCredits()
-                  } else {
-                    throw new Error(response.data.message || 'Grant failed')
-                  }
-                } catch (err) {
-                  console.error('❌ Test credits grant failed:', err)
-                  if (err.response?.status === 403) {
-                    console.error('403: Test credits grant is not available. Check admin key configuration.')
-                  }
-                } finally {
-                  setIsGrantingTestCredits(false)
-                }
-              }}
-              disabled={isGrantingTestCredits}
-              className="px-4 py-2 bg-red-600 hover:bg-red-500 disabled:bg-red-800 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl border-2 border-yellow-400 shadow-lg shadow-red-500/50 transition-all relative z-30"
-              title="Grant 1000 test credits (DEBUG MODE - Always Visible)"
-              style={{ minWidth: '120px' }}
-            >
-              {isGrantingTestCredits ? 'Granting...' : '🧪 Grant +1000'}
-            </button>
-
-            {/* My Credits */}
+            {/* Pro Plan: Active Badge */}
             {isAuthenticated && (
-              <button
-                onClick={() => setShowCreditModal(true)}
-                className="flex items-center gap-2 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-800 hover:border-amber-500/30 transition-all"
-              >
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
-                  <Zap className="w-4 h-4 text-white" />
-                </div>
-                <div className="text-left hidden md:block">
-                  <div className="text-xs text-zinc-500 text-[10px] uppercase tracking-wider">My Credits</div>
-                  <div className="text-sm font-bold text-white">
-                    {credits !== null ? credits.toLocaleString() : '...'}
-                  </div>
-                </div>
-              </button>
+              <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 border border-emerald-500/30 rounded-xl shadow-lg">
+                <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
+                <span className="text-sm font-bold text-white">Pro Plan: Active</span>
+              </div>
             )}
 
             {/* User Menu */}
