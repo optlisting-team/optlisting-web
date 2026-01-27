@@ -61,11 +61,13 @@ export default function Pricing() {
       variantId = '1255285'
     }
     
-    // Lemon Squeezy checkout URL format for subscriptions
-    // Final URL format: https://optlisting.lemonsqueezy.com/checkout/buy/795931?checkout[variant_id]=1255285&checkout[custom][user_id]=...
+    // Lemon Squeezy hosted checkout URL format (direct redirect, bypasses overlay)
+    // CRITICAL: Use /buy/{product_id} instead of /checkout/buy/{product_id} to avoid 404
+    // Final URL format: https://optlisting.lemonsqueezy.com/buy/795931?checkout[variant_id]=1255285&checkout[custom][user_id]=...
     // Documentation: https://docs.lemonsqueezy.com/help/checkout/checkout-custom-fields
     
-    const baseUrl = `${LEMON_SQUEEZY_STORE}/checkout/buy/${productId}`
+    // Use /buy/{product_id} for hosted checkout (direct redirect, no overlay)
+    const baseUrl = `${LEMON_SQUEEZY_STORE}/buy/${productId}`
     const params = new URLSearchParams({
       'checkout[variant_id]': variantId,
       'checkout[custom][user_id]': userId,
@@ -82,7 +84,7 @@ export default function Pricing() {
     console.log('   Variant ID (numeric):', variantId)
     console.log('   User ID:', userId)
     console.log('   Email:', userEmail || 'not provided')
-    console.log('   URL Structure:', `checkout/buy/${productId}?checkout[variant_id]=${variantId}`)
+    console.log('   URL Structure:', `buy/${productId}?checkout[variant_id]=${variantId}`)
     return checkoutUrl
   }
 
