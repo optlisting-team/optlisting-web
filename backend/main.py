@@ -14,7 +14,7 @@ import os
 import uuid
 from pydantic import BaseModel
 
-from .models import init_db, get_db, Listing, DeletionLog, Profile, CSVFormat, Base, engine
+from .models import init_db, get_db, Listing, DeletionLog, Profile, CSVFormat, CSVProcessingTask, Base, engine
 from .services import detect_source, extract_supplier_info, analyze_zombie_listings, generate_export_csv, count_low_performing_candidates
 from .dummy_data import generate_dummy_listings
 from .webhooks import verify_webhook_signature, process_webhook_event
@@ -1301,39 +1301,41 @@ def analyze_low_performing(
     db: Session = Depends(get_db)
 ):
     """
-    Low-Performing SKUs 분석 (크레딧 차감 포함)
+    Low-Performing SKUs analysis
     
-    크레딧 차감: 1 credit (atomic 처리)
-    - 크레딧 부족 시 402 Payment Required 에러 반환
-    - 성공 시 분석 결과 반환 (count, items, remaining_credits, requestId)
+    Validates active Professional subscription before performing analysis.
+    - Subscription required: 402 Payment Required error if not active
+    - Success: Returns analysis results (count, items, requestId)
     
     Args:
-        request: 필터 파라미터 (days, sales_lte, watch_lte, imp_lte, views_lte, request_id)
-        user_id: 사용자 ID
-        store_id: 스토어 ID (선택)
-        db: 데이터베이스 세션
+        request: Filter parameters (days, sales_lte, watch_lte, imp_lte, views_lte, request_id)
+        user_id: User ID
+        store_id: Store ID (optional)
+        db: Database session
         
     Returns:
         {
             "success": bool,
-            "count": int,  # 필터링된 low-performing items 개수
-            "items": List[Dict],  # 필터링된 items 리스트
-            "remaining_credits": int,  # 남은 크레딧
-            "request_id": str,  # 요청 ID
-            "filters": Dict  # 적용된 필터
+            "count": int,  # Number of filtered low-performing items
+            "items": List[Dict],  # Filtered items list
+            "subscriptionStatus": str,  # Subscription status
+            "request_id": str,  # Request ID
+            "filters": Dict  # Applied filters
         }
     """
     import uuid
     import logging
-    from .credit_service import deduct_credits_atomic, get_available_credits, TransactionType
     from fastapi import status as http_status
     
     logger = logging.getLogger(__name__)
     
-    # Request ID 생성 (idempotency를 위해)
+    # Validate active Professional subscription
+    require_active_subscription(db, user_id)
+    
+    # Request ID generation (for idempotency)
     request_id = request.request_id or f"analysis_{uuid.uuid4().hex[:16]}"
     
-    # 필터 값 검증 및 정규화
+    # Filter value validation and normalization
     days = max(1, request.days)
     sales_lte = max(0, request.sales_lte)
     watch_lte = max(0, request.watch_lte)
@@ -1348,49 +1350,11 @@ def analyze_low_performing(
         "views_lte": views_lte
     }
     
-    logger.info(f"📊 [{request_id}] Low-Performing 분석 요청: user_id={user_id}, filters={filters}")
+    logger.info(f"📊 [{request_id}] Low-Performing analysis request: user_id={user_id}, filters={filters}")
     
-    # 크레딧 체크 및 atomic 차감 (1 credit)
-    required_credits = 1
-    try:
-        credit_result = deduct_credits_atomic(
-            db=db,
-            user_id=user_id,
-            amount=required_credits,
-            description=f"Low-Performing SKUs analysis (filters: {filters})",
-            reference_id=request_id
-        )
-        
-        if not credit_result.success:
-            # 크레딧 부족
-            remaining = get_available_credits(db, user_id)
-            logger.warning(f"⚠️ [{request_id}] 크레딧 부족: available={remaining}, required={required_credits}")
-            raise HTTPException(
-                status_code=http_status.HTTP_402_PAYMENT_REQUIRED,
-                detail={
-                    "error": "insufficient_credits",
-                    "message": credit_result.message,
-                    "available_credits": remaining,
-                    "required_credits": required_credits,
-                    "request_id": request_id
-                }
-            )
-        
-        remaining_credits = credit_result.remaining_credits
-        logger.info(f"✅ [{request_id}] 크레딧 차감 성공: deducted={credit_result.deducted_amount}, remaining={remaining_credits}")
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ [{request_id}] 크레딧 차감 실패: {str(e)}")
-        raise HTTPException(
-            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "error": "credit_deduction_failed",
-                "message": f"Failed to deduct credits: {str(e)}",
-                "request_id": request_id
-            }
-        )
+    # Get subscription status for response
+    subscription_info = get_subscription_status(db, user_id)
+    subscription_status = subscription_info.get("status", "inactive")
     
     # 분석 실행
     try:
@@ -1448,7 +1412,7 @@ def analyze_low_performing(
             "success": True,
             "count": count,
             "items": items,
-            "remaining_credits": remaining_credits,
+            "subscriptionStatus": subscription_status,
             "request_id": request_id,
             "filters": filters
         }
@@ -2521,24 +2485,26 @@ async def lemonsqueezy_webhook(request: Request, db: Session = Depends(get_db)):
 
 class CreateCheckoutRequest(BaseModel):
     variant_id: str
-    # user_id는 JWT에서 추출되므로 모델에서 제거
+    # user_id is extracted from JWT, not from request body
 
 @app.post("/api/lemonsqueezy/create-checkout")
 async def create_checkout(
     request: CreateCheckoutRequest,
+    user_id: str = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Lemon Squeezy Checkout API를 사용하여 checkout 생성
-    API 키가 설정되지 않으면 404 에러를 안내합니다.
+    Create Lemon Squeezy checkout for Professional subscription
+    
+    Returns checkout URL for $120/month Professional Plan
     """
     import requests
     logger = logging.getLogger(__name__)
     variant_id = request.variant_id
-    user_id = request.user_id
     
-    LS_API_KEY = os.getenv("LEMON_SQUEEZY_API_KEY")
-    LS_STORE_ID = os.getenv("LEMON_SQUEEZY_STORE_ID")
+    # Environment variables with safe fallbacks to prevent crashes
+    LS_API_KEY = os.getenv("LEMON_SQUEEZY_API_KEY") or ""
+    LS_STORE_ID = os.getenv("LEMON_SQUEEZY_STORE_ID") or ""
     APP_URL = os.getenv("APP_URL", "https://optlisting.com")
     
     if not LS_API_KEY or not LS_STORE_ID:

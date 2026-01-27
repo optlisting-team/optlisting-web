@@ -19,8 +19,8 @@ from .models import Profile
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# 환경 변수
-LS_WEBHOOK_SECRET = os.getenv("LEMON_SQUEEZY_WEBHOOK_SECRET") or os.getenv("LS_WEBHOOK_SECRET", "")
+# Environment variables with safe fallbacks
+LS_WEBHOOK_SECRET = os.getenv("LEMON_SQUEEZY_WEBHOOK_SECRET") or os.getenv("LS_WEBHOOK_SECRET") or ""
 
 # 플랜별 리스팅 제한
 PLAN_LIMITS = {
