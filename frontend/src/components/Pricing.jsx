@@ -6,11 +6,19 @@ import { Check } from 'lucide-react'
 const LEMON_SQUEEZY_STORE = import.meta.env.VITE_LEMON_SQUEEZY_STORE || 'https://optlisting.lemonsqueezy.com'
 
 // Professional Plan - $120/month
+// IMPORTANT: Update these IDs with actual values from Lemon Squeezy Dashboard
+// Get product_id and variant_id from: Lemon Squeezy Dashboard > Products > Professional Plan
 const PROFESSIONAL_PLAN = {
   id: 'professional',
   name: 'Professional Plan',
   price: 120,
   billing: 'month',
+  // Environment variables for Lemon Squeezy product and variant IDs
+  // Set these in Vercel/Railway environment variables:
+  // VITE_LEMON_SQUEEZY_PRODUCT_ID=your_product_id
+  // VITE_LEMON_SQUEEZY_VARIANT_ID=your_variant_id
+  product_id: import.meta.env.VITE_LEMON_SQUEEZY_PRODUCT_ID || '',
+  variant_id: import.meta.env.VITE_LEMON_SQUEEZY_VARIANT_ID || '',
   features: [
     'Unlimited eBay listings analysis',
     'Advanced zombie detection algorithms',
@@ -27,28 +35,65 @@ export default function Pricing() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
 
-  // Generate Lemon Squeezy Checkout link for $120/month subscription
-  const generateCheckoutUrl = (productId, variantId = null) => {
+  // Generate Lemon Squeezy Checkout link for $120/month Professional subscription
+  // Format: https://optlisting.lemonsqueezy.com/checkout/buy/{product_id}?checkout[variant_id]={variant_id}&checkout[custom][user_id]={user_id}&checkout[custom][email]={email}
+  const generateCheckoutUrl = () => {
     const userId = user?.id || user?.user_metadata?.user_id
+    const userEmail = user?.email || ''
+    
     if (!userId) {
-      console.error('User not logged in')
-      return '#'
+      console.error('❌ [CHECKOUT] User not logged in')
+      return null
     }
-    const baseUrl = `${LEMON_SQUEEZY_STORE}/checkout/buy/${productId}`
+    
+    // Validate product_id and variant_id are configured
+    if (!PROFESSIONAL_PLAN.product_id || !PROFESSIONAL_PLAN.variant_id) {
+      console.error('❌ [CHECKOUT] Lemon Squeezy product_id or variant_id not configured')
+      console.error('   Please set VITE_LEMON_SQUEEZY_PRODUCT_ID and VITE_LEMON_SQUEEZY_VARIANT_ID environment variables')
+      return null
+    }
+    
+    // Lemon Squeezy checkout URL format for subscriptions
+    // Documentation: https://docs.lemonsqueezy.com/help/checkout/checkout-custom-fields
+    const baseUrl = `${LEMON_SQUEEZY_STORE}/checkout/buy/${PROFESSIONAL_PLAN.product_id}`
     const params = new URLSearchParams({
+      'checkout[variant_id]': PROFESSIONAL_PLAN.variant_id,
       'checkout[custom][user_id]': userId,
     })
     
-    if (variantId) {
-      params.append('checkout[variant_id]', variantId)
+    // Add email if available for webhook synchronization
+    if (userEmail) {
+      params.append('checkout[custom][email]', userEmail)
     }
     
-    return `${baseUrl}?${params.toString()}`
+    const checkoutUrl = `${baseUrl}?${params.toString()}`
+    console.log('🔗 [CHECKOUT] Generated checkout URL:', checkoutUrl)
+    console.log('   Product ID:', PROFESSIONAL_PLAN.product_id)
+    console.log('   Variant ID:', PROFESSIONAL_PLAN.variant_id)
+    console.log('   User ID:', userId)
+    console.log('   Email:', userEmail || 'not provided')
+    return checkoutUrl
   }
 
-  const handleSubscribe = (productId, variantId = null) => {
+  const handleSubscribe = () => {
+    if (!user?.id) {
+      console.error('❌ [CHECKOUT] Cannot subscribe: User not logged in')
+      alert('Please log in to subscribe to the Professional Plan.')
+      return
+    }
+    
     setLoading(true)
-    const checkoutUrl = generateCheckoutUrl(productId, variantId)
+    const checkoutUrl = generateCheckoutUrl()
+    
+    if (!checkoutUrl) {
+      console.error('❌ [CHECKOUT] Failed to generate checkout URL')
+      alert('Checkout configuration error. Please contact support or check environment variables.')
+      setLoading(false)
+      return
+    }
+    
+    // Open Lemon Squeezy checkout in new window
+    console.log('🚀 [CHECKOUT] Opening Lemon Squeezy checkout:', checkoutUrl)
     window.open(checkoutUrl, '_blank')
     setLoading(false)
   }
@@ -99,7 +144,7 @@ export default function Pricing() {
 
             {/* Subscribe Button */}
             <button
-              onClick={() => handleSubscribe('professional-plan')}
+              onClick={handleSubscribe}
               disabled={loading || !user}
               className={`
                 w-full py-4 rounded-xl font-bold text-lg transition-all duration-200
@@ -109,7 +154,7 @@ export default function Pricing() {
                 }
               `}
             >
-              {loading ? 'Processing...' : !user ? 'Please log in to subscribe' : 'Subscribe Now - $120/month'}
+              {loading ? 'Processing...' : !user ? 'Please log in to subscribe' : 'Subscribe to Professional Plan - $120/month'}
             </button>
 
             {/* Notice */}
