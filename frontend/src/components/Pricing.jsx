@@ -82,12 +82,19 @@ export default function Pricing() {
       return
     }
     
+    // Check if IDs are configured before attempting checkout
+    if (!PROFESSIONAL_PLAN.product_id || !PROFESSIONAL_PLAN.variant_id) {
+      console.error('❌ [CHECKOUT] Lemon Squeezy product_id or variant_id not configured')
+      alert('Checkout configuration error. Please contact support.')
+      return
+    }
+    
     setLoading(true)
     const checkoutUrl = generateCheckoutUrl()
     
     if (!checkoutUrl) {
+      // This should only happen if user_id extraction failed (already logged)
       console.error('❌ [CHECKOUT] Failed to generate checkout URL')
-      alert('Checkout configuration error. Please contact support or check environment variables.')
       setLoading(false)
       return
     }
