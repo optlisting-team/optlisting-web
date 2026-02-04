@@ -1225,7 +1225,7 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
     UPSERT listings using PostgreSQL's ON CONFLICT DO UPDATE.
     
     This function handles duplicate key conflicts by updating existing records
-    instead of raising IntegrityError. Uses the unique index 'idx_user_platform_item'
+    instead of raising IntegrityError. Uses the unique constraint 'unique_listing_per_user'
     which is on (user_id, platform, item_id).
     
     **공급처 자동 감지**: supplier_name과 supplier_id가 없으면 SKU, image_url, title, brand, upc를 기반으로 자동 감지합니다.
@@ -1247,25 +1247,7 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
     """
     from datetime import datetime as dt
     upsert_start_time = dt.utcnow()
-    """
-    UPSERT listings using PostgreSQL's ON CONFLICT DO UPDATE.
-    
-    This function handles duplicate key conflicts by updating existing records
-    instead of raising IntegrityError. Uses the unique index 'idx_user_platform_item'
-    which is on (user_id, platform, item_id).
-    
-    **공급처 자동 감지**: supplier_name과 supplier_id가 없으면 SKU, image_url, title, brand, upc를 기반으로 자동 감지합니다.
-    
-    For PostgreSQL: Uses INSERT ... ON CONFLICT DO UPDATE
-    For SQLite: Falls back to individual INSERT OR REPLACE (less efficient but compatible)
-    
-    Args:
-        db: Database session
-        listings: List of Listing objects to upsert
-        
-    Returns:
-        Number of listings processed
-    """
+
     if not listings:
         return 0
     
@@ -1362,11 +1344,13 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
             # eBay sync에서는 항상 platform="eBay"로 저장되어야 함
             platform = "eBay"  # 항상 "eBay"로 강제 설정 (대소문자 정확히 일치)
             
-            # ✅ FIX: item_id 필드가 없으면 ebay_item_id 사용
+            # ✅ CRITICAL: DB unique constraint is (user_id, platform, item_id) - must populate item_id
             item_id = getattr(listing, 'item_id', None) or getattr(listing, 'ebay_item_id', None) or ""
+            if not item_id:
+                logger.warning(f"⚠️ [UPSERT] Skipping listing with empty item_id/ebay_item_id: title={getattr(listing, 'title', '')[:50]}")
+                continue
             
             # ✅ CRITICAL: user_id가 None이거나 빈 문자열이면 에러 발생 (fallback 금지)
-            # expected_user_id가 제공되면 그것을 사용, 아니면 listing의 user_id 사용
             listing_user_id = expected_user_id if expected_user_id else getattr(listing, 'user_id', None)
             
             if not listing_user_id:
@@ -1377,11 +1361,11 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 raise ValueError(f"user_id가 유효하지 않습니다: {listing_user_id}. user_id는 필수입니다.")
             
             # ✅ FIX: Never access listing.raw_data - use empty dict directly to avoid AttributeError
-            # SQLAlchemy objects may not have raw_data initialized, so always use empty dict
             values = {
-                'user_id': listing_user_id,  # ✅ CRITICAL: expected_user_id 우선 사용
-                'platform': platform,  # 정규화된 platform 값 사용
+                'user_id': listing_user_id,
+                'platform': platform,
                 'item_id': item_id,
+                'ebay_item_id': item_id,  # ✅ NOT NULL; unique_listing_per_user is (user_id, platform, item_id)
                 'title': listing.title,
                 'image_url': listing.image_url,
                 'sku': listing.sku,
@@ -1419,20 +1403,10 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 logger.info(f"💾 [UPSERT] Processing batch {batch_num}/{total_batches} ({len(batch)} items)")
                 
                 # Use PostgreSQL's INSERT ... ON CONFLICT DO UPDATE
+                # ✅ CRITICAL: DB constraint is unique_listing_per_user (user_id, platform, item_id) - must match exactly
                 stmt = insert(table).values(batch)
                 
-                # On conflict, update these fields (but preserve created_at)
-                # Use excluded table reference for PostgreSQL ON CONFLICT
-                # ✅ FIX: platform 필드가 없으면 marketplace 사용, item_id가 없으면 ebay_item_id 사용
-                conflict_columns = ['user_id']
-                if hasattr(Listing, 'platform'):
-                    conflict_columns.append('platform')
-                elif hasattr(Listing, 'marketplace'):
-                    conflict_columns.append('marketplace')
-                if hasattr(Listing, 'item_id'):
-                    conflict_columns.append('item_id')
-                elif hasattr(Listing, 'ebay_item_id'):
-                    conflict_columns.append('ebay_item_id')
+                conflict_columns = ['user_id', 'platform', 'item_id']
                 
                 excluded = stmt.excluded
                 stmt = stmt.on_conflict_do_update(
@@ -1474,22 +1448,17 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 logger.error(f"   - Error type: {type(batch_err).__name__}")
                 import traceback
                 logger.error(f"   - Traceback: {traceback.format_exc()}")
-                # Continue with next batch instead of failing completely
-                # Try to save individual items from this batch
+                # Retry batch items individually with same constraint
                 logger.warning(f"⚠️ [UPSERT] Attempting to save batch {batch_num} items individually...")
-                # Re-define conflict_columns for individual retry
-                retry_conflict_columns = ['user_id']
-                if hasattr(Listing, 'platform'):
-                    retry_conflict_columns.append('platform')
-                elif hasattr(Listing, 'marketplace'):
-                    retry_conflict_columns.append('marketplace')
-                if hasattr(Listing, 'item_id'):
-                    retry_conflict_columns.append('item_id')
-                elif hasattr(Listing, 'ebay_item_id'):
-                    retry_conflict_columns.append('ebay_item_id')
+                retry_conflict_columns = ['user_id', 'platform', 'item_id']
                 
                 for item_idx, item in enumerate(batch):
                     try:
+                        # Ensure conflict key columns present for unique_listing_per_user
+                        if 'platform' not in item:
+                            item = {**item, 'platform': 'eBay'}
+                        if 'item_id' not in item and 'ebay_item_id' in item:
+                            item = {**item, 'item_id': item['ebay_item_id']}
                         stmt_single = insert(table).values(item)
                         stmt_single = stmt_single.on_conflict_do_update(
                             index_elements=retry_conflict_columns,

@@ -2433,9 +2433,9 @@ async def get_active_listings_trading_api(
                     listing_obj = parse_listing_from_data(listing_data, user_id, platform="eBay")
                     listing_objects.append(listing_obj)
                 
-                # Upsert (중복 시 업데이트)
+                # Upsert (중복 시 업데이트) - expected_user_id 전달로 user_id 일치 보장
                 if listing_objects:
-                    upserted_count = upsert_listings(db, listing_objects)
+                    upserted_count = upsert_listings(db, listing_objects, expected_user_id=user_id)
                     db.commit()
                     t4_duration = (datetime.utcnow() - t4).total_seconds() * 1000
                     logger.info(f"💾 [t4] Saved {upserted_count} listings to database [RequestId: {request_id}] - Duration: {t4_duration:.2f}ms")

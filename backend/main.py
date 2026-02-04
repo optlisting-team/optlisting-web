@@ -25,6 +25,8 @@ from .subscription_service import (
     require_active_subscription,
 )
 
+logger = logging.getLogger(__name__)
+
 # Supabase Auth for JWT verification
 try:
     from supabase import create_client, Client
@@ -34,13 +36,14 @@ except ImportError:
     logger = logging.getLogger(__name__)
     logger.warning("⚠️ Supabase client not available. Install with: pip install supabase")
 
-app = FastAPI(title="OptListing API", version="1.4.0")
+app = FastAPI(title="OptListing API", version="1.2.1")
 
 # ============================================================
-# Environment Variables Validation (서버 시작 시 체크)
+# Environment variables: SUPABASE_URL, SUPABASE_ANON_KEY (or VITE_* fallback);
+# LEMON_SQUEEZY_* for checkout/webhooks; DATABASE_URL for Postgres.
 # ============================================================
 def validate_supabase_env():
-    """Supabase 환경 변수 검증 - 서버 시작 시 필수"""
+    """Validate Supabase credentials at startup; server cannot start without them."""
     import logging
     logger = logging.getLogger(__name__)
     
@@ -2180,24 +2183,25 @@ def get_subscription_status_endpoint(
     db: Session = Depends(get_db)
 ):
     """
-    Get user subscription status
-    
+    Return current user subscription status. Response shape is always the same for
+    consistent client handling. On error, returns inactive with error key.
     Returns:
-    - status: "active" | "inactive" | "cancelled" | "expired"
-    - plan: "professional" | "free"
-    - subscription_id: Lemon Squeezy subscription ID
-    - expires_at: Subscription expiration date
+        status: "active" | "inactive" | "cancelled" | "expired"
+        plan: "professional" | "free"
+        subscription_id: Lemon Squeezy subscription ID or None
+        expires_at: ISO date string or None
+        error: Present only on failure (optional)
     """
     try:
-        subscription_info = get_subscription_status(db, user_id)
-        return subscription_info
+        return get_subscription_status(db, user_id)
     except Exception as e:
-        logger.error(f"❌ [SUBSCRIPTION] Error fetching subscription status for user {user_id}: {e}")
+        logger.error(f"[SUBSCRIPTION] Error for user {user_id}: {e}")
         return {
             "status": "inactive",
             "plan": "free",
             "subscription_id": None,
-            "expires_at": None
+            "expires_at": None,
+            "error": "failed_to_fetch",
         }
 
 
@@ -2310,6 +2314,33 @@ def start_analysis(
             remaining_credits=result.remaining_credits,
             message=f"분석 시작: {listing_count}개 리스팅, {result.deducted_amount} 크레딧 차감 (분석 중 오류 발생: {str(e)})"
         )
+
+
+@app.get("/api/credits")
+def get_user_credits(
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Return current user credit summary for frontend (AccountContext).
+    Returns available_credits so Dashboard/Sidebar can show balance without TypeError.
+    """
+    try:
+        from .credit_service import get_credit_summary
+        summary = get_credit_summary(db, user_id)
+        return {
+            "available_credits": summary.get("available_credits", 0),
+            "purchased_credits": summary.get("purchased_credits", 0),
+            "consumed_credits": summary.get("consumed_credits", 0),
+        }
+    except Exception as e:
+        logger.error(f"[CREDITS] Error for user {user_id}: {e}")
+        return {
+            "available_credits": 0,
+            "purchased_credits": 0,
+            "consumed_credits": 0,
+            "error": "failed_to_fetch",
+        }
 
 
 @app.post("/api/credits/add")
@@ -2437,22 +2468,16 @@ def initialize_credits(
 @app.post("/api/lemonsqueezy/webhook")
 async def lemonsqueezy_webhook(request: Request, db: Session = Depends(get_db)):
     """
-    Lemon Squeezy 웹훅 엔드포인트
-    안정성 원칙: 모든 에러는 로깅하고 200 OK 반환 (LS 재시도 방지)
+    Lemon Squeezy webhook receiver. Always returns 200 OK and logs errors
+    to avoid LS retries; verifies X-Signature and dispatches to process_webhook_event.
     """
     import logging
     logger = logging.getLogger(__name__)
-    
     try:
-        # 원본 요청 본문 읽기 (시그니처 검증용)
         body = await request.body()
-        
-        # X-Signature 헤더 확인
         signature = request.headers.get("X-Signature", "")
-        
-        # 시그니처 검증
         if not verify_webhook_signature(body, signature):
-            logger.error("웹훅 시그니처 검증 실패")
+            logger.error("Webhook signature verification failed")
             # 안정성: 검증 실패 시에도 200 OK 반환 (LS 재시도 방지)
             # 실제 운영에서는 401을 반환할 수도 있지만, 로깅으로 모니터링
             return JSONResponse(
@@ -2524,26 +2549,20 @@ async def create_checkout(
     db: Session = Depends(get_db)
 ):
     """
-    Create Lemon Squeezy checkout for Professional subscription
-    
-    Returns checkout URL for $120/month Professional Plan
+    Create Lemon Squeezy checkout (credit packs or variants). Returns checkout_url for
+    opening in browser. user_id from JWT; variant_id from request body.
     """
     import requests
     logger = logging.getLogger(__name__)
     variant_id = request.variant_id
-    # user_id is extracted from JWT via Depends(get_current_user), not from request body
-    
-    # Environment variables with safe fallbacks to prevent crashes
     LS_API_KEY = os.getenv("LEMON_SQUEEZY_API_KEY") or ""
     LS_STORE_ID = os.getenv("LEMON_SQUEEZY_STORE_ID") or ""
     APP_URL = os.getenv("APP_URL", "https://optlisting.com")
-    
-    # Warning logs for missing critical configuration
+
     if not LS_API_KEY:
-        logger.warning("⚠️ [CONFIG] LEMON_SQUEEZY_API_KEY is not set. Checkout creation will fail.")
+        logger.warning("[CONFIG] LEMON_SQUEEZY_API_KEY not set")
     if not LS_STORE_ID:
-        logger.warning("⚠️ [CONFIG] LEMON_SQUEEZY_STORE_ID is not set. Checkout creation will fail.")
-    
+        logger.warning("[CONFIG] LEMON_SQUEEZY_STORE_ID not set")
     if not LS_API_KEY or not LS_STORE_ID:
         raise HTTPException(
             status_code=500,
@@ -2553,32 +2572,20 @@ async def create_checkout(
                 "setup_required": True
             }
         )
-    
+
+    variant_id_str = str(variant_id)
+    store_id_str = str(LS_STORE_ID)
+    api_headers = {
+        "Authorization": f"Bearer {LS_API_KEY}",
+        "Accept": "application/vnd.api+json",
+    }
     try:
-        # Ensure variant_id and store_id are strings (Lemon Squeezy API requirement)
-        variant_id_str = str(variant_id)
-        store_id_str = str(LS_STORE_ID)
-        
-        # Temporary debug logs
-        logger.info(f"[DEBUG] Creating checkout: variant_id={variant_id_str}, user_id={user_id}, store_id={store_id_str}")
-        
-        # Preflight validation: Check if store and variant exist
-        api_headers = {
-            "Authorization": f"Bearer {LS_API_KEY}",
-            "Accept": "application/vnd.api+json",
-        }
-        
-        # Validate Store ID
-        logger.info(f"[DEBUG] Validating store_id: {store_id_str}")
         store_check = requests.get(
             f"https://api.lemonsqueezy.com/v1/stores/{store_id_str}",
             headers=api_headers,
             timeout=10,
         )
-        logger.info(f"[DEBUG] Store validation response: status={store_check.status_code}, body={store_check.text[:500]}")
-        
         if store_check.status_code == 404:
-            logger.error(f"[DEBUG] Store ID {store_id_str} does not exist in Lemon Squeezy")
             raise HTTPException(
                 status_code=400,
                 detail={
@@ -2588,7 +2595,7 @@ async def create_checkout(
                 }
             )
         elif store_check.status_code != 200:
-            logger.error(f"[DEBUG] Store validation failed: {store_check.status_code} - {store_check.text[:200]}")
+            logger.warning("Store validation failed: %s", store_check.status_code)
             raise HTTPException(
                 status_code=400,
                 detail={
@@ -2598,17 +2605,12 @@ async def create_checkout(
                 }
             )
         
-        # Validate Variant ID
-        logger.info(f"[DEBUG] Validating variant_id: {variant_id_str}")
         variant_check = requests.get(
             f"https://api.lemonsqueezy.com/v1/variants/{variant_id_str}",
             headers=api_headers,
             timeout=10,
         )
-        logger.info(f"[DEBUG] Variant validation response: status={variant_check.status_code}, body={variant_check.text[:500]}")
-        
         if variant_check.status_code == 404:
-            logger.error(f"[DEBUG] Variant ID {variant_id_str} does not exist in Lemon Squeezy")
             raise HTTPException(
                 status_code=400,
                 detail={
@@ -2618,7 +2620,7 @@ async def create_checkout(
                 }
             )
         elif variant_check.status_code != 200:
-            logger.error(f"[DEBUG] Variant validation failed: {variant_check.status_code} - {variant_check.text[:200]}")
+            logger.warning("Variant validation failed: %s", variant_check.status_code)
             raise HTTPException(
                 status_code=400,
                 detail={
@@ -2627,9 +2629,6 @@ async def create_checkout(
                     "variant_id": variant_id_str
                 }
             )
-        
-        # Both store and variant are valid, proceed with checkout creation
-        logger.info(f"[DEBUG] Preflight validation passed. Creating checkout...")
         
         request_payload = {
             "data": {
@@ -2666,15 +2665,6 @@ async def create_checkout(
                 },
             },
         }
-        
-        # Log product_options value and type before request
-        product_options_value = request_payload["data"]["attributes"]["product_options"]
-        logger.info(f"[DEBUG] product_options value: {product_options_value}, type: {type(product_options_value).__name__}, is_array: {isinstance(product_options_value, list)}")
-        
-        # Log exact JSON payload being sent
-        payload_json = json.dumps(request_payload, indent=2)
-        logger.info(f"[DEBUG] Checkout request payload (exact JSON):\n{payload_json}")
-        
         response = requests.post(
             "https://api.lemonsqueezy.com/v1/checkouts",
             headers={
@@ -2685,36 +2675,17 @@ async def create_checkout(
             json=request_payload,
             timeout=10,
         )
-        
-        logger.info(f"[DEBUG] Lemon Squeezy API response: status={response.status_code}, body={response.text[:1000]}")
-        
         if response.status_code != 201:
             error_detail = response.text
-            logger.error(f"[DEBUG] Lemon Squeezy API error: {response.status_code}")
-            logger.error(f"[DEBUG] Error details (full): {error_detail}")
-            
-            # Try to parse error response for better error message
+            error_message = f"HTTP {response.status_code}"
             try:
                 error_json = response.json()
-                error_message = "Unknown error"
-                field_name = None
-                if "errors" in error_json and isinstance(error_json["errors"], list) and len(error_json["errors"]) > 0:
+                if "errors" in error_json and isinstance(error_json["errors"], list) and error_json["errors"]:
                     first_error = error_json["errors"][0]
-                    error_message = first_error.get("detail", first_error.get("title", "Unknown error"))
-                    # Extract field name from error message if it contains "must be an array"
-                    if "must be an array" in error_message.lower():
-                        # Try to extract field name from source pointer or detail
-                        source = first_error.get("source", {})
-                        pointer = source.get("pointer", "")
-                        if pointer:
-                            # Extract field name from JSON pointer (e.g., "/data/attributes/product_options/enabled_variants")
-                            field_name = pointer.split("/")[-1]
-                        logger.error(f"[DEBUG] Field that must be an array: {field_name} (from pointer: {pointer})")
-                    logger.error(f"[DEBUG] Parsed error: {error_message}")
-            except Exception as e:
-                error_message = error_detail[:200] if error_detail else f"HTTP {response.status_code}"
-                logger.error(f"[DEBUG] Failed to parse error JSON: {e}")
-            
+                    error_message = first_error.get("detail", first_error.get("title", error_message))
+            except Exception:
+                error_message = (error_detail[:200] if error_detail else error_message)
+            logger.warning("Lemon Squeezy checkout failed: %s", error_message)
             raise HTTPException(
                 status_code=500,
                 detail={
@@ -2727,115 +2698,6 @@ async def create_checkout(
         
         checkout_data = response.json()
         checkout_url = checkout_data["data"]["attributes"]["url"]
-        
-        logger.info(f"[DEBUG] Checkout created successfully for variant {variant_id_str}, user {user_id}")
-        return {"checkout_url": checkout_url}
-        
-    except requests.exceptions.Timeout:
-        raise HTTPException(status_code=504, detail="Lemon Squeezy API timeout")
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Lemon Squeezy API request error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error creating checkout: {str(e)}")
-
-
-# ============================================================
-# Lemon Squeezy Checkout API
-# ============================================================
-
-@app.post("/api/lemonsqueezy/create-checkout")
-async def create_checkout(
-    variant_id: str,
-    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
-    db: Session = Depends(get_db)
-):
-    """
-    Lemon Squeezy Checkout API를 사용하여 checkout 생성
-    API 키가 설정되지 않으면 에러 메시지를 반환합니다.
-    """
-    import requests
-    
-    LS_API_KEY = os.getenv("LEMON_SQUEEZY_API_KEY")
-    LS_STORE_ID = os.getenv("LEMON_SQUEEZY_STORE_ID")
-    APP_URL = os.getenv("APP_URL", "https://optlisting.com")
-    
-    if not LS_API_KEY or not LS_STORE_ID:
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "error": "Lemon Squeezy API not configured",
-                "message": "Please set LEMON_SQUEEZY_API_KEY and LEMON_SQUEEZY_STORE_ID environment variables in Railway.",
-                "setup_required": True
-            }
-        )
-    
-    try:
-        request_payload = {
-            "data": {
-                "type": "checkouts",
-                "attributes": {
-                    "custom_price": None,
-                    "product_options": [],
-                    "checkout_options": {
-                        "embed": False,
-                        "media": False,
-                        "logo": True,
-                        "redirect_url": "https://optlisting.com/payment/success",
-                    },
-                    "checkout_data": {
-                        "custom": {
-                            "user_id": user_id,
-                        },
-                    },
-                    "expires_at": None,
-                },
-                "relationships": {
-                    "store": {
-                        "data": {
-                            "type": "stores",
-                            "id": LS_STORE_ID,
-                        },
-                    },
-                    "variant": {
-                        "data": {
-                            "type": "variants",
-                            "id": variant_id,
-                        },
-                    },
-                },
-            },
-        }
-        
-        # Log product_options value and type before request
-        product_options_value = request_payload["data"]["attributes"]["product_options"]
-        logger.info(f"[DEBUG] product_options value: {product_options_value}, type: {type(product_options_value).__name__}, is_array: {isinstance(product_options_value, list)}")
-        
-        response = requests.post(
-            "https://api.lemonsqueezy.com/v1/checkouts",
-            headers={
-                "Authorization": f"Bearer {LS_API_KEY}",
-                "Accept": "application/vnd.api+json",
-                "Content-Type": "application/vnd.api+json",
-            },
-            json=request_payload,
-            timeout=10,
-        )
-        
-        if response.status_code != 201:
-            error_detail = response.text
-            logger.error(f"Lemon Squeezy API error: {response.status_code} - {error_detail}")
-            raise HTTPException(
-                status_code=response.status_code,
-                detail={
-                    "error": "Failed to create checkout",
-                    "message": f"Lemon Squeezy API returned {response.status_code}",
-                    "details": error_detail[:500]  # Limit error message length
-                }
-            )
-        
-        checkout_data = response.json()
-        checkout_url = checkout_data["data"]["attributes"]["url"]
-        
-        logger.info(f"Checkout created successfully for variant {variant_id}, user {user_id}")
         return {"checkout_url": checkout_url}
         
     except requests.exceptions.Timeout:
