@@ -1949,7 +1949,7 @@ async def get_active_listings_trading_api_internal(
         try:
             # Count before DB save
             before_count = db.query(Listing).filter(Listing.user_id == user_id).count()
-                logger.info(f"   - Existing listings count in DB (user_id='{user_id}'): {before_count}")
+            logger.info(f"   - Existing listings count in DB (user_id='{user_id}'): {before_count}")
             
             # Use consolidated parser utility
             from .listing_parser import parse_listing_from_data
