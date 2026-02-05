@@ -151,8 +151,10 @@ function Dashboard() {
   })
   const [listings, setListings] = useState([])
   const [lowPerformingCount, setLowPerformingCount] = useState(null) // null = not analyzed yet
+  const [lowPerformingItems, setLowPerformingItems] = useState([]) // filtered items for CSV export
   const [showDiagnosisResult, setShowDiagnosisResult] = useState(false)
   const [isAnalyzingListings, setIsAnalyzingListings] = useState(false)
+  const [isDownloadingShopifyCSV, setIsDownloadingShopifyCSV] = useState(false)
   
   // Result display flag (only shown when Find button is clicked)
   const [showResults, setShowResults] = useState(false)
@@ -1420,12 +1422,59 @@ function Dashboard() {
         if (watches > maxWatches) return false
         return true
       })
+      setLowPerformingItems(low)
       setLowPerformingCount(low.length)
       setShowDiagnosisResult(true)
     } catch (err) {
       showToast(getErrorMessage(err), 'error')
     } finally {
       setIsAnalyzingListings(false)
+    }
+  }
+
+  // Generate Shopify bulk CSV from low-performing items and trigger download
+  const handleDownloadShopifyCSV = () => {
+    if (!lowPerformingItems || lowPerformingItems.length === 0) {
+      showToast('No items to export.', 'warning')
+      return
+    }
+    setIsDownloadingShopifyCSV(true)
+    try {
+      const slug = (s) => (s || '')
+        .toString()
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+      const escapeCsv = (v) => {
+        const str = v == null ? '' : String(v)
+        return str.includes(',') || str.includes('"') || str.includes('\n') ? `"${str.replace(/"/g, '""')}"` : str
+      }
+      const header = ['Handle', 'Title', 'Vendor', 'Type', 'Variant SKU', 'Variant Price', 'Tags']
+      const rows = lowPerformingItems.map((l) => {
+        const title = l.title || ''
+        const itemId = l.item_id || l.ebay_item_id || l.id || ''
+        const handle = `${slug(title)}${itemId ? '-' + String(itemId).replace(/\s+/g, '-') : ''}`.replace(/^-|-$/g, '') || 'listing'
+        const sku = l.sku || itemId || ''
+        const price = l.price != null ? l.price : ''
+        return [handle, title, 'eBay Import', 'Low Performance', sku, price, 'Low Performance, Delete Candidate'].map(escapeCsv)
+      })
+      const csvContent = [header.join(','), ...rows.map((r) => r.join(','))].join('\n')
+      const dateStr = new Date().toISOString().slice(0, 10)
+      const filename = `shopify_bulk_update_${dateStr}.csv`
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.click()
+      URL.revokeObjectURL(url)
+      showToast(`Downloaded ${filename}`, 'success')
+    } catch (err) {
+      showToast(getErrorMessage(err), 'error')
+    } finally {
+      setIsDownloadingShopifyCSV(false)
     }
   }
 
@@ -2166,15 +2215,29 @@ function Dashboard() {
               type="button"
               onClick={handleAnalyze}
               disabled={isAnalyzingListings}
-              className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-xl transition-all"
+              className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2"
             >
+              {isAnalyzingListings && <Loader2 className="w-5 h-5 animate-spin" aria-hidden />}
               {isAnalyzingListings ? 'Analyzing...' : 'Analyze Listings'}
             </button>
 
-            {/* Results - initially hidden, shown after Analyze */}
+            {/* Results - shown after Analyze, smooth appearance */}
             {showDiagnosisResult && (
-              <div className="mt-6 pt-6 border-t border-zinc-200">
-                <p className="text-red-600 font-bold text-lg">Low Performing Items: {lowPerformingCount}</p>
+              <div className="mt-6 pt-6 border-t border-zinc-200 transition-opacity duration-300 ease-out opacity-100">
+                <div className="flex flex-wrap items-center gap-3">
+                  <p className="text-red-600 font-bold text-lg">Low Performing Items: {lowPerformingCount}</p>
+                  {lowPerformingCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleDownloadShopifyCSV}
+                      disabled={isDownloadingShopifyCSV}
+                      className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all flex items-center gap-2"
+                    >
+                      {isDownloadingShopifyCSV && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
+                      {isDownloadingShopifyCSV ? 'Preparing...' : 'Download Shopify CSV'}
+                    </button>
+                  )}
+                </div>
                 <p className="text-sm text-zinc-500 mt-1">Ready to export for Shopify.</p>
               </div>
             )}
