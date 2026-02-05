@@ -9,7 +9,7 @@ import { useAccount } from '../contexts/AccountContext'
 const API_BASE_URL = import.meta.env.DEV 
   ? (import.meta.env.VITE_API_URL || '')  // Development: use env var or empty for Vite proxy
   : ''  // Production: ALWAYS use relative path (vercel.json proxy handles routing to Railway)
-// const CURRENT_USER_ID = "default-user" // 제거됨: user_id는 AuthContext에서 가져와야 함
+// const CURRENT_USER_ID = "default-user" // Removed: get user_id from AuthContext
 
 // Store License Table Component
 function StoreLicenseTable({ 

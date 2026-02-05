@@ -7,8 +7,7 @@ import { normalizeImageUrl } from '../utils/imageUtils'
 // Use environment variable for Railway URL, fallback based on environment
 // CRITICAL: Production MUST use relative path /api (proxied by vercel.json) to avoid CORS issues
 // Only use VITE_API_URL in development if needed, production always uses relative path
-// API_BASE_URL은 api.js에서 import
-// JWT 인증이 필요한 요청은 apiClient 사용, 인증이 필요 없는 요청(health check 등)은 axios 사용
+// API_BASE_URL from api.js; use apiClient for JWT requests, axios for unauthenticated (e.g. health)
 
 function LowPerformingResults({ mode = 'low', initialFilters = null, initialItems = null, onClose = null, onError = null }) {
   // Filters from props (for low-performing mode) or defaults
@@ -104,13 +103,13 @@ function LowPerformingResults({ mode = 'low', initialFilters = null, initialItem
       
       console.log(`📦 fetchListings [${requestId}]: Starting to fetch eBay listings...`, { mode, filters, page, pageSize })
       
-      // Performance mark 시작
+      // Performance mark start
       if (typeof performance !== 'undefined' && performance.mark) {
         performance.mark(`fetchListings_start_${requestId}`)
       }
       
       // Build API params
-      // user_id는 JWT 인증으로 자동 추출되므로 파라미터에서 제거
+      // user_id from JWT (no param)
       const params = {
         page: page,
         entries_per_page: pageSize,
@@ -134,7 +133,7 @@ function LowPerformingResults({ mode = 'low', initialFilters = null, initialItem
       
       console.log(`📡 fetchListings [${requestId}]: Calling API:`, `${API_BASE_URL}/api/ebay/listings/active`, params)
       
-      // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
+      // Use apiClient for JWT (Authorization header auto-added)
       const response = await apiClient.get(`/api/ebay/listings/active`, {
         params,
         timeout: 120000,
@@ -147,7 +146,7 @@ function LowPerformingResults({ mode = 'low', initialFilters = null, initialItem
         throw new Error(response.data.error || 'Failed to fetch eBay listings')
       }
       
-      // Performance mark 종료 및 측정
+      // Performance mark end and measure
       if (typeof performance !== 'undefined' && performance.mark && performance.measure) {
         performance.mark(`fetchListings_end_${requestId}`)
         performance.measure(
@@ -212,12 +211,12 @@ function LowPerformingResults({ mode = 'low', initialFilters = null, initialItem
     }
   }
   
-  // 초기 items가 있으면 사용 (서버 호출 생략)
-  // initialItems가 변경될 때만 listings 업데이트
+  // Use initial items when present (skip server call)
+  // Update listings only when initialItems changes
   useEffect(() => {
     if (initialItems && Array.isArray(initialItems) && initialItems.length > 0) {
       console.log('📦 LowPerformingResults: Using initial items from analysis result', initialItems.length)
-      // Transform initial items (한 번만 수행)
+      // Transform initial items (once)
       const transformedListings = initialItems.map((item, index) => {
         const supplierInfo = extractSupplierInfo(item.title, item.sku, item.image_url)
         const rawImageUrl = item.image_url
@@ -258,26 +257,26 @@ function LowPerformingResults({ mode = 'low', initialFilters = null, initialItem
       return
     }
     
-    // initialItems가 없거나 빈 배열이면 서버에서 가져오기
+    // If no initialItems or empty, fetch from server
     if (!initialItems || (Array.isArray(initialItems) && initialItems.length === 0)) {
       fetchListings()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialItems]) // initialItems가 변경될 때만 실행
+  }, [initialItems]) // Run only when initialItems changes
   
-  // 페이지네이션/검색/정렬 변경 시 (initialItems가 없을 때만 서버 호출)
+  // On pagination/search/sort (server call only when no initialItems)
   useEffect(() => {
-    // initialItems가 있으면 클라이언트 측 필터링만 수행 (이미 listings state에 있음)
+    // If initialItems present, client-side filter only (listings already in state)
     if (initialItems && Array.isArray(initialItems) && initialItems.length > 0) {
-      return // 클라이언트 측 필터링만 수행 (useMemo에서 처리)
+      return // Client-side filter only (handled in useMemo)
     }
     
-    // initialItems가 없으면 서버에서 가져오기
+    // If no initialItems, fetch from server
     fetchListings()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, page, pageSize, search, sortBy, sortOrder])
   
-  // 필터 변경 시 (initialItems가 없을 때만)
+  // On filter change (only when no initialItems)
   useEffect(() => {
     if (mode === 'low' && (!initialItems || (Array.isArray(initialItems) && initialItems.length === 0))) {
       // Reset to page 1 when filters change
@@ -331,11 +330,11 @@ function LowPerformingResults({ mode = 'low', initialFilters = null, initialItem
     }
   }
   
-  // 클라이언트 측 필터링/정렬/검색 (initialItems가 있을 때)
+  // Client-side filter/sort/search (when initialItems present)
   const filteredAndSortedListings = useMemo(() => {
     let filtered = listings
     
-    // 검색 필터
+    // Search filter
     if (search) {
       const searchLower = search.toLowerCase()
       filtered = filtered.filter(item => 
@@ -345,18 +344,18 @@ function LowPerformingResults({ mode = 'low', initialFilters = null, initialItem
       )
     }
     
-    // 정렬
+    // Sort
     if (sortBy) {
       filtered = [...filtered].sort((a, b) => {
         let aVal = a[sortBy] || 0
         let bVal = b[sortBy] || 0
         
-        // 숫자 비교
+        // Numeric compare
         if (typeof aVal === 'number' && typeof bVal === 'number') {
           return sortOrder === 'asc' ? aVal - bVal : bVal - aVal
         }
         
-        // 문자열 비교
+        // String compare
         if (typeof aVal === 'string' && typeof bVal === 'string') {
           return sortOrder === 'asc' 
             ? aVal.localeCompare(bVal)
@@ -370,7 +369,7 @@ function LowPerformingResults({ mode = 'low', initialFilters = null, initialItem
     return filtered
   }, [listings, search, sortBy, sortOrder])
   
-  // 페이지네이션
+  // Pagination
   const paginatedListings = useMemo(() => {
     const startIndex = (page - 1) * pageSize
     const endIndex = startIndex + pageSize
@@ -380,9 +379,9 @@ function LowPerformingResults({ mode = 'low', initialFilters = null, initialItem
   const totalPages = Math.ceil(filteredAndSortedListings.length / pageSize)
   const displayCount = filteredAndSortedListings.length
   
-  // 전체 선택 핸들러 (paginatedListings 정의 후에 정의)
+  // Select-all handler (defined after paginatedListings)
   const handleSelectAll = (checked) => {
-    // 전체 선택: 현재 표시된 페이지의 모든 항목 선택
+    // Select all: current page items only
     if (checked) {
       setSelectedIds(paginatedListings.map(item => item.id))
     } else {
@@ -410,7 +409,7 @@ function LowPerformingResults({ mode = 'low', initialFilters = null, initialItem
             onClick={onClose}
             className="px-4 py-2 text-sm text-zinc-400 hover:text-white transition-colors"
           >
-            ✕ 닫기
+            ✕ Close
           </button>
         )}
       </div>

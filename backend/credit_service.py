@@ -1,13 +1,6 @@
 """
-OptListing Credit Service
-=========================
-3-Way Hybrid Pricing을 위한 크레딧 관리 서비스
-
-주요 기능:
-- 원자적(Atomic) 크레딧 차감 (동시성 안전)
-- 크레딧 잔액 조회
-- 크레딧 충전 (결제 연동용)
-- FastAPI 의존성 주입 지원
+OptListing Credit Service - 3-Way Hybrid Pricing.
+Features: atomic credit deduct (concurrency-safe), balance query, top-up (payment), FastAPI Depends.
 """
 
 import uuid
@@ -26,7 +19,7 @@ from .models import Profile, get_db
 
 
 # =============================================
-# 상수 및 설정
+# Constants and config
 # =============================================
 
 class PlanType(str, Enum):
@@ -43,7 +36,7 @@ class TransactionType(str, Enum):
     BONUS = "bonus"
 
 
-# 플랜별 기본 크레딧 (가입 시 부여)
+# Default credits per plan (granted on signup)
 PLAN_DEFAULT_CREDITS = {
     PlanType.FREE: 100,
     PlanType.STARTER: 500,
@@ -51,17 +44,17 @@ PLAN_DEFAULT_CREDITS = {
     PlanType.ENTERPRISE: 10000,
 }
 
-# 무료티어 설정
-FREE_TIER_MAX_COUNT = 3  # 최대 무료 사용 횟수
+# Free tier config
+FREE_TIER_MAX_COUNT = 3  # Max free uses
 
 
 # =============================================
-# 응답 데이터 클래스
+# Response dataclasses
 # =============================================
 
 @dataclass
 class CreditCheckResult:
-    """크레딧 검사 결과"""
+    """Credit check result"""
     success: bool
     available_credits: int
     requested_credits: int
@@ -70,7 +63,7 @@ class CreditCheckResult:
 
 @dataclass
 class CreditDeductResult:
-    """크레딧 차감 결과"""
+    """Credit deduct result"""
     success: bool
     remaining_credits: int
     deducted_amount: int
@@ -80,7 +73,7 @@ class CreditDeductResult:
 
 @dataclass
 class CreditAddResult:
-    """크레딧 추가 결과"""
+    """Credit add result"""
     success: bool
     total_credits: int
     added_amount: int
@@ -89,15 +82,15 @@ class CreditAddResult:
 
 
 # =============================================
-# 핵심 크레딧 함수
+# Core credit functions
 # =============================================
 
 def get_available_credits(db: Session, user_id: str) -> int:
     """
-    사용자의 잔여 크레딧 조회
+    Get user's remaining credits.
     
     Returns:
-        int: 잔여 크레딧 (purchased_credits - consumed_credits)
+        int: Remaining credits (purchased_credits - consumed_credits)
     """
     profile = db.query(Profile).filter(Profile.user_id == user_id).first()
     
@@ -113,15 +106,8 @@ def check_credits(
     required_credits: int
 ) -> CreditCheckResult:
     """
-    크레딧 충분 여부 검사 (차감 없음)
-    
-    Args:
-        db: 데이터베이스 세션
-        user_id: 사용자 ID
-        required_credits: 필요한 크레딧 수
-        
-    Returns:
-        CreditCheckResult: 검사 결과
+    Check if user has enough credits (no deduct).
+    Args: db, user_id, required_credits. Returns: CreditCheckResult.
     """
     available = get_available_credits(db, user_id)
     
@@ -149,22 +135,11 @@ def deduct_credits_atomic(
     reference_id: Optional[str] = None
 ) -> CreditDeductResult:
     """
-    원자적 크레딧 차감 (동시성 안전)
-    
-    무료티어가 남아있으면 크레딧 차감 없이 진행하고 무료티어 카운트 증가
-    무료티어가 모두 사용되면 일반 크레딧 차감 로직 사용
-    
-    PostgreSQL의 원자적 UPDATE를 사용하여 Race Condition 방지
-    
-    Args:
-        db: 데이터베이스 세션
-        user_id: 사용자 ID
-        amount: 차감할 크레딧 수
-        description: 트랜잭션 설명
-        reference_id: 참조 ID (분석 작업 ID 등)
-        
-    Returns:
-        CreditDeductResult: 차감 결과 (무료티어 사용 시 deducted_amount=0)
+    Atomic credit deduction (concurrency-safe).
+    If free tier remains, no deduction and free tier count increases; else normal deduct.
+    Uses PostgreSQL atomic UPDATE to prevent race condition.
+    Args: db, user_id, amount, description, reference_id.
+    Returns: CreditDeductResult (deducted_amount=0 when free tier used).
     """
     if amount <= 0:
         return CreditDeductResult(
@@ -175,8 +150,7 @@ def deduct_credits_atomic(
         )
     
     try:
-        # 무료티어 확인 및 사용 (원자적 UPDATE)
-        # free_tier_count < FREE_TIER_MAX_COUNT인 경우 증가
+        # Check and use free tier (atomic UPDATE)
         free_tier_result = db.execute(
             text("""
                 UPDATE profiles
@@ -196,11 +170,11 @@ def deduct_credits_atomic(
         free_tier_row = free_tier_result.fetchone()
         
         if free_tier_row is not None:
-            # 무료티어 사용 성공 - 크레딧 차감 없이 진행
+            # Free tier used successfully - no credit deduction
             remaining_credits = free_tier_row.remaining
             free_tier_used = free_tier_row.free_tier_count
             
-            # 트랜잭션 이력 기록 (무료티어 사용으로 기록)
+            # Log transaction (free tier)
             try:
                 db.execute(
                     text("""
@@ -210,7 +184,7 @@ def deduct_credits_atomic(
                     """),
                     {
                         "user_id": user_id,
-                        "amount": 0,  # 무료티어는 0 크레딧
+                        "amount": 0,  # Free tier = 0 credits
                         "balance": remaining_credits,
                         "description": description or f"Free tier usage ({free_tier_used}/{FREE_TIER_MAX_COUNT})",
                         "reference_id": reference_id or str(uuid.uuid4())
@@ -224,14 +198,13 @@ def deduct_credits_atomic(
             return CreditDeductResult(
                 success=True,
                 remaining_credits=remaining_credits,
-                deducted_amount=0,  # 무료티어는 차감 없음
+                deducted_amount=0,  # Free tier = no deduct
                 message=f"Free tier used ({free_tier_used}/{FREE_TIER_MAX_COUNT})",
                 transaction_id=str(uuid.uuid4())
             )
         
-        # 무료티어가 모두 사용됨 - 일반 크레딧 차감 로직 진행
-        # ✅ 원자적 UPDATE (동시성 안전)
-        # WHERE 절에서 잔액 검사를 함께 수행하여 Race Condition 방지
+        # Free tier exhausted - proceed with normal credit deduct
+        # Atomic UPDATE (concurrency-safe); WHERE checks balance to prevent race
         result = db.execute(
             text("""
                 UPDATE profiles
@@ -250,7 +223,7 @@ def deduct_credits_atomic(
         row = result.fetchone()
         
         if row is None:
-            # 업데이트 실패 - 잔액 부족
+            # Update failed - insufficient balance
             available = get_available_credits(db, user_id)
             
             return CreditDeductResult(
@@ -262,7 +235,7 @@ def deduct_credits_atomic(
         
         remaining_credits = row.remaining
         
-        # 트랜잭션 이력 기록 (credit_transactions 테이블이 있는 경우)
+        # Log transaction (if credit_transactions table exists)
         transaction_id = str(uuid.uuid4())
         try:
             db.execute(
@@ -273,15 +246,15 @@ def deduct_credits_atomic(
                 """),
                 {
                     "user_id": user_id,
-                    "amount": -amount,  # 차감은 음수
+                    "amount": -amount,  # Deduct = negative
                     "balance": remaining_credits,
                     "description": description or f"Deducted {amount} credits",
                     "reference_id": reference_id or transaction_id
                 }
             )
-        except SQLAlchemyError:
-            # credit_transactions 테이블이 없으면 무시
-            pass
+            except SQLAlchemyError:
+                # Ignore if credit_transactions table does not exist
+                pass
         
         db.commit()
         
@@ -312,20 +285,9 @@ def add_credits(
     reference_id: Optional[str] = None
 ) -> CreditAddResult:
     """
-    크레딧 추가 (구매, 보너스, 환불 등)
-    
-    Profile이 없으면 자동으로 생성합니다 (idempotent).
-    
-    Args:
-        db: 데이터베이스 세션
-        user_id: 사용자 ID
-        amount: 추가할 크레딧 수
-        transaction_type: 트랜잭션 유형
-        description: 트랜잭션 설명
-        reference_id: 참조 ID (결제 ID 등)
-        
-    Returns:
-        CreditAddResult: 추가 결과
+    Add credits (purchase, bonus, refund, etc). Creates Profile if missing (idempotent).
+    Args: db, user_id, amount, transaction_type, description, reference_id.
+    Returns: CreditAddResult.
     """
     if amount <= 0:
         return CreditAddResult(
@@ -339,13 +301,13 @@ def add_credits(
     logger.info(f"[add_credits] START: user_id={user_id}, amount={amount}, transaction_type={transaction_type.value}, reference_id={reference_id}")
     
     try:
-        # 먼저 profile이 있는지 확인하고 없으면 생성 (idempotent)
+        # Check profile exists; create if not (idempotent)
         logger.info(f"[add_credits] Querying profile for user_id={user_id}")
         profile = db.query(Profile).filter(Profile.user_id == user_id).first()
         
         if not profile:
             logger.info(f"[add_credits] Profile not found, creating new profile for user_id={user_id}")
-            # Profile이 없으면 자동 생성
+            # Auto-create profile if not present
             try:
                 logger.info(f"[add_credits] Creating Profile object for user_id={user_id}")
                 profile = Profile(
@@ -368,8 +330,7 @@ def add_credits(
                 db.rollback()
                 logger.error(f"[add_credits] ❌ Profile creation failed: user_id={user_id}, error={str(e)}", exc_info=True)
                 logger.error(f"[add_credits] Error type: {type(e).__name__}, Error details: {repr(e)}")
-                # Race condition: 다른 프로세스가 이미 생성했을 수 있음
-                # 다시 조회 시도
+                # Race: another process may have created; retry query
                 logger.info(f"[add_credits] Retrying query after rollback for user_id={user_id}")
                 profile = db.query(Profile).filter(Profile.user_id == user_id).first()
                 if not profile:
@@ -385,7 +346,7 @@ def add_credits(
         else:
             logger.info(f"[add_credits] ✅ Profile found: user_id={user_id}, profile_id={profile.id}, purchased_credits={profile.purchased_credits}, consumed_credits={profile.consumed_credits}")
         
-        # 원자적 UPDATE
+        # Atomic UPDATE
         logger.info(f"[add_credits] Executing UPDATE query: user_id={user_id}, amount={amount}")
         result = db.execute(
             text("""
@@ -406,7 +367,7 @@ def add_credits(
         
         if row is None:
             logger.error(f"[add_credits] ❌ UPDATE returned no rows: user_id={user_id}, amount={amount}")
-            # 이 경우는 발생하지 않아야 하지만, 안전을 위해 처리
+            # Should not happen; handle for safety
             return CreditAddResult(
                 success=False,
                 total_credits=get_available_credits(db, user_id),
@@ -418,7 +379,7 @@ def add_credits(
         logger.info(f"[add_credits] ✅ UPDATE successful: user_id={user_id}, new_total_credits={total_credits}")
         transaction_id = str(uuid.uuid4())
         
-        # 트랜잭션 이력 기록
+        # Log transaction
         try:
             logger.info(f"[add_credits] Inserting credit_transaction: user_id={user_id}, amount={amount}, reference_id={reference_id}")
             db.execute(
@@ -430,7 +391,7 @@ def add_credits(
                 {
                     "user_id": user_id,
                     "type": transaction_type.value,
-                    "amount": amount,  # 추가는 양수
+                    "amount": amount,  # Add = positive
                     "balance": total_credits,
                     "description": description or f"Added {amount} credits ({transaction_type.value})",
                     "reference_id": reference_id or transaction_id
@@ -440,7 +401,7 @@ def add_credits(
         except SQLAlchemyError as e:
             logger.error(f"[add_credits] ❌ Failed to insert credit_transaction: user_id={user_id}, error={str(e)}", exc_info=True)
             logger.error(f"[add_credits] Error type: {type(e).__name__}, Error details: {repr(e)}")
-            # credit_transactions 테이블이 없으면 무시하되 로그는 남김
+            # Ignore if credit_transactions table does not exist (log only)
         
         logger.info(f"[add_credits] Committing transaction for user_id={user_id}")
         db.commit()
@@ -484,23 +445,15 @@ def initialize_user_credits(
     plan: PlanType = PlanType.FREE
 ) -> CreditAddResult:
     """
-    신규 사용자 크레딧 초기화
-    
-    Args:
-        db: 데이터베이스 세션
-        user_id: 사용자 ID
-        plan: 플랜 유형
-        
-    Returns:
-        CreditAddResult: 초기화 결과
+    Initialize credits for new user. Args: db, user_id, plan. Returns: CreditAddResult.
     """
     default_credits = PLAN_DEFAULT_CREDITS.get(plan, 100)
     
-    # 프로필 생성 또는 업데이트
+    # Create or get profile
     profile = db.query(Profile).filter(Profile.user_id == user_id).first()
     
     if not profile:
-        # 새 프로필 생성
+        # Create new profile
         profile = Profile(
             user_id=user_id,
             purchased_credits=default_credits,
@@ -517,7 +470,7 @@ def initialize_user_credits(
             message=f"User initialized with {default_credits} credits ({plan.value} plan)"
         )
     else:
-        # 기존 프로필 - 크레딧이 0인 경우에만 초기화
+        # Existing profile - init only if credits 0
         if profile.purchased_credits == 0:
             return add_credits(
                 db, user_id, default_credits,
@@ -534,20 +487,20 @@ def initialize_user_credits(
 
 
 # =============================================
-# FastAPI 의존성 주입
+# FastAPI dependency injection
 # =============================================
 
 class CreditChecker:
     """
-    FastAPI 의존성 - 크레딧 검사 및 차감
+    FastAPI dependency - credit check and deduct.
     
-    사용 예시:
+    Example:
         @app.post("/api/analysis/start")
         async def start_analysis(
             request: AnalysisRequest,
             credit_check: CreditDeductResult = Depends(CreditChecker(auto_deduct=True))
         ):
-            # credit_check.success가 False면 이미 HTTPException 발생
+            # HTTPException already raised if credit_check.success is False
             ...
     """
     
@@ -558,8 +511,8 @@ class CreditChecker:
     ):
         """
         Args:
-            auto_deduct: True면 검사 성공 시 자동 차감
-            credits_per_listing: 리스팅당 필요 크레딧 수
+            auto_deduct: If True, auto-deduct on check success
+            credits_per_listing: Credits required per listing
         """
         self.auto_deduct = auto_deduct
         self.credits_per_listing = credits_per_listing
@@ -570,21 +523,11 @@ class CreditChecker:
         listing_count: int,
         db: Session = Depends(get_db)
     ) -> CreditCheckResult | CreditDeductResult:
-        """
-        크레딧 검사 (및 선택적 차감)
-        
-        Args:
-            user_id: 사용자 ID (요청 헤더 또는 토큰에서 추출)
-            listing_count: 분석할 리스팅 수
-            db: DB 세션
-            
-        Raises:
-            HTTPException: 크레딧 부족 시 402 Payment Required
-        """
+        """Credit check (and optional deduct). Raises 402 if insufficient."""
         required_credits = listing_count * self.credits_per_listing
         
         if self.auto_deduct:
-            # 검사 + 차감 동시 수행
+            # Check + deduct
             result = deduct_credits_atomic(
                 db, user_id, required_credits,
                 description=f"Analysis of {listing_count} listings"
@@ -603,7 +546,7 @@ class CreditChecker:
             
             return result
         else:
-            # 검사만 수행
+            # Check only
             result = check_credits(db, user_id, required_credits)
             
             if not result.success:
@@ -621,16 +564,7 @@ class CreditChecker:
 
 
 def require_credits(amount: int):
-    """
-    고정 크레딧 요구 데코레이터 스타일 의존성
-    
-    사용 예시:
-        @app.post("/api/some-feature")
-        async def some_feature(
-            credits: CreditDeductResult = Depends(require_credits(10))
-        ):
-            ...
-    """
+    """Fixed-amount credit dependency. Use: Depends(require_credits(10))."""
     async def dependency(
         user_id: str,
         db: Session = Depends(get_db)
@@ -654,16 +588,11 @@ def require_credits(amount: int):
 
 
 # =============================================
-# 유틸리티 함수
+# Utilities
 # =============================================
 
 def get_credit_summary(db: Session, user_id: str) -> Dict[str, Any]:
-    """
-    사용자 크레딧 요약 정보
-    
-    Returns:
-        dict: 크레딧 요약 정보
-    """
+    """Get user credit summary. Returns dict."""
     try:
         # Use raw SQL to safely check if column exists and get data
         from sqlalchemy import inspect
@@ -768,10 +697,8 @@ def refund_credits(
     reference_id: Optional[str] = None
 ) -> CreditAddResult:
     """
-    크레딧 환불 (분석 실패 시 등)
-    
-    consumed_credits를 감소시키는 대신 purchased_credits를 증가시킴
-    (이력 추적을 위해)
+    Refund credits (e.g. on analysis failure).
+    Increases purchased_credits instead of decreasing consumed_credits (for audit).
     """
     return add_credits(
         db, user_id, amount,

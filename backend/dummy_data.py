@@ -168,7 +168,7 @@ def generate_dummy_listings(db: Session, count: int = 50, user_id: str = "defaul
                 title = f"{brand} {title}"
             
             # Determine if product goes through Shopify (30% chance)
-            # Shopify 경유 제품: marketplace는 eBay이지만 management_hub가 Shopify
+            # Shopify-routed product: marketplace eBay but management_hub Shopify
             goes_through_shopify = random.random() < 0.3
             
             # Build metrics JSONB

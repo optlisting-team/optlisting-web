@@ -1,6 +1,5 @@
 """
-인증 관련 공통 모듈
-JWT 토큰 검증 로직을 중앙 관리
+Auth common module. Centralized JWT token verification.
 """
 import os
 import logging
@@ -20,18 +19,12 @@ except ImportError:
 
 def get_current_user(request: Request) -> str:
     """
-    FastAPI 의존성 함수: JWT 토큰을 검증하고 user_id를 반환합니다.
-    
-    Authorization: Bearer <JWT> 헤더에서 토큰을 추출하고
-    Supabase Auth를 통해 검증합니다.
-    
-    Returns:
-        str: 인증된 사용자의 user_id (UUID)
-    
-    Raises:
-        HTTPException: 토큰이 없거나 유효하지 않은 경우 401 반환
+    FastAPI dependency: verify JWT and return user_id.
+    Extracts token from Authorization: Bearer <JWT> and verifies via Supabase Auth.
+    Returns: authenticated user_id (UUID).
+    Raises: HTTPException 401 if token missing or invalid.
     """
-    # Authorization 헤더 확인
+    # Check Authorization header
     auth_header = request.headers.get("Authorization")
     if not auth_header:
         logger.warning("❌ [AUTH] Authorization header missing")
@@ -40,7 +33,7 @@ def get_current_user(request: Request) -> str:
             detail="Authorization header missing. Please provide a valid JWT token."
         )
     
-    # Bearer 토큰 추출
+    # Extract Bearer token
     try:
         scheme, token = auth_header.split()
         if scheme.lower() != "bearer":
@@ -52,7 +45,7 @@ def get_current_user(request: Request) -> str:
             detail="Invalid authorization header format. Expected: Bearer <token>"
         )
     
-    # Supabase 클라이언트 생성 및 토큰 검증
+    # Create Supabase client and verify token
     if not SUPABASE_AVAILABLE:
         logger.error("❌ [AUTH] Supabase client not available")
         raise HTTPException(
@@ -73,7 +66,7 @@ def get_current_user(request: Request) -> str:
         
         supabase: Client = create_client(supabase_url, supabase_key)
         
-        # 토큰 검증 및 사용자 정보 조회
+        # Verify token and get user info
         user_response = supabase.auth.get_user(token)
         
         if user_response.user is None:

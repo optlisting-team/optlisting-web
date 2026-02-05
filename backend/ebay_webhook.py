@@ -22,7 +22,7 @@ import os
 import hashlib
 import logging
 import base64
-import time as time_module  # time.sleep과 구분
+import time as time_module  # distinguish from time.sleep
 import requests
 import asyncio
 from datetime import datetime, timedelta, date
@@ -213,21 +213,21 @@ async def ebay_deletion_notification(request: Request):
     logger.info("📥 eBay Request Received (POST)")
     
     try:
-        # Request body 읽기
+        # Read request body
         body = await request.body()
         body_str = body.decode('utf-8')
         
         logger.info(f"   Body length: {len(body_str)}")
         logger.info(f"   Body preview: {body_str[:500]}...")
         
-        # JSON 파싱
+        # JSON parse
         try:
             data = await request.json()
         except Exception as json_err:
             logger.warning(f"   JSON parse error: {json_err}")
             data = {}
         
-        # Challenge code 확인 (POST body에 있는 경우)
+        # Check challenge code (when present in POST body)
         challenge_code = data.get("challenge_code") or data.get("challengeCode")
         
         if challenge_code:
@@ -259,7 +259,7 @@ async def ebay_deletion_notification(request: Request):
                 content={"challengeResponse": challenge_response}
             )
         
-        # 실제 Deletion Notification 처리
+        # Handle Deletion Notification
         notification_type = data.get("metadata", {}).get("topic", "unknown")
         ebay_user_id = data.get("notification", {}).get("data", {}).get("userId", "unknown")
         
@@ -267,12 +267,12 @@ async def ebay_deletion_notification(request: Request):
         logger.info(f"   Type: {notification_type}")
         logger.info(f"   eBay User ID: {ebay_user_id}")
         
-        # 실제 사용자 데이터 삭제 로직 구현
+        # User data deletion logic
         from .models import get_db, Profile, Listing, DeletionLog
         
         db = next(get_db())
         try:
-            # 1. profiles 테이블에서 ebay_user_id로 검색
+            # 1. Find profile by ebay_user_id
             profile = db.query(Profile).filter(Profile.ebay_user_id == ebay_user_id).first()
             
             if not profile:
@@ -288,14 +288,14 @@ async def ebay_deletion_notification(request: Request):
             user_id = profile.user_id
             logger.info(f"   Found profile: user_id={user_id}")
             
-            # 2. 해당 사용자의 모든 listings 조회
+            # 2. Query all listings for this user
             user_listings = db.query(Listing).filter(Listing.user_id == user_id).all()
             listing_count = len(user_listings)
             
             logger.info(f"   Found {listing_count} listings for user {user_id}")
             
             if listing_count > 0:
-                # 3. deletion_logs 기록 (삭제 전에 스냅샷 저장)
+                # 3. Write deletion_logs (snapshot before delete)
                 deletion_logs = []
                 for listing in user_listings:
                     # Extract supplier_name
@@ -334,13 +334,12 @@ async def ebay_deletion_notification(request: Request):
                 db.bulk_save_objects(deletion_logs)
                 logger.info(f"   Created {len(deletion_logs)} deletion log entries")
                 
-                # 4. 관련 listings 삭제
+                # 4. Delete related listings
                 for listing in user_listings:
                     db.delete(listing)
                 logger.info(f"   Deleted {listing_count} listings")
                 
-                # 5. Profile도 삭제 (선택사항 - 또는 비활성화만 할 수도 있음)
-                # 여기서는 삭제하지 않고, 필요시 나중에 정리할 수 있도록 남겨둠
+                # 5. Profile delete optional; leave as-is for later cleanup
                 # db.delete(profile)
                 
                 db.commit()
@@ -354,7 +353,7 @@ async def ebay_deletion_notification(request: Request):
             logger.error(f"❌ Error processing deletion: {str(e)}")
             import traceback
             logger.error(traceback.format_exc())
-            # 에러가 발생해도 eBay에 성공 응답을 보내야 함 (재시도 방지)
+            # Return 200 to eBay even on error (avoid retry)
             return JSONResponse(
                 status_code=200,
                 content={
@@ -383,7 +382,7 @@ async def ebay_deletion_notification(request: Request):
         logger.error(f"❌ Error: {str(e)}")
         logger.info("=" * 60)
         
-        # eBay는 200 OK를 기대하므로, 에러가 나도 200 반환
+        # eBay expects 200; return 200 even on error
         return JSONResponse(
             status_code=200,
             content={
@@ -396,7 +395,7 @@ async def ebay_deletion_notification(request: Request):
 @router.get("/health")
 async def ebay_webhook_health():
     """
-    eBay Webhook Health Check - 설정 상태 확인용
+    eBay Webhook Health Check - verify configuration
     """
     verification_secret = get_verification_secret()
     webhook_endpoint = get_webhook_endpoint()
@@ -417,8 +416,8 @@ async def test_challenge(
     challenge_code: str = Query("test123", description="Test challenge code")
 ):
     """
-    Challenge Response 테스트 엔드포인트
-    - 디버그용: 설정된 환경변수로 challenge response 계산 테스트
+    Test endpoint for challenge response.
+    Debug: test challenge response calculation with configured env vars.
     """
     verification_secret = get_verification_secret()
     webhook_endpoint = get_webhook_endpoint()
@@ -451,25 +450,22 @@ async def test_challenge(
 
 
 # =====================================================
-# eBay OAuth 2.0 Endpoints - 원클릭 연결
+# eBay OAuth 2.0 Endpoints - one-click connect
 # =====================================================
 
 @router.post("/auth/start")
 async def ebay_auth_start(
     request: Request,
-    # JWT 인증으로 user_id 추출 (쿼리 파라미터 제거)
+    # user_id from JWT (no query param)
     user_id: str = Depends(get_current_user),
     state: Optional[str] = Query(None, description="Optional state parameter for CSRF protection")
 ):
     """
-    🚀 eBay OAuth 시작 - "Connect eBay" 버튼 클릭 시 호출
-    
-    1. JWT 토큰에서 user_id 추출 (Authorization 헤더)
-    2. Authorization URL 생성
-    3. 사용자를 eBay 로그인 페이지로 리다이렉트
-    
-    프론트엔드에서 호출 방법:
-    - apiClient를 사용하여 JWT 토큰이 자동으로 헤더에 추가됨
+    eBay OAuth start - called when user clicks "Connect eBay".
+    1. Extract user_id from JWT (Authorization header)
+    2. Build authorization URL
+    3. Redirect to eBay login
+    Frontend: use apiClient so JWT is auto-added;
     - window.location.href = `${API_URL}/api/ebay/auth/start`
     """
     logger.info("=" * 60)
@@ -478,7 +474,7 @@ async def ebay_auth_start(
     logger.info(f"   state: {state}")
     logger.info(f"   Request headers: {dict(request.headers)}")
     
-    # 환경변수 확인
+    # Check env vars
     if not EBAY_CLIENT_ID:
         logger.error("❌ EBAY_CLIENT_ID not configured!")
         logger.error(f"   EBAY_CLIENT_ID value: {EBAY_CLIENT_ID[:10] if EBAY_CLIENT_ID else 'None'}...")
@@ -489,17 +485,17 @@ async def ebay_auth_start(
         logger.error(f"   EBAY_RU_NAME value: {EBAY_RU_NAME[:20] if EBAY_RU_NAME else 'None'}...")
         raise HTTPException(status_code=500, detail="eBay RuName not configured")
     
-    # Environment 선택
+    # Select environment
     env = EBAY_ENVIRONMENT if EBAY_ENVIRONMENT in EBAY_AUTH_ENDPOINTS else "PRODUCTION"
     auth_url_base = EBAY_AUTH_ENDPOINTS[env]["authorize"]
     
-    # State 파라미터 생성 (user_id 포함)
+    # Build state param (include user_id)
     state_value = state or f"user_{user_id}_{datetime.now().timestamp()}"
     
-    # Scope 조합
+    # Scope string
     scope_string = " ".join(EBAY_SCOPES)
     
-    # Authorization URL 파라미터
+    # Authorization URL params
     auth_params = {
         "client_id": EBAY_CLIENT_ID,
         "redirect_uri": EBAY_RU_NAME,
@@ -536,12 +532,11 @@ async def ebay_auth_callback(
     error_description: Optional[str] = Query(None, description="Error description")
 ):
     """
-    🔐 eBay OAuth Callback - eBay 로그인 후 리다이렉트되는 엔드포인트
-    
-    1. Authorization code 수신
-    2. Code를 Access Token + Refresh Token으로 교환
-    3. 토큰을 DB에 저장
-    4. 프론트엔드로 리다이렉트 (성공/실패 메시지)
+    eBay OAuth Callback - redirected here after eBay login.
+    1. Receive authorization code
+    2. Exchange code for access + refresh token
+    3. Save tokens to DB
+    4. Redirect to frontend (success/failure message)
     """
     logger.info("=" * 60)
     logger.info("🔐 eBay OAuth Callback Received")
@@ -552,21 +547,21 @@ async def ebay_auth_callback(
     logger.info(f"   error: {error}")
     logger.info(f"   error_description: {error_description}")
     
-    # 에러 처리
+    # Error handling
     if error:
         logger.error(f"❌ OAuth Error: {error} - {error_description}")
         error_redirect = f"{FRONTEND_URL}/settings?ebay_error={error}&message={error_description or 'Authorization failed'}"
         return RedirectResponse(url=error_redirect, status_code=302)
     
-    # Authorization code 확인
+    # Check authorization code
     if not code:
         logger.error("❌ No authorization code received")
         error_redirect = f"{FRONTEND_URL}/settings?ebay_error=no_code&message=No authorization code received"
         return RedirectResponse(url=error_redirect, status_code=302)
     
-    # State에서 user_id 추출
-    # State 형식: "user_{user_id}_{timestamp}"
-    # CRITICAL: 'default-user'는 절대 사용하지 않음 - 실제 로그인 유저 ID만 허용
+    # Extract user_id from state
+    # State format: "user_{user_id}_{timestamp}"
+    # CRITICAL: never use 'default-user' - only allow actual logged-in user ID
     user_id = None
     if state:
         logger.info(f"   Raw state parameter: {state}")
@@ -576,7 +571,7 @@ async def ebay_auth_callback(
                 parts = state.split("_")
                 logger.info(f"   State parts: {parts}")
                 if len(parts) >= 2:
-                    extracted_user_id = parts[1]  # 실제 user_id 추출
+                    extracted_user_id = parts[1]  # actual user_id
                     if extracted_user_id:
                         user_id = extracted_user_id
                         logger.info(f"   ✅ Extracted valid user_id from state: {user_id}")
@@ -589,7 +584,7 @@ async def ebay_auth_callback(
         else:
             logger.warning(f"   State does not start with 'user_': {state[:50]}")
     
-    # user_id 검증 - None이면 에러 반환
+    # Validate user_id - return error if None
     if not user_id:
         logger.error(f"❌ Invalid user_id: '{user_id}' - Cannot save token without valid user_id")
         error_redirect = f"{FRONTEND_URL}/dashboard?ebay_error=invalid_user&message=User ID is required. Please log in and try again."
@@ -597,7 +592,7 @@ async def ebay_auth_callback(
     
     logger.info(f"   ✅ Final user_id to use: {user_id} (validated)")
     
-    # 환경변수 확인
+    # Check env vars
     if not EBAY_CLIENT_ID or not EBAY_CLIENT_SECRET:
         logger.error("❌ eBay credentials not configured!")
         error_redirect = f"{FRONTEND_URL}/settings?ebay_error=config&message=eBay credentials not configured"
@@ -637,15 +632,14 @@ async def ebay_auth_callback(
         
         access_token = token_data.get("access_token")
         refresh_token = token_data.get("refresh_token")
-        expires_in = token_data.get("expires_in", 7200)  # 기본 2시간
+        expires_in = token_data.get("expires_in", 7200)  # default 2h
         
         logger.info(f"✅ Tokens received successfully")
         logger.info(f"   access_token: {access_token[:20] if access_token else 'None'}...")
         logger.info(f"   refresh_token: {'Yes' if refresh_token else 'No'}")
         logger.info(f"   expires_in: {expires_in} seconds")
         
-        # 토큰 만료 시간 계산 (UTC 기준)
-        # eBay 토큰은 UTC 시간으로 만료 시간을 제공하므로 UTC로 저장
+        # Token expiry (UTC). eBay provides UTC; store as UTC.
         token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
         token_updated_at = datetime.utcnow()
         
@@ -654,7 +648,7 @@ async def ebay_auth_callback(
         logger.info(f"   Expires in: {expires_in} seconds ({expires_in / 3600:.2f} hours)")
         logger.info(f"   Token expires at (UTC): {token_expires_at.isoformat()}")
         
-        # 🔥 eBay User ID 가져오기 (Trading API GetUser 사용)
+        # Get eBay User ID (Trading API GetUser)
         ebay_user_id = None
         try:
             logger.info("🔍 Fetching eBay User ID from Trading API...")
@@ -685,10 +679,10 @@ async def ebay_auth_callback(
                 user_root = ET.fromstring(user_response.text)
                 user_ns = {"ebay": "urn:ebay:apis:eBLBaseComponents"}
                 
-                # 에러 체크
+                # Error check
                 ack = user_root.find(".//ebay:Ack", user_ns)
                 if ack is not None and ack.text == "Success":
-                    # UserID 추출
+                    # Extract UserID
                     user_id_elem = user_root.find(".//ebay:User", user_ns)
                     if user_id_elem is not None:
                         ebay_user_id = user_id_elem.findtext("ebay:UserID", "", user_ns)
@@ -703,9 +697,9 @@ async def ebay_auth_callback(
                 logger.warning(f"⚠️ GetUser API request failed: {user_response.status_code}")
         except Exception as user_err:
             logger.warning(f"⚠️ Failed to get eBay User ID: {user_err}")
-            # eBay User ID 가져오기 실패해도 계속 진행 (토큰 저장은 성공)
+            # Continue even if eBay User ID fetch fails (token save still succeeds)
         
-        # DB에 토큰 저장
+        # Save tokens to DB
         from .models import Profile, get_db
         db = None
         db_verify = None
@@ -713,7 +707,7 @@ async def ebay_auth_callback(
         try:
             db = next(get_db())
             
-            # 프로필 조회 (free_tier_count 컬럼이 없을 수 있으므로 raw SQL 사용)
+            # Get profile (raw SQL if free_tier_count column missing)
             from sqlalchemy import text
             query = text("""
                 SELECT id, user_id
@@ -726,7 +720,7 @@ async def ebay_auth_callback(
             profile_exists = row is not None
             
             if not profile_exists:
-                # 새 프로필 생성 (free_tier_count 컬럼이 없어도 동작하도록 raw SQL 사용)
+                # Create new profile (raw SQL so it works without free_tier_count)
                 insert_query = text("""
                     INSERT INTO profiles (user_id, ebay_access_token, ebay_refresh_token, 
                                           ebay_token_expires_at, ebay_token_updated_at, ebay_user_id)
@@ -742,7 +736,7 @@ async def ebay_auth_callback(
                 })
                 logger.info(f"📝 Creating new profile for user: {user_id} (eBay User ID: {ebay_user_id})")
             else:
-                # 기존 프로필 업데이트 (free_tier_count 컬럼이 없어도 동작하도록 raw SQL 사용)
+                # Update existing profile (raw SQL so it works without free_tier_count)
                 update_query = text("""
                     UPDATE profiles
                     SET ebay_access_token = :access_token,
@@ -762,24 +756,24 @@ async def ebay_auth_callback(
                 })
                 logger.info(f"📝 Updating existing profile for user: {user_id} (eBay User ID: {ebay_user_id})")
             
-            # 트랜잭션 커밋 (Race condition 방지: 커밋 완료 후 리다이렉트)
+            # Commit (avoid race: commit before redirect)
             db.commit()
             logger.info(f"✅ Tokens saved to database for user: {user_id}")
             logger.info(f"   Access token length: {len(access_token)}")
             logger.info(f"   Refresh token exists: {bool(refresh_token)}")
             logger.info(f"   Token expires at: {token_expires_at.isoformat()}")
             
-            # Race condition 방지: DB 커밋 후 약간의 지연 (토큰 저장 완료 보장)
-            time_module.sleep(0.1)  # 100ms 지연으로 DB 쓰기 완료 보장
+            # Small delay after commit so DB write completes
+            time_module.sleep(0.1)  # 100ms
             
-            # 저장 후 즉시 확인 (검증) - 새 세션으로 다시 조회
+            # Verify immediately after save - re-query with new session
             db.close()
             db = None
             
-            # 새 세션으로 검증 (free_tier_count 컬럼이 없을 수 있으므로 안전하게 처리)
+            # Verify with new session (safe if free_tier_count missing)
             db_verify = next(get_db())
             
-            # Raw SQL 사용 (free_tier_count 컬럼이 없어도 동작)
+            # Raw SQL (works without free_tier_count)
             from sqlalchemy import text
             query = text("""
                 SELECT 
@@ -792,7 +786,7 @@ async def ebay_auth_callback(
             result = db_verify.execute(query, {"user_id": user_id})
             row = result.fetchone()
             if row:
-                # Raw SQL 결과를 객체처럼 사용하기 위해 간단한 클래스 생성
+                # Simple class to use raw SQL result like object
                 class ProfileVerify:
                     def __init__(self, row):
                         self.id = row[0]
@@ -814,7 +808,7 @@ async def ebay_auth_callback(
                 logger.info(f"   Token expires at (DB): {profile_verify.ebay_token_expires_at.isoformat() if profile_verify.ebay_token_expires_at else 'None'}")
                 logger.info(f"   Token updated at (DB): {profile_verify.ebay_token_updated_at.isoformat() if profile_verify.ebay_token_updated_at else 'None'}")
                 
-                # 만료 시간 검증
+                # Expiry time verification
                 if profile_verify.ebay_token_expires_at:
                     time_until_expiry = (profile_verify.ebay_token_expires_at - datetime.utcnow()).total_seconds()
                     logger.info(f"   Time until expiry: {time_until_expiry:.0f} seconds ({time_until_expiry / 3600:.2f} hours)")
@@ -824,14 +818,14 @@ async def ebay_auth_callback(
                 if profile_verify:
                     logger.error(f"   Has access token: {bool(profile_verify.ebay_access_token)}")
                     logger.error(f"   Profile user_id: {profile_verify.user_id}")
-                # 검증 실패해도 계속 진행 (DB에 저장은 되었을 수 있음)
+                # Continue even if verify fails (DB save may have succeeded)
             
             if db_verify:
                 db_verify.close()
                 db_verify = None
             
-            # Race condition 방지: 검증 완료 후 추가 지연 (토큰이 완전히 저장되었음을 보장)
-            time_module.sleep(0.05)  # 50ms 추가 지연
+            # Extra delay after verify
+            time_module.sleep(0.05)  # 50ms
             
         except Exception as e:
             if db:
@@ -856,8 +850,7 @@ async def ebay_auth_callback(
         logger.info(f"   - Tokens saved: Yes")
         logger.info("=" * 60)
         
-        # 성공! 프론트엔드로 리다이렉트
-        # Dashboard로 리다이렉트 (settings 대신)
+        # Success - redirect to frontend (Dashboard, not settings)
         success_redirect = f"{FRONTEND_URL}/dashboard?ebay_connected=true&message=eBay account connected successfully"
         logger.info(f"✅ OAuth complete! Redirecting to: {success_redirect}")
         logger.info("=" * 60)
@@ -879,18 +872,17 @@ async def ebay_auth_callback(
 
 def check_token_status(user_id: str, db: Session = None) -> Dict[str, Any]:
     """
-    🔍 경량화된 토큰 상태 확인 함수
-    
-    DB에서 토큰 존재 여부와 만료 상태만 확인 (API 호출 없음)
-    자동 갱신은 백그라운드 워커가 처리
-    
+    Lightweight token status check.
+    Only checks existence and expiry in DB (no API call).
+    Auto-refresh is handled by background worker.
+
     Returns:
         {
-            "has_valid_token": bool,  # 유효한 토큰이 있는지
-            "is_expired": bool,        # 토큰이 만료되었는지
-            "has_refresh_token": bool,  # Refresh token이 있는지
-            "expires_at": str,          # 만료 시간 (ISO format)
-            "needs_refresh": bool       # 갱신이 필요한지 (1시간 이내 만료)
+            "has_valid_token": bool,
+            "is_expired": bool,
+            "has_refresh_token": bool,
+            "expires_at": str,  # ISO
+            "needs_refresh": bool  # within 1h of expiry
         }
     """
     close_db = False
@@ -913,7 +905,7 @@ def check_token_status(user_id: str, db: Session = None) -> Dict[str, Any]:
                 "needs_refresh": False
             }
         
-        # 토큰 만료 확인
+        # Check token expiry
         is_expired = False
         needs_refresh = False
         expires_at = None
@@ -922,7 +914,7 @@ def check_token_status(user_id: str, db: Session = None) -> Dict[str, Any]:
             expires_at = profile.ebay_token_expires_at.isoformat()
             now = datetime.utcnow()
             is_expired = profile.ebay_token_expires_at < now
-            # 만료 1시간 전부터 갱신 필요로 표시
+            # Mark needs_refresh within 1h of expiry
             refresh_threshold = profile.ebay_token_expires_at - timedelta(hours=1)
             needs_refresh = now >= refresh_threshold
         
@@ -950,13 +942,10 @@ def check_token_status(user_id: str, db: Session = None) -> Dict[str, Any]:
 
 @router.get("/auth/status")
 async def ebay_auth_status(
-    user_id: str = Depends(get_current_user)  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user)  # user_id from JWT
 ):
     """
-    📊 eBay 연결 상태 확인 (경량화된 버전)
-    
-    DB에서 토큰 상태만 확인 (API 호출 없음)
-    자동 갱신은 백그라운드 워커가 처리
+    eBay connection status (lightweight). DB only; refresh by background worker.
     """
     import traceback
     logger.info("=" * 60)
@@ -967,7 +956,7 @@ async def ebay_auth_status(
         
         db = next(get_db())
         
-        # 프로필 조회 및 상세 로깅
+        # Profile lookup and detailed logging
         logger.info(f"📊 [STATUS] Querying Profile table for user_id: {user_id}")
         profile = db.query(Profile).filter(Profile.user_id == user_id).first()
         
@@ -997,7 +986,7 @@ async def ebay_auth_status(
         logger.info(f"📊 [STATUS] ebay_token_expires_at: {profile.ebay_token_expires_at}")
         logger.info(f"📊 [STATUS] ebay_user_id: {profile.ebay_user_id}")
         
-        # 경량화된 토큰 상태 확인
+        # Lightweight token status check
         token_status = check_token_status(user_id, db)
         
         logger.info(f"📊 [STATUS] Token status check result:")
@@ -1007,7 +996,7 @@ async def ebay_auth_status(
         logger.info(f"   - expires_at: {token_status['expires_at']}")
         logger.info(f"   - needs_refresh: {token_status['needs_refresh']}")
         
-        # connected 판단 로직
+        # connected decision logic
         has_valid_token = token_status["has_valid_token"]
         is_expired = token_status["is_expired"]
         connected = has_valid_token and not is_expired
@@ -1068,7 +1057,7 @@ async def ebay_auth_status(
 @router.get("/oauth/config")
 async def ebay_oauth_config():
     """
-    🔧 eBay OAuth 설정 상태 확인 (디버그용)
+    eBay OAuth config status (debug)
     """
     return {
         "client_id_configured": bool(EBAY_CLIENT_ID),
@@ -1082,20 +1071,20 @@ async def ebay_oauth_config():
 
 @router.get("/debug/tokens")
 async def debug_tokens(
-    user_id: str = Depends(get_current_user)  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user)  # user_id from JWT
 ):
     """
-    🔍 디버그: 모든 토큰 정보 확인 (긴급 디버깅용)
+    Debug: full token info (emergency debugging)
     """
     try:
         from .models import get_db, Profile
         
         db = next(get_db())
         
-        # 모든 프로필 조회
+        # Get all profiles
         all_profiles = db.query(Profile).all()
         
-        # 특정 user_id의 프로필
+        # Profile for given user_id
         profile = db.query(Profile).filter(Profile.user_id == user_id).first()
         
         result = {
@@ -1130,7 +1119,7 @@ async def debug_tokens(
 
 
 # =====================================================
-# eBay Listings API - 리스팅 가져오기
+# eBay Listings API - fetch listings
 # =====================================================
 
 # eBay API Base URLs
@@ -1150,11 +1139,10 @@ EBAY_API_ENDPOINTS = {
 
 def get_user_access_token(user_id: str) -> Optional[str]:
     """
-    DB에서 사용자의 eBay access token 가져오기
-    토큰이 만료됐으면 refresh token으로 갱신
+    Get user's eBay access token from DB. Refresh with refresh_token if expired.
     """
     logger.info("=" * 60)
-    logger.info(f"🔑 [TOKEN] get_user_access_token 호출:")
+    logger.info(f"🔑 [TOKEN] get_user_access_token called:")
     logger.info(f"   - user_id: {user_id} (type: {type(user_id).__name__})")
     
     db = None
@@ -1162,14 +1150,14 @@ def get_user_access_token(user_id: str) -> Optional[str]:
         from .models import get_db, Profile
         
         db = next(get_db())
-        logger.info(f"   - DB 연결 성공")
+        logger.info(f"   - DB connected")
         
         profile = db.query(Profile).filter(Profile.user_id == user_id).first()
         
         if not profile:
             logger.error(f"❌ [TOKEN] Profile not found for user_id: {user_id}")
-            logger.error(f"   - 가능한 원인: eBay OAuth 연결이 완료되지 않음")
-            logger.error(f"   - 해결 방법: Dashboard에서 'Connect eBay' 버튼을 클릭하여 다시 연결하세요")
+            logger.error(f"   - Possible cause: eBay OAuth not completed")
+            logger.error(f"   - Fix: Click 'Connect eBay' on Dashboard")
             logger.info("=" * 60)
             return None
         
@@ -1179,13 +1167,13 @@ def get_user_access_token(user_id: str) -> Optional[str]:
         
         if not profile.ebay_access_token:
             logger.error(f"❌ [TOKEN] No access token found for user_id: {user_id}")
-            logger.error(f"   - Profile은 존재하지만 ebay_access_token이 NULL")
-            logger.error(f"   - 가능한 원인: OAuth 토큰 저장 실패 또는 토큰이 삭제됨")
-            logger.error(f"   - 해결 방법: Dashboard에서 'Connect eBay' 버튼을 클릭하여 다시 연결하세요")
+            logger.error(f"   - Profile exists but ebay_access_token is NULL")
+            logger.error(f"   - Possible cause: OAuth token save failed or token deleted")
+            logger.error(f"   - Fix: Click 'Connect eBay' on Dashboard to reconnect")
             logger.info("=" * 60)
             return None
         
-        # 토큰 만료 확인
+        # Check token expiry
         token_expires_at = profile.ebay_token_expires_at if hasattr(profile, 'ebay_token_expires_at') else None
         if token_expires_at:
             now = datetime.utcnow()
@@ -1201,13 +1189,13 @@ def get_user_access_token(user_id: str) -> Optional[str]:
             
             if is_expired:
                 logger.warning(f"⚠️ [TOKEN] Token expired for user_id: {user_id}, attempting refresh...")
-                # 토큰 갱신 필요
+                # Token refresh needed
                 refresh_token = profile.ebay_refresh_token if hasattr(profile, 'ebay_refresh_token') else None
                 if refresh_token:
                     logger.info(f"   - Refresh token exists, attempting refresh...")
                     new_token = refresh_access_token(refresh_token)
                     if new_token:
-                        # DB 업데이트
+                        # Update DB
                         profile.ebay_access_token = new_token["access_token"]
                         profile.ebay_token_expires_at = datetime.utcnow() + timedelta(seconds=new_token.get("expires_in", 7200))
                         profile.ebay_token_updated_at = datetime.utcnow()
@@ -1218,17 +1206,17 @@ def get_user_access_token(user_id: str) -> Optional[str]:
                         return new_token["access_token"]
                     else:
                         logger.error(f"❌ [TOKEN] Token refresh failed for user_id: {user_id}")
-                        logger.error(f"   - refresh_access_token 함수가 None을 반환함")
-                        logger.error(f"   - 해결 방법: Dashboard에서 'Connect eBay' 버튼을 클릭하여 다시 연결하세요")
+                        logger.error(f"   - refresh_access_token returned None")
+                        logger.error(f"   - Fix: Click 'Connect eBay' on Dashboard")
                         logger.info("=" * 60)
                 else:
                     logger.error(f"❌ [TOKEN] No refresh token available for user_id: {user_id}")
-                    logger.error(f"   - ebay_refresh_token이 NULL")
-                    logger.error(f"   - 해결 방법: Dashboard에서 'Connect eBay' 버튼을 클릭하여 다시 연결하세요")
+                    logger.error(f"   - ebay_refresh_token is NULL")
+                    logger.error(f"   - Fix: Click 'Connect eBay' on Dashboard to reconnect")
                     logger.info("=" * 60)
                 return None
         
-        # 토큰 유효성 확인
+        # Verify token validity
         token_preview = f"{profile.ebay_access_token[:10]}...{profile.ebay_access_token[-4:]}" if len(profile.ebay_access_token) > 14 else "***"
         logger.info(f"✅ [TOKEN] Valid access token found for user_id: {user_id}")
         logger.info(f"   - Token preview: {token_preview}")
@@ -1248,7 +1236,7 @@ def get_user_access_token(user_id: str) -> Optional[str]:
 
 def refresh_access_token(refresh_token: str) -> Optional[Dict]:
     """
-    Refresh token으로 새 access token 발급
+    Issue new access token from refresh token
     """
     try:
         env = EBAY_ENVIRONMENT if EBAY_ENVIRONMENT in EBAY_AUTH_ENDPOINTS else "PRODUCTION"
@@ -1283,21 +1271,17 @@ def refresh_access_token(refresh_token: str) -> Optional[Dict]:
 
 @router.get("/listings")
 async def get_ebay_listings(
-    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user),  # user_id from JWT auth
     limit: int = Query(100, description="Number of listings to fetch", ge=1, le=500),
     offset: int = Query(0, description="Offset for pagination", ge=0)
 ):
     """
-    📦 eBay Active Listings 가져오기
-    
-    사용자의 eBay 스토어에서 활성 리스팅 목록을 가져옵니다.
-    - 제목, 가격, SKU, 수량
-    - 등록일, 조회수, 관심목록 수
+    Get eBay Active Listings. Title, price, SKU, quantity; date listed, views, watch count.
     """
     logger.info("=" * 60)
     logger.info(f"📦 Fetching eBay listings for user: {user_id}")
     
-    # Access Token 가져오기
+    # Get access token
     access_token = get_user_access_token(user_id)
     
     if not access_token:
@@ -1308,7 +1292,7 @@ async def get_ebay_listings(
         )
     
     try:
-        # eBay Sell Inventory API 호출
+        # Call eBay Sell Inventory API
         env = EBAY_ENVIRONMENT if EBAY_ENVIRONMENT in EBAY_API_ENDPOINTS else "PRODUCTION"
         inventory_url = f"{EBAY_API_ENDPOINTS[env]['sell_inventory']}/inventory_item"
         
@@ -1336,7 +1320,7 @@ async def get_ebay_listings(
         
         data = response.json()
         
-        # 리스팅 데이터 변환
+        # Transform listing data
         listings = []
         inventory_items = data.get("inventoryItems", [])
         
@@ -1466,15 +1450,15 @@ async def _sync_ebay_listings_background(
                 ).rowcount
                 
                 if platform_fixed > 0:
-                    logger.info(f"🔧 [CLEANUP] platform 보정: {platform_fixed}개 listings 업데이트됨")
+                    logger.info(f"🔧 [CLEANUP] platform corrected: {platform_fixed} listings updated")
                     db.commit()
             except Exception as cleanup_err:
-                logger.warning(f"⚠️ [CLEANUP] 정리 로직 실행 중 오류: {cleanup_err}")
+                logger.warning(f"⚠️ [CLEANUP] Cleanup error: {cleanup_err}")
                 db.rollback()
             finally:
                 db.close()
         except Exception as db_err:
-            logger.warning(f"⚠️ [CLEANUP] DB 연결 실패: {db_err}")
+            logger.warning(f"⚠️ [CLEANUP] DB connection failed: {db_err}")
             pass
         
         try:
@@ -1483,17 +1467,16 @@ async def _sync_ebay_listings_background(
             logger.info(f"   - eBay User ID: {ebay_user_id}")
             logger.info("=" * 60)
             
-            # 기존 get_active_listings_trading_api 로직 재사용
-            # 첫 페이지부터 모든 페이지를 순회하며 동기화
+            # Reuse get_active_listings_trading_api logic; iterate all pages
             page = 1
-            entries_per_page = 200  # 최대값 사용
+            entries_per_page = 200  # max
             total_fetched = 0
             total_upserted = 0
             total_pages = 1
-            page_stats = []  # 각 페이지별 통계
+            page_stats = []  # Stats per page
             
             while page <= total_pages:
-                # get_active_listings_trading_api의 로직을 직접 호출
+                # Call get_active_listings_trading_api logic directly
                 result = await get_active_listings_trading_api_internal(
                     request=request,
                     user_id=user_id,
@@ -1518,12 +1501,12 @@ async def _sync_ebay_listings_background(
                     }
                     page_stats.append(page_stat)
                     
-                    # 다음 페이지로
+                    # Next page
                     page += 1
                 else:
                     break
             
-            # ✅ 3. last_sync_at 강제 업데이트: Sync 완료 후 해당 user_id의 listings의 last_synced_at을 현재 시간으로 강제 업데이트 및 commit
+            # 3. Force last_sync_at update: set listings last_synced_at to now and commit
             sync_timestamp = datetime.utcnow()
             if total_upserted > 0:
                 try:
@@ -1531,7 +1514,7 @@ async def _sync_ebay_listings_background(
                     from sqlalchemy import func
                     db = next(get_db())
                     try:
-                        # Case-insensitive로 platform="eBay"인 listings의 last_synced_at 업데이트
+                        # Update last_synced_at for listings where platform="eBay" (case-insensitive)
                         updated_count = db.query(Listing).filter(
                             Listing.user_id == user_id,
                             func.lower(Listing.platform) == func.lower("eBay")
@@ -1625,15 +1608,14 @@ async def get_active_listings_trading_api_internal(
     entries_per_page: int = 200
 ):
     """
-    내부 함수: Trading API를 사용하여 활성 listings를 가져와 DB에 저장
-    (get_active_listings_trading_api와 동일한 로직, 재사용을 위해 분리)
+    Internal: fetch active listings via Trading API and save to DB. Same logic as get_active_listings_trading_api, split for reuse.
     """
-    # ✅ user_id 검증: 유효한 UUID여야 함
+    # Validate user_id: must be valid UUID
     if not user_id:
         logger.error(f"❌ [INTERNAL] Invalid user_id: {user_id}")
         raise HTTPException(status_code=400, detail=f"Invalid user_id: {user_id}. User must be logged in.")
     
-    # RequestId 추출 (헤더에서)
+    # Extract RequestId (from header)
     request_id = request.headers.get("X-Request-Id", f"server_{datetime.now().timestamp()}_{user_id}")
     
     t0 = datetime.utcnow()
@@ -1647,29 +1629,29 @@ async def get_active_listings_trading_api_internal(
     t1_duration = (datetime.utcnow() - t1).total_seconds() * 1000
     
     if access_token:
-        # 토큰의 일부만 로깅 (보안)
+        # Log only part of token (security)
         token_preview = f"{access_token[:10]}...{access_token[-4:]}" if len(access_token) > 14 else "***"
         logger.info(f"📋 [t1] Token retrieved [RequestId: {request_id}] - Duration: {t1_duration:.2f}ms")
         logger.info(f"   ✅ Access token found: {token_preview} (length: {len(access_token)})")
     else:
         logger.error(f"📋 [t1] Token retrieval failed [RequestId: {request_id}] - Duration: {t1_duration:.2f}ms")
         logger.error(f"   ❌ No valid access token found for user_id: {user_id}")
-        logger.error(f"   가능한 원인:")
-        logger.error(f"   1. Profile이 DB에 없음")
-        logger.error(f"   2. ebay_access_token이 없음")
-        logger.error(f"   3. 토큰이 만료되었고 refresh도 실패함")
+        logger.error(f"   Possible causes:")
+        logger.error(f"   1. No profile in DB")
+        logger.error(f"   2. No ebay_access_token")
+        logger.error(f"   3. Token expired and refresh failed")
         raise HTTPException(
             status_code=401,
             detail="eBay not connected or token expired. Please reconnect your eBay account."
         )
     
-    # eBay Trading API 호출
+    # Call eBay Trading API
     env = EBAY_ENVIRONMENT if EBAY_ENVIRONMENT in EBAY_API_ENDPOINTS else "PRODUCTION"
     trading_url = EBAY_API_ENDPOINTS[env]["trading"]
     
-    # ✅ 3. 데이터 강제 싱크 테스트: API 파라미터 확인 및 로깅
+    # 3. Force sync test: API params check and logging
     logger.info("=" * 60)
-    logger.info(f"📋 [API PARAMS] eBay Trading API 요청 파라미터:")
+    logger.info(f"📋 [API PARAMS] eBay Trading API request params:")
     logger.info(f"   - PageNumber: {page}")
     logger.info(f"   - EntriesPerPage: {entries_per_page}")
     logger.info(f"   - DetailLevel: ReturnAll")
@@ -1738,7 +1720,7 @@ async def get_active_listings_trading_api_internal(
         logger.error(f"   Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
     
-    # XML 파싱
+    # XML parse
     t3 = datetime.utcnow()
     try:
         import xml.etree.ElementTree as ET
@@ -1755,20 +1737,20 @@ async def get_active_listings_trading_api_internal(
         logger.error(f"   Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"XML parsing error: {str(e)}")
     
-    # Namespace 처리
+    # Namespace handling
     ns = {"ebay": "urn:ebay:apis:eBLBaseComponents"}
     
-    # 에러 체크 및 상세 로깅
+    # Error check and detailed logging
     ack = root.find(".//ebay:Ack", ns)
     ack_text = ack.text if ack is not None else "Unknown"
     logger.info(f"🔍 [API RESPONSE] Ack status: {ack_text}")
     
-    # ✅ 3. 데이터 강제 싱크 테스트: API 응답 상세 분석
+    # API response analysis
     logger.info("=" * 60)
-    logger.info(f"📊 [API RESPONSE] eBay Trading API 응답 분석:")
+    logger.info(f"📊 [API RESPONSE] eBay Trading API response analysis:")
     logger.info(f"   - Ack: {ack_text}")
     
-    # TotalNumberOfEntries 추출 (fetched=0 케이스 진단용)
+    # Extract TotalNumberOfEntries (for diagnosing fetched=0 case)
     pagination_result = root.find(".//ebay:PaginationResult", ns)
     total_entries_from_api = None
     total_pages_from_api = None
@@ -1788,13 +1770,13 @@ async def get_active_listings_trading_api_internal(
         logger.info(f"   - Requested EntriesPerPage: {entries_per_page}")
         
         if total_entries_from_api == 0:
-            logger.warning(f"⚠️ [API RESPONSE] TotalNumberOfEntries=0 - eBay 계정에 활성 listings가 없거나 API 권한 문제")
-            logger.warning(f"   - 가능한 원인:")
-            logger.warning(f"     1. eBay 계정에 활성 listings가 실제로 없음")
-            logger.warning(f"     2. API 권한 부족 (필요한 scope: https://api.ebay.com/oauth/api_scope/sell.marketing.readonly)")
-            logger.warning(f"     3. Access Token이 유효하지 않음 (401 에러가 아닌 경우)")
+            logger.warning(f"⚠️ [API RESPONSE] TotalNumberOfEntries=0 - no active listings or API permission issue")
+            logger.warning(f"   - Possible causes:")
+            logger.warning(f"     1. No active listings on eBay account")
+            logger.warning(f"     2. API scope missing (sell.marketing.readonly)")
+            logger.warning(f"     3. Invalid access token")
     else:
-        logger.warning(f"⚠️ [API RESPONSE] PaginationResult가 응답에 없음")
+        logger.warning(f"⚠️ [API RESPONSE] PaginationResult missing from response")
     
     logger.info("=" * 60)
     
@@ -1815,55 +1797,55 @@ async def get_active_listings_trading_api_internal(
         logger.error(f"   - User ID: {user_id}")
         logger.error(f"   - Access token preview: {access_token[:20]}...{access_token[-10:]}")
         
-        # 전체 에러 XML 로깅
+        # Log full error XML
         errors_elem = root.find(".//ebay:Errors", ns)
         if errors_elem is not None:
             import xml.etree.ElementTree as ET
             errors_xml = ET.tostring(errors_elem, encoding='unicode')
             logger.error(f"   - Full Errors XML: {errors_xml}")
         
-        # fetched=0 케이스 진단을 위한 추가 정보
+        # Extra info for diagnosing fetched=0 case
         if total_entries_from_api == 0:
-            logger.warning(f"⚠️ [INTERNAL] TotalNumberOfEntries=0 - 가능한 원인:")
-            logger.warning(f"   1. eBay 계정에 활성 listings가 없음")
-            logger.warning(f"   2. API 권한 부족 (필요한 scope: https://api.ebay.com/oauth/api_scope/sell.marketing.readonly)")
-            logger.warning(f"   3. 필터 조건에 맞는 listings가 없음")
-            logger.warning(f"   4. Access Token이 유효하지 않음 (토큰 재검증 필요)")
+            logger.warning(f"⚠️ [INTERNAL] TotalNumberOfEntries=0 - possible causes:")
+            logger.warning(f"   1. No active listings on eBay account")
+            logger.warning(f"   2. API scope missing")
+            logger.warning(f"   3. No listings match filter")
+            logger.warning(f"   4. Invalid access token (re-verify)")
         
         raise HTTPException(status_code=400, detail=f"eBay Error ({error_code}): {error_msg}")
     
-    # Success인 경우에도 TotalNumberOfEntries 로깅
+    # Log TotalNumberOfEntries even on Success
     if total_entries_from_api is not None:
         logger.info(f"✅ [INTERNAL] Trading API Success - TotalNumberOfEntries: {total_entries_from_api}")
     
-    # 리스팅 파싱 (기존 로직과 동일)
+    # Parse listings (same as existing logic)
     listings = []
     active_list = root.find(".//ebay:ActiveList", ns)
     
-    # 🔍 STEP 1: eBay API fetch 응답 데이터 개수 로깅
+    # STEP 1: Log eBay API fetch response count
     logger.info("=" * 60)
-    logger.info(f"🔍 [FETCH DEBUG] eBay API 응답 분석:")
+    logger.info(f"🔍 [FETCH DEBUG] eBay API response analysis:")
     logger.info(f"   - User ID: {user_id}")
     logger.info(f"   - Page: {page}, Entries per page: {entries_per_page}")
     logger.info(f"   - TotalNumberOfEntries (from API): {total_entries_from_api}")
     
     if active_list is not None:
         items = active_list.findall(".//ebay:Item", ns)
-        logger.info(f"📊 [FETCH COUNT] eBay API 응답에서 파싱된 Item 개수: {len(items)}")
+        logger.info(f"📊 [FETCH COUNT] Parsed Item count from eBay API: {len(items)}")
         logger.info(f"   - TotalNumberOfEntries (from API): {total_entries_from_api}")
         logger.info(f"   - Page: {page}, Entries per page: {entries_per_page}")
         
         if len(items) == 0 and total_entries_from_api and total_entries_from_api > 0:
-            logger.warning(f"⚠️ [FETCH COUNT] 파싱된 Item이 0개인데 TotalNumberOfEntries는 {total_entries_from_api}개입니다!")
-            logger.warning(f"   - XML 파싱 문제 가능성")
-            logger.warning(f"   - Response XML 일부: {response.text[:1000]}")
+            logger.warning(f"⚠️ [FETCH COUNT] Parsed 0 Items but TotalNumberOfEntries is {total_entries_from_api}!")
+            logger.warning(f"   - Possible XML parsing issue")
+            logger.warning(f"   - Response XML excerpt: {response.text[:1000]}")
         elif len(items) == 0 and (not total_entries_from_api or total_entries_from_api == 0):
-            logger.warning(f"⚠️ [FETCH COUNT] eBay 계정에 활성 listings가 없습니다.")
+            logger.warning(f"⚠️ [FETCH COUNT] No active listings on eBay account.")
             logger.warning(f"   - TotalNumberOfEntries: {total_entries_from_api}")
             logger.warning(f"   - User ID: {user_id}")
         
         for item in items:
-            # 기존 get_active_listings_trading_api와 동일한 파싱 로직
+            # Same parsing logic as get_active_listings_trading_api
             item_id = item.findtext("ebay:ItemID", "", ns)
             title = item.findtext("ebay:Title", "", ns)
             
@@ -1879,7 +1861,7 @@ async def get_active_listings_trading_api_internal(
             start_time = item.findtext("ebay:ListingDetails/ebay:StartTime", "", ns)
             sku = item.findtext("ebay:SKU", "", ns)
             
-            # 이미지 처리 (기존 로직과 동일)
+            # Image handling (same as existing logic)
             picture_url = ""
             thumbnail_url = ""
             
@@ -1899,7 +1881,7 @@ async def get_active_listings_trading_api_internal(
                     picture_url = gallery_url.strip()
                     thumbnail_url = gallery_url.strip()
             
-            # Supplier 정보 추출
+            # Extract Supplier info
             from .services import extract_supplier_info
             supplier_name, supplier_id = extract_supplier_info(
                 sku=sku,
@@ -1939,17 +1921,17 @@ async def get_active_listings_trading_api_internal(
             
             listings.append(listing)
     else:
-        logger.error(f"❌ [FETCH COUNT] active_list가 None입니다!")
-        logger.error(f"   - XML 응답에 ActiveList 요소가 없음")
-        logger.error(f"   - Response XML 일부: {response.text[:1000]}")
+        logger.error(f"❌ [FETCH COUNT] active_list is None!")
+        logger.error(f"   - No ActiveList element in XML response")
+        logger.error(f"   - Response XML sample: {response.text[:1000]}")
     logger.info("=" * 60)
     
-    # 페이지네이션 정보
+    # Pagination info
     pagination = active_list.find("ebay:PaginationResult", ns) if active_list is not None else None
     total_entries = int(pagination.findtext("ebay:TotalNumberOfEntries", "0", ns)) if pagination is not None else len(listings)
     total_pages = int(pagination.findtext("ebay:TotalNumberOfPages", "1", ns)) if pagination is not None else 1
     
-    # DB에 리스팅 저장
+    # Save listings to DB
     logger.info("=" * 60)
     logger.info(f"💾 [DB SAVE] Preparing to save listings to DB:")
     logger.info(f"   - User ID: {user_id} (type: {type(user_id).__name__})")
@@ -1965,9 +1947,9 @@ async def get_active_listings_trading_api_internal(
         
         db = next(get_db())
         try:
-            # DB 저장 전 개수 확인
+            # Count before DB save
             before_count = db.query(Listing).filter(Listing.user_id == user_id).count()
-            logger.info(f"   - DB에 저장된 기존 listings 개수 (user_id='{user_id}'): {before_count}")
+                logger.info(f"   - Existing listings count in DB (user_id='{user_id}'): {before_count}")
             
             # Use consolidated parser utility
             from .listing_parser import parse_listing_from_data
@@ -1983,27 +1965,27 @@ async def get_active_listings_trading_api_internal(
                     continue  # Skip invalid listings
             
             if listing_objects:
-                # ✅ 2단계: 저장 ID 일치화 - 명확한 로깅
+                # Step 2: Align saved IDs - clear logging
                 logger.info("=" * 60)
                 logger.info(f"💾 [DB SAVE] Saving for user: {user_id}")
-                logger.info(f"   - Total listings to save: {len(listing_objects)}개")
-                logger.info(f"   - Platform: eBay (강제 설정)")
+                logger.info(f"   - Total listings to save: {len(listing_objects)}")
+                logger.info(f"   - Platform: eBay (forced)")
                 logger.info(f"   - user_id type: {type(user_id).__name__}")
                 logger.info(f"   - user_id value: '{user_id}'")
                 logger.info("=" * 60)
                 
-                # user_id 일치 확인 (샘플 검증)
+                # user_id match check (sample)
                 sample_user_ids = set()
-                for listing_obj in listing_objects[:5]:  # 처음 5개만 확인
+                for listing_obj in listing_objects[:5]:  # first 5 only
                     sample_user_ids.add(getattr(listing_obj, 'user_id', None))
                 if sample_user_ids:
                     if len(sample_user_ids) == 1 and list(sample_user_ids)[0] == user_id:
-                        logger.info(f"✅ [DB SAVE] user_id 일치 확인: {user_id}")
+                        logger.info(f"✅ [DB SAVE] user_id match confirmed: {user_id}")
                     else:
-                        logger.error(f"❌ [DB SAVE] user_id 불일치! expected={user_id}, found={sample_user_ids}")
+                        logger.error(f"❌ [DB SAVE] user_id mismatch! expected={user_id}, found={sample_user_ids}")
                 
-                # ✅ DB 저장: upsert_listings 호출 (user_id 전달)
-                logger.info(f"💾 [DB SAVE] upsert_listings 호출 시작...")
+                # DB save: call upsert_listings (pass user_id)
+                logger.info(f"💾 [DB SAVE] Calling upsert_listings...")
                 logger.info(f"   - Total listing objects to save: {len(listing_objects)}")
                 upserted_count = upsert_listings(db, listing_objects, expected_user_id=user_id)
                 logger.info(f"✅ [DB SAVE] upsert_listings completed: {upserted_count} items processed")
@@ -2016,16 +1998,16 @@ async def get_active_listings_trading_api_internal(
                     logger.error(f"❌ [DB SAVE] CRITICAL: upsert_listings reported {upserted_count} items, but DB count is 0!")
                     logger.error(f"   - This indicates a database transaction or commit issue")
                 
-                # ✅ 추가 commit 확인 (batch processing already commits, but ensure final state)
+                # Extra commit check (batch processing already commits, but ensure final state)
                 try:
                     db.flush()
                     db.commit()
                     logger.info(f"✅ [DB SAVE] Final commit successful")
                 except Exception as extra_commit_err:
-                    logger.warning(f"⚠️ [SYNC] 추가 commit 실패: {extra_commit_err}")
+                    logger.warning(f"⚠️ [SYNC] Extra commit failed: {extra_commit_err}")
                     db.rollback()
                 
-                # ✅ 저장 결과 확인
+                # Verify save result
                 from sqlalchemy import text
                 after_count = db.query(Listing).filter(
                     Listing.user_id == user_id,
@@ -2035,40 +2017,40 @@ async def get_active_listings_trading_api_internal(
                 sync_end_time = dt.utcnow()
                 sync_duration = (sync_end_time - sync_start_time).total_seconds()
                 
-                logger.info(f"✅ [SYNC] 저장 완료: upserted={upserted_count}, DB count={after_count} (user_id={user_id}, platform=eBay)")
+                logger.info(f"✅ [SYNC] Save complete: upserted={upserted_count}, DB count={after_count} (user_id={user_id}, platform=eBay)")
                 logger.info(f"⏱️ [SYNC] Execution time: {sync_duration:.2f} seconds ({sync_duration/60:.2f} minutes)")
                 
                 if after_count == 0 and upserted_count > 0:
-                    logger.error(f"❌ [SYNC] CRITICAL: upserted={upserted_count}개 처리했지만 DB count=0!")
+                    logger.error(f"❌ [SYNC] CRITICAL: processed {upserted_count} but DB count=0!")
                 elif after_count > before_count:
-                    logger.info(f"✅ [SYNC] {after_count - before_count}개 추가 저장됨")
+                    logger.info(f"✅ [SYNC] {after_count - before_count} new records saved")
                 elif after_count == before_count and upserted_count > 0:
-                    logger.info(f"ℹ️ [SYNC] 모든 레코드 업데이트됨 (신규 추가 없음)")
+                    logger.info(f"ℹ️ [SYNC] All records updated (no new additions)")
                 
                 t4_duration = (datetime.utcnow() - t4).total_seconds() * 1000
                 logger.info(f"💾 [t4] Saved {upserted_count} listings to database [RequestId: {request_id}] - Duration: {t4_duration:.2f}ms")
-                logger.info(f"📊 [DB UPSERT] DB Upsert 결과:")
+                logger.info(f"📊 [DB UPSERT] DB Upsert result:")
                 logger.info(f"   - user_id (used in upsert): {user_id}")
                 logger.info(f"   - platform (used in upsert): eBay")
                 logger.info(f"   - item_id field: used for conflict resolution")
                 logger.info(f"   - listings processed: {len(listing_objects)}")
                 logger.info(f"   - upserted count (returned): {upserted_count}")
                 
-                # 🔍 DB에 실제로 저장된 레코드 수 확인 (user_id 일치)
+                # Verify actual saved record count in DB (user_id match)
                 try:
                     from .models import Listing
                     actual_saved_count = db.query(Listing).filter(
                         Listing.user_id == user_id,
                         Listing.platform == "eBay"
                     ).count()
-                    logger.info(f"📊 [DB VERIFY] DB에 실제 저장된 레코드 수 확인:")
+                    logger.info(f"📊 [DB VERIFY] Verifying actual saved record count in DB:")
                     logger.info(f"   - Query: WHERE user_id='{user_id}' AND platform='eBay'")
                     logger.info(f"   - Actual count in DB: {actual_saved_count}")
                     if actual_saved_count > 0 and upserted_count != actual_saved_count:
-                        logger.warn(f"   ⚠️ upserted_count({upserted_count})와 DB 실제 count({actual_saved_count}) 불일치")
-                        logger.warn(f"   가능한 원인: 이전에 저장된 레코드가 포함되어 있거나 upsert 로직 문제")
+                        logger.warn(f"   ⚠️ upserted_count({upserted_count}) and DB actual count({actual_saved_count}) mismatch")
+                        logger.warn(f"   Possible causes: previously saved records included or upsert logic issue")
                 except Exception as verify_err:
-                    logger.warning(f"⚠️ [DB VERIFY] DB 확인 중 오류 (무시): {verify_err}")
+                    logger.warning(f"⚠️ [DB VERIFY] Error during DB verify (ignored): {verify_err}")
             else:
                 logger.warning(f"⚠️ [RequestId: {request_id}] No listing objects to upsert")
                 upserted_count = 0
@@ -2084,7 +2066,7 @@ async def get_active_listings_trading_api_internal(
         logger.warning(f"⚠️ [RequestId: {request_id}] Failed to save listings to database: {save_err}")
         upserted_count = 0
     
-    # 검증 로그 표준화: 세 줄만 남김 (페이지별 상세 로그 제거)
+    # Standardize validation log: keep only 3 lines (remove per-page detail logs)
     
     return {
         "success": True,
@@ -2101,20 +2083,16 @@ async def get_active_listings_trading_api_internal(
 @router.get("/listings/active")
 async def get_active_listings_trading_api(
     request: Request,
-    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user),  # Extract user_id via JWT auth
     page: int = Query(1, description="Page number", ge=1),
     entries_per_page: int = Query(100, description="Entries per page", ge=1, le=200)
 ):
     """
-    📦 eBay Active Listings (Trading API 방식)
-    
-    GetMyeBaySelling API를 사용하여 더 상세한 판매 데이터를 가져옵니다.
-    - 조회수 (ViewCount)
-    - 관심목록 수 (WatchCount)
-    - 판매 수량 (QuantitySold)
-    - 노출 횟수 (ImpressionCount)
+    eBay Active Listings (Trading API).
+    Fetches detailed selling data via GetMyeBaySelling API:
+    - ViewCount, WatchCount, QuantitySold, ImpressionCount.
     """
-    # RequestId 추출 (헤더에서)
+    # Extract RequestId (from header)
     request_id = request.headers.get("X-Request-Id", f"server_{datetime.now().timestamp()}_{user_id}")
     
     t0 = datetime.utcnow()
@@ -2131,7 +2109,7 @@ async def get_active_listings_trading_api(
     
     if not access_token:
         logger.error(f"❌ [RequestId: {request_id}] No access token found for user_id: {user_id}")
-        # 디버그 정보 추가
+        # Add debug info
         try:
             from .models import get_db, Profile
             db = next(get_db())
@@ -2192,14 +2170,14 @@ async def get_active_listings_trading_api(
             logger.error(f"   [RequestId: {request_id}] Response: {response.text[:500]}")
             raise HTTPException(status_code=response.status_code, detail="eBay Trading API error")
         
-        # XML 파싱
+        # XML parse
         t3 = datetime.utcnow()
         import xml.etree.ElementTree as ET
         root = ET.fromstring(response.text)
         t3_duration = (datetime.utcnow() - t3).total_seconds() * 1000
         logger.info(f"📊 [t3] XML parsed [RequestId: {request_id}] - Duration: {t3_duration:.2f}ms")
         
-        # 디버깅: 첫 번째 Item의 XML 구조 확인 (이미지 관련)
+        # Debug: check first Item XML structure (image-related)
         first_item = root.find(".//{urn:ebay:apis:eBLBaseComponents}Item")
         if first_item is not None:
             logger.info("🔍 First Item XML structure check:")
@@ -2215,10 +2193,10 @@ async def get_active_listings_trading_api(
             if gallery_url is not None:
                 logger.info(f"   GalleryURL: {gallery_url.text[:80] if gallery_url.text else 'None'}...")
         
-        # Namespace 처리
+        # Namespace handling
         ns = {"ebay": "urn:ebay:apis:eBLBaseComponents"}
         
-        # 에러 체크
+        # Error check
         ack = root.find(".//ebay:Ack", ns)
         if ack is not None and ack.text != "Success":
             errors = root.findall(".//ebay:Errors/ebay:ShortMessage", ns)
@@ -2226,7 +2204,7 @@ async def get_active_listings_trading_api(
             logger.error(f"❌ eBay API Error: {error_msg}")
             raise HTTPException(status_code=400, detail=f"eBay Error: {error_msg}")
         
-        # 리스팅 파싱
+        # Parse listings
         listings = []
         active_list = root.find(".//ebay:ActiveList", ns)
         
@@ -2234,63 +2212,61 @@ async def get_active_listings_trading_api(
             items = active_list.findall(".//ebay:Item", ns)
             
             for item in items:
-                # 기본 정보
+                # Basic info
                 item_id = item.findtext("ebay:ItemID", "", ns)
                 title = item.findtext("ebay:Title", "", ns)
                 
-                # 가격
+                # Price
                 current_price = item.find("ebay:SellingStatus/ebay:CurrentPrice", ns)
                 price = float(current_price.text) if current_price is not None and current_price.text else 0
                 
-                # 수량
+                # Quantity
                 quantity = int(item.findtext("ebay:QuantityAvailable", "0", ns))
                 quantity_sold = int(item.findtext("ebay:SellingStatus/ebay:QuantitySold", "0", ns))
                 
-                # 통계
+                # Stats
                 watch_count = int(item.findtext("ebay:WatchCount", "0", ns))
-                hit_count = int(item.findtext("ebay:HitCount", "0", ns))  # 조회수
+                hit_count = int(item.findtext("ebay:HitCount", "0", ns))  # View count
                 
-                # 날짜
+                # Dates
                 start_time = item.findtext("ebay:ListingDetails/ebay:StartTime", "", ns)
                 end_time = item.findtext("ebay:ListingDetails/ebay:EndTime", "", ns)
                 
                 # SKU
                 sku = item.findtext("ebay:SKU", "", ns)
                 
-                # 이미지 - 썸네일 이미지 URL 추출 (여러 방법 시도)
+                # Image: extract thumbnail URL (try multiple methods)
                 picture_url = ""
                 thumbnail_url = ""
                 
-                # 방법 1: PictureDetails에서 PictureURL 찾기
+                # Method 1: Find PictureURL in PictureDetails
                 picture_details = item.find("ebay:PictureDetails", ns)
                 if picture_details is not None:
-                    # 모든 PictureURL 찾기 (여러 이미지 지원)
                     picture_urls = picture_details.findall("ebay:PictureURL", ns)
                     
                     if picture_urls and len(picture_urls) > 0:
-                        # 첫 번째 PictureURL을 메인 이미지로 사용
+                        # Use first PictureURL as main image
                         first_picture = picture_urls[0]
                         if first_picture is not None and first_picture.text:
                             picture_url = first_picture.text.strip()
                             logger.info(f"   📷 Image found (PictureURL): {picture_url[:50]}...")
                             
-                            # eBay 이미지 URL을 썸네일로 변환
-                            # eBay 이미지 URL 패턴: https://i.ebayimg.com/images/g/.../s-l500.jpg
-                            # 썸네일 버전: s-l500 -> s-l225 (더 작은 크기)
+                            # Convert eBay image URL to thumbnail
+                            # eBay image URL pattern: https://i.ebayimg.com/images/g/.../s-l500.jpg
+                            # Thumbnail: s-l500 -> s-l225
                             thumbnail_url = picture_url
                             
-                            # eBay 이미지 URL에서 썸네일 버전 생성
+                            # Generate thumbnail from eBay image URL
                             if "s-l" in thumbnail_url:
-                                # s-l500, s-l140 등을 s-l225로 변경 (썸네일 크기)
+                                # s-l500, s-l140 -> s-l225 (thumbnail size)
                                 import re
                                 thumbnail_url = re.sub(r's-l\d+', 's-l225', thumbnail_url)
                             elif thumbnail_url and "ebayimg.com" in thumbnail_url:
-                                # eBay 이미지 URL이지만 크기 파라미터가 없는 경우
-                                # URL 끝에 썸네일 크기 추가
+                                # eBay image URL but no size param: append thumbnail size
                                 if "?" in thumbnail_url:
                                     thumbnail_url = f"{thumbnail_url}&s-l225"
                                 else:
-                                    # .jpg, .png 등 확장자 앞에 썸네일 크기 추가
+                                    # Add thumbnail size before extension
                                     if thumbnail_url.endswith(('.jpg', '.jpeg', '.png', '.gif')):
                                         base_url = thumbnail_url.rsplit('.', 1)[0]
                                         ext = thumbnail_url.rsplit('.', 1)[1]
@@ -2302,7 +2278,7 @@ async def get_active_listings_trading_api(
                 else:
                     logger.warning(f"   ⚠️ No PictureDetails found for item {item_id}")
                 
-                # 방법 2: GalleryURL 시도 (PictureDetails가 없을 때)
+                # Method 2: Try GalleryURL (when PictureDetails missing)
                 if not picture_url:
                     gallery_url = item.findtext("ebay:GalleryURL", "", ns)
                     if gallery_url and gallery_url.strip():
@@ -2310,7 +2286,7 @@ async def get_active_listings_trading_api(
                         thumbnail_url = gallery_url.strip()
                         logger.info(f"   📷 Using GalleryURL as fallback: {picture_url[:50]}...")
                 
-                # 방법 3: ListingDetails에서 GalleryURL 시도
+                # Method 3: Try GalleryURL in ListingDetails
                 if not picture_url:
                     listing_details = item.find("ebay:ListingDetails", ns)
                     if listing_details is not None:
@@ -2320,15 +2296,11 @@ async def get_active_listings_trading_api(
                             thumbnail_url = gallery_url.strip()
                             logger.info(f"   📷 Using ListingDetails GalleryURL: {picture_url[:50]}...")
                 
-                # 방법 4: ItemID로 eBay 이미지 URL 생성 (fallback)
-                # eBay 표준 이미지 URL 패턴: https://i.ebayimg.com/images/g/{item_id}/s-l500.jpg
+                # Method 4: Build eBay image URL from ItemID (fallback)
+                # eBay image URL pattern: https://i.ebayimg.com/images/g/{item_id}/s-l500.jpg
                 if not picture_url and item_id:
-                    # eBay Gallery URL 패턴 시도
                     try:
-                        # 일반적인 eBay 이미지 URL 패턴
-                        # 패턴 1: https://i.ebayimg.com/images/g/{item_id}/s-l500.jpg
-                        # 패턴 2: https://i.ebayimg.com/00/s/{width}x{height}/z/{hash}/file.jpg
-                        # 간단한 방법: Gallery URL 패턴 사용
+                        # Common eBay image URL patterns; use Gallery URL pattern
                         gallery_url_pattern = f"https://i.ebayimg.com/images/g/{item_id}/s-l500.jpg"
                         picture_url = gallery_url_pattern
                         thumbnail_url = gallery_url_pattern.replace("s-l500", "s-l225")
@@ -2336,39 +2308,39 @@ async def get_active_listings_trading_api(
                     except Exception as fallback_err:
                         logger.warning(f"   ⚠️ Fallback image URL generation failed for item {item_id}: {fallback_err}")
                 
-                # Supplier 정보 추출 (SKU, 이미지 URL, 제목 기반)
+                # Extract Supplier info (SKU, image URL, title)
                 from .services import extract_supplier_info
                 supplier_name, supplier_id = extract_supplier_info(
                     sku=sku,
                     image_url=picture_url or thumbnail_url,
                     title=title,
-                    brand="",  # Trading API에서 brand 정보는 별도로 가져와야 함
-                    upc=""  # Trading API에서 UPC 정보는 별도로 가져와야 함
+                    brand="",  # Trading API: brand fetched separately
+                    upc=""  # Trading API: UPC fetched separately
                 )
                 
                 listing = {
                     "item_id": item_id,
                     "ebay_item_id": item_id,
-                    "sell_item_id": item_id,  # Sell Item ID 명시적으로 추가
+                    "sell_item_id": item_id,  # Explicit Sell Item ID
                     "title": title,
                     "price": price,
                     "quantity_available": quantity,
                     "quantity_sold": quantity_sold,
                     "watch_count": watch_count,
                     "view_count": hit_count,
-                    "impressions": 0,  # Trading API에서는 제공 안 됨, Analytics API 필요
+                    "impressions": 0,  # Not in Trading API; needs Analytics API
                     "sku": sku,
                     "start_time": start_time,
                     "end_time": end_time,
-                    "picture_url": picture_url,  # 메인 이미지 URL
-                    "thumbnail_url": thumbnail_url,  # 썸네일 이미지 URL (좀비 SKU 리포트용)
-                    "image_url": picture_url or thumbnail_url,  # 프론트엔드 호환성을 위한 필드 (메인 이미지 우선, 없으면 썸네일)
-                    "days_listed": 0,  # 계산 필요
-                    "supplier_name": supplier_name,  # 추출된 공급처 이름
-                    "supplier_id": supplier_id  # 추출된 공급처 ID (예: ASIN, Walmart ID 등)
+                    "picture_url": picture_url,  # Main image URL
+                    "thumbnail_url": thumbnail_url,  # Thumbnail URL (zombie SKU report)
+                    "image_url": picture_url or thumbnail_url,  # Frontend compat (main then thumbnail)
+                    "days_listed": 0,  # Computed
+                    "supplier_name": supplier_name,  # Extracted supplier name
+                    "supplier_id": supplier_id  # Extracted supplier ID (e.g. ASIN, Walmart ID)
                 }
                 
-                # days_listed 계산
+                # Compute days_listed
                 if start_time:
                     try:
                         from dateutil import parser
@@ -2379,24 +2351,24 @@ async def get_active_listings_trading_api(
                 
                 listings.append(listing)
         
-        # 페이지네이션 정보
+        # Pagination info
         pagination = active_list.find("ebay:PaginationResult", ns) if active_list is not None else None
         total_entries = int(pagination.findtext("ebay:TotalNumberOfEntries", "0", ns)) if pagination is not None else len(listings)
         total_pages = int(pagination.findtext("ebay:TotalNumberOfPages", "1", ns)) if pagination is not None else 1
         
         logger.info(f"✅ [RequestId: {request_id}] Retrieved {len(listings)} active listings (Page {page}/{total_pages})")
         
-        # MVP: 이미지 정보는 프론트엔드에서 사용하지 않으므로 GetMultipleItems API 호출 제거
-        # 성능 최적화: 이미지 관련 API 호출을 생략하여 응답 시간 단축
+        # MVP: Skip GetMultipleItems for images; frontend does not use them
+        # Perf: omit image API calls to reduce latency
         for listing in listings:
-            # 이미지 필드는 빈 문자열로 설정 (기존 코드와의 호환성 유지)
+            # Set image fields to empty for backward compat
             listing.setdefault("picture_url", "")
             listing.setdefault("thumbnail_url", "")
             listing.setdefault("image_url", "")
         
         logger.info(f"✅ [RequestId: {request_id}] Image fetching skipped for performance (MVP optimization)")
         
-        # 첫 번째 리스팅의 이미지 정보 로깅
+        # Log image info for first listing
         if listings and len(listings) > 0:
             first_listing = listings[0]
             logger.info(f"🔍 [RequestId: {request_id}] First listing image data (Item ID: {first_listing.get('item_id', 'N/A')}):")
@@ -2404,7 +2376,7 @@ async def get_active_listings_trading_api(
             logger.info(f"   thumbnail_url: {first_listing.get('thumbnail_url', 'MISSING')[:80] if first_listing.get('thumbnail_url') else 'MISSING'}")
             logger.info(f"   image_url: {first_listing.get('image_url', 'MISSING')[:80] if first_listing.get('image_url') else 'MISSING'}")
         
-        # 🔥 DB에 리스팅 저장 (supplier_id 포함)
+        # Save listings to DB (with supplier_id)
         t4 = datetime.utcnow()
         t4_duration = 0
         upserted_count = 0
@@ -2415,10 +2387,10 @@ async def get_active_listings_trading_api(
             
             db = next(get_db())
             try:
-                # Listing 객체로 변환
+                # Convert to Listing objects
                 listing_objects = []
                 for listing_data in listings:
-                    # date_listed 계산
+                    # Compute date_listed
                     date_listed = date.today()
                     if listing_data.get("start_time"):
                         try:
@@ -2427,13 +2399,12 @@ async def get_active_listings_trading_api(
                         except:
                             pass
                     
-                    # Listing 객체 생성
-                    # Use consolidated parser utility
+                    # Create Listing object (use consolidated parser)
                     from .listing_parser import parse_listing_from_data
                     listing_obj = parse_listing_from_data(listing_data, user_id, platform="eBay")
                     listing_objects.append(listing_obj)
                 
-                # Upsert (중복 시 업데이트) - expected_user_id 전달로 user_id 일치 보장
+                # Upsert (update on duplicate) - expected_user_id ensures user_id match
                 if listing_objects:
                     upserted_count = upsert_listings(db, listing_objects, expected_user_id=user_id)
                     db.commit()
@@ -2452,9 +2423,9 @@ async def get_active_listings_trading_api(
         except Exception as save_err:
             t4_duration = (datetime.utcnow() - t4).total_seconds() * 1000
             logger.warning(f"⚠️ [RequestId: {request_id}] Failed to save listings to database (Duration: {t4_duration:.2f}ms): {save_err}")
-            # DB 저장 실패해도 API 응답은 반환
+            # Return API response even if DB save fails
         
-        # 전체 타임라인 로깅
+        # Full timeline logging
         t_end = datetime.utcnow()
         total_duration = (t_end - t0).total_seconds() * 1000
         logger.info(f"⏱️ [RequestId: {request_id}] Total timeline:")
@@ -2473,7 +2444,7 @@ async def get_active_listings_trading_api(
             "total_pages": total_pages,
             "entries_per_page": entries_per_page,
             "listings": listings,
-            "request_id": request_id  # Response에 requestId 포함
+            "request_id": request_id  # Include requestId in response
         }
         
     except HTTPException:
@@ -2485,9 +2456,9 @@ async def get_active_listings_trading_api(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# 백그라운드 sync를 위한 헬퍼 함수
+# Helper to start background sync
 async def start_background_sync(request: Request, user_id: str):
-    """백그라운드에서 eBay listings sync 시작"""
+    """Start eBay listings sync in background."""
     try:
         logger.info(f"🔄 [BG-SYNC] Starting background sync for user {user_id}")
         await sync_ebay_listings(request, user_id)
@@ -2498,28 +2469,20 @@ async def start_background_sync(request: Request, user_id: str):
 @router.get("/summary")
 async def get_ebay_summary(
     request: Request,
-    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user),  # Extract user_id via JWT auth
     filters: Optional[str] = Query(None, description="Optional filter JSON for low-performing calculation")
 ):
     """
-    📊 eBay Listings Summary (경량화된 통계 API)
-    
-    Dashboard 초기 로딩 시 카운트만 가져오는 경량 API
-    - Active listings count
-    - Low-performing count (필터 기준)
-    - Last sync timestamp
-    - Queue count (선택)
-    
-    성능 최적화:
-    - 데이터가 없을 경우 즉시 빈 값 반환
-    - DB 쿼리 최적화 (인덱스 활용)
-    - 비동기 처리로 응답 시간 단축
+    eBay Listings Summary (lightweight stats API).
+    Fetches counts only on dashboard load:
+    - Active count, low-performing count (by filter), last_sync_at, queue count.
+    Optimizations: return empty when no data; indexed queries; async.
     """
     import traceback
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
     
-    # Validate user_id - 유효한 UUID여야 함
+    # Validate user_id: must be valid UUID
     if not user_id:
         return {
             "success": False,
@@ -2538,35 +2501,31 @@ async def get_ebay_summary(
         
         db = next(get_db())
         try:
-            # ✅ 성능 최적화: 즉시 빈 값 반환 (데이터가 없을 경우)
-            # 먼저 빠른 존재 여부 확인 (LIMIT 1 사용, 인덱스 활용)
+            # Perf: return empty immediately when no data (quick existence check, LIMIT 1)
             from sqlalchemy import func
             has_listings = db.query(Listing).filter(
                 Listing.user_id == user_id
             ).limit(1).first()
             
             if not has_listings:
-                # ✅ 초기 로딩 최적화: 데이터가 없으면 백그라운드에서 자동 sync 시작
-                # 첫 로그인 시 자동으로 eBay API에서 데이터 가져오기
+                # On first load: if no data, start background sync automatically
                 logger.info(f"🔄 [AUTO-SYNC] No listings found for user {user_id}, starting background sync...")
                 
-                # 백그라운드 태스크로 sync 시작 (응답 지연 없음)
-                # FastAPI의 async 함수에서는 get_running_loop()를 사용해야 함
+                # Start sync in background (no response delay); use get_running_loop() in async
                 try:
                     import asyncio
-                    # 현재 실행 중인 이벤트 루프 가져오기 (FastAPI async context)
                     loop = asyncio.get_running_loop()
-                    # 백그라운드 태스크 생성 (fire-and-forget)
+                    # Fire-and-forget background task
                     loop.create_task(start_background_sync(request, user_id))
                     logger.info(f"✅ [AUTO-SYNC] Background sync task created for user {user_id}")
                 except RuntimeError:
-                    # 실행 중인 루프가 없는 경우 (일반적으로 발생하지 않음)
+                    # No running loop (uncommon)
                     logger.warning(f"⚠️ [AUTO-SYNC] No running event loop found, skipping background sync")
                 except Exception as bg_err:
                     logger.warning(f"⚠️ [AUTO-SYNC] Failed to start background sync: {bg_err}")
-                    # 백그라운드 태스크 실패해도 응답은 정상 반환
+                    # Response still returned even if background task fails
                 
-                # 데이터가 없어도 즉시 빈 값 반환 (백그라운드 sync는 별도로 진행)
+                # Return empty immediately; background sync runs separately
                 return {
                     "success": True,
                     "user_id": user_id,
@@ -2575,17 +2534,17 @@ async def get_ebay_summary(
                     "queue_count": 0,
                     "last_sync_at": None,
                     "filters_applied": {},
-                    "auto_sync_started": True  # 프론트엔드에서 알림 표시용
+                    "auto_sync_started": True  # For frontend notification
                 }
             
-            # ✅ 최적화된 쿼리: 인덱스 활용 (user_id, platform)
+            # Optimized query: use index (user_id, platform)
             active_query = db.query(Listing).filter(
                 Listing.user_id == user_id,
                 func.lower(Listing.platform) == func.lower("eBay")
             )
             active_count = active_query.count()
             
-            # ✅ Last sync timestamp (가장 최근 last_synced_at) - 인덱스 활용
+            # Last sync timestamp (most recent last_synced_at)
             last_listing = db.query(Listing).filter(
                 Listing.user_id == user_id,
                 func.lower(Listing.platform) == func.lower("eBay")
@@ -2593,8 +2552,7 @@ async def get_ebay_summary(
             
             last_sync_at = last_listing.last_synced_at.isoformat() if last_listing and last_listing.last_synced_at else None
             
-            # Low-performing count (기본 필터: 7일, 0 판매, 0 관심, 10 이하 조회수)
-            # 필터가 제공되면 사용, 없으면 기본값
+            # Low-performing count (default: 7d, 0 sales, 0 watches, <=10 views); use filters if provided
             default_filters = {
                 "analytics_period_days": 7,
                 "max_sales": 0,
@@ -2610,31 +2568,29 @@ async def get_ebay_summary(
                     parsed_filters = json.loads(filters)
                     filter_params = {**default_filters, **parsed_filters}
                     
-                    # 필터 키 매핑: market_place_filter와 marketplace_filter 둘 다 체크
+                    # Check both market_place_filter and marketplace_filter
                     marketplace_filter = parsed_filters.get("market_place_filter") or parsed_filters.get("marketplace_filter")
                     if marketplace_filter and marketplace_filter.lower() != "ebay":
-                        logger.warn(f"⚠️ [SUMMARY] marketplace_filter가 'eBay'가 아님: {marketplace_filter}")
+                        logger.warn(f"⚠️ [SUMMARY] marketplace_filter is not 'eBay': {marketplace_filter}")
                 except Exception as filter_err:
-                    logger.warn(f"⚠️ [FILTER] 필터 파싱 실패: {filter_err}")
+                    logger.warn(f"⚠️ [FILTER] Filter parse failed: {filter_err}")
                     pass
             
-            # ✅ 3-1. filters_applied에 platform 정보 추가 (대소문자 통일)
-            filter_params["marketplace_filter"] = "eBay"  # 정규화된 값으로 통일
-            filter_params["platform"] = "eBay"  # 추가 정보
+            # Add platform to filters_applied (normalize case)
+            filter_params["marketplace_filter"] = "eBay"
+            filter_params["platform"] = "eBay"
             
-            # Low-performing 계산 (DB에서 직접 필터링)
-            # Note: view_count와 impressions는 Listing 모델에 직접 필드가 없으므로 metrics JSONB에서 확인 필요
-            # 간단한 통계를 위해 date_listed, sold_qty, watch_count만 필터링
+            # Low-performing: filter in DB. view_count/impressions in metrics JSONB.
+            # Use date_listed, sold_qty, watch_count for simple stats
             min_days = filter_params.get("analytics_period_days", 7)
             max_sales = filter_params.get("max_sales", 0)
             max_watches = filter_params.get("max_watches", 0)
             
-            # 날짜 기준 필터: min_days 이상 등록된 것 (cutoff_date 이전에 등록된 것)
+            # Date filter: listed at least min_days ago (before cutoff_date)
             cutoff_date = date_type.today() - timedelta(days=min_days)
             
-            # 기본 필터: date_listed, sold_qty, watch_count만 사용
-            # view_count와 impressions는 metrics JSONB에 저장되므로 전체 listings 조회 시 필터링
-            # ✅ 1. 플랫폼 대소문자 통일: Case-insensitive 검색 사용
+            # Filter by date_listed, sold_qty, watch_count; view_count/impressions in metrics JSONB
+            # Platform: case-insensitive
             low_performing_query = db.query(Listing).filter(
                 Listing.user_id == user_id,
                 func.lower(Listing.platform) == func.lower("eBay"),  # Case-insensitive
@@ -2645,12 +2601,11 @@ async def get_ebay_summary(
             
             low_performing_count = low_performing_query.count()
             
-            # Queue count는 DeletionLog에서 가져오지 않고, 클라이언트에서 관리하는 것으로 가정
-            # 필요시 별도 API로 제공
+            # Queue count: managed on client; provide separate API if needed
             queue_count = 0
             
-            # 검증 로그 표준화: 세 줄만 남김
-            logger.info(f"[DASHBOARD] 현재 활성 상품 수: {active_count}개.")
+            # Standard validation log
+            logger.info(f"[DASHBOARD] Active listings count: {active_count}.")
             
             return {
                 "success": True,

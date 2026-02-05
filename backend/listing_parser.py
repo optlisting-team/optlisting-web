@@ -33,7 +33,7 @@ def parse_listing_from_data(
     # Validate user_id
     if not user_id or user_id == "default-user":
         logger.error(f"❌ [PARSER] Invalid user_id: {user_id}")
-        raise ValueError(f"user_id가 유효하지 않습니다: {user_id}. 'default-user'로 저장할 수 없습니다.")
+        raise ValueError(f"Invalid user_id: {user_id}. Cannot use 'default-user'.")
     
     # Parse date_listed
     date_listed = date.today()

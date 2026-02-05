@@ -16,8 +16,7 @@ class Listing(Base):
     __tablename__ = "listings"
 
     id = Column(Integer, primary_key=True, index=True)
-    # ✅ 멀티테넌시: ebay_item_id의 unique 제약조건 제거
-    # 대신 (user_id, ebay_item_id) 복합 UNIQUE 제약조건을 마이그레이션 SQL로 생성
+    # Multi-tenant: no unique on ebay_item_id alone; use (user_id, ebay_item_id) UNIQUE via migration
     ebay_item_id = Column(String, index=True, nullable=False)
     title = Column(String, nullable=False)
     sku = Column(String, nullable=False)
@@ -38,8 +37,8 @@ class Listing(Base):
     raw_data = Column(JSONB, default={}, nullable=True)  # Raw JSON data from eBay API
     
     # Additional fields (added via migration)
-    item_id = Column(String, nullable=True)  # Generic item ID (ebay_item_id와 별도)
-    platform = Column(String, nullable=True)  # Generic platform (marketplace와 별도)
+    item_id = Column(String, nullable=True)  # Generic item ID (separate from ebay_item_id)
+    platform = Column(String, nullable=True)  # Generic platform (separate from marketplace)
     user_id = Column(String, nullable=True, index=True)
     supplier_id = Column(String, nullable=True)
     supplier_name = Column(String, nullable=True)  # Supplier name from CSV matching
@@ -63,9 +62,9 @@ class DeletionLog(Base):
     marketplace = Column(String, nullable=True)  # "eBay", "Amazon", etc.
     source = Column(String, nullable=True)  # "Amazon", "Walmart", etc.
     deleted_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
-    # 멀티테넌시: user_id 필드 추가 (기존 데이터는 nullable로 유지, 마이그레이션 필요)
+    # Multi-tenant: user_id (nullable for migration)
     user_id = Column(String, nullable=True, index=True)
-    # JSONB snapshot 필드 (기존 스키마에 있을 수 있음 - 확인 필요)
+    # JSONB snapshot (may exist in legacy schema)
     snapshot = Column(JSONB, nullable=True)
 
     def __repr__(self):
@@ -113,17 +112,17 @@ class Profile(Base):
 
 class CSVFormat(Base):
     """
-    공급처별 공식 CSV 포맷 정의
-    각 공급처/도구별로 CSV 컬럼 구조와 데이터 매핑 규칙을 저장
+    Official CSV format per supplier/tool.
+    Stores column structure and mapping rules per supplier.
     """
     __tablename__ = "csv_formats"
 
     id = Column(Integer, primary_key=True, index=True)
-    supplier_name = Column(String, nullable=False, index=True)  # 공급처/도구 이름 (e.g., "autods", "wholesale2b", "shopify_matrixify")
-    display_name = Column(String, nullable=True)  # 표시용 이름 (e.g., "AutoDS", "Wholesale2B")
+    supplier_name = Column(String, nullable=False, index=True)  # Supplier/tool name (e.g. "autods", "wholesale2b")
+    display_name = Column(String, nullable=True)  # Display name (e.g. "AutoDS", "Wholesale2B")
     
-    # CSV 포맷 정의 (JSONB로 저장)
-    # 예: {
+    # CSV format definition (JSONB)
+    # Example: {
     #   "columns": ["Source ID", "File Action"],
     #   "column_order": ["Source ID", "File Action"],
     #   "mappings": {
@@ -131,11 +130,11 @@ class CSVFormat(Base):
     #     "File Action": {"value": "delete"}
     #   }
     # }
-    format_schema = Column(JSONB, nullable=False)  # CSV 포맷 스키마
+    format_schema = Column(JSONB, nullable=False)  # CSV format schema
     
-    # 메타데이터
-    description = Column(String, nullable=True)  # 포맷 설명
-    is_active = Column(Boolean, default=True, nullable=False)  # 활성화 여부
+    # Metadata
+    description = Column(String, nullable=True)  # Format description
+    is_active = Column(Boolean, default=True, nullable=False)  # Active flag
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

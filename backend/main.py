@@ -36,7 +36,7 @@ except ImportError:
     logger = logging.getLogger(__name__)
     logger.warning("⚠️ Supabase client not available. Install with: pip install supabase")
 
-app = FastAPI(title="OptListing API", version="1.2.3")
+app = FastAPI(title="OptListing API", version="1.3.0")
 
 # ============================================================
 # Environment variables: SUPABASE_URL, SUPABASE_ANON_KEY (or VITE_* fallback);
@@ -73,7 +73,7 @@ def validate_supabase_env():
     print("✅ Supabase credentials validated")
     return True
 
-# 서버 시작 시 환경 변수 검증
+# Validate env vars on server start
 try:
     validate_supabase_env()
 except ValueError as e:
@@ -207,7 +207,7 @@ def run_supabase_self_test():
 # Execute self-test immediately at module import
 run_supabase_self_test()
 
-# eBay Webhook Router 등록
+# eBay Webhook Router registration
 app.include_router(ebay_webhook_router)
 
 # In-memory cache for KPI metrics (5-minute TTL)
@@ -362,7 +362,7 @@ async def global_exception_handler(request: Request, exc):
     
     logger = logging.getLogger(__name__)
     
-    # 상세한 에러 로깅
+    # Detailed error logging
     error_traceback = traceback.format_exc()
     logger.error(f"❌ Unhandled exception: {type(exc).__name__}: {str(exc)}")
     logger.error(f"   Request URL: {request.url}")
@@ -395,11 +395,11 @@ def startup_event():
     logger = logging.getLogger(__name__)
     
     try:
-        # ✅ 4. 검증 로그 추가: 서버 시작 시 DB 연결 성공 여부 확인
+        # Verify DB connection on startup
         from .models import engine
         from sqlalchemy import text
         
-        # DB 연결 테스트
+        # DB connection test
         logger.info("[STARTUP] Testing database connection...")
         try:
             with engine.connect() as conn:
@@ -427,34 +427,34 @@ def startup_event():
             # The database connection will be tested on first request
             logger.warning("[STARTUP] Server will continue to start, but database operations may fail")
         
-        # ✅ 자동 정리 로직: 서버 시작 시 유효하지 않은 user_id 데이터 정리
+        # Cleanup: remove listings with invalid user_id on startup
         try:
             db = next(get_db())
             try:
                 from sqlalchemy import text
                 from .models import Profile
                 
-                # 유효한 user_id 목록 조회
+                # Get valid user_id list
                 valid_user_ids = db.query(Profile.user_id).filter(Profile.user_id.isnot(None)).all()
                 valid_user_id_set = {uid[0] for uid in valid_user_ids}
                 
-                # 유효하지 않은 user_id를 가진 listings 삭제
+                # Delete listings with invalid user_id
                 invalid_count = db.execute(
                     text("""
                         DELETE FROM listings 
                         WHERE user_id IS NULL 
-                        -- OR user_id = 'default-user' -- 제거됨: 이제 모든 user_id는 유효한 UUID여야 함
+                        -- OR user_id = 'default-user' -- removed: all user_id must be valid UUID
                         OR (user_id NOT IN (SELECT user_id FROM profiles WHERE user_id IS NOT NULL) 
                             AND user_id IS NOT NULL)
                     """)
                 ).rowcount
                 
                 if invalid_count > 0:
-                    logger.info(f"🧹 [STARTUP] 유효하지 않은 user_id를 가진 {invalid_count}개 listings 삭제됨")
+                    logger.info(f"🧹 [STARTUP] Cleaned {invalid_count} listings with invalid user_id")
                     print(f"🧹 [STARTUP] Cleaned up {invalid_count} listings with invalid user_id")
                     db.commit()
                 
-                # platform 보정: "ebay" (소문자)를 "eBay"로 업데이트
+                # Normalize platform: lowercase "ebay" -> "eBay"
                 platform_fixed = db.execute(
                     text("""
                         UPDATE listings 
@@ -465,19 +465,19 @@ def startup_event():
                 ).rowcount
                 
                 if platform_fixed > 0:
-                    logger.info(f"🔧 [STARTUP] platform 보정: {platform_fixed}개 listings 업데이트됨")
+                    logger.info(f"🔧 [STARTUP] Fixed platform for {platform_fixed} listings")
                     print(f"🔧 [STARTUP] Fixed platform case for {platform_fixed} listings")
                     db.commit()
                 
                 count = db.query(Listing).count()
                 print(f"Database contains {count} listings after cleanup")
             except Exception as cleanup_err:
-                logger.warning(f"⚠️ [STARTUP] 정리 로직 실행 중 오류: {cleanup_err}")
+                logger.warning(f"⚠️ [STARTUP] Cleanup error: {cleanup_err}")
                 db.rollback()
             finally:
                 db.close()
         except Exception as e:
-            logger.warning(f"⚠️ [STARTUP] 정리 로직 실행 실패: {e}")
+            logger.warning(f"⚠️ [STARTUP] Cleanup failed: {e}")
             # Don't crash the server if cleanup fails
     except Exception as e:
         # Log error but don't crash the server
@@ -496,14 +496,14 @@ def root():
 @app.get("/api/health")
 def health_check():
     """
-    서비스 Health Check 엔드포인트 (성능 최적화)
-    - API 상태
-    - DB 연결 상태 (타임아웃 적용)
-    - eBay Worker 상태
-    
-    성능 최적화:
-    - DB 연결 테스트에 타임아웃 적용 (1초 이내 응답 보장)
-    - Worker 상태 확인은 비동기로 처리
+    Service health check endpoint (optimized).
+    - API status
+    - DB connection (with timeout)
+    - eBay Worker status
+
+    Optimizations:
+    - DB connection test with timeout (response within 1s)
+    - Worker check is async
     """
     from datetime import datetime
     import signal
@@ -519,23 +519,23 @@ def health_check():
         }
     }
     
-    # DB 연결 테스트 (타임아웃 적용)
+    # DB connection test (with timeout)
     try:
         from .models import engine
         from sqlalchemy import text
         
-        # 타임아웃을 위한 간단한 연결 테스트
-        # pool_pre_ping이 활성화되어 있으면 빠른 연결 확인 가능
+        # Simple connection test for timeout
+        # pool_pre_ping enables fast connection check
         with engine.connect() as conn:
-            # 간단한 쿼리로 빠른 응답 보장
+            # Simple query for fast response
             result = conn.execute(text("SELECT 1"))
-            result.fetchone()  # 결과 가져오기
+            result.fetchone()  # Consume result
         health["services"]["database"] = "ok"
     except Exception as e:
         health["services"]["database"] = f"error: {str(e)[:50]}"
         health["status"] = "degraded"
     
-    # Worker 상태 확인 (비동기, 타임아웃 적용)
+    # Worker status check (async, with timeout)
     try:
         from .workers.ebay_token_worker import get_worker_status
         worker_status = get_worker_status()
@@ -548,7 +548,7 @@ def health_check():
     except ImportError:
         health["services"]["ebay_worker"] = "not_loaded"
     except Exception as e:
-        # Worker 상태 확인 실패는 전체 health에 영향 주지 않음
+        # Worker check failure does not affect overall health
         health["services"]["ebay_worker"] = f"error: {str(e)[:50]}"
     
     return health
@@ -559,12 +559,10 @@ async def trigger_token_refresh(
     admin_key: str = None
 ):
     """
-    수동으로 eBay Token 갱신 작업 트리거 (관리자용)
-    
-    참고: 이 엔드포인트는 Worker 프로세스와 별개로 동작합니다.
-    실제 갱신은 Worker가 처리합니다.
+    Manually trigger eBay token refresh (admin).
+    Note: This endpoint runs separately from Worker. Worker performs the actual refresh.
     """
-    # 간단한 보안 체크 (프로덕션에서는 더 강력한 인증 필요)
+    # Simple security check (use stronger auth in production)
     expected_key = os.getenv("ADMIN_API_KEY", "")
     if expected_key and admin_key != expected_key:
         raise HTTPException(status_code=403, detail="Invalid admin key")
@@ -586,26 +584,25 @@ async def trigger_token_refresh(
 
 @app.get("/api/debug/listings")
 def debug_listings(
-    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user),  # JWT -> user_id
     platform: str = Query("eBay", description="Platform filter"),
     db: Session = Depends(get_db)
 ):
     """
-    🔍 디버그 엔드포인트: Listings 테이블 조회 및 샘플 데이터 반환
-    JWT 인증이 필요합니다.
-    
-    sync upsert와 summary 쿼리의 키 일치 여부를 확인하기 위한 임시 디버그 엔드포인트
-    - user_id + platform으로 count
-    - 샘플 row 5개 반환
-    - sync upsert와 summary 쿼리의 키 비교 정보 제공
+    Debug endpoint: query Listings table and return sample data. Requires JWT.
+
+    Temporary debug endpoint to verify sync upsert vs summary query key alignment.
+    - Count by user_id + platform
+    - Return 5 sample rows
+    - Provide key comparison info
     """
     """
-    🔍 디버그 엔드포인트: Listings 테이블 조회 및 샘플 데이터 반환
-    
-    sync upsert와 summary 쿼리의 키 일치 여부를 확인하기 위한 임시 디버그 엔드포인트
-    - user_id + platform으로 count
-    - 샘플 row 5개 반환
-    - sync upsert와 summary 쿼리의 키 비교 정보 제공
+    Debug endpoint: query Listings and return sample data.
+
+    Temporary debug to verify sync upsert vs summary key alignment.
+    - Count by user_id + platform
+    - Return 5 sample rows
+    - Key comparison info
     """
     import logging
     logger = logging.getLogger(__name__)
@@ -614,7 +611,7 @@ def debug_listings(
     logger.info(f"🔍 [DEBUG] Debug listings query for user_id={user_id}, platform={platform}")
     
     try:
-        # Summary 쿼리와 동일한 조건으로 조회
+        # Same conditions as summary query
         query = db.query(Listing).filter(
             Listing.user_id == user_id,
             Listing.platform == platform
@@ -622,10 +619,10 @@ def debug_listings(
         
         count = query.count()
         
-        # 샘플 row 5개 가져오기
+        # Fetch 5 sample rows
         sample_listings = query.limit(5).all()
         
-        # 샘플 데이터를 딕셔너리로 변환
+        # Convert sample to dict
         sample_data = []
         for listing in sample_listings:
             sample_data.append({
@@ -645,7 +642,7 @@ def debug_listings(
         logger.info(f"   - Sample rows: {len(sample_data)}")
         logger.info("=" * 60)
         
-        # Sync upsert 키와 Summary 쿼리 키 비교 정보
+        # Sync upsert vs Summary key comparison info
         sync_upsert_keys = {
             "user_id": user_id,
             "platform": platform,
@@ -684,7 +681,7 @@ def get_listings(
     skip: int = 0,
     limit: int = 100,
     store_id: Optional[str] = None,  # Store ID filter - 'all' or None means all stores
-    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user),  # JWT -> user_id
     db: Session = Depends(get_db)
 ):
     """Get all listings for a specific user"""
@@ -729,7 +726,9 @@ def get_listings(
                     )
                 ),
                 "sold_qty": (l.metrics.get('sales') if l.metrics and isinstance(l.metrics, dict) and 'sales' in l.metrics else None) or getattr(l, 'sold_qty', 0) or 0,
-                "watch_count": (l.metrics.get('views') if l.metrics and isinstance(l.metrics, dict) and 'views' in l.metrics else None) or getattr(l, 'watch_count', 0) or 0,
+                "watch_count": (l.metrics.get('watch_count') if l.metrics and isinstance(l.metrics, dict) and 'watch_count' in l.metrics else None) or getattr(l, 'watch_count', 0) or 0,
+                "view_count": (l.metrics.get('views') if l.metrics and isinstance(l.metrics, dict) and 'views' in l.metrics else None) or getattr(l, 'view_count', 0) or 0,
+                "last_updated": (l.updated_at or l.last_synced_at or l.created_at).isoformat() if (getattr(l, 'updated_at', None) or getattr(l, 'last_synced_at', None) or getattr(l, 'created_at', None)) else None,
                 # Management hub information (for Shopify detection)
                 "management_hub": (
                     l.metrics.get('management_hub') if l.metrics and isinstance(l.metrics, dict) and 'management_hub' in l.metrics else None
@@ -769,31 +768,31 @@ def detect_listing_source(
 
 @app.get("/api/analyze")
 def analyze_zombies(
-    # 새 필터 파라미터 (순서대로)
-    analytics_period_days: int = 7,  # 1. 분석 기준 기간
+    # Filter params (in order)
+    analytics_period_days: int = 7,  # 1. Analysis period
     min_days: int = 7,               # Legacy compatibility
-    max_sales: int = 0,              # 2. 기간 내 판매 건수
-    max_watches: int = 0,            # 3. 찜하기 (Watch)
+    max_sales: int = 0,              # 2. Sales in period
+    max_watches: int = 0,            # 3. Watches
     max_watch_count: int = 0,        # Legacy compatibility
-    max_impressions: int = 100,      # 4. 총 노출 횟수
-    max_views: int = 10,             # 5. 총 조회 횟수
+    max_impressions: int = 100,      # 4. Impressions
+    max_views: int = 10,             # 5. Views
     supplier_filter: str = "All",
     marketplace: str = "eBay",       # MVP Scope: Default to eBay
     store_id: Optional[str] = None,
-    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user),  # JWT -> user_id
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db)
 ):
     """
-    OptListing 최종 좀비 분석 필터 API
-    
-    필터 순서 (판매 → 관심 → 트래픽):
-    1. analytics_period_days: 분석 기준 기간 (기본 7일)
-    2. max_sales: 기간 내 판매 건수 (기본 0건)
-    3. max_watches: 찜하기/Watch (기본 0건)
-    4. max_impressions: 총 노출 횟수 (기본 100회 미만)
-    5. max_views: 총 조회 횟수 (기본 10회 미만)
+    OptListing zombie analysis filter API.
+
+    Filter order (Sales -> Watch -> Traffic):
+    1. analytics_period_days: analysis period (default 7 days)
+    2. max_sales: sales in period (default 0)
+    3. max_watches: watches (default 0)
+    4. max_impressions: impressions (default < 100)
+    5. max_views: views (default < 10)
     
     Returns:
     - total_count: Total number of ALL listings in the database
@@ -892,7 +891,7 @@ def analyze_zombies(
             total_breakdown["Unknown"] = total_breakdown.get("Unknown", 0) + count
     
     # Calculate breakdown by platform using SQL GROUP BY (dynamic - includes all marketplaces)
-    # ✅ FIX: platform 필드가 없으면 marketplace 사용
+    # FIX: if platform missing use marketplace
     platform_field = Listing.platform if hasattr(Listing, 'platform') else Listing.marketplace
     platform_query = db.query(
         platform_field,
@@ -928,10 +927,10 @@ def analyze_zombies(
     # Use max_watches if provided, otherwise fall back to max_watch_count
     effective_watches = max_watches if max_watches > 0 else max_watch_count
     
-    # 🔍 디버깅: 필터 파라미터 로깅
+    # Debug: log filter params
     import logging
     logger = logging.getLogger(__name__)
-    logger.info(f"🔍 Zombie 분석 필터 파라미터: min_days={effective_period}, max_sales={max_sales}, max_watches={effective_watches}, max_impressions={max_impressions}, max_views={max_views}, supplier_filter={supplier_filter}, platform_filter={marketplace}")
+    logger.info(f"🔍 Zombie filter params: min_days={effective_period}, max_sales={max_sales}, max_watches={effective_watches}, max_impressions={max_impressions}, max_views={max_views}, supplier_filter={supplier_filter}, platform_filter={marketplace}")
     
     zombies, zombie_breakdown = analyze_zombie_listings(
         db,
@@ -949,7 +948,7 @@ def analyze_zombies(
         limit=limit
     )
     
-    logger.info(f"✅ Zombie 분석 결과: {len(zombies)}개 좀비 발견 (전체 {total_count}개 중)")
+    logger.info(f"✅ Zombie analysis: {len(zombies)} zombies (of {total_count} total)")
     
     # Cache KPI metrics if this is a full page request
     if skip == 0 and limit >= 100 and not cached_kpi:
@@ -1005,50 +1004,47 @@ def analyze_zombies(
 
 
 class LowPerformingAnalysisRequest(BaseModel):
-    """Low-Performing 분석 요청 모델"""
+    """Low-Performing analysis request model"""
     days: int = 7  # analytics_period_days
     sales_lte: int = 0  # max_sales
     watch_lte: int = 0  # max_watches
     imp_lte: int = 100  # max_impressions
     views_lte: int = 10  # max_views
-    request_id: Optional[str] = None  # 클라이언트에서 생성한 requestId (idempotency)
+    request_id: Optional[str] = None  # Client-generated requestId (idempotency)
 
 
 class LowPerformingExecuteRequest(BaseModel):
-    """Low-Performing 분석 실행 요청 모델 (idempotency 포함)"""
+    """Low-Performing analysis execute request (with idempotency)"""
     days: int = 7
     sales_lte: int = 0
     watch_lte: int = 0
     imp_lte: int = 100
     views_lte: int = 10
-    idempotency_key: str  # 클라이언트에서 생성한 고유 키 (필수) - 중복 실행 방지
+    idempotency_key: str  # Client-generated unique key (required) - prevent duplicate run
 
 
 @app.post("/api/analysis/low-performing/quote")
 def quote_low_performing_analysis(
     request: LowPerformingAnalysisRequest,
-    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user),  # JWT -> user_id
     store_id: Optional[str] = Query(None, description="Store ID (optional)"),
     db: Session = Depends(get_db)
 ):
     """
-    Low-Performing 분석 비용 견적 (Preflight)
-    
-    분석 대상 SKU 수를 계산하고, 필요한 크레딧과 남은 크레딧을 반환합니다.
-    크레딧을 차감하지 않습니다.
-    
+    Low-Performing analysis quote (preflight).
+    Computes candidate SKU count and returns required/remaining credits. No deduction.
     Args:
-        request: 필터 파라미터
-        user_id: 사용자 ID
-        store_id: 스토어 ID (선택)
-        db: 데이터베이스 세션
+        request: filter params
+        user_id: user ID
+        store_id: store ID (optional)
+        db: DB session
         
     Returns:
         {
-            "estimatedCandidates": int,  # 분석 대상 SKU 수
-            "requiredCredits": int,      # 필요한 크레딧 (SKU 수만큼)
-            "remainingCredits": int,     # 남은 크레딧
-            "filters": Dict              # 적용된 필터
+            "estimatedCandidates": int,  # Candidate SKU count
+            "requiredCredits": int,      # Required credits (per SKU)
+            "remainingCredits": int,     # Remaining credits
+            "filters": Dict              # Applied filters
         }
     """
     import logging
@@ -1058,7 +1054,7 @@ def quote_low_performing_analysis(
     logger = logging.getLogger(__name__)
     
     # Request logging
-    logger.info(f"📊 [QUOTE] Low-Performing 분석 견적 요청 시작")
+    logger.info(f"📊 [QUOTE] Low-Performing quote request started")
     logger.info(f"📊 [QUOTE] Request body: {request.dict()}")
     logger.info(f"📊 [QUOTE] Query params: user_id={user_id}, store_id={store_id}")
     
@@ -1073,7 +1069,7 @@ def quote_low_performing_analysis(
             }
         )
     
-    # 필터 값 검증 및 정규화
+    # Validate and normalize filter values
     days = max(1, request.days)
     sales_lte = max(0, request.sales_lte)
     watch_lte = max(0, request.watch_lte)
@@ -1091,7 +1087,7 @@ def quote_low_performing_analysis(
     logger.info(f"📊 [QUOTE] Resolved filters: {filters}")
     logger.info(f"📊 [QUOTE] Resolved user_id: {user_id}, store_id: {store_id}")
     
-    # 분석 대상 SKU 수 계산 (실제 분석 수행 X)
+    # Count candidate SKUs (no actual analysis)
     try:
         logger.info(f"📊 [QUOTE] Calling count_low_performing_candidates...")
         estimated_candidates = count_low_performing_candidates(
@@ -1110,7 +1106,7 @@ def quote_low_performing_analysis(
         logger.info(f"📊 [QUOTE] count_low_performing_candidates result: {estimated_candidates}")
     except Exception as e:
         error_trace = traceback.format_exc()
-        logger.error(f"❌ [QUOTE] 분석 대상 SKU 수 계산 실패: {str(e)}")
+        logger.error(f"❌ [QUOTE] Candidate count failed: {str(e)}")
         logger.error(f"❌ [QUOTE] Stack trace:\n{error_trace}")
         
         # Check if it's a database/user not found error
@@ -1148,7 +1144,7 @@ def quote_low_performing_analysis(
 @app.post("/api/analysis/low-performing/execute")
 def execute_low_performing_analysis(
     request: LowPerformingExecuteRequest,
-    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user),  # JWT -> user_id
     store_id: Optional[str] = Query(None, description="Store ID (optional)"),
     db: Session = Depends(get_db)
 ):
@@ -1191,7 +1187,7 @@ def execute_low_performing_analysis(
     # TODO: Implement proper idempotency check using a dedicated table
     # For now, we'll proceed with the analysis
     
-    # 필터 값 검증 및 정규화
+    # Validate and normalize filter values
     days = max(1, request.days)
     sales_lte = max(0, request.sales_lte)
     watch_lte = max(0, request.watch_lte)
@@ -1237,7 +1233,7 @@ def execute_low_performing_analysis(
     subscription_info = get_subscription_status(db, user_id)
     subscription_status = subscription_info.get("status", "inactive")
     
-    # 분석 실행
+    # Run analysis
     try:
         zombies, zombie_breakdown = analyze_zombie_listings(
             db=db,
@@ -1256,9 +1252,9 @@ def execute_low_performing_analysis(
         )
         
         count = len(zombies)
-        logger.info(f"✅ [{idempotency_key}] 분석 완료: {count}개 low-performing items 발견")
+        logger.info(f"✅ [{idempotency_key}] Analysis done: {count} low-performing items")
         
-        # Items 변환
+        # Transform items
         items = [
             {
                 "id": z.id,
@@ -1301,8 +1297,8 @@ def execute_low_performing_analysis(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ [{idempotency_key}] 분석 실행 실패: {str(e)}")
-        # 분석 실패 시 크레딧 환불 고려 (현재는 환불하지 않음)
+        logger.error(f"❌ [{idempotency_key}] Analysis failed: {str(e)}")
+        # Consider credit refund on failure (currently no refund)
         raise HTTPException(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
@@ -1316,7 +1312,7 @@ def execute_low_performing_analysis(
 @app.post("/api/analysis/low-performing")
 def analyze_low_performing(
     request: LowPerformingAnalysisRequest,
-    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user),  # JWT -> user_id
     store_id: Optional[str] = Query(None, description="Store ID (optional)"),
     db: Session = Depends(get_db)
 ):
@@ -1376,7 +1372,7 @@ def analyze_low_performing(
     subscription_info = get_subscription_status(db, user_id)
     subscription_status = subscription_info.get("status", "inactive")
     
-    # 분석 실행
+    # Run analysis
     try:
         zombies, zombie_breakdown = analyze_zombie_listings(
             db=db,
@@ -1387,17 +1383,17 @@ def analyze_low_performing(
             max_watch_count=watch_lte,  # Legacy compatibility
             max_impressions=imp_lte,
             max_views=views_lte,
-            supplier_filter="All",  # 기본값
-            platform_filter="eBay",  # 기본값
+            supplier_filter="All",  # default
+            platform_filter="eBay",  # default
             store_id=store_id,
-            skip=0,  # 전체 결과 반환
-            limit=10000  # 최대 10000개까지 반환
+            skip=0,  # full result
+            limit=10000  # max 10000
         )
         
         count = len(zombies)
-        logger.info(f"✅ [{request_id}] 분석 완료: {count}개 low-performing items 발견")
+        logger.info(f"✅ [{request_id}] Analysis done: {count} low-performing items")
         
-        # Items 변환
+        # Transform items
         items = [
             {
                 "id": z.id,
@@ -1440,9 +1436,9 @@ def analyze_low_performing(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ [{request_id}] 분석 실행 실패: {str(e)}")
-        # 분석 실패 시 크레딧 환불 (선택사항 - 현재는 환불하지 않음)
-        # TODO: 분석 실패 시 크레딧 환불 로직 추가 고려
+        logger.error(f"❌ [{request_id}] Analysis failed: {str(e)}")
+        # Optional: credit refund on failure (currently no refund)
+        # TODO: add refund logic on failure
         raise HTTPException(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
@@ -1506,7 +1502,7 @@ class ExportQueueRequest(BaseModel):
 @app.post("/api/export-queue")
 def export_queue_csv(
     request: ExportQueueRequest,
-    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user),  # JWT -> user_id
     db: Session = Depends(get_db)
 ):
     """
@@ -1538,7 +1534,7 @@ def export_queue_csv(
         )
     
     # Extract platform from request if provided (optional parameter)
-    # Frontend에서 platform 파라미터를 전달하면 이를 사용하여 target_tool 매핑
+    # If frontend passes platform, use it to map target_tool
     platform = getattr(request, 'platform', None)
     
     # Generate CSV directly from items (dictionaries) with target_tool (with snapshot logging)
@@ -1546,7 +1542,7 @@ def export_queue_csv(
         items, 
         target_tool, 
         db=db, 
-        user_id=user_id,  # JWT 인증으로 추출된 user_id 사용
+        user_id=user_id,  # user_id from JWT
         mode=mode,
         store_id=request.store_id,
         platform=platform
@@ -1577,7 +1573,7 @@ class LogDeletionRequest(BaseModel):
 @app.post("/api/log-deletion")
 def log_deletion(
     request: LogDeletionRequest,
-    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user),  # JWT -> user_id
     db: Session = Depends(get_db)
 ):
     """
@@ -1617,7 +1613,7 @@ def log_deletion(
             title=item.get("title", "Unknown"),
             platform=platform,
             supplier=supplier,  # Use supplier_name (not source)
-            user_id=user_id,  # JWT 인증으로 추출된 user_id 추가
+            user_id=user_id,  # user_id from JWT
             snapshot=snapshot_data  # Store full snapshot in JSONB
         )
         logs.append(log_entry)
@@ -1643,7 +1639,7 @@ def log_deletion(
 def get_deletion_history(
     skip: int = 0,
     limit: int = 1000,
-    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user),  # JWT -> user_id
     db: Session = Depends(get_db)
 ):
     """
@@ -1656,10 +1652,10 @@ def get_deletion_history(
         skip = max(0, skip)
         limit = min(max(1, limit), 10000)  # Clamp between 1 and 10000
         
-        # Get total count (user_id 필터 적용)
+        # Get total count (user_id filter)
         total_count = db.query(DeletionLog).filter(DeletionLog.user_id == user_id).count()
         
-        # Get logs (most recent first) - user_id 필터 적용
+        # Get logs (most recent first) - user_id filter
         logs = db.query(DeletionLog).filter(DeletionLog.user_id == user_id).order_by(DeletionLog.deleted_at.desc()).offset(skip).limit(limit).all()
         
         # Build response with safe field access
@@ -1782,7 +1778,7 @@ def update_listing(
 @app.post("/api/dummy-data")
 def create_dummy_data(
     count: int = 50,
-    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user),  # JWT -> user_id
     db: Session = Depends(get_db)
 ):
     """Generate dummy listings for testing with new hybrid schema"""
@@ -1808,7 +1804,7 @@ def create_dummy_data(
 
 
 # ============================================================
-# CSV Upload Endpoints - 공급처 CSV 파이프라인
+# CSV Upload Endpoints - supplier CSV pipeline
 # ============================================================
 
 from fastapi import File, UploadFile
@@ -1821,7 +1817,7 @@ from .csv_processor import (
 
 
 class CSVUploadResponse(BaseModel):
-    """CSV 업로드 응답 스키마"""
+    """CSV upload response schema"""
     success: bool
     message: str
     result: Optional[Dict] = None
@@ -2110,13 +2106,12 @@ def download_csv_template():
 
 @app.get("/api/unmatched-listings")
 def get_unmatched_listings_endpoint(
-    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user),  # JWT -> user_id
     limit: int = 100,
     db: Session = Depends(get_db)
 ):
     """
-    공급처 정보가 없는 리스팅 목록 조회
-    사용자가 CSV에 추가해야 할 리스팅들
+    List listings without supplier info (for CSV add).
     """
     try:
         listings = get_unmatched_listings(db, user_id, limit)
@@ -2124,7 +2119,7 @@ def get_unmatched_listings_endpoint(
         return {
             "count": len(listings),
             "listings": listings,
-            "message": f"공급처 정보가 없는 리스팅 {len(listings)}개"
+            "message": f"Listings without supplier info: {len(listings)}"
         }
         
     except Exception as e:
@@ -2132,7 +2127,7 @@ def get_unmatched_listings_endpoint(
         traceback.print_exc()
         raise HTTPException(
             status_code=500,
-            detail=f"조회 실패: {str(e)}"
+            detail=f"Fetch failed: {str(e)}"
         )
 
 
@@ -2141,15 +2136,15 @@ def get_unmatched_listings_endpoint(
 # ============================================================
 
 class AnalysisStartRequest(BaseModel):
-    """분석 시작 요청 스키마"""
-    listing_ids: Optional[List[int]] = None  # 특정 리스팅만 분석
-    listing_count: Optional[int] = None  # 또는 리스팅 수 직접 지정
+    """Analysis start request schema"""
+    listing_ids: Optional[List[int]] = None  # Specific listing IDs
+    listing_count: Optional[int] = None  # Or listing count
     analysis_type: str = "zombie"  # "zombie", "full", "quick"
     marketplace: str = "eBay"
 
 
 class AnalysisStartResponse(BaseModel):
-    """분석 시작 응답 스키마"""
+    """Analysis start response schema"""
     success: bool
     analysis_id: str
     listings_to_analyze: int
@@ -2159,7 +2154,7 @@ class AnalysisStartResponse(BaseModel):
 
 
 class CreditBalanceResponse(BaseModel):
-    """크레딧 잔액 응답 스키마"""
+    """Credits balance response schema"""
     user_id: str
     purchased_credits: int
     consumed_credits: int
@@ -2170,10 +2165,10 @@ class CreditBalanceResponse(BaseModel):
 
 
 class AddCreditsRequest(BaseModel):
-    """크레딧 추가 요청 스키마 (결제 후 연동)"""
+    """Add credits request schema (post-payment)"""
     amount: int
     transaction_type: str = "purchase"  # "purchase", "bonus", "refund"
-    reference_id: Optional[str] = None  # 결제 ID 등
+    reference_id: Optional[str] = None  # Payment ID etc
     description: Optional[str] = None
 
 
@@ -2208,35 +2203,27 @@ def get_subscription_status_endpoint(
 @app.post("/api/analysis/start", response_model=AnalysisStartResponse)
 def start_analysis(
     request: AnalysisStartRequest,
-    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user),  # JWT -> user_id
     db: Session = Depends(get_db)
 ):
     """
-    리스팅 분석 시작 (크레딧 검사 및 차감)
-    
-    **크레딧 정책:**
-    - 1 리스팅 = 1 크레딧 (기본)
-    - 잔액 부족 시 402 Payment Required 반환
-    
-    **요청:**
-    - listing_ids: 분석할 리스팅 ID 목록 (선택)
-    - listing_count: 또는 리스팅 수 직접 지정 (선택)
-    - analysis_type: "zombie" (기본), "full", "quick"
-    
-    **응답:**
-    - analysis_id: 분석 작업 ID (추적용)
-    - credits_deducted: 차감된 크레딧
-    - remaining_credits: 남은 크레딧
+    Start listing analysis (credit check and deduct).
+
+    **Credit policy:** 1 listing = 1 credit (default). 402 if insufficient.
+
+    **Request:** listing_ids (optional), listing_count (optional), analysis_type: "zombie"|"full"|"quick".
+
+    **Response:** analysis_id, credits_deducted, remaining_credits.
     """
     import uuid
     
-    # 1. 분석할 리스팅 수 결정
+    # 1. Determine listing count to analyze
     if request.listing_ids:
         listing_count = len(request.listing_ids)
     elif request.listing_count:
         listing_count = request.listing_count
     else:
-        # listing_ids와 listing_count 모두 없으면 전체 리스팅 수 조회
+        # If no listing_ids/count, get total listing count
         listing_count = db.query(Listing).filter(
             Listing.user_id == user_id
         ).count()
@@ -2244,10 +2231,10 @@ def start_analysis(
     if listing_count <= 0:
         raise HTTPException(
             status_code=400,
-            detail="분석할 리스팅이 없습니다"
+            detail="No listings to analyze"
         )
     
-    # 2. 크레딧 검사 및 원자적 차감
+    # 2. Credit check and atomic deduct
     analysis_id = str(uuid.uuid4())
     
     result = deduct_credits_atomic(
@@ -2258,7 +2245,7 @@ def start_analysis(
         reference_id=analysis_id
     )
     
-    # 3. 크레딧 부족 시 402 반환
+    # 3. Return 402 if insufficient credits
     if not result.success:
         raise HTTPException(
             status_code=402,  # Payment Required
@@ -2267,12 +2254,11 @@ def start_analysis(
                 "message": result.message,
                 "available_credits": result.remaining_credits,
                 "required_credits": listing_count,
-                "purchase_url": "/pricing"  # 결제 페이지 URL
+                "purchase_url": "/pricing"  # Checkout URL
             }
         )
     
-    # 4. 분석 작업 시작 (실제 분석 로직 연동)
-    # analyze_zombie_listings 함수를 호출하여 실제 분석 수행
+    # 4. Start analysis (call analyze_zombie_listings)
     try:
         zombies, zombie_breakdown = analyze_zombie_listings(
             db=db,
@@ -2285,8 +2271,8 @@ def start_analysis(
             supplier_filter=request.supplier_filter or "All",
             platform_filter=request.marketplace or "eBay",
             store_id=request.store_id,
-            skip=0,  # 분석 작업은 전체 리스팅 대상
-            limit=10000  # 충분히 큰 값으로 설정
+            skip=0,  # All listings
+            limit=10000  # Large limit
         )
         
         zombie_count = len(zombies)
@@ -2298,21 +2284,20 @@ def start_analysis(
             listings_to_analyze=listing_count,
             credits_deducted=result.deducted_amount,
             remaining_credits=result.remaining_credits,
-            message=f"분석 완료: {listing_count}개 리스팅 중 {zombie_count}개 Low-Performing 발견, {result.deducted_amount} 크레딧 차감"
+            message=f"Analysis done: {zombie_count} Low-Performing of {listing_count} listings, {result.deducted_amount} credits deducted"
         )
     except Exception as e:
         logger.error(f"❌ Analysis failed: {str(e)}")
         import traceback
         logger.error(traceback.format_exc())
-        # 분석 실패 시에도 크레딧은 이미 차감되었으므로 성공 응답 반환
-        # (크레딧 환불은 별도 프로세스로 처리)
+        # On analysis failure still return success (credits already deducted; refund separate)
         return AnalysisStartResponse(
             success=True,
             analysis_id=analysis_id,
             listings_to_analyze=listing_count,
             credits_deducted=result.deducted_amount,
             remaining_credits=result.remaining_credits,
-            message=f"분석 시작: {listing_count}개 리스팅, {result.deducted_amount} 크레딧 차감 (분석 중 오류 발생: {str(e)})"
+            message=f"Analysis started: {listing_count} listings, {result.deducted_amount} credits deducted (error during analysis: {str(e)})"
         )
 
 
@@ -2346,31 +2331,26 @@ def get_user_credits(
 @app.post("/api/credits/add")
 def add_user_credits(
     request: AddCreditsRequest,
-    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user),  # JWT -> user_id
     admin_key: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """
-    크레딧 추가 (결제 완료 후 또는 관리자용)
-    
-    **보안:** 프로덕션에서는 Webhook 또는 Admin API Key 검증 필요
-    
-    **요청:**
-    - amount: 추가할 크레딧 수
-    - transaction_type: "purchase", "bonus", "refund"
-    - reference_id: 결제 ID (선택)
+    Add credits (post-payment or admin).
+    **Security:** In production use Webhook or Admin API Key verification.
+    **Request:** amount, transaction_type, reference_id (optional).
     """
-    # 간단한 보안 체크 (프로덕션에서는 Webhook 시그니처 검증으로 대체)
+    # Simple security check (in production use Webhook signature)
     expected_key = os.getenv("ADMIN_API_KEY", "")
     if expected_key and admin_key != expected_key:
-        # Admin key가 설정되어 있고 일치하지 않으면 거부
-        # 단, Lemon Squeezy Webhook에서는 별도 검증
-        pass  # MVP에서는 허용 (TODO: 프로덕션에서 강화)
+        # Reject if admin key set and mismatch
+        # Lemon Squeezy Webhook has separate verification
+        pass  # MVP: allow (TODO: strengthen in production)
     
     if request.amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
     
-    # TransactionType 변환
+    # TransactionType conversion
     try:
         tx_type = TransactionType(request.transaction_type)
     except ValueError:
@@ -2401,16 +2381,13 @@ def add_user_credits(
 def refund_user_credits(
     amount: int,
     reason: str,
-    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user),  # JWT -> user_id
     reference_id: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """
-    크레딧 환불 (분석 실패 시 등)
-    
-    **사용 사례:**
-    - 분석 중 오류 발생 시 자동 환불
-    - 고객 서비스 환불
+    Refund credits (e.g. on analysis failure).
+    Use cases: auto-refund on error, customer service refund.
     """
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
@@ -2430,7 +2407,7 @@ def refund_user_credits(
         "success": True,
         "refunded_credits": result.added_amount,
         "total_credits": result.total_credits,
-        "message": f"환불 완료: {amount} 크레딧 ({reason})"
+        "message": f"Refund done: {amount} credits ({reason})"
     }
 
 
@@ -2441,11 +2418,8 @@ def initialize_credits(
     db: Session = Depends(get_db)
 ):
     """
-    신규 사용자 크레딧 초기화
-    
-    **사용 사례:**
-    - 회원 가입 시 자동 호출
-    - 플랜 업그레이드 시 보너스 크레딧 지급
+    Initialize credits for new user.
+    Use cases: on signup, bonus on plan upgrade.
     """
     try:
         plan_type = PlanType(plan)
@@ -2478,19 +2452,19 @@ async def lemonsqueezy_webhook(request: Request, db: Session = Depends(get_db)):
         signature = request.headers.get("X-Signature", "")
         if not verify_webhook_signature(body, signature):
             logger.error("Webhook signature verification failed")
-            # 안정성: 검증 실패 시에도 200 OK 반환 (LS 재시도 방지)
-            # 실제 운영에서는 401을 반환할 수도 있지만, 로깅으로 모니터링
+            # Return 200 on verification failure (avoid LS retry)
+            # In production may return 401; monitor via logs
             return JSONResponse(
-                status_code=200,  # LS 재시도 방지를 위해 200 반환
+                status_code=200,  # 200 to avoid LS retry
                 content={"status": "error", "message": "Invalid signature"},
                 headers={"X-Webhook-Status": "invalid_signature"}
             )
         
-        # JSON 파싱
+        # JSON parse
         try:
             event_data = json.loads(body.decode('utf-8'))
         except json.JSONDecodeError as e:
-            logger.error(f"웹훅 JSON 파싱 오류: {e}")
+            logger.error(f"Webhook JSON parse error: {e}")
             return JSONResponse(
                 status_code=200,
                 content={"status": "error", "message": "Invalid JSON"}
@@ -2518,16 +2492,16 @@ async def lemonsqueezy_webhook(request: Request, db: Session = Depends(get_db)):
                 )
                 
         except Exception as e:
-            logger.error(f"웹훅 이벤트 처리 중 예상치 못한 오류: {e}", exc_info=True)
-            # 안정성: 예외 발생해도 200 OK 반환
+            logger.error(f"Webhook event handling error: {e}", exc_info=True)
+            # Return 200 even on exception (stability)
             return JSONResponse(
                 status_code=200,
                 content={"status": "error", "message": "Internal error (logged)"}
             )
             
     except Exception as e:
-        logger.error(f"웹훅 요청 처리 중 예상치 못한 오류: {e}", exc_info=True)
-        # 안정성: 모든 예외를 잡아서 200 OK 반환
+        logger.error(f"Webhook request handling error: {e}", exc_info=True)
+        # Return 200 on any exception (stability)
         return JSONResponse(
             status_code=200,
             content={"status": "error", "message": "Request processing failed (logged)"}
@@ -2717,8 +2691,7 @@ def get_csv_formats(
     db: Session = Depends(get_db)
 ):
     """
-    CSV 포맷 목록 조회
-    supplier_name이 제공되면 해당 포맷만 반환
+    List CSV formats. If supplier_name provided, return that format only.
     """
     if supplier_name:
         csv_format = db.query(CSVFormat).filter(
@@ -2764,7 +2737,7 @@ def update_csv_format(
     db: Session = Depends(get_db)
 ):
     """
-    CSV 포맷 업데이트
+    Update CSV format.
     """
     csv_format = db.query(CSVFormat).filter(
         CSVFormat.supplier_name == supplier_name
@@ -2795,7 +2768,7 @@ def update_csv_format(
 @app.post("/api/csv-formats/init")
 def init_csv_formats_endpoint(db: Session = Depends(get_db)):
     """
-    CSV 포맷 초기 데이터 생성
+    Initialize CSV format seed data.
     """
     try:
         from .init_csv_formats import init_csv_formats
@@ -2806,11 +2779,11 @@ def init_csv_formats_endpoint(db: Session = Depends(get_db)):
 
 
 # ============================================================
-# 테스트용 크레딧 충전 엔드포인트 (Admin-only)
+# Test credit top-up endpoint (Admin-only)
 # ============================================================
 
 class AdminGrantCreditsRequest(BaseModel):
-    """관리자 크레딧 부여 요청"""
+    """Admin grant credits request"""
     user_id: str
     amount: int
     description: Optional[str] = None
@@ -2823,35 +2796,20 @@ def admin_grant_credits(
     db: Session = Depends(get_db)
 ):
     """
-    관리자용 크레딧 부여 엔드포인트 (Admin-only)
-    
-    프로덕션에서 일반 유저가 무제한 충전할 수 없도록 안전장치 구현:
-    - ADMIN_API_KEY 환경 변수로 인증 필요
-    - 프로덕션 환경에서는 admin_key가 필수
-    - amount는 양수만 허용
-    
-    Args:
-        request: 크레딧 부여 요청 (user_id, amount, description)
-        admin_key: 관리자 API 키 (환경 변수 ADMIN_API_KEY와 일치해야 함)
-        db: 데이터베이스 세션
-        
-    Returns:
-        {
-            "success": bool,
-            "totalCredits": int,  # 총 크레딧 (부여 후)
-            "addedAmount": int,    # 부여된 크레딧
-            "message": str
-        }
+    Admin grant credits endpoint (Admin-only).
+    Security: ADMIN_API_KEY required; admin_key required in production; amount must be positive.
+    Args: request (user_id, amount, description), admin_key, db.
+    Returns: success, totalCredits, addedAmount, message.
     """
     import logging
     from .credit_service import add_credits, TransactionType
     
     logger = logging.getLogger(__name__)
     
-    # 관리자 인증 체크
+    # Admin auth check
     expected_admin_key = os.getenv("ADMIN_API_KEY", "")
     
-    # 프로덕션 환경에서 admin_key 검증 (개발 환경에서는 선택적)
+    # Verify admin_key in production (optional in dev)
     is_production = os.getenv("ENVIRONMENT", "").lower() in ["production", "prod"]
     
     if is_production or expected_admin_key:
@@ -2865,7 +2823,7 @@ def admin_grant_credits(
                 }
             )
     
-    # 요청 검증
+    # Validate request
     if request.amount <= 0:
         raise HTTPException(
             status_code=400,
@@ -2930,39 +2888,24 @@ def admin_grant_credits(
 
 
 # ============================================================
-# 쿠폰 기반 크레딧 충전 엔드포인트 (Coupon Redeem)
+# Coupon-based credit top-up endpoint (Coupon Redeem)
 # ============================================================
 
 class CouponRedeemRequest(BaseModel):
-    """쿠폰 사용 요청"""
+    """Coupon redeem request"""
     coupon_code: str
 
 
 @app.post("/api/credits/redeem")
 def redeem_coupon(
     request: CouponRedeemRequest,
-    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user),  # JWT -> user_id
     db: Session = Depends(get_db)
 ):
     """
-    쿠폰 사용 엔드포인트 (Coupon Redeem)
-    
-    프로덕션에서 일반 유저가 무제한 충전할 수 없도록 안전장치 구현:
-    - 쿠폰 코드는 환경 변수나 별도 테이블에서 관리
-    - 1회 사용 제한 (계정당 1회)
-    - 만료 날짜 체크
-    - 쿠폰 코드 검증
-    
-    Args:
-        request: 쿠폰 사용 요청 (coupon_code)
-        user_id: 사용자 ID
-        db: 데이터베이스 세션
-        
-    Returns:
-        {
-            "success": bool,
-            "totalCredits": int,  # 총 크레딧 (충전 후)
-            "addedAmount": int,    # 충전된 크레딧
+    Coupon redeem endpoint. Security: one-time per account; expiry check.
+    Args: request (coupon_code), user_id, db.
+    Returns: success, totalCredits (after top-up), addedAmount,
             "message": str
         }
     """
@@ -2974,15 +2917,15 @@ def redeem_coupon(
     
     logger = logging.getLogger(__name__)
     
-    # 쿠폰 코드 검증 (환경 변수에서 관리 - 프로덕션에서는 별도 테이블 사용 권장)
-    # 예시 쿠폰 코드 (환경 변수에서 관리)
+    # Coupon code validation (env or table in production)
+    # Example codes (from env)
     valid_coupons = {
         "TEST100": {"credits": 100, "expires_days": 30, "one_time": True},
         "WELCOME50": {"credits": 50, "expires_days": 30, "one_time": True},
-        # 프로덕션에서는 별도 coupons 테이블에서 관리 권장
+        # In production use separate coupons table
     }
     
-    # 환경 변수에서 쿠폰 코드 추가 로드 (선택적)
+    # Load extra coupon codes from env (optional)
     coupon_code_env = os.getenv("COUPON_CODES", "")
     if coupon_code_env:
         try:
@@ -2995,7 +2938,7 @@ def redeem_coupon(
     coupon_code = request.coupon_code.strip().upper()
     
     if coupon_code not in valid_coupons:
-        logger.warning(f"⚠️ 잘못된 쿠폰 코드: {coupon_code}")
+        logger.warning(f"⚠️ Invalid coupon code: {coupon_code}")
         raise HTTPException(
             status_code=400,
             detail={
@@ -3006,7 +2949,7 @@ def redeem_coupon(
     
     coupon_info = valid_coupons[coupon_code]
     
-    # 1회 사용 제한 체크 (credit_transactions 테이블에서 확인)
+    # One-time use check (credit_transactions table)
     if coupon_info.get("one_time", True):
         try:
             existing_redeem = db.execute(
@@ -3023,7 +2966,7 @@ def redeem_coupon(
             ).fetchone()
             
             if existing_redeem:
-                logger.warning(f"⚠️ 이미 사용된 쿠폰: user_id={user_id}, coupon={coupon_code}")
+                logger.warning(f"⚠️ Coupon already used: user_id={user_id}, coupon={coupon_code}")
                 raise HTTPException(
                     status_code=400,
                     detail={
@@ -3034,10 +2977,10 @@ def redeem_coupon(
         except HTTPException:
             raise
         except Exception as e:
-            logger.warning(f"⚠️ 쿠폰 사용 이력 확인 실패 (계속 진행): {str(e)}")
+            logger.warning(f"⚠️ Coupon history check failed (continuing): {str(e)}")
     
-    # 쿠폰 만료 체크 (환경 변수나 별도 테이블에서 관리)
-    # 현재는 간단하게 처리 (실제로는 coupons 테이블에서 expires_at 확인)
+    # Coupon expiry check (env or table)
+    # Simplified for now (in production check expires_at in coupons table)
     
     credits_amount = coupon_info.get("credits", 0)
     
@@ -3050,9 +2993,9 @@ def redeem_coupon(
             }
         )
     
-    logger.info(f"🎫 쿠폰 사용 요청: user_id={user_id}, coupon={coupon_code}, credits={credits_amount}")
+    logger.info(f"🎫 Coupon redeem: user_id={user_id}, coupon={coupon_code}, credits={credits_amount}")
     
-    # 크레딧 충전
+    # Credit top-up
     try:
         reference_id = f"coupon_{coupon_code}_{uuid.uuid4().hex[:16]}"
         result = add_credits(
@@ -3065,7 +3008,7 @@ def redeem_coupon(
         )
         
         if not result.success:
-            logger.error(f"❌ 쿠폰 사용 실패: {result.message}")
+            logger.error(f"❌ Coupon redeem failed: {result.message}")
             raise HTTPException(
                 status_code=500,
                 detail={
@@ -3074,7 +3017,7 @@ def redeem_coupon(
                 }
             )
         
-        logger.info(f"✅ 쿠폰 사용 성공: user_id={user_id}, coupon={coupon_code}, credits={credits_amount}, total={result.total_credits}")
+        logger.info(f"✅ Coupon redeem success: user_id={user_id}, coupon={coupon_code}, credits={credits_amount}, total={result.total_credits}")
         
         return {
             "success": True,
@@ -3086,7 +3029,7 @@ def redeem_coupon(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ 쿠폰 사용 실패: {str(e)}")
+        logger.error(f"❌ Coupon redeem failed: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail={
@@ -3097,26 +3040,21 @@ def redeem_coupon(
 
 
 # ============================================================
-# Dev-only 테스트용 크레딧 충전 엔드포인트 (개발 환경 전용)
+# Dev-only test credit top-up endpoint (dev only)
 # ============================================================
 
 @app.post("/api/dev/credits/topup")
 def dev_topup_credits(
     amount: int = Query(100, description="Amount of credits to add"),
-    user_id: str = Depends(get_current_user),  # JWT 인증으로 user_id 추출
+    user_id: str = Depends(get_current_user),  # JWT -> user_id
     db: Session = Depends(get_db)
 ):
     """
-    Dev-only 테스트용 크레딧 충전 엔드포인트
+    Dev-only test credit top-up endpoint
     
-    보안: Production에서는 절대 작동하지 않도록 이중 체크
-    - ENABLE_DEV_TOPUP=true && ENVIRONMENT != "production" 일 때만 작동
-    - 조건 불만족 시 403 Forbidden 반환
-    
-    Args:
-        amount: 충전할 크레딧 수 (기본값: 100)
-        user_id: 사용자 ID
-        db: 데이터베이스 세션
+    Security: double-check so it never runs in production.
+    Only when ENABLE_DEV_TOPUP=true && ENVIRONMENT != "production"; 403 otherwise.
+    Args: amount (default 100), user_id, db.
         
     Returns:
         {
@@ -3131,7 +3069,7 @@ def dev_topup_credits(
     
     logger = logging.getLogger(__name__)
     
-    # 이중 보안 체크: ENABLE_DEV_TOPUP && ENVIRONMENT != "production"
+    # Double security check: ENABLE_DEV_TOPUP && ENVIRONMENT != "production"
     enable_dev_topup = os.getenv("ENABLE_DEV_TOPUP", "").lower() == "true"
     environment = os.getenv("ENVIRONMENT", "").lower()
     is_production = environment in ["production", "prod"]
@@ -3146,7 +3084,7 @@ def dev_topup_credits(
             }
         )
     
-    # amount 검증
+    # Validate amount
     if amount <= 0:
         raise HTTPException(
             status_code=400,
@@ -3156,9 +3094,9 @@ def dev_topup_credits(
             }
         )
     
-    logger.info(f"🧪 [DEV] 크레딧 충전 요청: user_id={user_id}, amount={amount}")
+    logger.info(f"🧪 [DEV] Credit top-up request: user_id={user_id}, amount={amount}")
     
-    # 크레딧 충전
+    # Credit top-up
     try:
         result = add_credits(
             db=db,
@@ -3170,7 +3108,7 @@ def dev_topup_credits(
         )
         
         if not result.success:
-            logger.error(f"❌ [DEV] 크레딧 충전 실패: {result.message}")
+            logger.error(f"❌ [DEV] Credit top-up failed: {result.message}")
             raise HTTPException(
                 status_code=500,
                 detail={
@@ -3179,7 +3117,7 @@ def dev_topup_credits(
                 }
             )
         
-        logger.info(f"✅ [DEV] 크레딧 충전 성공: user_id={user_id}, amount={amount}, total={result.total_credits}")
+        logger.info(f"✅ [DEV] Credit top-up success: user_id={user_id}, amount={amount}, total={result.total_credits}")
         
         return {
             "success": True,
@@ -3191,7 +3129,7 @@ def dev_topup_credits(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ [DEV] 크레딧 충전 실패: {str(e)}")
+        logger.error(f"❌ [DEV] Credit top-up failed: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail={

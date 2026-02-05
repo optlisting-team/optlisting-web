@@ -15,7 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
 from .models import Profile
 
-# 로깅 설정
+# Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -26,30 +26,27 @@ LS_WEBHOOK_SECRET = os.getenv("LEMON_SQUEEZY_WEBHOOK_SECRET") or os.getenv("LS_W
 if not LS_WEBHOOK_SECRET:
     logger.warning("⚠️ [CONFIG] LEMON_SQUEEZY_WEBHOOK_SECRET is not set. Webhook signature verification will fail.")
 
-# 플랜별 리스팅 제한
+# Listing limits per plan
 PLAN_LIMITS = {
-    "pro": 999999,  # Pro 플랜: 실질적으로 무제한
-    "free": 100,    # Free 플랜: 100개 제한
-    "default": 100  # 기본값
+    "pro": 999999,  # Pro plan: effectively unlimited
+    "free": 100,    # Free plan: 100 limit
+    "default": 100  # Default
 }
 
-# 크레딧 팩 정의 (가격 → 크레딧 매핑)
-# Lemon Squeezy의 variant_id 또는 product_name으로 매칭
+# Credit pack definition (price -> credits). Match by Lemon Squeezy variant_id or product_name.
 CREDIT_PACKS = {
-    # 가격 기준 매핑 (단위: cents)
-    500: 300,      # $5 → 300 크레딧
-    1000: 800,     # $10 → 800 크레딧
-    1500: 1200,    # $15 → 1,200 크레딧
-    2000: 2000,    # $20 → 2,000 크레딧
-    2500: 2600,    # $25 → 2,600 크레딧
-    5000: 6000,    # $50 → 6,000 크레딧
+    # Price in cents -> credits
+    500: 300,      # $5 -> 300 credits
+    1000: 800,     # $10 -> 800 credits
+    1500: 1200,    # $15 -> 1,200 credits
+    2000: 2000,    # $20 -> 2,000 credits
+    2500: 2600,    # $25 -> 2,600 credits
+    5000: 6000,    # $50 -> 6,000 credits
 }
 
-# Variant ID 기준 매핑 (Lemon Squeezy 설정 후 업데이트 필요)
+# Variant ID -> credits (update after Lemon Squeezy setup)
 VARIANT_CREDITS = {
-    "1150506": 1000,  # Credit Pack_1000 - $5.00 → 1,000 크레딧
-    # "variant_id": credits
-    # 예: "12345": 300,
+    "1150506": 1000,  # Credit Pack_1000 - $5.00 -> 1,000 credits
 }
 
 
@@ -86,13 +83,13 @@ def get_or_create_profile(db: Session, user_id: str) -> Profile:
     """
     logger.info(f"[get_or_create_profile] START: user_id={user_id}")
     try:
-        # 먼저 조회 시도
+        # Try query first
         logger.info(f"[get_or_create_profile] Querying profile for user_id={user_id}")
         profile = db.query(Profile).filter(Profile.user_id == user_id).first()
         
         if not profile:
             logger.info(f"[get_or_create_profile] Profile not found, creating new profile for user_id={user_id}")
-            # 프로필이 없으면 생성 (idempotent)
+            # Create profile if not present (idempotent)
             try:
                 logger.info(f"[get_or_create_profile] Creating Profile object for user_id={user_id}")
                 profile = Profile(
@@ -110,20 +107,20 @@ def get_or_create_profile(db: Session, user_id: str) -> Profile:
                 db.commit()
                 logger.info(f"[get_or_create_profile] Refreshing profile for user_id={user_id}")
                 db.refresh(profile)
-                logger.info(f"[get_or_create_profile] ✅ 새 프로필 생성 성공: user_id={user_id}, profile_id={profile.id}")
+                logger.info(f"[get_or_create_profile] New profile created: user_id={user_id}, profile_id={profile.id}")
             except SQLAlchemyError as e:
                 db.rollback()
                 logger.error(f"[get_or_create_profile] ❌ Profile creation failed: user_id={user_id}, error={str(e)}", exc_info=True)
                 logger.error(f"[get_or_create_profile] Error type: {type(e).__name__}, Error details: {repr(e)}")
-                # Race condition: 다른 프로세스가 이미 생성했을 수 있음
-                # 다시 조회 시도
+                # Race condition: another process may have already created
+                # Retry query
                 logger.info(f"[get_or_create_profile] Retrying query after rollback for user_id={user_id}")
                 profile = db.query(Profile).filter(Profile.user_id == user_id).first()
                 if not profile:
-                    logger.error(f"[get_or_create_profile] ❌ 프로필 생성 실패 및 재조회 실패: user_id={user_id}, error={e}")
+                    logger.error(f"[get_or_create_profile] Profile creation and retry both failed: user_id={user_id}, error={e}")
                     raise
                 else:
-                    logger.info(f"[get_or_create_profile] ✅ 프로필이 다른 프로세스에 의해 이미 생성됨: user_id={user_id}, profile_id={profile.id}")
+                    logger.info(f"[get_or_create_profile] Profile already created by another process: user_id={user_id}, profile_id={profile.id}")
         else:
             logger.info(f"[get_or_create_profile] ✅ Profile found: user_id={user_id}, profile_id={profile.id}, purchased_credits={profile.purchased_credits}, consumed_credits={profile.consumed_credits}")
         
@@ -131,12 +128,12 @@ def get_or_create_profile(db: Session, user_id: str) -> Profile:
         return profile
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"[get_or_create_profile] ❌ 프로필 조회/생성 중 DB 오류: user_id={user_id}, error={str(e)}", exc_info=True)
+        logger.error(f"[get_or_create_profile] DB error during profile get/create: user_id={user_id}, error={str(e)}", exc_info=True)
         logger.error(f"[get_or_create_profile] Error type: {type(e).__name__}, Error details: {repr(e)}")
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"[get_or_create_profile] ❌ 프로필 조회/생성 중 예상치 못한 오류: user_id={user_id}, error={str(e)}", exc_info=True)
+        logger.error(f"[get_or_create_profile] Unexpected error during profile get/create: user_id={user_id}, error={str(e)}", exc_info=True)
         logger.error(f"[get_or_create_profile] Error type: {type(e).__name__}, Error details: {repr(e)}")
         raise
 
@@ -234,53 +231,46 @@ def handle_subscription_created(db: Session, event_data: Dict) -> bool:
 
 def handle_subscription_updated(db: Session, event_data: Dict) -> bool:
     """
-    subscription_updated 이벤트 처리
-    플랜 변경(업그레이드/다운그레이드) 시 total_listings_limit 및 subscription_status 업데이트
-    
-    Args:
-        db: 데이터베이스 세션
-        event_data: 웹훅 이벤트 데이터
-    
-    Returns:
-        처리 성공 여부
+    Handle subscription_updated: update total_listings_limit and subscription_status on plan change.
+    Args: db, event_data. Returns: success.
     """
     try:
         subscription = event_data.get('data', {}).get('attributes', {})
         subscription_id = subscription.get('id') or event_data.get('data', {}).get('id')
         status = subscription.get('status', '').lower()
         
-        # user_id 추출
+        # Extract user_id
         custom_data = subscription.get('custom_data', {})
         user_id = custom_data.get('user_id') or subscription.get('user_id')
         
         if not user_id:
-            # subscription_id로 프로필 찾기
+            # Find profile by subscription_id
             profile = db.query(Profile).filter(
                 Profile.ls_subscription_id == str(subscription_id)
             ).first()
             if not profile:
-                logger.error(f"subscription_updated: subscription_id={subscription_id}에 해당하는 프로필을 찾을 수 없습니다")
+                logger.error(f"subscription_updated: No profile found for subscription_id={subscription_id}")
                 return False
             user_id = profile.user_id
         else:
             profile = get_or_create_profile(db, user_id)
         
-        # 상태 업데이트
+        # Update status
         if status in ['active', 'cancelled', 'expired', 'past_due']:
             profile.subscription_status = status
         
-        # 플랜 확인 및 제한 업데이트
-        # LS에서는 variant_id 또는 product_id로 플랜을 구분합니다
+        # Plan check and limit update
+        # LS distinguishes plan by variant_id or product_id
         variant_id = subscription.get('variant_id')
         product_id = subscription.get('product_id')
         
-        # Pro 플랜인지 확인 (variant_id 또는 product_id로 판단)
-        # 실제 LS 설정에 맞게 조정 필요
+        # Check if Pro plan (by variant_id or product_id)
+        # Adjust to match actual LS setup
         is_pro_plan = (
             variant_id and 'pro' in str(variant_id).lower()
         ) or (
             product_id and 'pro' in str(product_id).lower()
-        ) or status == 'active'  # 활성 상태면 Pro로 간주
+        ) or status == 'active'  # Treat active as Pro
         
         if is_pro_plan and status == 'active':
             profile.subscription_plan = 'pro'
@@ -289,20 +279,20 @@ def handle_subscription_updated(db: Session, event_data: Dict) -> bool:
             profile.subscription_plan = 'free'
             profile.total_listings_limit = PLAN_LIMITS['free']
         
-        # 구독 ID 업데이트 (없는 경우)
+        # Update subscription ID if missing
         if not profile.ls_subscription_id:
             profile.ls_subscription_id = str(subscription_id)
         
         db.commit()
-        logger.info(f"구독 업데이트 완료: user_id={user_id}, status={status}, plan={profile.subscription_plan}")
+        logger.info(f"Subscription updated: user_id={user_id}, status={status}, plan={profile.subscription_plan}")
         return True
         
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"subscription_updated 처리 중 DB 오류: {e}")
+        logger.error(f"subscription_updated DB error: {e}")
         return False
     except Exception as e:
-        logger.error(f"subscription_updated 처리 중 예상치 못한 오류: {e}")
+        logger.error(f"subscription_updated: Unexpected error: {e}")
         return False
 
 
@@ -322,59 +312,58 @@ def handle_subscription_cancelled(db: Session, event_data: Dict) -> bool:
         subscription = event_data.get('data', {}).get('attributes', {})
         subscription_id = subscription.get('id') or event_data.get('data', {}).get('id')
         
-        # user_id 추출
+        # Extract user_id
         custom_data = subscription.get('custom_data', {})
         user_id = custom_data.get('user_id') or subscription.get('user_id')
         
         if not user_id:
-            # subscription_id로 프로필 찾기
+            # Find profile by subscription_id
             profile = db.query(Profile).filter(
                 Profile.ls_subscription_id == str(subscription_id)
             ).first()
             if not profile:
-                logger.error(f"subscription_cancelled: subscription_id={subscription_id}에 해당하는 프로필을 찾을 수 없습니다")
+                logger.error(f"subscription_cancelled: No profile found for subscription_id={subscription_id}")
                 return False
         else:
             profile = get_or_create_profile(db, user_id)
         
-        # 상태를 cancelled로 변경
+        # Set status to cancelled; limit kept until expiry
         profile.subscription_status = 'cancelled'
-        # 제한은 유지 (기간 만료까지 사용 가능)
         
         db.commit()
-        logger.info(f"구독 취소 완료: user_id={profile.user_id}, subscription_id={subscription_id}")
+        logger.info(f"Subscription cancelled: user_id={profile.user_id}, subscription_id={subscription_id}")
         return True
         
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"subscription_cancelled 처리 중 DB 오류: {e}")
+        logger.error(f"subscription_cancelled: DB error: {e}")
         return False
     except Exception as e:
-        logger.error(f"subscription_cancelled 처리 중 예상치 못한 오류: {e}")
+        logger.error(f"subscription_cancelled: Unexpected error: {e}")
         return False
 
 
 def find_user_id_recursive(data: Dict, key: str = "user_id", max_depth: int = 10, current_depth: int = 0) -> Optional[str]:
     """
-    재귀적으로 딕셔너리에서 user_id 찾기
+    Recursively find user_id in dictionary.
     
     Args:
-        data: 검색할 딕셔너리
-        key: 찾을 키 이름
-        max_depth: 최대 재귀 깊이
-        current_depth: 현재 깊이
+        data: Dictionary to search
+        key: Key name to find
+        max_depth: Max recursion depth
+        current_depth: Current depth
     
     Returns:
-        찾은 user_id 값 또는 None
+        Found user_id value or None
     """
     if current_depth >= max_depth or not isinstance(data, dict):
         return None
     
-    # 현재 레벨에서 직접 확인
+    # Check current level directly
     if key in data and data[key]:
         return str(data[key])
     
-    # 모든 값에 대해 재귀 검색
+    # Recursive search over all values
     for value in data.values():
         if isinstance(value, dict):
             result = find_user_id_recursive(value, key, max_depth, current_depth + 1)
@@ -391,7 +380,7 @@ def find_user_id_recursive(data: Dict, key: str = "user_id", max_depth: int = 10
 
 
 def parse_custom_data(custom_data) -> Dict:
-    """custom_data를 딕셔너리로 파싱"""
+    """Parse custom_data to dict."""
     if isinstance(custom_data, dict):
         return custom_data
     elif isinstance(custom_data, str):
@@ -404,15 +393,8 @@ def parse_custom_data(custom_data) -> Dict:
 
 def handle_order_created(db: Session, event_data: Dict) -> bool:
     """
-    order_created 이벤트 처리 (크레딧 팩 구매)
-    결제 성공 확인 후 크레딧 적립
-    
-    Args:
-        db: 데이터베이스 세션
-        event_data: 웹훅 이벤트 데이터
-    
-    Returns:
-        처리 성공 여부
+    Handle order_created (credit pack purchase). Add credits after payment confirmed.
+    Args: db, event_data. Returns: success.
     """
     from .credit_service import add_credits, TransactionType
     import requests
@@ -455,7 +437,7 @@ def handle_order_created(db: Session, event_data: Dict) -> bool:
             user_id = str(custom_data_1['user_id'])
             extraction_paths.append("data.attributes.custom_data.user_id")
         
-        # 경로 2: event_data["meta"]["custom_data"]["user_id"]
+        # Path 2: event_data["meta"]["custom_data"]["user_id"]
         if not user_id:
             custom_data_2 = meta_data.get('custom_data', {})
             custom_data_2 = parse_custom_data(custom_data_2)
@@ -473,27 +455,27 @@ def handle_order_created(db: Session, event_data: Dict) -> bool:
                     user_id = str(item_custom_data['user_id'])
                     extraction_paths.append("data.attributes.first_order_item.custom_data.user_id")
         
-        # 경로 4: 재귀 탐색
+        # Path 4: recursive search
         if not user_id:
             user_id = find_user_id_recursive(event_data)
             if user_id:
                 extraction_paths.append("recursive_search")
         
         if not user_id:
-            # 실패 시 payload 일부를 로그에 남기기
-            payload_sample = json.dumps(event_data, indent=2)[:2000]  # 처음 2000자만
-            logger.error(f"[WEBHOOK] order_created: user_id를 찾을 수 없습니다. order_id={order_id}")
+            # On failure log payload sample (first 2000 chars)
+            payload_sample = json.dumps(event_data, indent=2)[:2000]
+            logger.error(f"[WEBHOOK] order_created: user_id not found. order_id={order_id}")
             logger.error(f"[WEBHOOK] order_created: Tried paths: data.attributes.custom_data, meta.custom_data, first_order_item.custom_data, recursive_search")
             logger.error(f"[WEBHOOK] order_created: Payload sample:\n{payload_sample}")
             return False
         
         logger.info(f"[WEBHOOK] order_created: user_id found via {extraction_paths[0] if extraction_paths else 'unknown'}: user_id={user_id}")
         
-        # variant_id 추출
+        # Extract variant_id
         first_order_item = order_attributes.get('first_order_item', {})
         variant_id = str(first_order_item.get('variant_id', '')) if first_order_item else ''
         
-        # variant_id가 없으면 Lemon Squeezy API로 주문 상세 조회
+        # If no variant_id, fetch order detail from Lemon Squeezy API
         if not variant_id:
             logger.info(f"[WEBHOOK] order_created: variant_id not in payload, fetching from API...")
             LS_API_KEY = os.getenv("LEMON_SQUEEZY_API_KEY")
@@ -521,16 +503,16 @@ def handle_order_created(db: Session, event_data: Dict) -> bool:
         
         logger.info(f"[WEBHOOK] order_created: order_id={order_id}, variant_id={variant_id}, user_id={user_id}")
         
-        # 결제 성공(유료) 확정
+        # Confirm payment (paid) status
         is_paid = False
         
-        # 방법 1: payload에서 status 확인
+        # Method 1: check status in payload
         order_status = order_attributes.get('status', '').lower()
         if order_status == 'paid':
             is_paid = True
             logger.info(f"[WEBHOOK] order_created: Order status is 'paid' from payload")
         else:
-            # 방법 2: Lemon Squeezy API로 주문 상태 확인
+            # Method 2: check order status via Lemon Squeezy API
             logger.info(f"[WEBHOOK] order_created: Order status not 'paid' in payload, checking via API...")
             LS_API_KEY = os.getenv("LEMON_SQUEEZY_API_KEY")
             if LS_API_KEY:
@@ -608,14 +590,7 @@ def handle_order_created(db: Session, event_data: Dict) -> bool:
 
 def handle_order_paid(db: Session, event_data: Dict) -> bool:
     """
-    order_paid 이벤트 처리 (크레딧 충전)
-    
-    Args:
-        db: 데이터베이스 세션
-        event_data: 웹훅 이벤트 데이터
-    
-    Returns:
-        처리 성공 여부
+    Handle order_paid (credit top-up). Args: db, event_data. Returns: success.
     """
     from .credit_service import add_credits, TransactionType
     from sqlalchemy import text
@@ -745,10 +720,10 @@ def process_webhook_event(db: Session, event_data: Dict) -> bool:
         elif event_name == 'order_paid':
             return handle_order_paid(db, event_data)
         else:
-            logger.warning(f"처리되지 않은 이벤트: {event_name}")
-            return True  # 알 수 없는 이벤트는 성공으로 처리 (200 OK 반환)
+            logger.warning(f"Unhandled event: {event_name}")
+            return True  # Unknown event -> return success (200 OK)
             
     except Exception as e:
-        logger.error(f"웹훅 이벤트 처리 중 예상치 못한 오류: {e}")
+        logger.error(f"Webhook event handling error: {e}")
         return False
 

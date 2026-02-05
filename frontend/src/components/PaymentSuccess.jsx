@@ -12,8 +12,8 @@ const API_BASE_URL = import.meta.env.DEV
   ? (import.meta.env.VITE_API_URL || '')  // Development: use env var or empty for Vite proxy
   : ''  // Production: ALWAYS use relative path (vercel.json proxy handles routing to Railway)
 
-const POLLING_INTERVAL = 1500 // 1.5초
-const MAX_POLLING_TIME = 30000 // 30초
+const POLLING_INTERVAL = 1500 // 1.5s
+const MAX_POLLING_TIME = 30000 // 30s
 
 function PaymentSuccess() {
   const navigate = useNavigate()
@@ -124,7 +124,7 @@ function PaymentSuccess() {
                   Payment completed. Activating your Professional Plan...
                 </p>
                 <p className="text-sm text-zinc-500 dark:text-zinc-500">
-                  {elapsedTime}초 / {MAX_POLLING_TIME / 1000}초
+                  {elapsedTime}s / {MAX_POLLING_TIME / 1000}s
                 </p>
               </div>
             </>
@@ -155,7 +155,7 @@ function PaymentSuccess() {
                   onClick={handleGoToDashboard}
                   className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white"
                 >
-                  대시보드로 이동
+                  Go to Dashboard
                 </Button>
               </div>
             </>
@@ -185,7 +185,7 @@ function PaymentSuccess() {
                     variant="outline"
                     className="w-full border-zinc-700 text-zinc-300 hover:bg-zinc-800"
                   >
-                    대시보드로 이동
+                    Go to Dashboard
                   </Button>
                 </div>
               </div>

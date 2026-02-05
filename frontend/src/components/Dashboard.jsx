@@ -1,26 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { createPortal } from 'react-dom'
 import axios from 'axios'
 import { apiClient, API_BASE_URL } from '../lib/api'
 import { useStore } from '../contexts/StoreContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useAccount } from '../contexts/AccountContext'
-import SummaryCard from './SummaryCard'
-import ZombieTable from './ZombieTable'
-import FilterBar from './FilterBar'
-import DeleteQueue from './DeleteQueue'
-import HistoryTable from './HistoryTable'
-import HistoryView from './HistoryView'
-import QueueReviewPanel from './QueueReviewPanel'
-import FilteringModal from './FilteringModal'
-import ConfirmModal from './ConfirmModal'
-import LowPerformingResults from './LowPerformingResults'
 import Toast from './Toast'
-import PlatformSelectModal from './PlatformSelectModal'
-import { Button } from './ui/button'
-import { AlertCircle, X, Loader2 } from 'lucide-react'
-import { getImageUrlFromListing, normalizeImageUrl } from '../utils/imageUtils'
+import { Loader2 } from 'lucide-react'
 
 // API_BASE_URL is imported from api.js
 // Use apiClient for requests requiring JWT authentication, use axios for requests without auth (e.g., health check)
@@ -156,6 +142,17 @@ function Dashboard() {
   })
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [isSyncingListings, setIsSyncingListings] = useState(false) // Sync in progress state
+
+  // Diagnosis zone: filter criteria and results
+  const [criteria, setCriteria] = useState({
+    periodDays: 7,
+    maxViews: 0,
+    maxWatches: 0
+  })
+  const [listings, setListings] = useState([])
+  const [lowPerformingCount, setLowPerformingCount] = useState(null) // null = not analyzed yet
+  const [showDiagnosisResult, setShowDiagnosisResult] = useState(false)
+  const [isAnalyzingListings, setIsAnalyzingListings] = useState(false)
   
   // Result display flag (only shown when Find button is clicked)
   const [showResults, setShowResults] = useState(false)
@@ -1378,6 +1375,75 @@ function Dashboard() {
     setQueue(queue.filter(item => item.id !== id))
   }
 
+  // Connect eBay: start OAuth and redirect
+  const handleConnectEbay = async () => {
+    if (!currentUserId) {
+      showToast('Please log in first.', 'error')
+      return
+    }
+    try {
+      const response = await apiClient.post('/api/ebay/auth/start', {})
+      const authUrl = response.data?.url
+      if (!authUrl) {
+        showToast('No authorization URL received.', 'error')
+        return
+      }
+      window.location.assign(authUrl)
+    } catch (err) {
+      const msg = err.response?.data?.detail?.message || err.message || 'Failed to start eBay connection.'
+      showToast(msg, 'error')
+    }
+  }
+
+  // Fetch all active listings for diagnosis (paginate if needed)
+  const fetchListings = async () => {
+    if (!currentUserId) return []
+    try {
+      const limit = 5000
+      const response = await apiClient.get('/api/listings', { params: { skip: 0, limit } })
+      const list = response.data?.listings || []
+      setListings(list)
+      return list
+    } catch (err) {
+      console.error('Failed to fetch listings:', err)
+      showToast(getErrorMessage(err), 'error')
+      return []
+    }
+  }
+
+  // Analyze listings: filter by (today - last_updated <= days) AND (views <= max_views) AND (watches <= max_watches)
+  const handleAnalyze = async () => {
+    setIsAnalyzingListings(true)
+    setShowDiagnosisResult(false)
+    try {
+      let list = listings
+      if (list.length === 0) {
+        list = await fetchListings()
+      }
+      const { periodDays, maxViews, maxWatches } = criteria
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const low = list.filter((l) => {
+        const lastUpdated = l.last_updated ? new Date(l.last_updated) : null
+        if (!lastUpdated) return false
+        const diffMs = today - lastUpdated
+        const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000))
+        if (diffDays > periodDays) return false
+        const views = Number(l.view_count) ?? 0
+        const watches = Number(l.watch_count) ?? 0
+        if (views > maxViews) return false
+        if (watches > maxWatches) return false
+        return true
+      })
+      setLowPerformingCount(low.length)
+      setShowDiagnosisResult(true)
+    } catch (err) {
+      showToast(getErrorMessage(err), 'error')
+    } finally {
+      setIsAnalyzingListings(false)
+    }
+  }
+
   // Sync: summary stats + history (Dashboard never loads product list)
   const handleSync = async () => {
     try {
@@ -1597,9 +1663,9 @@ function Dashboard() {
           } else {
             // Backend reports not connected - do NOT set connected state
             console.warn('⚠️ Backend reports not connected:', {
-              backendConnected,
-              hasValidToken,
-              isExpired,
+              connected: response.data?.connected,
+              hasValidToken: response.data?.token_status?.has_valid_token,
+              isExpired: response.data?.is_expired,
               user_id: currentUserId
             })
             
@@ -2037,10 +2103,11 @@ function Dashboard() {
   }
 
 
+  const showConnectEbay = !isStoreConnected || totalListings === 0
+
   return (
     <div className="font-sans bg-black dark:bg-black min-h-full">
-      <div className="px-6 pt-4">
-        {/* Loading indicator while sync is in progress */}
+      <div className="px-6 pt-4 flex flex-col items-center justify-center min-h-[60vh]">
         {isSyncingListings && (
           <div className="mb-4 p-4 bg-blue-900/20 border border-blue-500/30 rounded-xl">
             <div className="flex items-center gap-3">
@@ -2049,219 +2116,87 @@ function Dashboard() {
             </div>
           </div>
         )}
-        
-        {/* Summary Card */}
-        <SummaryCard 
-          key="summary-card"
-          totalListings={totalListings}
-          totalBreakdown={totalBreakdown}
-          platformBreakdown={platformBreakdown}
-          totalZombies={totalZombies}
-          zombieBreakdown={zombieBreakdown}
-          queueCount={queue.length}
-          totalDeleted={totalDeleted}
-          loading={summaryLoading}  // SummaryCard uses its own loading state (prevents full screen blocking)
-          syncingListings={isSyncingListings}
-          filters={filters}
-          viewMode={viewMode}
-          onViewModeChange={null}
-          connectedStore={selectedStore}
-          connectedStoresCount={connectedStoresCount}
-          onSync={handleSync}
-          showFilter={showFilter}
-          onToggleFilter={handleToggleFilter}
-          // API Health & Credits
-          apiConnected={apiConnected}
-          apiError={apiError}
-          userPlan={userPlan}
-          // Low-Performing items for Product Journey analysis (not used in Dashboard)
-          zombies={[]}
-          userCredits={credits ?? 0}
-          usedCredits={usedCredits}
-          // Store connection callback
-          onConnectionChange={handleStoreConnection}
-          // Supplier export callback
-          onSupplierExport={handleSupplierExport}
-          filterContent={null}
-          // Summary stats (newly added)
-          summaryStats={summaryStats}
-          // Analysis result (for filtered badge)
-          analysisResult={analysisResult}
-          // Export CSV callback
-          onExportCSV={handleExportCSV}
-          // Error callback
-          onError={(msg, err) => showToast(getErrorMessage(err || { message: msg }), 'error')}
-        />
 
-
-        {/* FilterBar - Find Low-Performing SKUs button */}
-        {isStoreConnected && summaryStats.activeCount > 0 && (
-          <div className="mt-6">
-            <FilterBar 
-              onApplyFilter={handleApplyFilter}
-              onSync={handleSync}
-              loading={loading}
-              initialFilters={filters}
-            />
-          </div>
-        )}
-
-
-        {/* History View - Full Page */}
-        {viewMode === 'history' && (
-          <HistoryView 
-            historyLogs={historyLogs}
-            loading={loading}
-            onBack={() => setViewMode('all')}
-          />
-        )}
-
-        {/* Results Section - Only shown when Find button is clicked */}
-        {showResults && (
-          <div id="results-section" className="mt-8">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-white">
-                {resultsMode === 'low' ? '📉 Low-Performing SKUs' : '📋 All Listings'}
-              </h2>
+        <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl p-12 flex flex-col items-center justify-center text-center">
+          {summaryLoading && !summaryStats.activeCount && !isStoreConnected ? (
+            <p className="text-zinc-500 text-lg">Loading...</p>
+          ) : showConnectEbay ? (
+            <>
+              <p className="text-zinc-600 text-lg mb-8">Connect your eBay account to see active listings.</p>
               <button
-                onClick={() => {
-                  setShowResults(false)
-                  setResultsFilters(null)
-                }}
-                className="px-4 py-2 text-sm text-zinc-400 hover:text-white transition-colors"
+                type="button"
+                onClick={handleConnectEbay}
+                className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-emerald-500/30 transition-all"
               >
-                ✕ Close
+                Connect eBay
               </button>
-            </div>
-            <LowPerformingResults 
-              mode={resultsMode}
-              initialFilters={resultsFilters}
-              initialItems={analysisResult?.items}
-              onClose={() => {
-                setShowResults(false)
-                setResultsFilters(null)
-              }}
-              onError={(msg, err) => showToast(getErrorMessage(err || { message: msg }), 'error')}
-            />
-          </div>
-        )}
-        
-        {/* Queue View maintained in Dashboard (local state only) */}
-        {viewMode === 'queue' && queue.length > 0 && (
-          <div className="mt-8">
-            <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mb-4">
-              <p className="text-sm text-zinc-400">
-                ✅ <strong className="text-white">Full-Screen Final Review Mode</strong> - Review all items grouped by source. Each section has its own download button.
+            </>
+          ) : (
+            <>
+              <p className="text-zinc-600 text-sm font-medium uppercase tracking-wider mb-2">Total Active Listings</p>
+              <p className="text-zinc-900 font-bold" style={{ fontSize: '6rem', lineHeight: 1 }}>
+                {totalListings}
               </p>
+            </>
+          )}
+        </div>
+
+        {/* Diagnosis Zone - only when connected and has listings */}
+        {!showConnectEbay && (
+          <div className="w-full max-w-2xl mt-8 bg-white rounded-2xl shadow-xl p-8">
+            <h3 className="text-lg font-semibold text-zinc-900 mb-4">Diagnosis</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Period (Days)</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={criteria.periodDays}
+                  onChange={(e) => setCriteria((c) => ({ ...c, periodDays: Number(e.target.value) || 7 }))}
+                  className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-zinc-900"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Max Views</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={criteria.maxViews}
+                  onChange={(e) => setCriteria((c) => ({ ...c, maxViews: Number(e.target.value) || 0 }))}
+                  className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-zinc-900"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Max Watches</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={criteria.maxWatches}
+                  onChange={(e) => setCriteria((c) => ({ ...c, maxWatches: Number(e.target.value) || 0 }))}
+                  className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-zinc-900"
+                />
+              </div>
             </div>
-            <QueueReviewPanel
-              queue={queue}
-              onRemove={handleRemoveFromQueue}
-              onSourceChange={handleSourceChange}
-              onExportComplete={(exportedIds) => {
-                setQueue(queue.filter(item => !exportedIds.includes(item.id)))
-              }}
-              onHistoryUpdate={() => {
-                fetchHistory().catch(err => console.error('History fetch error:', err))
-              }}
-              onError={(msg, err) => showToast(getErrorMessage(err || { message: msg }), err ? 'error' : 'success')}
-            />
+            <button
+              type="button"
+              onClick={handleAnalyze}
+              disabled={isAnalyzingListings}
+              className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-xl transition-all"
+            >
+              {isAnalyzingListings ? 'Analyzing...' : 'Analyze Listings'}
+            </button>
+
+            {/* Results - initially hidden, shown after Analyze */}
+            {showDiagnosisResult && (
+              <div className="mt-6 pt-6 border-t border-zinc-200">
+                <p className="text-red-600 font-bold text-lg">Low Performing Items: {lowPerformingCount}</p>
+                <p className="text-sm text-zinc-500 mt-1">Ready to export for Shopify.</p>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Confirm Modal - Credit consumption confirmation */}
-      <ConfirmModal
-        isOpen={showConfirmModal}
-        onClose={() => {
-          if (!isAnalyzing) {
-            setShowConfirmModal(false)
-            setPendingAnalysisFilters(null)
-          }
-        }}
-        onConfirm={handleConfirmAnalysis}
-        creditsRequired={requiredCredits}
-        currentCredits={credits || 0}
-        isProcessing={isAnalyzing || isFetchingQuote}
-      />
-
-      {/* Filtering Modal (legacy - maintain if needed) */}
-      <FilteringModal
-        isOpen={showFilteringModal}
-        onClose={() => {
-          // Don't allow closing during filtering
-          if (!isFiltering) {
-            setShowFilteringModal(false)
-            setPendingFiltersForModal(null)
-          }
-        }}
-        onConfirm={handleConfirmFiltering}
-        creditsRequired={summaryStats.activeCount || 0}
-        currentCredits={credits || 0}
-        listingCount={summaryStats.activeCount || 0}
-        isFiltering={isFiltering}
-      />
-
-      {/* Error Modal */}
-      {showErrorModal && createPortal(
-        <div 
-          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowErrorModal(false)}
-        >
-          <div 
-            className="bg-zinc-900 border border-red-500/50 rounded-lg max-w-md w-full shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="p-6 border-b border-zinc-700">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <AlertCircle className="w-6 h-6 text-red-400" />
-                  <h3 className="text-xl font-bold text-white">Error</h3>
-                </div>
-                <button
-                  onClick={() => setShowErrorModal(false)}
-                  className="text-zinc-400 hover:text-white transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-            
-            {/* Content */}
-            <div className="p-6">
-              <p className="text-sm text-zinc-300 mb-6 leading-relaxed">
-                {errorModalMessage}
-              </p>
-              
-              <div className="flex gap-3 justify-end">
-                <button
-                  onClick={() => setShowErrorModal(false)}
-                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors text-sm font-medium"
-                >
-                  Close
-                </button>
-                  <button
-                    onClick={() => {
-                      setShowErrorModal(false)
-                      // Dashboard does not load listings, so only refetch summary stats
-                      fetchSummaryStats().catch(err => {
-                        console.error('Failed to retry summary stats:', err)
-                        showToast(getErrorMessage(err), 'error')
-                      })
-                    }}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium"
-                  >
-                    Retry
-                  </button>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* Toast Notification */}
       {toast && (
         <Toast
           message={toast.message}
@@ -2269,18 +2204,6 @@ function Dashboard() {
           onClose={() => setToast(null)}
         />
       )}
-
-      {/* Platform Select Modal */}
-      <PlatformSelectModal
-        isOpen={showPlatformModal}
-        onClose={() => {
-          if (!isExportingCSV) {
-            setShowPlatformModal(false)
-          }
-        }}
-        onSelectPlatform={handlePlatformSelect}
-        loading={isExportingCSV}
-      />
     </div>
   )
 }

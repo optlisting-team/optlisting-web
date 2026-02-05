@@ -6,15 +6,15 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 
 // Demo stores for testing - initial state
-// ✅ FIX: Amazon Store 제거 - eBay Store만 표시
+// FIX: Show eBay Store only (Amazon Store removed)
 const INITIAL_STORES = [
   { id: 'store-1', name: 'eBay Store', platform: 'eBay', connected: false },
-  // Amazon Store와 Walmart Store 제거 - 실제로 연결된 스토어만 표시
+  // Amazon/Walmart removed - show only connected stores
   // { id: 'store-2', name: 'Amazon Store', platform: 'Amazon', connected: false },
   // { id: 'store-3', name: 'Shopify Store', platform: 'Shopify', connected: false },
 ]
 
-// ✅ FIX: API_BASE_URL은 이미 '../lib/api'에서 import하므로 중복 선언 제거
+// FIX: API_BASE_URL from '../lib/api' - no duplicate
 
 // Store Selector Component
 function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onError, loading = false, onSync = null, syncingListings = false }) {
@@ -28,7 +28,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
   const [ebayUserId, setEbayUserId] = useState(null)
   const dropdownRef = useRef(null)
   
-  // 중복 클릭 방지를 위한 플래그 및 debounce
+  // Flag and debounce to prevent double-click
   const connectButtonInProgress = useRef(false)
   const connectButtonDebounceTimer = useRef(null)
 
@@ -59,8 +59,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
     try {
       setCheckingConnection(true)
       // Lightweight token status check
-      // JWT 인증이 필요한 요청은 apiClient 사용 (Authorization 헤더 자동 추가)
-      // apiClient의 기본 timeout(60000) 사용
+      // Use apiClient for JWT (Authorization auto); default timeout 60000
       const response = await apiClient.get(`/api/ebay/auth/status`)
       
       // Check if valid token exists
@@ -213,15 +212,14 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
       e.stopPropagation()
     }
     
-    // JWT 인증 사용 - user_id는 헤더에서 자동 추출됨
+    // JWT auth - user_id from header
     if (!currentUserId) {
       onError('Please log in to connect eBay', null)
       return
     }
     
     try {
-      // JWT 토큰을 헤더에 포함하여 OAuth start 요청
-      // OAuth는 리다이렉트이므로, fetch로 요청하여 Location 헤더를 받아 리다이렉트
+      // OAuth start with JWT in header; backend returns URL for redirect
       const { data: { session } } = await supabase.auth.getSession()
       
       if (!session?.access_token) {
@@ -282,7 +280,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
                 </div>
                 
                 {stores
-                  .filter(store => store.platform === 'eBay' || store.connected) // ✅ FIX: eBay만 표시하거나 연결된 스토어만 표시
+                  .filter(store => store.platform === 'eBay' || store.connected) // Show eBay or connected only
                   .map((store) => (
                   <div
                     key={store.id}
@@ -357,27 +355,27 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
               e.preventDefault()
               e.stopPropagation()
               
-              // 중복 클릭 방지
+              // Prevent double-click
               if (connectButtonInProgress.current) {
                 console.warn('⚠️ Connect button already in progress, ignoring click')
                 return
               }
               
-              // Debounce: 이전 타이머가 있으면 취소
+              // Debounce: cancel previous timer
               if (connectButtonDebounceTimer.current) {
                 clearTimeout(connectButtonDebounceTimer.current)
               }
               
-              // Debounce 적용 (500ms)
+              // Debounce 500ms
               connectButtonDebounceTimer.current = setTimeout(async () => {
                 connectButtonInProgress.current = true
                 
-                // Performance mark 시작
+                // Performance mark start
                 if (typeof performance !== 'undefined' && performance.mark) {
                   performance.mark('connect_ebay_start')
                 }
                 
-                // requestId 생성
+                // Generate requestId
                 const requestId = `connect_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
                 
                 // Clear any stale sessionStorage flags to ensure clean OAuth flow
@@ -419,12 +417,12 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
                   }
                   
                   // Start OAuth if not connected
-                  // JWT 인증 사용 - user_id는 헤더에서 자동 추출됨
+                  // JWT auth - user_id from header
                   if (!currentUserId) {
                     throw new Error('User not logged in')
                   }
                   
-                  // JWT 토큰을 헤더에 포함하여 OAuth start 요청
+                  // OAuth start with JWT in header
                   const { data: { session } } = await supabase.auth.getSession()
                   
                   if (!session?.access_token) {
@@ -433,7 +431,7 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
                   
                   console.log(`🔗 [${requestId}] Starting OAuth flow with JWT...`)
                   
-                  // Performance mark: OAuth 시작
+                  // Performance mark: OAuth start
                   if (typeof performance !== 'undefined' && performance.mark) {
                     performance.mark('oauth_redirect_start')
                   }
@@ -746,13 +744,13 @@ function SummaryCard({ onError,
         >
           <div className={`text-4xl font-black ${totalZombies > 0 ? 'text-red-400' : 'text-white'}`}>{totalZombies || 0}</div>
           <div className={`text-sm uppercase mt-1 ${totalZombies > 0 ? 'text-red-400' : 'text-zinc-500'}`}>Low-Performing</div>
-          {/* Filtered 배지 (분석 결과가 있을 때) */}
+          {/* Filtered badge (when analysis result present) */}
           {totalZombies > 0 && analysisResult && (
             <div className="absolute top-2 right-2 px-2 py-0.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs font-medium">
               Filtered
             </div>
           )}
-          {/* Export CSV 버튼 */}
+          {/* Export CSV button */}
           {totalZombies > 0 && analysisResult && (
             <div className="mt-4">
               <button

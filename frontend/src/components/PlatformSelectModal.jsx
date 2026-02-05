@@ -16,7 +16,7 @@ function PlatformSelectModal({ isOpen, onClose, onSelectPlatform, loading = fals
         {/* Header */}
         <div className="p-6 border-b border-zinc-700">
           <div className="flex items-center justify-between">
-            <h3 className="text-xl font-bold text-white">플랫폼 선택</h3>
+            <h3 className="text-xl font-bold text-white">Select Platform</h3>
             <button
               onClick={onClose}
               disabled={loading}
@@ -26,7 +26,7 @@ function PlatformSelectModal({ isOpen, onClose, onSelectPlatform, loading = fals
             </button>
           </div>
           <p className="text-sm text-zinc-400 mt-2">
-            CSV 내보내기 형식을 선택하세요
+            Choose CSV export format
           </p>
         </div>
         
@@ -54,7 +54,7 @@ function PlatformSelectModal({ isOpen, onClose, onSelectPlatform, loading = fals
         {/* Footer */}
         <div className="p-6 border-t border-zinc-700">
           <p className="text-xs text-zinc-500 text-center">
-            각 플랫폼별로 최적화된 CSV 형식으로 내보냅니다
+            Exports in platform-optimized CSV format
           </p>
         </div>
       </div>

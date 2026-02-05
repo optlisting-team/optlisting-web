@@ -1,4 +1,3 @@
-import Sidebar from './Sidebar'
 import PageHeader from './PageHeader'
 
 function DashboardLayout({ children }) {
@@ -32,13 +31,8 @@ function DashboardLayout({ children }) {
         />
       </div>
       
-      {/* Sidebar - Fixed */}
-      <div className="fixed left-0 top-0 h-screen z-30">
-        <Sidebar />
-      </div>
-      
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 ml-64">
+      {/* Main Content Area - Full Width */}
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Page Header - Sticky */}
         <PageHeader />
         

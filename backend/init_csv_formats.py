@@ -1,6 +1,5 @@
 """
-CSV 포맷 초기 데이터 생성 스크립트
-각 공급처별 공식 CSV 포맷을 DB에 저장
+CSV format seed data script. Saves official CSV format per supplier to DB.
 """
 import json
 from sqlalchemy.orm import Session
@@ -8,7 +7,7 @@ from models import CSVFormat, Base, engine, SessionLocal
 
 
 def init_csv_formats(db: Session):
-    """CSV 포맷 초기 데이터 생성"""
+    """Initialize CSV format seed data."""
     
     formats = [
         {

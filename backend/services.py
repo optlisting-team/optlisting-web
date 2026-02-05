@@ -21,26 +21,26 @@ def detect_shopify_routing(
     brand: str = ""
 ) -> bool:
     """
-    Shopify 경유 여부 감지
+    Detect whether product goes through Shopify.
     
     Returns: True if product goes through Shopify, False otherwise
     
     Detection Methods:
-    1. SKU 패턴: "SHOP-", "SH-", "Shopify-", "SHOPIFY-"
-    2. Image URL: shopify 관련 도메인 (cdn.shopify.com, *.myshopify.com)
-    3. Title/Brand에 shopify 관련 키워드
+    1. SKU pattern: "SHOP-", "SH-", "Shopify-", "SHOPIFY-"
+    2. Image URL: Shopify-related domains (cdn.shopify.com, *.myshopify.com)
+    3. Shopify keywords in Title/Brand
     """
     sku_upper = sku.upper() if sku else ""
     image_url_lower = image_url.lower() if image_url else ""
     title_lower = title.lower() if title else ""
     brand_lower = brand.lower() if brand else ""
     
-    # SKU 패턴 확인
+    # SKU pattern check
     shopify_sku_patterns = ["SHOP-", "SH-", "SHOPIFY-", "SHOPIFY", "SHOP"]
     if any(sku_upper.startswith(pattern) for pattern in shopify_sku_patterns):
         return True
     
-    # Image URL 패턴 확인
+    # Image URL pattern check
     shopify_url_patterns = [
         "cdn.shopify.com",
         ".myshopify.com",
@@ -50,7 +50,7 @@ def detect_shopify_routing(
     if any(pattern in image_url_lower for pattern in shopify_url_patterns):
         return True
     
-    # Title/Brand에 shopify 관련 키워드
+    # Shopify keywords in Title/Brand
     search_text = f"{title_lower} {brand_lower}".strip()
     shopify_keywords = ["shopify", "shopify store", "via shopify"]
     if any(keyword in search_text for keyword in shopify_keywords):
@@ -79,40 +79,40 @@ def extract_supplier_info(
     - AliExpress/Others: Regex matching logic
     - Fallback: If unknown, set supplier_name="Unverified"
     
-    Note: Shopify 경유 여부는 별도 함수 detect_shopify_routing()으로 감지
+    Note: Shopify routing is detected by separate function detect_shopify_routing()
     """
     sku_upper = sku.upper() if sku else ""
     image_url_lower = image_url.lower() if image_url else ""
     title_lower = title.lower() if title else ""
     brand_lower = brand.lower() if brand else ""
     
-    # SKU에서 공급처 힌트 추출 (더 정교한 파싱)
-    # SKU 패턴 예시:
-    # - "AMZ-B08ABC1234" → Amazon
-    # - "WM-123456" → Walmart
-    # - "AE-789012" → AliExpress
-    # - "CJ-345678" → CJ Dropshipping
-    # - "SHOP-AMZ-B08ABC1234" → Shopify 경유 Amazon
-    # - "AUTODS-B08ABC1234" → AutoDS 사용
-    # - "YABALLE-AMZ-123" → Yaballe 사용
-    # - "B08ABC1234" → ASIN만 있으면 Amazon
+    # Extract supplier hints from SKU (refined parsing)
+    # SKU pattern examples:
+    # - "AMZ-B08ABC1234" -> Amazon
+    # - "WM-123456" -> Walmart
+    # - "AE-789012" -> AliExpress
+    # - "CJ-345678" -> CJ Dropshipping
+    # - "SHOP-AMZ-B08ABC1234" -> Shopify via Amazon
+    # - "AUTODS-B08ABC1234" -> AutoDS
+    # - "YABALLE-AMZ-123" -> Yaballe
+    # - "B08ABC1234" -> ASIN only -> Amazon
     
-    # SKU를 하이픈(-) 또는 언더스코어(_)로 분리하여 분석
+    # Split SKU by hyphen (-) or underscore (_) for analysis
     sku_parts = re.split(r'[-_]', sku_upper)
     
     # Amazon Detection
     # Pattern 1: SKU starts with "AMZ" or contains "B0" (ASIN pattern)
     amazon_asin_pattern = r'B0[0-9A-Z]{8}'  # ASIN format: B + 9 alphanumeric
     
-    # Amazon SKU 패턴 (확장)
-    amazon_sku_patterns = ["AMZ", "AMAZON", "AUTODS"]  # AutoDS도 보통 Amazon 제품
+    # Amazon SKU pattern (extended)
+    amazon_sku_patterns = ["AMZ", "AMAZON", "AUTODS"]  # AutoDS usually Amazon products
     amazon_in_sku = (
         sku_upper.startswith("AMZ") or
         any(part in amazon_sku_patterns for part in sku_parts) or
-        re.search(amazon_asin_pattern, sku_upper)  # ASIN 패턴이 있으면 Amazon
+        re.search(amazon_asin_pattern, sku_upper)  # ASIN pattern -> Amazon
     )
     
-    # Amazon Image URL 패턴 (강화)
+    # Amazon Image URL pattern (enhanced)
     amazon_url_patterns = [
         "ssl-images-amazon.com",
         "images-na.ssl-images-amazon.com",
@@ -121,10 +121,10 @@ def extract_supplier_info(
         "amazon-adsystem.com"
     ]
     
-    # Amazon Title/Brand 키워드
+    # Amazon Title/Brand keywords
     amazon_keywords = ["amazon basics", "solimo", "happy belly"]
     
-    # Amazon 감지 (우선순위: SKU > Image URL > Title/Brand)
+    # Amazon detection (priority: SKU > Image URL > Title/Brand)
     is_amazon = (
         amazon_in_sku or
         any(pattern in image_url_lower for pattern in amazon_url_patterns) or
@@ -150,14 +150,14 @@ def extract_supplier_info(
         return ("Amazon", supplier_id)
     
     # Walmart Detection
-    # Walmart SKU 패턴 (확장)
+    # Walmart SKU pattern (extended)
     walmart_sku_patterns = ["WM", "WALMART", "WMT"]
     walmart_in_sku = (
         sku_upper.startswith("WM") or
         any(part in walmart_sku_patterns for part in sku_parts)
     )
     
-    # Walmart Image URL 패턴 (강화)
+    # Walmart Image URL pattern (enhanced)
     walmart_url_patterns = [
         "walmartimages.com",
         "i5.walmartimages.com",
@@ -165,7 +165,7 @@ def extract_supplier_info(
         "walmart.com/images"
     ]
     
-    # Walmart Title/Brand 키워드
+    # Walmart Title/Brand keywords
     walmart_keywords = ["mainstays", "great value", "equate", "pen+gear", "pen & gear", "hyper tough"]
     
     is_walmart = (
@@ -184,7 +184,7 @@ def extract_supplier_info(
         return ("Walmart", supplier_id)
     
     # AliExpress Detection
-    # AliExpress SKU 패턴 (확장)
+    # AliExpress SKU pattern (extended)
     aliexpress_sku_patterns = ["AE", "ALI", "ALIEXPRESS", "ALI-EXPRESS"]
     aliexpress_in_sku = (
         sku_upper.startswith("AE") or
@@ -192,7 +192,7 @@ def extract_supplier_info(
         any(part in aliexpress_sku_patterns for part in sku_parts)
     )
     
-    # AliExpress Image URL 패턴 (강화)
+    # AliExpress Image URL pattern (enhanced)
     aliexpress_url_patterns = [
         "alicdn.com",
         "ae01.alicdn.com",
@@ -272,12 +272,12 @@ def extract_supplier_info(
         return ("Costway", cw_id)
     
     # ============================================
-    # 자동화 툴 감지 (AutoDS, Yaballe 등)
-    # 우선순위: 자동화 툴 > 공급처
+    # Automation tool detection (AutoDS, Yaballe, etc.)
+    # Priority: automation tool > supplier
     # ============================================
     
-    # AutoDS 감지
-    # AutoDS SKU 패턴: "AUTODS-", "ADS-", "AD-", "AUTODS", "AUTODS-AMZ-", "AUTODS-WM-"
+    # AutoDS detection
+    # AutoDS SKU pattern: "AUTODS-", "ADS-", "AD-", "AUTODS", "AUTODS-AMZ-", "AUTODS-WM-"
     autods_sku_patterns = ["AUTODS", "ADS", "AD"]
     autods_in_sku = (
         sku_upper.startswith("AUTODS") or
@@ -286,7 +286,7 @@ def extract_supplier_info(
         any(part in autods_sku_patterns for part in sku_parts)
     )
     
-    # AutoDS Image URL 패턴
+    # AutoDS Image URL pattern
     autods_url_patterns = ["autods.com", "autods.io"]
     
     is_autods = (
@@ -296,9 +296,9 @@ def extract_supplier_info(
     )
     
     if is_autods:
-        # AutoDS SKU에서 실제 공급처 추출 시도 (예: "AUTODS-AMZ-B08ABC1234" → "B08ABC1234")
-        # 패턴 분석: AutoDS 접두사 제거 후 남은 부분에서 실제 공급처 ID 추출
-        # 지원 패턴: AUTODS-, ADS-, AD-, AL- (AutoDS의 일부 변형)
+        # Try to extract actual supplier from AutoDS SKU (e.g. "AUTODS-AMZ-B08ABC1234" -> "B08ABC1234")
+        # Pattern: remove AutoDS prefix, extract supplier ID from remainder
+        # Supported: AUTODS-, ADS-, AD-, AL- (AutoDS variants)
         remaining_sku = None
         if sku_upper.startswith("AUTODS"):
             remaining_sku = sku_upper.replace("AUTODS", "", 1).strip("-").strip()
@@ -308,21 +308,21 @@ def extract_supplier_info(
             remaining_sku = sku_upper.replace("ADS", "", 1).strip("-").strip()
         elif sku_upper.startswith("AD-"):
             remaining_sku = sku_upper.replace("AD-", "", 1).strip()
-        elif sku_upper.startswith("AL-") and not sku_upper.startswith("ALI"):  # AL-는 AutoDS 패턴, ALI-는 AliExpress
+        elif sku_upper.startswith("AL-") and not sku_upper.startswith("ALI"):  # AL- = AutoDS, ALI- = AliExpress
             remaining_sku = sku_upper.replace("AL-", "", 1).strip()
         
-        # 남은 SKU에서 실제 공급처 ID 추출 (재귀적 파싱)
+        # Extract supplier ID from remaining SKU (recursive parsing)
         supplier_id = None
         if remaining_sku:
-            # 하이픈으로 분리된 부분들 분석
+            # Analyze parts split by hyphen
             remaining_parts = re.split(r'[-_]', remaining_sku)
             
-            # Amazon ASIN 패턴 찾기 (B0으로 시작하는 10자리)
+            # Find Amazon ASIN pattern (10 chars starting with B0)
             amazon_asin_pattern = r'B0[0-9A-Z]{8}'
             asin_match = re.search(amazon_asin_pattern, remaining_sku)
             if asin_match:
                 supplier_id = asin_match.group(0)
-            # AMZ 접두사 제거 후 ASIN 찾기
+            # Find ASIN after removing AMZ prefix
             elif remaining_parts and remaining_parts[0] == "AMZ" and len(remaining_parts) > 1:
                 # "AMZ-B08ABC1234" → "B08ABC1234"
                 for part in remaining_parts[1:]:
@@ -330,28 +330,28 @@ def extract_supplier_info(
                         supplier_id = part
                         break
                 if not supplier_id:
-                    # ASIN 패턴이 없으면 나머지 부분을 ID로 사용
+                    # If no ASIN pattern, use remainder as ID
                     supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
-            # Walmart 패턴 (WM 접두사 제거)
+            # Walmart pattern (remove WM prefix)
             elif remaining_parts and remaining_parts[0] in ["WM", "WMT", "WALMART"]:
                 # "WM-123456" → "123456"
                 supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
-            # AliExpress 패턴 (AE, ALI 접두사 제거)
+            # AliExpress pattern (remove AE, ALI prefix)
             elif remaining_parts and remaining_parts[0] in ["AE", "ALI", "ALIEXPRESS"]:
                 # "AE-789012" → "789012"
                 supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
-            # 다른 공급처 패턴들
+            # Other supplier patterns
             elif remaining_parts and remaining_parts[0] in ["CJ", "HD", "WF", "CO", "CW", "BG"]:
                 # "CJ-345678" → "345678"
                 supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
             else:
-                # 패턴이 없으면 전체를 ID로 사용 (단, AutoDS 접두사는 제외)
+                # If no pattern, use full string as ID (excluding AutoDS prefix)
                 supplier_id = remaining_sku if remaining_sku else None
         
         return ("AutoDS", supplier_id)
     
-    # Yaballe 감지
-    # Yaballe SKU 패턴: "YAB-", "YB-", "YABALLE-", "YABALLE", "YABALLE-AMZ-"
+    # Yaballe detection
+    # Yaballe SKU pattern: "YAB-", "YB-", "YABALLE-", "YABALLE", "YABALLE-AMZ-"
     yaballe_sku_patterns = ["YABALLE", "YAB", "YB"]
     yaballe_in_sku = (
         sku_upper.startswith("YABALLE") or
@@ -369,8 +369,8 @@ def extract_supplier_info(
     )
     
     if is_yaballe:
-        # Yaballe SKU에서 실제 공급처 추출 시도 (예: "YABALLE-AMZ-B08ABC1234" → "B08ABC1234")
-        # 패턴 분석: Yaballe 접두사 제거 후 남은 부분에서 실제 공급처 ID 추출
+        # Try to extract supplier from Yaballe SKU (e.g. "YABALLE-AMZ-B08ABC1234" -> "B08ABC1234")
+        # Pattern: remove Yaballe prefix, extract supplier ID from remainder
         remaining_sku = None
         if sku_upper.startswith("YABALLE"):
             remaining_sku = sku_upper.replace("YABALLE", "", 1).strip("-").strip()
@@ -383,18 +383,18 @@ def extract_supplier_info(
         elif sku_upper.startswith("YB"):
             remaining_sku = sku_upper.replace("YB", "", 1).strip("-").strip()
         
-        # 남은 SKU에서 실제 공급처 ID 추출 (재귀적 파싱)
+        # Extract supplier ID from remaining SKU (recursive parsing)
         supplier_id = None
         if remaining_sku:
-            # 하이픈으로 분리된 부분들 분석
+            # Analyze parts split by hyphen
             remaining_parts = re.split(r'[-_]', remaining_sku)
             
-            # Amazon ASIN 패턴 찾기 (B0으로 시작하는 10자리)
+            # Find Amazon ASIN pattern (10 chars starting with B0)
             amazon_asin_pattern = r'B0[0-9A-Z]{8}'
             asin_match = re.search(amazon_asin_pattern, remaining_sku)
             if asin_match:
                 supplier_id = asin_match.group(0)
-            # AMZ 접두사 제거 후 ASIN 찾기
+            # Find ASIN after removing AMZ prefix
             elif remaining_parts and remaining_parts[0] == "AMZ" and len(remaining_parts) > 1:
                 # "AMZ-B08ABC1234" → "B08ABC1234"
                 for part in remaining_parts[1:]:
@@ -402,22 +402,22 @@ def extract_supplier_info(
                         supplier_id = part
                         break
                 if not supplier_id:
-                    # ASIN 패턴이 없으면 나머지 부분을 ID로 사용
+                    # If no ASIN pattern, use remainder as ID
                     supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
-            # Walmart 패턴 (WM 접두사 제거)
+            # Walmart pattern (remove WM prefix)
             elif remaining_parts and remaining_parts[0] in ["WM", "WMT", "WALMART"]:
                 # "WM-123456" → "123456"
                 supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
-            # AliExpress 패턴 (AE, ALI 접두사 제거)
+            # AliExpress pattern (remove AE, ALI prefix)
             elif remaining_parts and remaining_parts[0] in ["AE", "ALI", "ALIEXPRESS"]:
                 # "AE-789012" → "789012"
                 supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
-            # 다른 공급처 패턴들
+            # Other supplier patterns
             elif remaining_parts and remaining_parts[0] in ["CJ", "HD", "WF", "CO", "CW", "BG"]:
                 # "CJ-345678" → "345678"
                 supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
             else:
-                # 패턴이 없으면 전체를 ID로 사용 (단, Yaballe 접두사는 제외)
+                # If no pattern, use full string as ID (excluding Yaballe prefix)
                 supplier_id = remaining_sku if remaining_sku else None
         
         return ("Yaballe", supplier_id)
@@ -435,7 +435,7 @@ def extract_supplier_info(
         spk_id = sku_upper.replace("SPK", "").strip("-").strip() if sku_upper.startswith("SPK") else None
         return ("Spocket", spk_id)
     
-    # SaleHoo (주의: "SH"는 Shopify와 겹칠 수 있으므로 더 구체적인 패턴 필요)
+    # SaleHoo (note: "SH" may conflict with Shopify; use more specific pattern)
     salehoo_sku_patterns = ["SH", "SALEHOO", "SALE-HOO"]
     salehoo_in_sku = (
         (sku_upper.startswith("SH") and not any(shopify_part in sku_parts for shopify_part in ["SHOP", "SHOPIFY"])) or
@@ -628,11 +628,11 @@ def analyze_zombie_listings(
     db: Session,
     user_id: str,
     min_days: int = 7,               # Legacy: analytics_period_days
-    max_sales: int = 0,              # 2. 기간 내 판매 건수
+    max_sales: int = 0,              # 2. Sales in period
     max_watch_count: int = 0,        # Legacy: max_watches
-    max_watches: int = 0,            # 3. 찜하기 (Watch)
-    max_impressions: int = 100,      # 4. 총 노출 횟수
-    max_views: int = 10,             # 5. 총 조회 횟수
+    max_watches: int = 0,            # 3. Watches
+    max_impressions: int = 100,      # 4. Impressions
+    max_views: int = 10,             # 5. Views
     supplier_filter: str = "All",
     platform_filter: str = "eBay",   # MVP Scope: Default to eBay (only eBay and Shopify supported)
     store_id: Optional[str] = None,
@@ -640,15 +640,15 @@ def analyze_zombie_listings(
     limit: int = 100                 # Pagination: limit to N records
 ) -> Tuple[List[Listing], Dict[str, int]]:
     """
-    OptListing 최종 좀비 분석 필터
-    순서: 판매(Sales) → 관심(Watch) → 트래픽(Traffic)
+    OptListing zombie analysis filter.
+    Order: Sales -> Watch -> Traffic.
     
-    필터 순서 (eBay 셀러의 자연스러운 판단 흐름):
-    1. analytics_period_days (min_days): 분석 기준 기간 (기본 7일)
-    2. max_sales: 기간 내 판매 건수 (기본 0건 = No Sale)
-    3. max_watches: 찜하기/Watch (기본 0건)
-    4. max_impressions: 총 노출 횟수 (기본 100회 미만)
-    5. max_views: 총 조회 횟수 (기본 10회 미만)
+    Filter order (eBay seller flow):
+    1. analytics_period_days (min_days): analysis period (default 7 days)
+    2. max_sales: sales in period (default 0 = No Sale)
+    3. max_watches: watches (default 0)
+    4. max_impressions: impressions (default < 100)
+    5. max_views: views (default < 10)
     
     Uses metrics JSONB field for flexible filtering:
     - metrics['sales']['total_sales'] or metrics['sales']
@@ -668,9 +668,8 @@ def analyze_zombie_listings(
     max_impressions = max(0, max_impressions)
     max_views = max(0, max_views)
     
-    # ✅ 날짜 필터: min_days 이상 등록된 것만 포함 (예: 7일 이상)
-    # 예: 오늘이 12월 13일이고 min_days=7이면, cutoff_date = 12월 6일
-    # date_listed < 12월 6일 = 12월 6일 이전에 등록된 것 = 7일 이상 등록된 것만 포함
+    # Date filter: include only listings listed at least min_days ago (e.g. 7+ days)
+    # e.g. today Dec 13, min_days=7 -> cutoff_date = Dec 6; date_listed < Dec 6 = listed 7+ days ago
     cutoff_date = date.today() - timedelta(days=min_days)
     
     # Build query with filters
@@ -689,24 +688,24 @@ def analyze_zombie_listings(
     # If store_id is 'all' or None, DO NOT filter by store (return all for user)
     
     # Date filter: use metrics['date_listed'] (JSONB) or fallback to date_listed/last_synced_at
-    # ✅ FIX: JSONB 연산자 안전하게 처리 및 NULL 체크 강화
+    # FIX: safe JSONB ops and NULL checks
     date_filters = []
     
-    # Use metrics JSONB if available (안전한 방식)
-    # ✅ FIX: hasattr 제거 (SQL 쿼리 레벨에서 의미 없음), NULL 체크 강화
+    # Use metrics JSONB if available (safe)
+    # FIX: no hasattr at query level; enforce NULL checks
     date_filters.append(
         and_(
             Listing.metrics.isnot(None),
             Listing.metrics.has_key('date_listed'),
-            # ✅ FIX: jsonb_typeof으로 타입 확인 후 안전하게 추출
+            # FIX: check type with jsonb_typeof then extract safely
             or_(
-                # JSONB 값이 문자열인 경우
+                # JSONB value is string
                 and_(
                     func.jsonb_typeof(Listing.metrics['date_listed']) == 'string',
                     Listing.metrics['date_listed'].astext.isnot(None),
                     cast(Listing.metrics['date_listed'].astext, Date) < cutoff_date
                 ),
-                # JSONB 값이 숫자(타임스탬프)인 경우
+                # JSONB value is number (timestamp)
                 and_(
                     func.jsonb_typeof(Listing.metrics['date_listed']) == 'number',
                     Listing.metrics['date_listed'].astext.isnot(None),
@@ -747,13 +746,13 @@ def analyze_zombie_listings(
         )
     )
     
-    # 날짜 필터가 하나라도 있으면 적용
+    # Apply if any date filter present
     if date_filters:
         query = query.filter(or_(*date_filters))
     
     # Sales filter: use metrics['sales'] (JSONB) with robust casting
-    # ✅ FIX: JSONB 연산자 안전하게 처리 및 타입 검증 추가
-    # ✅ FIX: metrics가 없을 때 직접 필드(quantity_sold, sold_qty)를 fallback으로 사용
+    # FIX: safe JSONB ops and type validation
+    # FIX: when metrics missing, use direct fields (quantity_sold, sold_qty) as fallback
     if max_sales is not None and max_sales >= 0:
         # Use CASE to safely handle NULL metrics or missing keys
         sales_value = case(
@@ -775,7 +774,7 @@ def analyze_zombie_listings(
         )
         query = query.filter(sales_value <= max_sales)
     
-    # 3. Watch/찜하기 필터: metrics['watches'] or metrics['watches']['total_watches']
+    # 3. Watch filter: metrics['watches'] or metrics['watches']['total_watches']
     if effective_max_watches is not None and effective_max_watches >= 0:
         watches_value = case(
             # Try nested structure first: metrics['watches']['total_watches']
@@ -803,10 +802,10 @@ def analyze_zombie_listings(
         )
         query = query.filter(watches_value <= effective_max_watches)
     
-    # 4. Impressions/노출 필터: metrics['impressions'] or metrics['impressions']['total_impressions']
-    # ✅ FIX: metrics에 impressions가 없으면 필터를 적용하지 않음 (모든 항목 포함)
+    # 4. Impressions filter: metrics['impressions'] or metrics['impressions']['total_impressions']
+    # FIX: if metrics has no impressions, skip filter (include all)
     if max_impressions is not None and max_impressions > 0:
-        # metrics에 impressions가 있는 항목만 필터링
+        # Filter only items that have impressions in metrics
         impressions_filter = or_(
             # Nested structure: metrics['impressions']['total_impressions']
             and_(
@@ -824,7 +823,7 @@ def analyze_zombie_listings(
                 Listing.metrics['impressions'].astext.isnot(None),
                 cast(Listing.metrics['impressions'].astext, Integer) < max_impressions
             ),
-            # metrics에 impressions가 없으면 필터를 통과 (모든 항목 포함)
+            # If no impressions in metrics, pass filter (include all)
             or_(
                 Listing.metrics == None,
                 ~Listing.metrics.has_key('impressions')
@@ -832,8 +831,8 @@ def analyze_zombie_listings(
         )
         query = query.filter(impressions_filter)
     
-    # 5. Views/조회 필터: metrics['views'] or metrics['views']['total_views']
-    # ✅ FIX: metrics가 없을 때 직접 필드(view_count, views)를 fallback으로 사용
+    # 5. Views filter: metrics['views'] or metrics['views']['total_views']
+    # FIX: when metrics missing, use direct fields (view_count, views) as fallback
     if max_views is not None and max_views > 0:
         views_value = case(
             # Try nested structure first
@@ -856,16 +855,16 @@ def analyze_zombie_listings(
                 ),
                 cast(Listing.metrics['views'].astext, Integer)
             ),
-            # Fallback to direct fields: view_count (Listing 모델에 정의된 필드)
-            # ✅ FIX: view_count 필드 사용 (Listing 모델에 정의됨)
+            # Fallback to direct fields: view_count (defined on Listing model)
+            # FIX: use view_count field (defined on Listing model)
             else_=func.coalesce(Listing.view_count, 0)
         )
         query = query.filter(views_value < max_views)
     
     # Apply platform filter (MVP Scope: Only eBay and Shopify)
-    # ✅ FIX: platform 필드가 없으면 marketplace 사용
+    # FIX: if platform missing use marketplace
     if platform_filter and platform_filter in ["eBay", "Shopify"]:
-        # platform 필드가 있으면 사용, 없으면 marketplace 사용
+        # Use platform if present, else marketplace
         if hasattr(Listing, 'platform'):
             query = query.filter(Listing.platform == platform_filter)
         else:
@@ -886,7 +885,7 @@ def analyze_zombie_listings(
         current_platforms.add(platform_filter)
     else:
         # If filtering all platforms, get all platforms from zombies
-        # ✅ FIX: platform 필드가 없으면 marketplace 사용
+        # FIX: if platform missing use marketplace
         for z in zombies:
             platform = getattr(z, 'platform', None) or getattr(z, 'marketplace', None) or "Unknown"
             current_platforms.add(platform)
@@ -904,7 +903,7 @@ def analyze_zombie_listings(
         is_active_elsewhere = False
         if zombie.supplier_id:
             # Find all other listings with the same supplier_id in OTHER platforms
-            # ✅ FIX: platform 필드가 없으면 marketplace 사용
+            # FIX: if platform missing use marketplace
             zombie_platform = getattr(zombie, 'platform', None) or getattr(zombie, 'marketplace', None)
             if hasattr(Listing, 'platform'):
                 other_listings_query = db.query(Listing).filter(
@@ -1010,7 +1009,7 @@ def analyze_zombie_listings(
     # Calculate Store-Level Breakdown: Group zombies by platform
     zombie_breakdown = {}
     for zombie in zombies:
-        # ✅ FIX: platform 필드가 없으면 marketplace 사용
+        # FIX: if platform missing use marketplace
         platform = getattr(zombie, 'platform', None) or getattr(zombie, 'marketplace', None) or "Unknown"
         zombie_breakdown[platform] = zombie_breakdown.get(platform, 0) + 1
     
@@ -1031,13 +1030,12 @@ def count_low_performing_candidates(
     store_id: Optional[str] = None
 ) -> int:
     """
-    분석 대상 SKU 수 계산 (필터 조건에 맞는 active listings 수)
-    
-    analyze_zombie_listings와 동일한 필터 로직을 사용하되, count만 반환합니다.
-    실제 분석을 수행하지 않으므로 크레딧을 차감하지 않습니다.
+    Count SKUs matching filter (number of active listings matching filter).
+    Uses same filter logic as analyze_zombie_listings but returns count only.
+    Does not perform analysis; no credit deduction.
     
     Returns:
-        int: 필터 조건에 맞는 분석 대상 SKU 수
+        int: Number of SKUs matching filter
     """
     # Ensure values are non-negative
     min_days = max(0, min_days)
@@ -1046,10 +1044,10 @@ def count_low_performing_candidates(
     max_impressions = max(0, max_impressions)
     max_views = max(0, max_views)
     
-    # 날짜 필터
+    # Date filter
     cutoff_date = date.today() - timedelta(days=min_days)
     
-    # Build query with filters (analyze_zombie_listings와 동일한 로직)
+    # Build query with filters (same logic as analyze_zombie_listings)
     query = db.query(Listing).filter(
         Listing.user_id == user_id
     )
@@ -1059,7 +1057,7 @@ def count_low_performing_candidates(
         if hasattr(Listing, 'store_id'):
             query = query.filter(Listing.store_id == store_id)
     
-    # Date filter (analyze_zombie_listings와 동일한 로직)
+    # Date filter (same logic as analyze_zombie_listings)
     date_filters = []
     date_filters.append(
         and_(
@@ -1228,7 +1226,7 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
     instead of raising IntegrityError. Uses the unique constraint 'unique_listing_per_user'
     which is on (user_id, platform, item_id).
     
-    **공급처 자동 감지**: supplier_name과 supplier_id가 없으면 SKU, image_url, title, brand, upc를 기반으로 자동 감지합니다.
+    **Auto-detect supplier**: If supplier_name/supplier_id missing, auto-detect from SKU, image_url, title, brand, upc.
     
     For PostgreSQL: Uses INSERT ... ON CONFLICT DO UPDATE
     For SQLite: Falls back to individual INSERT OR REPLACE (less efficient but compatible)
@@ -1251,26 +1249,26 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
     if not listings:
         return 0
     
-    # ✅ 2단계: 저장 시 ID 강제 일치 - expected_user_id가 제공되면 모든 listing의 user_id를 강제로 설정
+    # Step 2: Enforce user_id - if expected_user_id provided, set all listings' user_id
     if expected_user_id:
         logger.info("=" * 60)
-        logger.info(f"🔒 [UPSERT] ID 강제 일치 모드 활성화")
+        logger.info(f"🔒 [UPSERT] Enforcing user_id mode")
         logger.info(f"   - Expected user_id: {expected_user_id}")
-        logger.info(f"   - Total listings: {len(listings)}개")
+        logger.info(f"   - Total listings: {len(listings)}")
         logger.info("=" * 60)
         
         for listing in listings:
             current_user_id = getattr(listing, 'user_id', None)
             if current_user_id != expected_user_id:
-                logger.warning(f"⚠️ [UPSERT] user_id 불일치 감지: '{current_user_id}' -> '{expected_user_id}'로 강제 설정")
+                logger.warning(f"⚠️ [UPSERT] user_id mismatch: '{current_user_id}' -> '{expected_user_id}' (enforcing)")
                 listing.user_id = expected_user_id
             else:
-                logger.debug(f"✅ [UPSERT] user_id 일치: {current_user_id}")
+                logger.debug(f"✅ [UPSERT] user_id match: {current_user_id}")
     
-    # 공급처 자동 감지: supplier_name이 없거나 "Unverified"인 경우 자동 감지
+    # Auto-detect supplier when supplier_name missing or "Unverified"/"Unknown"
     for listing in listings:
         if not listing.supplier_name or listing.supplier_name == "Unverified" or listing.supplier_name == "Unknown":
-            # extract_supplier_info를 사용하여 공급처 자동 감지
+            # Use extract_supplier_info for auto-detect
             supplier_name, supplier_id = extract_supplier_info(
                 sku=listing.sku or "",
                 image_url=listing.image_url or "",
@@ -1299,12 +1297,12 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
         # Prepare data dictionaries for bulk insert
         values_list = []
         for listing in listings:
-            # ✅ 공급처 자동 감지: supplier_name이 없거나 "Unverified"/"Unknown"인 경우 자동 감지
+            # Auto-detect supplier when missing or "Unverified"/"Unknown"
             supplier_name = listing.supplier_name
             supplier_id = listing.supplier_id
             
             if not supplier_name or supplier_name in ["Unverified", "Unknown", ""]:
-                # extract_supplier_info를 사용하여 공급처 자동 감지
+                # Use extract_supplier_info for auto-detect
                 supplier_name, supplier_id = extract_supplier_info(
                     sku=listing.sku or "",
                     image_url=listing.image_url or "",
@@ -1312,12 +1310,12 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                     brand=listing.brand or "",
                     upc=listing.upc or ""
                 )
-                # Listing 객체도 업데이트 (나중에 사용할 수 있도록)
+                # Update Listing object for later use
                 listing.supplier_name = supplier_name
                 listing.supplier_id = supplier_id
                 listing.source = supplier_name or 'ebay'
             
-            # ✅ Shopify 경유 여부 자동 감지
+            # Auto-detect Shopify routing
             is_shopify = detect_shopify_routing(
                 sku=listing.sku or "",
                 image_url=listing.image_url or "",
@@ -1325,7 +1323,7 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 brand=listing.brand or ""
             )
             
-            # metrics와 analysis_meta에 management_hub 설정
+            # Set management_hub in metrics and analysis_meta
             metrics = listing.metrics if listing.metrics else {}
             if not isinstance(metrics, dict):
                 metrics = {}
@@ -1339,9 +1337,8 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 analysis_meta["management_hub"] = "Shopify"
             
             # Convert Listing object to dictionary
-            # ✅ CRITICAL: platform 필드를 반드시 "eBay"로 강제 설정
-            # eBay sync에서는 항상 platform="eBay"로 저장되어야 함
-            platform = "eBay"  # 항상 "eBay"로 강제 설정 (대소문자 정확히 일치)
+            # CRITICAL: always set platform to "eBay" for eBay sync
+            platform = "eBay"  # Must match exactly (case-sensitive)
             
             # ✅ CRITICAL: DB unique constraint is (user_id, platform, item_id) - must populate item_id
             item_id = getattr(listing, 'item_id', None) or getattr(listing, 'ebay_item_id', None) or ""
@@ -1349,15 +1346,15 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 logger.warning(f"⚠️ [UPSERT] Skipping listing with empty item_id/ebay_item_id: title={getattr(listing, 'title', '')[:50]}")
                 continue
             
-            # ✅ CRITICAL: user_id가 None이거나 빈 문자열이면 에러 발생 (fallback 금지)
+            # CRITICAL: user_id must not be None or empty (no fallback)
             listing_user_id = expected_user_id if expected_user_id else getattr(listing, 'user_id', None)
             
             if not listing_user_id:
-                logger.error(f"❌ [UPSERT] CRITICAL: user_id가 None입니다!")
+                logger.error(f"❌ [UPSERT] CRITICAL: user_id is None!")
                 logger.error(f"   - listing.user_id: {listing_user_id}")
                 logger.error(f"   - listing.id: {getattr(listing, 'id', 'N/A')}")
                 logger.error(f"   - listing.title: {getattr(listing, 'title', 'N/A')[:50]}")
-                raise ValueError(f"user_id가 유효하지 않습니다: {listing_user_id}. user_id는 필수입니다.")
+                raise ValueError(f"Invalid user_id: {listing_user_id}. user_id is required.")
             
             # ✅ FIX: Never access listing.raw_data - use empty dict directly to avoid AttributeError
             # source: NOT NULL in DB; use supplier name or "ebay" for eBay-synced listings
@@ -1371,13 +1368,13 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 'image_url': listing.image_url,
                 'sku': listing.sku,
                 'source': source_value,  # ✅ NOT NULL constraint
-                'supplier_name': supplier_name,  # 자동 감지된 값 사용
-                'supplier_id': supplier_id,  # 자동 감지된 값 사용
+                'supplier_name': supplier_name,  # Auto-detected value
+                'supplier_id': supplier_id,  # Auto-detected value
                 'brand': listing.brand,
                 'upc': listing.upc,
-                'metrics': metrics,  # Shopify 경유 정보 포함
+                'metrics': metrics,  # Includes Shopify routing
                 'raw_data': {},  # Always use empty dict - avoid AttributeError completely
-                'analysis_meta': analysis_meta,  # Shopify 경유 정보 포함
+                'analysis_meta': analysis_meta,  # Includes Shopify routing
                 'last_synced_at': listing.last_synced_at if listing.last_synced_at else datetime.utcnow(),
                 'updated_at': datetime.utcnow(),
                 # Legacy fields
@@ -1414,7 +1411,7 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 stmt = stmt.on_conflict_do_update(
                     index_elements=conflict_columns,
                     set_={
-                        'platform': 'eBay',  # ✅ CRITICAL: platform 필드를 항상 "eBay"로 강제 설정 (eBay sync 전용)
+                        'platform': 'eBay',  # CRITICAL: always "eBay" for eBay sync
                         'title': excluded.title,
                         'image_url': excluded.image_url,
                         'sku': excluded.sku,
@@ -1423,9 +1420,9 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                         'supplier_id': excluded.supplier_id,
                         'brand': excluded.brand,
                         'upc': excluded.upc,
-                        'metrics': excluded.metrics,  # Shopify 경유 정보 포함
+                        'metrics': excluded.metrics,  # Includes Shopify routing
                         'raw_data': excluded.raw_data,
-                        'analysis_meta': excluded.analysis_meta,  # Shopify 경유 정보 포함
+                        'analysis_meta': excluded.analysis_meta,  # Includes Shopify routing
                         'last_synced_at': excluded.last_synced_at,
                         'updated_at': datetime.utcnow(),
                         # Legacy fields
@@ -1489,12 +1486,12 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
     else:
         # SQLite: Use individual INSERT OR REPLACE (less efficient but compatible)
         for listing in listings:
-            # ✅ 공급처 자동 감지: supplier_name이 없거나 "Unverified"/"Unknown"인 경우 자동 감지
+            # Auto-detect supplier when missing or "Unverified"/"Unknown"
             supplier_name = listing.supplier_name
             supplier_id = listing.supplier_id
             
             if not supplier_name or supplier_name in ["Unverified", "Unknown", ""]:
-                # extract_supplier_info를 사용하여 공급처 자동 감지
+                # Use extract_supplier_info for auto-detect
                 supplier_name, supplier_id = extract_supplier_info(
                     sku=listing.sku or "",
                     image_url=listing.image_url or "",
@@ -1502,12 +1499,12 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                     brand=listing.brand or "",
                     upc=listing.upc or ""
                 )
-                # Listing 객체도 업데이트
+                # Update Listing object
                 listing.supplier_name = supplier_name
                 listing.supplier_id = supplier_id
                 listing.source = supplier_name or 'ebay'
             
-            # ✅ Shopify 경유 여부 자동 감지
+            # Auto-detect Shopify routing
             is_shopify = detect_shopify_routing(
                 sku=listing.sku or "",
                 image_url=listing.image_url or "",
@@ -1515,7 +1512,7 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 brand=listing.brand or ""
             )
             
-            # metrics와 analysis_meta에 management_hub 설정
+            # Set management_hub in metrics and analysis_meta
             if is_shopify:
                 if not listing.metrics:
                     listing.metrics = {}
@@ -1527,18 +1524,18 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 if isinstance(listing.analysis_meta, dict):
                     listing.analysis_meta["management_hub"] = "Shopify"
             
-            # ✅ FIX: platform 필드가 없으면 marketplace 사용, item_id가 없으면 ebay_item_id 사용
+            # FIX: if platform missing use marketplace; if item_id missing use ebay_item_id
             platform = getattr(listing, 'platform', None) or getattr(listing, 'marketplace', None) or "eBay"
             item_id = getattr(listing, 'item_id', None) or getattr(listing, 'ebay_item_id', None) or ""
             
-            # ✅ CRITICAL: user_id가 None이면 에러 발생 (fallback 금지)
+            # CRITICAL: user_id must not be None (no fallback)
             user_id = getattr(listing, 'user_id', None)
             if not user_id:
-                logger.error(f"❌ [UPSERT SQLite] CRITICAL: user_id가 None입니다!")
+                logger.error(f"❌ [UPSERT SQLite] CRITICAL: user_id is None!")
                 logger.error(f"   - listing.user_id: {user_id}")
                 logger.error(f"   - listing.id: {getattr(listing, 'id', 'N/A')}")
                 logger.error(f"   - listing.title: {getattr(listing, 'title', 'N/A')[:50]}")
-                raise ValueError(f"user_id가 유효하지 않습니다: {user_id}. user_id는 필수입니다.")
+                raise ValueError(f"Invalid user_id: {user_id}. user_id is required.")
             
             # Check if listing exists
             query = db.query(Listing).filter(Listing.user_id == user_id)
@@ -1555,7 +1552,7 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
             
             if existing:
                 # Update existing record
-                # ✅ CRITICAL: platform 필드도 업데이트 (eBay로 강제 설정)
+                # CRITICAL: update platform to eBay
                 if hasattr(existing, 'platform'):
                     existing.platform = platform
                 elif hasattr(existing, 'marketplace'):
@@ -1563,16 +1560,16 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 existing.title = listing.title
                 existing.image_url = listing.image_url
                 existing.sku = listing.sku
-                existing.supplier_name = supplier_name  # 자동 감지된 값 사용
-                existing.supplier_id = supplier_id  # 자동 감지된 값 사용
-                existing.source = supplier_name or 'ebay'  # ✅ NOT NULL
+                existing.supplier_name = supplier_name  # Auto-detected value
+                existing.supplier_id = supplier_id  # Auto-detected value
+                existing.source = supplier_name or 'ebay'  # NOT NULL
                 existing.brand = listing.brand
                 existing.upc = listing.upc
-                existing.metrics = listing.metrics if listing.metrics else {}  # Shopify 경유 정보 포함
+                existing.metrics = listing.metrics if listing.metrics else {}  # Includes Shopify routing
                 # ✅ FIX: Never access listing.raw_data - use empty dict directly to avoid AttributeError
                 # SQLAlchemy objects may not have raw_data initialized, so always use empty dict
                 existing.raw_data = {}
-                existing.analysis_meta = listing.analysis_meta if listing.analysis_meta else {}  # Shopify 경유 정보 포함
+                existing.analysis_meta = listing.analysis_meta if listing.analysis_meta else {}  # Includes Shopify routing
                 existing.last_synced_at = listing.last_synced_at if listing.last_synced_at else datetime.utcnow()
                 existing.updated_at = datetime.utcnow()
                 existing.price = listing.price
@@ -1591,7 +1588,7 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
 
 def extract_csv_fields(listing: Listing) -> Dict[str, any]:
     """
-    CSV 생성을 위한 필수 필드 추출
+    Extract required fields for CSV generation
     - external_id (eBay ItemID)
     - sku
     - is_zombie
@@ -1608,7 +1605,7 @@ def extract_csv_fields(listing: Listing) -> Dict[str, any]:
     # sku
     sku = getattr(listing, 'sku', '') or ""
     
-    # is_zombie (metrics 또는 별도 필드에서)
+    # is_zombie (from metrics or separate field)
     is_zombie = False
     if hasattr(listing, 'is_zombie'):
         is_zombie = bool(getattr(listing, 'is_zombie', False))
@@ -1616,7 +1613,7 @@ def extract_csv_fields(listing: Listing) -> Dict[str, any]:
         if isinstance(listing.metrics, dict):
             is_zombie = listing.metrics.get('is_zombie', False)
     
-    # zombie_score (metrics 또는 별도 필드에서)
+    # zombie_score (from metrics or separate field)
     zombie_score = None
     if hasattr(listing, 'zombie_score'):
         zombie_score = getattr(listing, 'zombie_score', None)
@@ -1625,12 +1622,12 @@ def extract_csv_fields(listing: Listing) -> Dict[str, any]:
             zombie_score = listing.metrics.get('zombie_score', None)
     
     # analysis_meta.recommendation.action
-    # ✅ FIX: JSONB 필드 안전하게 추출 (문자열 파싱 지원)
+    # FIX: safe JSONB extraction (supports string parsing)
     action = None
     try:
         if hasattr(listing, 'analysis_meta') and listing.analysis_meta:
             analysis_meta = listing.analysis_meta
-            # JSONB가 문자열로 저장된 경우 파싱
+            # Parse when JSONB stored as string
             if isinstance(analysis_meta, str):
                 try:
                     analysis_meta = json.loads(analysis_meta)
@@ -1643,7 +1640,7 @@ def extract_csv_fields(listing: Listing) -> Dict[str, any]:
                     action = recommendation.get('action', None)
         elif hasattr(listing, 'metrics') and listing.metrics:
             metrics = listing.metrics
-            # JSONB가 문자열로 저장된 경우 파싱
+            # Parse when JSONB stored as string
             if isinstance(metrics, str):
                 try:
                     metrics = json.loads(metrics)
@@ -1663,7 +1660,7 @@ def extract_csv_fields(listing: Listing) -> Dict[str, any]:
                     if isinstance(recommendation, dict):
                         action = recommendation.get('action', None)
     except Exception as e:
-        # 안정성: 예외 발생 시 None 반환 (500 에러 방지)
+        # On exception return None (avoid 500)
         logger.warning(f"Failed to extract action from analysis_meta: {e}")
         action = None
     
@@ -1736,14 +1733,14 @@ def export_zombies_to_csv(zombie_listings: List[Listing]) -> str:
 
 def get_csv_format(db: Session, supplier_name: str) -> Optional[dict]:
     """
-    DB에서 CSV 포맷 가져오기
+    Get CSV format from DB
     
     Args:
         db: Database session
-        supplier_name: 공급처/도구 이름 (e.g., "autods", "wholesale2b")
+        supplier_name: Supplier/tool name (e.g. "autods", "wholesale2b")
     
     Returns:
-        CSV 포맷 스키마 또는 None
+        CSV format schema or None
     """
     from models import CSVFormat
     
@@ -1761,7 +1758,7 @@ def generate_export_csv(
     listings,
     target_tool: str,
     db: Optional[Session] = None,
-    user_id: str = None,  # user_id는 필수 파라미터 - None이면 에러 발생
+    user_id: str = None,  # Required; error if None
     mode: str = "delete_list",
     store_id: Optional[str] = None,
     platform: Optional[str] = None
@@ -1769,10 +1766,10 @@ def generate_export_csv(
     """
     CSV Export for Dropshipping Automation Tools Only
     
-    CSV 포맷은 DB에서 가져와서 사용합니다.
-    각 공급처별 공식 포맷에 맞춰 데이터를 매핑합니다.
+    CSV format is loaded from DB.
+    Data is mapped per supplier official format.
     
-    Supported export formats (DB에서 관리):
+    Supported export formats (managed in DB):
     1. AutoDS: Headers: "Source ID", "File Action" | Data: supplier_id, "delete"
     2. Wholesale2B: Headers: "SKU", "Action" | Data: sku, "Delete"
     3. Shopify (Matrixify/Excelify): Headers: "ID", "Command" | Data: item_id, "DELETE"
@@ -1796,7 +1793,7 @@ def generate_export_csv(
     Note: Assumes 100% of items are from supported Dropshipping Tools (no manual/direct listings).
     """
     # Platform-based target_tool mapping (if platform is provided)
-    # platform 파라미터가 제공되면 target_tool을 플랫폼에 맞게 매핑
+    # If platform param provided, map target_tool to platform
     if platform:
         platform_to_tool = {
             'shopify': 'shopify_matrixify',
@@ -1839,7 +1836,7 @@ def generate_export_csv(
     elif not listings:
         return ""
     
-    # Validate user_id (필수 파라미터)
+    # Validate user_id (required)
     if not user_id:
         raise ValueError("user_id is required for CSV export. Cannot export without a valid user_id.")
     
@@ -1911,7 +1908,7 @@ def generate_export_csv(
         if isinstance(listing, dict):
             item_id = listing.get("item_id") or listing.get("ebay_item_id") or ""
             sku = listing.get("sku") or ""
-            # supplier_id: 기본값 빈 문자열로 안전하게 처리
+            # supplier_id: default to empty string safely
             supplier_id = listing.get("supplier_id") or ""
             supplier_name = listing.get("supplier_name") or listing.get("supplier") or listing.get("source") or "Unknown"
             platform = listing.get("platform") or listing.get("marketplace") or ""
@@ -1926,7 +1923,7 @@ def generate_export_csv(
         else:
             item_id = (listing.item_id if hasattr(listing, 'item_id') and listing.item_id else None) or (listing.ebay_item_id if hasattr(listing, 'ebay_item_id') and listing.ebay_item_id else None) or ""
             sku = listing.sku if hasattr(listing, 'sku') and listing.sku else ""
-            # supplier_id: 기본값 None 또는 빈 문자열로 안전하게 처리
+            # supplier_id: default None or empty string safely
             supplier_id = (listing.supplier_id if hasattr(listing, 'supplier_id') and listing.supplier_id else None) or ""
             supplier_name = (listing.supplier_name if hasattr(listing, 'supplier_name') and listing.supplier_name else None) or (listing.supplier if hasattr(listing, 'supplier') and listing.supplier else None) or (listing.source if hasattr(listing, 'source') and listing.source else None) or "Unknown"
             platform = (listing.platform if hasattr(listing, 'platform') and listing.platform else None) or (listing.marketplace if hasattr(listing, 'marketplace') and listing.marketplace else None) or ""
@@ -1946,7 +1943,7 @@ def generate_export_csv(
                 source_field = mapping["source"]
                 value = None
                 
-                # Get value from listing data (안전하게 처리)
+                # Get value from listing data (safe)
                 if source_field == "item_id":
                     value = item_id if item_id else ""
                 elif source_field == "sku":
@@ -1970,7 +1967,7 @@ def generate_export_csv(
                     else:
                         value = ""
                 
-                # 최종적으로 빈 문자열 보장
+                # Ensure empty string fallback
                 row[column_name] = value if value else ""
             else:
                 row[column_name] = ""
