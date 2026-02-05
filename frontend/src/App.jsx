@@ -6,7 +6,6 @@ import { AccountProvider } from './contexts/AccountContext'
 import LandingPage from './components/LandingPage'
 import DashboardPage from './components/DashboardPage'
 import ListingsPage from './components/ListingsPage'
-import SettingsPage from './components/SettingsPage'
 import LoginPage from './components/LoginPage'
 import SignupPage from './components/SignupPage'
 import TermsOfService from './components/TermsOfService'
@@ -51,14 +50,6 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <ListingsPage />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/settings" 
-                element={
-                  <ProtectedRoute>
-                    <SettingsPage />
                   </ProtectedRoute>
                 } 
               />

@@ -36,7 +36,7 @@ except ImportError:
     logger = logging.getLogger(__name__)
     logger.warning("⚠️ Supabase client not available. Install with: pip install supabase")
 
-app = FastAPI(title="OptListing API", version="1.3.3")
+app = FastAPI(title="OptListing API", version="1.3.4")
 
 # ============================================================
 # Environment variables: SUPABASE_URL, SUPABASE_ANON_KEY (or VITE_* fallback);
