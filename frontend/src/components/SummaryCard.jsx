@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { ChevronDown, Plus, Check, Unplug, Loader2, RefreshCw } from 'lucide-react'
 import axios from 'axios'
-import apiClient, { API_BASE_URL } from '../lib/api'
+import { apiClient, API_BASE_URL } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 
@@ -17,17 +17,15 @@ const INITIAL_STORES = [
 // ✅ FIX: API_BASE_URL은 이미 '../lib/api'에서 import하므로 중복 선언 제거
 
 // Store Selector Component
-function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onError, loading = false, onSync = null }) {
+function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onError, loading = false, onSync = null, syncingListings = false }) {
   const { user } = useAuth()
-  // Get actual user ID from auth context - CRITICAL: No fallback (must be logged in)
   const currentUserId = user?.id
   const [isOpen, setIsOpen] = useState(false)
   const [stores, setStores] = useState(INITIAL_STORES)
   const [selectedStore, setSelectedStore] = useState(stores[0])
   const [connecting, setConnecting] = useState(false)
-  const [checkingConnection, setCheckingConnection] = useState(false) // Changed default to false - only check on button click
-  const [ebayUserId, setEbayUserId] = useState(null) // Add eBay User ID state
-  const [isSyncing, setIsSyncing] = useState(false) // Sync button loading state
+  const [checkingConnection, setCheckingConnection] = useState(false)
+  const [ebayUserId, setEbayUserId] = useState(null)
   const dropdownRef = useRef(null)
   
   // 중복 클릭 방지를 위한 플래그 및 debounce
@@ -270,56 +268,6 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
             </div>
             <ChevronDown className={`w-3 h-3 text-zinc-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
           </button>
-          
-          {/* Sync Now Button - Only show for eBay Store when connected, positioned next to store name */}
-          {selectedStore?.platform === 'eBay' && selectedStore?.connected && (
-            <button
-              onClick={async (e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                
-                if (isSyncing || !currentUserId) return
-                
-                setIsSyncing(true)
-                try {
-                  console.log('🔄 [SYNC] Manual sync triggered from SummaryCard')
-                  const response = await apiClient.post('/api/ebay/listings/sync', {}, {
-                    timeout: 10000 // 10 second timeout for 202 Accepted response
-                  })
-                  
-                  if (response.status === 202) {
-                    console.log('✅ [SYNC] Sync job started in background')
-                    // Call onSync callback if provided (to refresh summary stats in parent)
-                    if (onSync) {
-                      onSync()
-                    }
-                  }
-                } catch (err) {
-                  console.error('❌ [SYNC] Sync failed:', err)
-                  if (onError) {
-                    onError('Failed to start sync. Please try again.', err)
-                  }
-                } finally {
-                  setIsSyncing(false)
-                }
-              }}
-              disabled={isSyncing}
-              className="absolute left-full ml-2 px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1 whitespace-nowrap"
-              title="Sync Now"
-            >
-              {isSyncing ? (
-                <>
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  <span>Syncing...</span>
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="w-3 h-3" />
-                  <span>Sync Now</span>
-                </>
-              )}
-            </button>
-          )}
 
           {/* Dropdown Menu */}
           {isOpen && (
@@ -384,14 +332,14 @@ function StoreSelector({ connectedStore, apiConnected, onConnectionChange, onErr
           )}
         </div>
 
-        {/* Connect / Disconnect / Connecting Button */}
-        {checkingConnection || loading ? (
+        {/* Connect / Disconnect / Connecting Button - disabled when sync in progress to prevent OAuth re-fire */}
+        {checkingConnection || loading || syncingListings ? (
           <button 
             disabled
             className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold rounded-lg border-2 border-blue-500/50 transition-all flex items-center gap-2 text-base shadow-lg animate-pulse cursor-not-allowed"
           >
             <Loader2 className="w-5 h-5 animate-spin" />
-            <span>{loading ? 'Loading...' : 'Connecting...'}</span>
+            <span>{syncingListings ? 'Syncing...' : (loading ? 'Loading...' : 'Connecting...')}</span>
           </button>
         ) : selectedStore?.connected ? (
           <button 
@@ -701,6 +649,7 @@ function SummaryCard({ onError,
   queueCount, 
   totalDeleted, 
   loading, 
+  syncingListings = false,
   filters = {}, 
   viewMode = 'zombies', 
   onViewModeChange,
@@ -750,6 +699,7 @@ function SummaryCard({ onError,
         onError={onError}
         loading={loading}
         onSync={onSync}
+        syncingListings={syncingListings}
       />
 
       {/* Stats Row - 2 Columns: Display only (non-interactive) */}

@@ -33,11 +33,6 @@ function Sidebar() {
   const planModalRef = useRef(null)
   const creditModalRef = useRef(null)
 
-  // Debug: Log environment variable in development mode only
-  if (import.meta.env.DEV) {
-    console.log('[DEBUG] Sidebar - VITE_ENABLE_TEST_CREDITS:', import.meta.env.VITE_ENABLE_TEST_CREDITS)
-  }
-
   // Close modals when clicking outside
   useEffect(() => {
     if (!showCreditModal && !showPlanModal) return
@@ -208,12 +203,12 @@ function Sidebar() {
                       <span className="text-emerald-300">Rollover ✨</span>
                     </div>
                   </div>
-                  <a
-                    href="https://optlisting.lemonsqueezy.com/checkout/basic"
+                  <Link
+                    to="/pricing"
                     className="block w-full py-2.5 bg-zinc-700 hover:bg-cyan-600 text-white font-bold rounded-xl text-center text-sm transition-all"
                   >
                     Get Started
-                  </a>
+                  </Link>
                 </div>
 
                 {/* PRO Plan */}
@@ -251,12 +246,12 @@ function Sidebar() {
                       <span className="text-emerald-300">Rollover ✨</span>
                     </div>
                   </div>
-                  <a
-                    href="https://optlisting.lemonsqueezy.com/checkout/pro"
+                  <Link
+                    to="/pricing"
                     className="block w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold rounded-xl text-center text-sm transition-all shadow-lg shadow-blue-500/30"
                   >
                     Best Value →
-                  </a>
+                  </Link>
                 </div>
 
                 {/* POWER SELLER Plan */}
@@ -294,12 +289,12 @@ function Sidebar() {
                       <span className="text-emerald-300">Rollover ✨</span>
                     </div>
                   </div>
-                  <a
-                    href="https://optlisting.lemonsqueezy.com/checkout/power-seller"
+                  <Link
+                    to="/pricing"
                     className="block w-full py-2.5 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white font-bold rounded-xl text-center text-sm transition-all shadow-lg shadow-purple-500/20"
                   >
                     Get Started
-                  </a>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -451,10 +446,7 @@ function Sidebar() {
                     
                     // Get user_id - must be logged in
                     const userId = user?.id
-                    if (!userId) {
-                      console.error('User not logged in')
-                      return
-                    }
+                    if (!userId) return
                     
                     // Lemon Squeezy Variant IDs
                     const variantIdMap = {
@@ -470,8 +462,7 @@ function Sidebar() {
                     
                     // Warn if variant ID is placeholder
                     if (variantId.includes('PLACEHOLDER')) {
-                      console.error('⚠️ Lemon Squeezy Variant IDs need to be configured! Please set up Variant IDs in the Sidebar.jsx file or environment variables. See LEMONSQUEEZY_SETUP.md for instructions.')
-                      // Show error in console instead of alert
+                      if (import.meta.env.DEV) console.warn('[CHECKOUT] Variant IDs not configured; see LEMONSQUEEZY_SETUP.md')
                       return
                     }
                     
@@ -494,8 +485,7 @@ function Sidebar() {
                         let errorMessage = `HTTP ${response.status}`
                         try {
                           const errorData = await response.json()
-                          console.error('Checkout API error:', errorData)
-                          
+                          if (import.meta.env.DEV) console.warn('[CHECKOUT] API error:', errorData)
                           // Handle different error formats
                           if (errorData.detail) {
                             if (typeof errorData.detail === 'string') {
@@ -506,9 +496,7 @@ function Sidebar() {
                               errorMessage = errorData.detail.error
                             }
                           }
-                        } catch (e) {
-                          console.error('Failed to parse error response:', e)
-                        }
+                        } catch (_e) {}
                         throw new Error(errorMessage)
                       }
                       
@@ -522,11 +510,7 @@ function Sidebar() {
                         throw new Error('No checkout URL returned from API')
                       }
                     } catch (error) {
-                      console.error('Failed to create checkout:', error)
-                      const errorMsg = error.message || 'Unknown error'
-                      // Show error in console instead of alert
-                      console.error(`Failed to create checkout: ${errorMsg}\n\nPlease check if Lemon Squeezy API keys are configured in Railway.`)
-                      // TODO: Add Toast or inline error display here
+                      if (import.meta.env.DEV) console.warn('[CHECKOUT] Create failed:', error?.message ?? error)
                     } finally {
                       setIsCreatingCheckout(false)
                     }

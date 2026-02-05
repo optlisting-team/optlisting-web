@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import apiClient from '../lib/api'
+import { apiClient } from '../lib/api'
 import { supabase } from '../lib/supabase'
 
 const AccountContext = createContext({
@@ -25,7 +25,7 @@ export const AccountProvider = ({ children }) => {
   const [showCreditModal, setShowCreditModal] = useState(false)
   const [credits, setCredits] = useState(null)
 
-  // Fetch credits (for Dashboard/Sidebar - prevents "r is not a function" TypeError in minified builds)
+  // Fetch credits (for Dashboard/Sidebar - prevents "r is not a function" TypeError)
   const fetchCredits = async () => {
     try {
       const response = await apiClient.get('/api/credits', { timeout: 15000 })
@@ -111,9 +111,6 @@ export const AccountProvider = ({ children }) => {
     fetchSubscription()
   }, [])
 
-  // Ensure refreshCredits is always a callable function (avoids "r is not a function" when consumed)
-  const safeRefreshCredits = typeof fetchCredits === 'function' ? fetchCredits : () => Promise.resolve()
-
   return (
     <AccountContext.Provider
       value={{
@@ -125,7 +122,7 @@ export const AccountProvider = ({ children }) => {
         setShowPlanModal,
         refreshSubscription: fetchSubscription,
         credits,
-        refreshCredits: safeRefreshCredits,
+        refreshCredits: fetchCredits,
         showCreditModal,
         setShowCreditModal
       }}

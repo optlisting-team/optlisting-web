@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import axios from 'axios'
-import apiClient, { API_BASE_URL } from '../lib/api'
+import { apiClient, API_BASE_URL } from '../lib/api'
 import { useStore } from '../contexts/StoreContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useAccount } from '../contexts/AccountContext'
@@ -1436,8 +1436,8 @@ function Dashboard() {
     
     // Handle payment success/cancel redirects
     if (paymentStatus === 'success') {
-      // Refetch credits to show updated balance (safe call - avoids minified "r is not a function")
-      if (typeof refreshCredits === 'function') refreshCredits()
+      // Refetch credits to show updated balance
+      refreshCredits()
       // Clean up URL parameter
       urlParams.delete('payment')
       const newUrl = window.location.pathname + (urlParams.toString() ? `?${urlParams.toString()}` : '')
@@ -1675,7 +1675,7 @@ function Dashboard() {
       try {
         const isHealthy = await checkApiHealth()
         if (isHealthy) {
-          if (typeof refreshCredits === 'function') refreshCredits()
+          refreshCredits()
           fetchHistory().catch(err => {
             console.error('History fetch error on mount:', err)
           })
@@ -1731,7 +1731,7 @@ function Dashboard() {
         }
       } catch (err) {
         console.warn('API Health Check failed (non-critical):', err)
-        if (typeof refreshCredits === 'function') refreshCredits()
+        refreshCredits()
         fetchHistory().catch(err => {
           console.error('History fetch error on mount:', err)
         })
@@ -2064,7 +2064,7 @@ function Dashboard() {
           syncingListings={isSyncingListings}
           filters={filters}
           viewMode={viewMode}
-          onViewModeChange={() => {}}
+          onViewModeChange={null}
           connectedStore={selectedStore}
           connectedStoresCount={connectedStoresCount}
           onSync={handleSync}

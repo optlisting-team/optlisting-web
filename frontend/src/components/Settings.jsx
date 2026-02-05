@@ -168,10 +168,6 @@ function StoreLicenseTable({
 // Main Settings Component
 function Settings() {
   // Debug: Log environment variable in development mode only
-  if (import.meta.env.DEV) {
-    console.log('[DEBUG] Settings - VITE_ENABLE_TEST_CREDITS:', import.meta.env.VITE_ENABLE_TEST_CREDITS)
-  }
-
   // Use AccountContext for credits
   const { credits, plan, refreshCredits } = useAccount()
   
@@ -189,7 +185,6 @@ function Settings() {
 
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
-  const [isGrantingCredits, setIsGrantingCredits] = useState(false)
   
   const handleConnect = () => {
     // TODO: Open OAuth flow
@@ -200,63 +195,6 @@ function Settings() {
   const handleDisconnect = (storeId) => {
     // Direct disconnect without confirmation (removed confirm dialog)
     setConnectedStores(connectedStores.filter(s => s.id !== storeId))
-  }
-
-  // Grant Test Credits handler
-  const handleGrantTestCredits = async () => {
-    if (isGrantingCredits) return
-    
-    setIsGrantingCredits(true)
-    setError(null)
-    setSuccess(null)
-    
-    try {
-      // Use admin grant endpoint with admin key from environment
-      const adminKey = import.meta.env.VITE_ADMIN_API_KEY || ''
-      const response = await axios.post(
-        `${API_BASE_URL}/api/admin/credits/grant`,
-        {
-          user_id: CURRENT_USER_ID,
-          amount: 1000,
-          description: 'Test credits grant from Settings'
-        },
-        {
-          params: {
-            admin_key: adminKey
-          },
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          timeout: 30000
-        }
-      )
-      
-      if (response.data.success) {
-        const { totalCredits, addedAmount } = response.data
-        setSuccess(`Test credits granted successfully! +${addedAmount} credits (Total: ${totalCredits.toLocaleString()})`)
-        // Refresh credits from AccountContext
-        if (refreshCredits) {
-          refreshCredits()
-        }
-        // Clear success message after 5 seconds
-        setTimeout(() => setSuccess(null), 5000)
-      } else {
-        throw new Error(response.data.message || 'Grant failed')
-      }
-    } catch (err) {
-      console.error('Test credits grant failed:', err)
-      
-      if (err.response?.status === 403) {
-        setError('Test credits grant is not available. Check admin key configuration.')
-      } else {
-        const errorMsg = err.response?.data?.detail?.message || err.response?.data?.error || err.message || 'Failed to grant test credits. Please try again.'
-        setError(errorMsg)
-      }
-      // Clear error message after 5 seconds
-      setTimeout(() => setError(null), 5000)
-    } finally {
-      setIsGrantingCredits(false)
-    }
   }
 
   // Plan info
@@ -324,28 +262,6 @@ function Settings() {
             </div>
           </div>
           
-          {/* Grant Test Credits Button (Dev-only) */}
-          {/* 
-            NOTE: This button is controlled by VITE_ENABLE_TEST_CREDITS environment variable.
-            It will NOT be hidden based on NODE_ENV=production, but only when VITE_ENABLE_TEST_CREDITS is not 'true'.
-            This allows the button to be visible in production if explicitly enabled via environment variable.
-            Security: The actual grant is protected by ADMIN_API_KEY on the backend.
-          */}
-          {import.meta.env.VITE_ENABLE_TEST_CREDITS === 'true' && (
-            <div className="mt-4 pt-4 border-t border-zinc-800">
-              <Button
-                onClick={handleGrantTestCredits}
-                disabled={isGrantingCredits}
-                variant="outline"
-                className="w-full border-purple-500/30 text-purple-400 hover:bg-purple-500/10 disabled:opacity-50"
-              >
-                {isGrantingCredits ? 'Granting...' : '🧪 Grant Test Credits (+1000)'}
-              </Button>
-              <p className="text-xs text-zinc-500 mt-2 text-center">
-                Dev-only: Grants 1000 test credits for testing purposes
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Store Licenses Section */}

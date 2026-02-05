@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import axios from 'axios'
-import apiClient, { API_BASE_URL } from '../lib/api'
+import { apiClient, API_BASE_URL } from '../lib/api'
 import ZombieTable from './ZombieTable'
 import { normalizeImageUrl } from '../utils/imageUtils'
 

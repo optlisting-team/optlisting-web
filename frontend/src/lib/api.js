@@ -99,5 +99,6 @@ apiClient.interceptors.response.use(
   }
 )
 
+// Named exports avoid minification "r is not a function" when default export is mis-resolved
+export { apiClient, API_BASE_URL }
 export default apiClient
-export { API_BASE_URL }

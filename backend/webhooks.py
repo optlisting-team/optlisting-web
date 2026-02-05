@@ -55,57 +55,34 @@ VARIANT_CREDITS = {
 
 def verify_webhook_signature(payload: bytes, signature: str) -> bool:
     """
-    Lemon Squeezy 웹훅 시그니처 검증
-    LS는 HMAC SHA256을 사용하여 시그니처를 생성합니다.
-    
-    Args:
-        payload: 원본 요청 본문 (bytes)
-        signature: X-Signature 헤더 값
-    
-    Returns:
-        검증 성공 여부
+    Verify Lemon Squeezy webhook payload using HMAC SHA256 (X-Signature header).
+    Returns True only if secret is set, signature is present, and digest matches.
     """
     if not LS_WEBHOOK_SECRET:
-        logger.error("LS_WEBHOOK_SECRET 환경 변수가 설정되지 않았습니다")
+        logger.error("LEMON_SQUEEZY_WEBHOOK_SECRET not set")
         return False
-    
     if not signature:
-        logger.error("웹훅 시그니처가 제공되지 않았습니다")
+        logger.error("Webhook X-Signature header missing")
         return False
-    
     try:
-        # HMAC SHA256으로 시그니처 생성
         expected_signature = hmac.new(
             LS_WEBHOOK_SECRET.encode('utf-8'),
             payload,
             hashlib.sha256
         ).hexdigest()
-        
-        # 시그니처 비교 (타이밍 공격 방지를 위해 hmac.compare_digest 사용)
         is_valid = hmac.compare_digest(expected_signature, signature)
-        
         if not is_valid:
-            logger.warning(f"웹훅 시그니처 검증 실패. 예상: {expected_signature[:10]}..., 받음: {signature[:10]}...")
-        
+            logger.warning("Webhook signature mismatch")
         return is_valid
     except Exception as e:
-        logger.error(f"웹훅 시그니처 검증 중 오류: {e}")
+        logger.error("Webhook signature verification error: %s", e)
         return False
 
 
 def get_or_create_profile(db: Session, user_id: str) -> Profile:
     """
-    프로필 조회 또는 생성 (idempotent, 안정성: 트랜잭션 처리)
-    
-    Profile이 없으면 자동으로 생성합니다.
-    Race condition을 고려하여 idempotent하게 구현되었습니다.
-    
-    Args:
-        db: 데이터베이스 세션
-        user_id: 사용자 ID
-    
-    Returns:
-        Profile 객체
+    Get existing profile by user_id or create one (idempotent). Handles race
+    conditions; safe for concurrent webhook and API calls.
     """
     logger.info(f"[get_or_create_profile] START: user_id={user_id}")
     try:
@@ -750,18 +727,11 @@ def handle_order_paid(db: Session, event_data: Dict) -> bool:
 
 def process_webhook_event(db: Session, event_data: Dict) -> bool:
     """
-    웹훅 이벤트 처리 라우터
-    
-    Args:
-        db: 데이터베이스 세션
-        event_data: 웹훅 이벤트 데이터
-    
-    Returns:
-        처리 성공 여부
+    Route Lemon Squeezy webhook event by meta.event_name; update profile,
+    credits, or subscription. Returns True if handled successfully.
     """
     event_name = event_data.get('meta', {}).get('event_name', '')
-    
-    logger.info(f"웹훅 이벤트 수신: {event_name}")
+    logger.info("Webhook event: %s", event_name)
     
     try:
         if event_name == 'subscription_created':

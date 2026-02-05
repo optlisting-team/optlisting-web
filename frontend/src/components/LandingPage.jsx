@@ -5,22 +5,13 @@ import { ArrowRight, TrendingDown, Ban, DollarSign, Check, CheckCircle, Zap, Tre
 import { useAuth } from '../contexts/AuthContext'
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from './ui/card'
 import { Button } from './ui/button'
+import { generateProfessionalCheckoutUrl } from '../lib/checkout'
 
-// Lemon Squeezy Store URL
-const LEMON_SQUEEZY_STORE = import.meta.env.VITE_LEMON_SQUEEZY_STORE || 'https://optlisting.lemonsqueezy.com'
-
-// Professional Plan - $120/month
-// CRITICAL: Use numeric IDs only (no string slugs) to avoid 404 errors
-// Product ID: 795931, Variant ID: 1255285
 const PROFESSIONAL_PLAN = {
   id: 'professional',
   name: 'Professional Plan',
   price: 120,
   billing: 'month',
-  // Numeric IDs with fallback to hardcoded values (prevents 404 errors)
-  // Environment variables override, but fallback ensures checkout always works
-  product_id: import.meta.env.VITE_LEMON_SQUEEZY_PRODUCT_ID || '795931',
-  variant_id: import.meta.env.VITE_LEMON_SQUEEZY_VARIANT_ID || '1255285',
   features: [
     'Unlimited eBay listings analysis',
     'Advanced zombie detection algorithms',
@@ -38,88 +29,12 @@ function LandingPage() {
   const { user, isAuthenticated, signOut } = useAuth()
   const navigate = useNavigate()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
-  const [isSubscribing, setIsSubscribing] = useState(false)
   const profileRef = useRef(null)
-  
-  // Generate Lemon Squeezy Checkout link for $120/month Professional subscription
-  // Format: https://optlisting.lemonsqueezy.com/checkout/buy/{product_id}?checkout[variant_id]={variant_id}&checkout[custom][user_id]={user_id}&checkout[custom][email]={email}
-  const generateCheckoutUrl = () => {
-    const userId = user?.id || user?.user_metadata?.user_id
-    const userEmail = user?.email || ''
-    
-    if (!userId) {
-      console.error('❌ [CHECKOUT] User not logged in')
-      return null
-    }
-    
-    // CRITICAL: Force numeric IDs with fallback to prevent 404 errors
-    // Always use numeric product_id (795931) in URL path, NOT a string slug
-    let productId = String(PROFESSIONAL_PLAN.product_id || '795931').trim()
-    let variantId = String(PROFESSIONAL_PLAN.variant_id || '1255285').trim()
-    
-    // Verify IDs are numeric (not string slugs) - use fallback if invalid
-    if (isNaN(Number(productId)) || productId === '') {
-      console.warn('⚠️ [CHECKOUT] Product ID is not numeric, using fallback: 795931')
-      productId = '795931'
-    }
-    if (isNaN(Number(variantId)) || variantId === '') {
-      console.warn('⚠️ [CHECKOUT] Variant ID is not numeric, using fallback: 1255285')
-      variantId = '1255285'
-    }
-    
-    // Lemon Squeezy hosted checkout URL format (direct redirect, bypasses overlay)
-    // CRITICAL: Use /buy/{product_id} instead of /checkout/buy/{product_id} to avoid 404
-    // Final URL format: https://optlisting.lemonsqueezy.com/buy/795931?checkout[variant_id]=1255285&checkout[custom][user_id]=...
-    // Documentation: https://docs.lemonsqueezy.com/help/checkout/checkout-custom-fields
-    
-    // Use /buy/{product_id} for hosted checkout (direct redirect, no overlay)
-    const baseUrl = `${LEMON_SQUEEZY_STORE}/buy/${productId}`
-    const params = new URLSearchParams({
-      'checkout[variant_id]': variantId,
-      'checkout[custom][user_id]': userId,
-      'test_mode': 'true', // Enable test mode for hosted checkout
-    })
-    
-    // Add email if available for webhook synchronization
-    if (userEmail) {
-      params.append('checkout[custom][email]', userEmail)
-    }
-    
-    const checkoutUrl = `${baseUrl}?${params.toString()}`
-    console.log('🔗 [CHECKOUT] Generated checkout URL:', checkoutUrl)
-    console.log('   Product ID (numeric):', productId)
-    console.log('   Variant ID (numeric):', variantId)
-    console.log('   User ID:', userId)
-    console.log('   Email:', userEmail || 'not provided')
-    console.log('   URL Structure:', `buy/${productId}?checkout[variant_id]=${variantId}`)
-    return checkoutUrl
-  }
-  
-  const handleSubscribe = () => {
-    if (!user?.id) {
-      console.error('❌ [CHECKOUT] Cannot subscribe: User not logged in')
-      // Redirect to login or show login modal
-      navigate('/login')
-      return
-    }
-    
-    // IDs are always available due to fallback values (795931, 1255285)
-    // No need to check - fallback ensures checkout always works
-    
-    setIsSubscribing(true)
-    const checkoutUrl = generateCheckoutUrl()
-    
-    if (!checkoutUrl) {
-      // This should only happen if user_id extraction failed (already logged)
-      console.error('❌ [CHECKOUT] Failed to generate checkout URL')
-      setIsSubscribing(false)
-      return
-    }
-    
-    // Open Lemon Squeezy checkout in new window
-    console.log('🚀 [CHECKOUT] Opening Lemon Squeezy checkout:', checkoutUrl)
-    window.open(checkoutUrl, '_blank')
-    setIsSubscribing(false)
+  const checkoutUrl = user ? generateProfessionalCheckoutUrl(user) : null
+  const canSubscribe = Boolean(isAuthenticated && user && checkoutUrl)
+
+  const logAndNavigate = (url) => {
+    console.log('🔗 NAVIGATING TO:', url)
   }
 
   // Close profile dropdown when clicking outside
@@ -651,17 +566,30 @@ function LandingPage() {
                   ))}
                 </div>
 
-                {/* Subscribe Button */}
-                <button
-                  onClick={handleSubscribe}
-                  disabled={isSubscribing || !isAuthenticated}
-                  className={`
-                    w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl text-center text-lg transition-all shadow-lg shadow-emerald-500/20 hover:shadow-xl hover:scale-[1.02]
-                    ${isSubscribing || !isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''}
-                  `}
-                >
-                  {isSubscribing ? 'Processing...' : !isAuthenticated ? 'Please log in to subscribe' : `Subscribe to Professional Plan — $${PROFESSIONAL_PLAN.price}/${PROFESSIONAL_PLAN.billing}`}
-                </button>
+                {/* Subscribe: direct anchor for bulletproof redirect; log URL before navigation */}
+                {canSubscribe ? (
+                  <a
+                    href={checkoutUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => logAndNavigate(checkoutUrl)}
+                    className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl text-center text-lg transition-all shadow-lg shadow-emerald-500/20 hover:shadow-xl hover:scale-[1.02] block"
+                  >
+                    Subscribe to Professional Plan — ${PROFESSIONAL_PLAN.price}/{PROFESSIONAL_PLAN.billing}
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => !isAuthenticated && navigate('/login')}
+                    disabled={!isAuthenticated}
+                    className={`
+                      w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl text-center text-lg transition-all shadow-lg shadow-emerald-500/20 hover:shadow-xl hover:scale-[1.02]
+                      ${!isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''}
+                    `}
+                  >
+                    {!isAuthenticated ? 'Please log in to subscribe' : 'Subscribe to Professional Plan — $' + PROFESSIONAL_PLAN.price + '/' + PROFESSIONAL_PLAN.billing}
+                  </button>
+                )}
 
                 {/* Trust Elements */}
                 <div className="mt-6 text-center text-zinc-400 text-sm">

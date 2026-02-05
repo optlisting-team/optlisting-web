@@ -73,37 +73,37 @@ class DeletionLog(Base):
 
 
 class Profile(Base):
+    """
+    User profile: auth id, Lemon Squeezy subscription, credits, eBay OAuth.
+    Indexed: user_id (unique), ls_customer_id, ls_subscription_id, subscription_status.
+    ebay_connected is not indexed; add idx_profiles_ebay_connected if filtering by it often.
+    """
     __tablename__ = "profiles"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, unique=True, nullable=False, index=True)  # 사용자 고유 ID
-    
-    # Lemon Squeezy 구독 정보
-    ls_customer_id = Column(String, nullable=True, index=True)  # Lemon Squeezy Customer ID
-    ls_subscription_id = Column(String, nullable=True, index=True)  # Lemon Squeezy Subscription ID
-    subscription_status = Column(String, default='inactive')  # 'active', 'cancelled', 'expired', 'inactive'
-    subscription_plan = Column(String, nullable=True)  # 'professional', 'free', etc.
-    
-    # 플랜 제한
-    total_listings_limit = Column(Integer, default=100)  # Pro 플랜: 무제한 또는 큰 수, Free: 100
-    
-    # 크레딧 시스템 (3-Way Hybrid Pricing)
-    purchased_credits = Column(Integer, default=0, nullable=False)  # 총 구매/부여 크레딧
-    consumed_credits = Column(Integer, default=0, nullable=False)   # 총 사용 크레딧
-    current_plan = Column(String, default='free')  # 'free', 'starter', 'pro', 'enterprise'
-    # free_tier_count는 마이그레이션(add_free_tier_count.sql) 실행 전까지 주석 처리
-    # 마이그레이션 실행 후 아래 주석을 해제하세요:
-    # free_tier_count = Column(Integer, default=0, nullable=False)  # 무료티어 사용 횟수 (최대 3회)
-    
-    # eBay OAuth 토큰
-    ebay_access_token = Column(String, nullable=True)  # eBay Access Token (2시간 만료)
-    ebay_refresh_token = Column(String, nullable=True)  # eBay Refresh Token (18개월 만료)
-    ebay_token_expires_at = Column(DateTime, nullable=True)  # Access Token 만료 시간
-    ebay_user_id = Column(String, nullable=True)  # eBay User ID
-    ebay_token_updated_at = Column(DateTime, nullable=True)  # 토큰 마지막 갱신 시간
-    ebay_connected = Column(Boolean, default=False)  # eBay 연결 상태
-    
-    # 메타데이터
+    user_id = Column(String, unique=True, nullable=False, index=True)
+
+    # Lemon Squeezy subscription (indexed in migrations)
+    ls_customer_id = Column(String, nullable=True, index=True)
+    ls_subscription_id = Column(String, nullable=True, index=True)
+    subscription_status = Column(String, default='inactive')  # active, cancelled, expired, inactive
+    subscription_plan = Column(String, nullable=True)  # professional, free, etc.
+
+    total_listings_limit = Column(Integer, default=100)
+
+    # Credits (3-way hybrid pricing)
+    purchased_credits = Column(Integer, default=0, nullable=False)
+    consumed_credits = Column(Integer, default=0, nullable=False)
+    current_plan = Column(String, default='free')  # free, starter, pro, enterprise
+
+    # eBay OAuth
+    ebay_access_token = Column(String, nullable=True)
+    ebay_refresh_token = Column(String, nullable=True)
+    ebay_token_expires_at = Column(DateTime, nullable=True)
+    ebay_user_id = Column(String, nullable=True)
+    ebay_token_updated_at = Column(DateTime, nullable=True)
+    ebay_connected = Column(Boolean, default=False)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
