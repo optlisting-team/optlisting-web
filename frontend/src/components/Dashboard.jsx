@@ -112,11 +112,6 @@ const DUMMY_STORE = {
 }
 
 function Dashboard() {
-  // Debug: Log environment variable in development mode only
-  if (import.meta.env.DEV) {
-    console.log('[DEBUG] Dashboard - VITE_ENABLE_TEST_CREDITS:', import.meta.env.VITE_ENABLE_TEST_CREDITS)
-  }
-
   const { selectedStore } = useStore()
   const { user } = useAuth()
   const { credits, refreshCredits } = useAccount()  // Use global credits from AccountContext
@@ -180,6 +175,8 @@ function Dashboard() {
   // OAuth callback verification guard - prevent multiple simultaneous verifications
   const isVerifyingConnection = useRef(false)
   const verificationAttemptCount = useRef(0)
+  // Sync-in-progress ref so guard works before state updates (prevents double sync/OAuth re-fire)
+  const syncInProgressRef = useRef(false)
   const MAX_VERIFICATION_ATTEMPTS = 6
   const VERIFICATION_BACKOFF_MS = [500, 1000, 1500, 2000, 2500, 3000] // Progressive backoff
   
@@ -311,8 +308,16 @@ function Dashboard() {
       return
     }
     
+    // Prevent duplicate sync: use ref so guard works before state updates (prevents OAuth re-fire loop)
+    if (syncInProgressRef.current) {
+      console.log('🔄 [SYNC] Sync already in progress, skipping duplicate trigger')
+      return
+    }
+    syncInProgressRef.current = true
+    
     // Set timeout for syncing state (60 seconds)
     let syncTimeout = null
+    let syncAccepted202 = false // When true, do NOT clear isSyncingListings in finally (polling owns it)
     
     try {
       setIsSyncingListings(true)
@@ -321,6 +326,7 @@ function Dashboard() {
       syncTimeout = setTimeout(() => {
         console.warn('⚠️ [SYNC] Sync is taking longer than expected (>60s)')
         showToast('Sync is taking longer than expected. Please refresh in a moment.', 'warning')
+        syncInProgressRef.current = false
         setIsSyncingListings(false)
       }, 60000) // 60 second timeout
       console.log('🔄 [SYNC] Starting eBay listings sync...')
@@ -333,22 +339,12 @@ function Dashboard() {
             timeout: 60000 // 60 second timeout (should receive 202 response quickly, but allow buffer for network issues)
           })
       
-      // Handle 202 Accepted response (background job started)
+      // Handle 202 Accepted response (background job started) — keep SYNCING state until polling completes
       // Distinguish between 202 (background job) and other success codes (200, 201)
       if (response.status === 202) {
-        console.log('='.repeat(60))
-        console.log('📊 [SYNC] /api/ebay/listings/sync response (202 Accepted):')
-        console.log(JSON.stringify(response.data, null, 2))
-        console.log('='.repeat(60))
-        
-        // 202 response means background job has started (not completed)
+        syncAccepted202 = true
         showToast('Sync in progress... This may take a minute.', 'info')
-        
-        // Save sync response to sessionStorage (for comparison with summary)
         sessionStorage.setItem('last_sync_response', JSON.stringify(response.data))
-        
-        // Background job started - start polling for completion
-        console.log('🔄 [SYNC] Background sync job started. Starting polling...')
         
         // ✅ Smooth UI Polling: Poll every 5 seconds until sync completes or timeout
         const MAX_POLL_ATTEMPTS = 24 // 24 attempts * 5 seconds = 120 seconds max
@@ -357,10 +353,9 @@ function Dashboard() {
         
         const pollForCompletion = async () => {
           if (pollAttempts >= MAX_POLL_ATTEMPTS) {
-            console.warn('⚠️ [SYNC] Polling timeout reached (120 seconds)')
             showToast('Sync is taking longer than expected. Use "Manual Refresh" button to check status.', 'warning')
-            // Keep syncing state active - don't clear it yet
-            // Final attempt to fetch stats
+            syncInProgressRef.current = false
+            setIsSyncingListings(false)
             try {
               await fetchSummaryStats()
             } catch (err) {
@@ -398,10 +393,9 @@ function Dashboard() {
               
               // Check if sync completed (REAL count > 0 - this is the critical check)
               if (activeCount > 0) {
-                // Sync completed - REAL count > 0
-                console.log(`✅ [SYNC] Background sync completed: ${activeCount} active listings found`)
                 showToast(`Sync completed: ${activeCount} active listings`, 'success')
                 syncCompleted = true
+                syncInProgressRef.current = false
                 setIsSyncingListings(false)
                 // Final refresh
                 await fetchSummaryStats()
@@ -413,8 +407,6 @@ function Dashboard() {
                 setTimeout(pollForCompletion, 5000) // Poll again in 5 seconds
               }
             } else {
-              // Invalid response, continue polling
-              console.warn(`⚠️ [SYNC] Invalid summary response, continuing to poll...`)
               setTimeout(pollForCompletion, 5000)
             }
           } catch (pollErr) {
@@ -423,16 +415,14 @@ function Dashboard() {
             const isNetworkError = pollErr.message?.includes('Network Error') || !pollErr.response
             
             if (isTimeout || isNetworkError) {
-              console.warn(`⚠️ [SYNC] Polling timeout/network error (attempt ${pollAttempts}):`, pollErr.message || pollErr.code)
-              // Continue polling on timeout/network errors
               if (pollAttempts < MAX_POLL_ATTEMPTS) {
-                console.log(`🔄 [SYNC] Retrying poll in 5 seconds...`)
                 setTimeout(pollForCompletion, 5000)
               } else {
                 // Max attempts reached
                 console.error('❌ [SYNC] Max polling attempts reached after timeout/network errors')
                 showToast('Sync status check timed out. Use "Manual Refresh" button to check status.', 'warning')
-                // Keep syncing state - don't clear it
+                syncInProgressRef.current = false
+                setIsSyncingListings(false)
                 try {
                   await fetchSummaryStats()
                 } catch (err) {
@@ -442,13 +432,13 @@ function Dashboard() {
             } else {
               // Other errors (4xx, 5xx)
               console.error(`❌ [SYNC] Polling error (attempt ${pollAttempts}):`, pollErr)
-              // Continue polling on other errors too (backend might be busy)
               if (pollAttempts < MAX_POLL_ATTEMPTS) {
                 setTimeout(pollForCompletion, 5000)
               } else {
                 console.error('❌ [SYNC] Max polling attempts reached')
                 showToast('Sync status check failed. Use "Manual Refresh" button.', 'error')
-                // Keep syncing state - don't clear it
+                syncInProgressRef.current = false
+                setIsSyncingListings(false)
                 try {
                   await fetchSummaryStats()
                 } catch (err) {
@@ -466,7 +456,6 @@ function Dashboard() {
         // They will be available after background sync completes
       } else if (response.status >= 200 && response.status < 300) {
         // Handle other success codes (200, 201) - immediate completion
-        console.log('✅ [SYNC] Sync completed immediately (non-202 success):', response.data)
         showToast('Sync completed successfully', 'success')
         // Refresh summary stats immediately for non-202 responses
         await fetchSummaryStats()
@@ -475,6 +464,7 @@ function Dashboard() {
         throw new Error(response.data?.message || `Sync failed with status ${response.status}`)
       }
     } catch (err) {
+      syncInProgressRef.current = false
       console.error('❌ [SYNC] Sync error:', err)
       
       // ✅ 2. eBay data collection issue resolution: Show clear message on token error
@@ -503,7 +493,11 @@ function Dashboard() {
       if (syncTimeout) {
         clearTimeout(syncTimeout)
       }
-      setIsSyncingListings(false)
+      // Only clear SYNCING when we did NOT receive 202 (polling owns state for 202)
+      if (!syncAccepted202) {
+        syncInProgressRef.current = false
+        setIsSyncingListings(false)
+      }
     }
   }
 
@@ -1442,8 +1436,8 @@ function Dashboard() {
     
     // Handle payment success/cancel redirects
     if (paymentStatus === 'success') {
-      // Refetch credits to show updated balance
-      refreshCredits()
+      // Refetch credits to show updated balance (safe call - avoids minified "r is not a function")
+      if (typeof refreshCredits === 'function') refreshCredits()
       // Clean up URL parameter
       urlParams.delete('payment')
       const newUrl = window.location.pathname + (urlParams.toString() ? `?${urlParams.toString()}` : '')
@@ -1583,15 +1577,18 @@ function Dashboard() {
               performance.mark('oauth_callback_complete')
             }
             
-            // CRITICAL: Automatically execute listings sync immediately after OAuth callback success
-            console.log('🔄 Starting eBay listings sync after OAuth connection...')
-            syncEbayListings().catch(err => {
-              console.error('Failed to sync eBay listings after OAuth:', err)
-              // Fetch summary stats even if sync fails
-              fetchSummaryStats().catch(fetchErr => {
-                console.error('Failed to fetch summary stats after sync error:', fetchErr)
+            // CRITICAL: Automatically execute listings sync immediately after OAuth callback success (only if not already syncing)
+            if (!syncInProgressRef.current) {
+              console.log('🔄 Starting eBay listings sync after OAuth connection...')
+              syncEbayListings().catch(err => {
+                console.error('Failed to sync eBay listings after OAuth:', err)
+                fetchSummaryStats().catch(fetchErr => {
+                  console.error('Failed to fetch summary stats after sync error:', fetchErr)
+                })
               })
-            })
+            } else {
+              console.log('🔄 Sync already in progress, skipping post-OAuth sync trigger')
+            }
             
             // Clear the processed flag after delay to allow for future connections
             setTimeout(() => {
@@ -1678,7 +1675,7 @@ function Dashboard() {
       try {
         const isHealthy = await checkApiHealth()
         if (isHealthy) {
-          refreshCredits()
+          if (typeof refreshCredits === 'function') refreshCredits()
           fetchHistory().catch(err => {
             console.error('History fetch error on mount:', err)
           })
@@ -1734,7 +1731,7 @@ function Dashboard() {
         }
       } catch (err) {
         console.warn('API Health Check failed (non-critical):', err)
-        refreshCredits()
+        if (typeof refreshCredits === 'function') refreshCredits()
         fetchHistory().catch(err => {
           console.error('History fetch error on mount:', err)
         })
@@ -2064,9 +2061,10 @@ function Dashboard() {
           queueCount={queue.length}
           totalDeleted={totalDeleted}
           loading={summaryLoading}  // SummaryCard uses its own loading state (prevents full screen blocking)
+          syncingListings={isSyncingListings}
           filters={filters}
           viewMode={viewMode}
-          onViewModeChange={null}
+          onViewModeChange={() => {}}
           connectedStore={selectedStore}
           connectedStoresCount={connectedStoresCount}
           onSync={handleSync}
@@ -2078,7 +2076,7 @@ function Dashboard() {
           userPlan={userPlan}
           // Low-Performing items for Product Journey analysis (not used in Dashboard)
           zombies={[]}
-          userCredits={credits || 0}
+          userCredits={credits ?? 0}
           usedCredits={usedCredits}
           // Store connection callback
           onConnectionChange={handleStoreConnection}
