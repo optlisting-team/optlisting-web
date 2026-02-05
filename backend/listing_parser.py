@@ -67,7 +67,7 @@ def parse_listing_from_data(
         user_id=user_id,
         supplier_name=listing_data.get("supplier_name"),
         supplier_id=listing_data.get("supplier_id"),
-        source=listing_data.get("supplier_name", "Unknown"),
+        source=listing_data.get("supplier_name") or "ebay",  # NOT NULL
         marketplace="eBay",
         platform=platform,  # CRITICAL: Must match summary query key
         raw_data=listing_data.get("raw_data", {}),

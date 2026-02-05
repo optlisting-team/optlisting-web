@@ -1280,9 +1280,10 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
             )
             listing.supplier_name = supplier_name
             listing.supplier_id = supplier_id
-            # source 필드도 업데이트 (legacy 호환성)
-            if hasattr(listing, 'source'):
-                listing.source = supplier_name
+            listing.source = supplier_name or 'ebay'
+        # DB NOT NULL: ensure source is always set for every listing
+        if not getattr(listing, 'source', None):
+            listing.source = listing.supplier_name or 'ebay'
     
     # Check if we're using PostgreSQL (has insert().on_conflict_do_update)
     # or SQLite (needs different approach)
@@ -1314,9 +1315,7 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 # Listing 객체도 업데이트 (나중에 사용할 수 있도록)
                 listing.supplier_name = supplier_name
                 listing.supplier_id = supplier_id
-                # source 필드도 업데이트 (legacy 호환성)
-                if hasattr(listing, 'source'):
-                    listing.source = supplier_name
+                listing.source = supplier_name or 'ebay'
             
             # ✅ Shopify 경유 여부 자동 감지
             is_shopify = detect_shopify_routing(
@@ -1361,6 +1360,8 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 raise ValueError(f"user_id가 유효하지 않습니다: {listing_user_id}. user_id는 필수입니다.")
             
             # ✅ FIX: Never access listing.raw_data - use empty dict directly to avoid AttributeError
+            # source: NOT NULL in DB; use supplier name or "ebay" for eBay-synced listings
+            source_value = supplier_name or 'ebay'
             values = {
                 'user_id': listing_user_id,
                 'platform': platform,
@@ -1369,6 +1370,7 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 'title': listing.title,
                 'image_url': listing.image_url,
                 'sku': listing.sku,
+                'source': source_value,  # ✅ NOT NULL constraint
                 'supplier_name': supplier_name,  # 자동 감지된 값 사용
                 'supplier_id': supplier_id,  # 자동 감지된 값 사용
                 'brand': listing.brand,
@@ -1416,6 +1418,7 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                         'title': excluded.title,
                         'image_url': excluded.image_url,
                         'sku': excluded.sku,
+                        'source': excluded.source,  # ✅ NOT NULL
                         'supplier_name': excluded.supplier_name,
                         'supplier_id': excluded.supplier_id,
                         'brand': excluded.brand,
@@ -1502,9 +1505,7 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 # Listing 객체도 업데이트
                 listing.supplier_name = supplier_name
                 listing.supplier_id = supplier_id
-                # source 필드도 업데이트 (legacy 호환성)
-                if hasattr(listing, 'source'):
-                    listing.source = supplier_name
+                listing.source = supplier_name or 'ebay'
             
             # ✅ Shopify 경유 여부 자동 감지
             is_shopify = detect_shopify_routing(
@@ -1564,6 +1565,7 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 existing.sku = listing.sku
                 existing.supplier_name = supplier_name  # 자동 감지된 값 사용
                 existing.supplier_id = supplier_id  # 자동 감지된 값 사용
+                existing.source = supplier_name or 'ebay'  # ✅ NOT NULL
                 existing.brand = listing.brand
                 existing.upc = listing.upc
                 existing.metrics = listing.metrics if listing.metrics else {}  # Shopify 경유 정보 포함
