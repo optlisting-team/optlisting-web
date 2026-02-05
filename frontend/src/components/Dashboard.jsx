@@ -1088,21 +1088,6 @@ function Dashboard() {
     setShowFilter(!showFilter)
   }
 
-  const handleAnalyze = () => {
-    // Show results in Dashboard when 'Find Low-Performing SKUs' button is clicked
-    console.log('🔍 handleAnalyze: Showing results panel in Dashboard')
-    setResultsMode('low')
-    setResultsFilters(filters)
-    setShowResults(true)
-    // Scroll to results section
-    setTimeout(() => {
-      const resultsSection = document.getElementById('results-section')
-      if (resultsSection) {
-        resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }
-    }, 100)
-  }
-
   // Handle filter confirmation from modal (legacy - maintain if needed)
   const handleConfirmFiltering = async () => {
     if (!pendingFiltersForModal) return
