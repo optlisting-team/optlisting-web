@@ -153,6 +153,7 @@ function Dashboard() {
   const [listings, setListings] = useState([])
   const [lowPerformingCount, setLowPerformingCount] = useState(null) // null = not analyzed yet
   const [lowPerformingItems, setLowPerformingItems] = useState([]) // filtered items for CSV export
+  const [selectedLowPerformingIds, setSelectedLowPerformingIds] = useState([]) // selected rows in preview table
   const [showDiagnosisResult, setShowDiagnosisResult] = useState(false)
   const [isAnalyzingListings, setIsAnalyzingListings] = useState(false)
   const [isDownloadingShopifyCSV, setIsDownloadingShopifyCSV] = useState(false)
@@ -1425,6 +1426,7 @@ function Dashboard() {
       })
       setLowPerformingItems(low)
       setLowPerformingCount(low.length)
+      setSelectedLowPerformingIds(low.map((l) => l.id || l.item_id || l.ebay_item_id).filter(Boolean))
       setShowDiagnosisResult(true)
     } catch (err) {
       showToast(getErrorMessage(err), 'error')
@@ -1433,10 +1435,15 @@ function Dashboard() {
     }
   }
 
-  // Generate Shopify bulk CSV from low-performing items and trigger download
+  const getLowPerformingItemId = (item) => item.id || item.item_id || item.ebay_item_id
+
+  // Generate Shopify bulk CSV from selected low-performing items and trigger download
   const handleDownloadShopifyCSV = () => {
-    if (!lowPerformingItems || lowPerformingItems.length === 0) {
-      showToast('No items to export.', 'warning')
+    const itemsToExport = lowPerformingItems.filter((l) =>
+      selectedLowPerformingIds.includes(getLowPerformingItemId(l))
+    )
+    if (!itemsToExport || itemsToExport.length === 0) {
+      showToast('No items selected to export.', 'warning')
       return
     }
     setIsDownloadingShopifyCSV(true)
@@ -1453,7 +1460,7 @@ function Dashboard() {
         return str.includes(',') || str.includes('"') || str.includes('\n') ? `"${str.replace(/"/g, '""')}"` : str
       }
       const header = ['Handle', 'Title', 'Vendor', 'Type', 'Variant SKU', 'Variant Price', 'Tags']
-      const rows = lowPerformingItems.map((l) => {
+      const rows = itemsToExport.map((l) => {
         const title = l.title || ''
         const itemId = l.item_id || l.ebay_item_id || l.id || ''
         const handle = `${slug(title)}${itemId ? '-' + String(itemId).replace(/\s+/g, '-') : ''}`.replace(/^-|-$/g, '') || 'listing'
@@ -2238,21 +2245,128 @@ function Dashboard() {
             {/* Results - shown after Analyze, smooth appearance */}
             {showDiagnosisResult && (
               <div className="mt-6 pt-6 border-t border-zinc-200 transition-opacity duration-300 ease-out opacity-100">
-                <div className="flex flex-wrap items-center gap-3">
-                  <p className="text-red-600 font-bold text-lg">Low Performing Items: {lowPerformingCount}</p>
-                  {lowPerformingCount > 0 && (
+                <p className="text-red-600 font-bold text-lg mb-4">Low Performing Items: {lowPerformingCount}</p>
+
+                {(lowPerformingCount > 0 || lowPerformingItems.length > 0) && (
+                  <>
+                    <div className="overflow-x-auto border border-zinc-300 rounded-lg mb-4 bg-white">
+                      <table className="w-full border-collapse text-sm text-zinc-900">
+                        <thead>
+                          <tr className="bg-zinc-100 border-b border-zinc-300">
+                            <th className="text-left p-2 sm:p-3 border-r border-zinc-300 last:border-r-0 text-zinc-900 font-medium">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={
+                                    lowPerformingItems.length > 0 &&
+                                    selectedLowPerformingIds.length === lowPerformingItems.length
+                                  }
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedLowPerformingIds(
+                                        lowPerformingItems.map((l) => getLowPerformingItemId(l)).filter(Boolean)
+                                      )
+                                    } else {
+                                      setSelectedLowPerformingIds([])
+                                    }
+                                  }}
+                                  className="rounded border-zinc-400 text-zinc-900"
+                                />
+                                Select All
+                              </label>
+                            </th>
+                            <th className="text-left p-2 sm:p-3 border-r border-zinc-300 text-zinc-900 font-medium">Image</th>
+                            <th className="text-left p-2 sm:p-3 border-r border-zinc-300 text-zinc-900 font-medium">Title</th>
+                            <th className="text-left p-2 sm:p-3 border-r border-zinc-300 text-zinc-900 font-medium">Date</th>
+                            <th className="text-left p-2 sm:p-3 border-r border-zinc-300 text-zinc-900 font-medium">Sold</th>
+                            <th className="text-left p-2 sm:p-3 text-zinc-900 font-medium">Stats</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white">
+                          {lowPerformingItems.length > 0 ? (
+                            lowPerformingItems.map((item, index) => {
+                              const itemId = getLowPerformingItemId(item)
+                              const isSelected = itemId != null && selectedLowPerformingIds.includes(itemId)
+                              const imageUrl = item.image_url || item.picture_url || item.thumbnail_url
+                              const dateStr = item.start_date
+                                ? new Date(item.start_date).toISOString().slice(0, 10)
+                                : null
+                              const views = Number(item.view_count) ?? 0
+                              const watches = Number(item.watch_count) ?? 0
+                              return (
+                                <tr
+                                  key={itemId != null ? itemId : `lp-row-${index}`}
+                                  className="border-b border-zinc-200 hover:bg-zinc-50 bg-white"
+                                >
+                                  <td className="p-2 sm:p-3 border-r border-zinc-200 text-zinc-900">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => {
+                                        if (itemId == null) return
+                                        setSelectedLowPerformingIds((prev) =>
+                                          prev.includes(itemId)
+                                            ? prev.filter((id) => id !== itemId)
+                                            : [...prev, itemId]
+                                        )
+                                      }}
+                                      className="rounded border-zinc-400 text-zinc-900"
+                                    />
+                                  </td>
+                                  <td className="p-2 sm:p-3 border-r border-zinc-200 text-zinc-900">
+                                    {imageUrl ? (
+                                      <img
+                                        src={imageUrl}
+                                        alt=""
+                                        className="w-10 h-10 object-cover rounded flex-shrink-0 border border-zinc-200"
+                                      />
+                                    ) : (
+                                      <div className="w-10 h-10 bg-zinc-200 rounded flex-shrink-0 border border-zinc-200" aria-hidden />
+                                    )}
+                                  </td>
+                                  <td className="p-2 sm:p-3 border-r border-zinc-200 text-zinc-900">
+                                    <span className="truncate max-w-[200px] block" title={item.title || ''}>
+                                      {item.title || '—'}
+                                    </span>
+                                  </td>
+                                  <td className="p-2 sm:p-3 border-r border-zinc-200 text-zinc-700">
+                                    {dateStr ?? 'N/A'}
+                                  </td>
+                                  <td className="p-2 sm:p-3 border-r border-zinc-200 text-zinc-900">
+                                    {item.quantity_sold != null ? item.quantity_sold : '—'}
+                                  </td>
+                                  <td className="p-2 sm:p-3 text-zinc-900">
+                                    {views} / {watches}
+                                  </td>
+                                </tr>
+                              )
+                            })
+                          ) : (
+                            <tr>
+                              <td colSpan={6} className="p-4 text-center text-zinc-600 bg-zinc-50 border-b border-zinc-200">
+                                No item rows loaded. Click &quot;Analyze Listings&quot; to load the list.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                     <button
                       type="button"
                       onClick={handleDownloadShopifyCSV}
-                      disabled={isDownloadingShopifyCSV}
+                      disabled={isDownloadingShopifyCSV || selectedLowPerformingIds.length === 0}
                       className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all flex items-center gap-2"
                     >
                       {isDownloadingShopifyCSV && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
-                      {isDownloadingShopifyCSV ? 'Preparing...' : 'Download Shopify CSV'}
+                      {isDownloadingShopifyCSV
+                        ? 'Preparing...'
+                        : `Download CSV (${selectedLowPerformingIds.length} items)`}
                     </button>
-                  )}
-                </div>
-                <p className="text-sm text-zinc-500 mt-1">Ready to export for Shopify.</p>
+                  </>
+                )}
+                {lowPerformingCount === 0 && (
+                  <p className="text-sm text-zinc-500">No low-performing items match the criteria.</p>
+                )}
               </div>
             )}
           </div>
