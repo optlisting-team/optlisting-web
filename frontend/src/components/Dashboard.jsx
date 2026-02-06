@@ -145,8 +145,9 @@ function Dashboard() {
 
   // Diagnosis zone: filter criteria and results
   const [criteria, setCriteria] = useState({
-    periodDays: 7,
-    maxViews: 0,
+    minAgeDays: 7,
+    maxSold: 0,
+    maxViews: 5,
     maxWatches: 0
   })
   const [listings, setListings] = useState([])
@@ -1407,7 +1408,7 @@ function Dashboard() {
       if (list.length === 0) {
         list = await fetchListings()
       }
-      const { periodDays, maxViews, maxWatches } = criteria
+      const { minAgeDays, maxViews, maxWatches } = criteria
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       const low = list.filter((l) => {
@@ -1415,7 +1416,7 @@ function Dashboard() {
         if (!lastUpdated) return false
         const diffMs = today - lastUpdated
         const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000))
-        if (diffDays > periodDays) return false
+        if (diffDays > minAgeDays) return false
         const views = Number(l.view_count) ?? 0
         const watches = Number(l.watch_count) ?? 0
         if (views > maxViews) return false
@@ -2179,29 +2180,42 @@ function Dashboard() {
         {!showConnectEbay && (
           <div className="w-full max-w-2xl mt-8 bg-white rounded-2xl shadow-xl p-8">
             <h3 className="text-lg font-semibold text-zinc-900 mb-4">Diagnosis</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Period (Days)</label>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Min Listing Age (Days)</label>
                 <input
                   type="number"
                   min={1}
-                  value={criteria.periodDays}
-                  onChange={(e) => setCriteria((c) => ({ ...c, periodDays: Number(e.target.value) || 7 }))}
+                  value={criteria.minAgeDays}
+                  onChange={(e) => setCriteria((c) => ({ ...c, minAgeDays: Number(e.target.value) || 7 }))}
+                  className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-zinc-900"
+                />
+                <p className="mt-1 text-sm text-gray-500">
+                  (Items listed on or before: {new Date(Date.now() - (criteria.minAgeDays || 7) * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)})
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Max Quantity Sold</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={criteria.maxSold}
+                  onChange={(e) => setCriteria((c) => ({ ...c, maxSold: Number(e.target.value) || 0 }))}
                   className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-zinc-900"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Max Views</label>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Max Total Views</label>
                 <input
                   type="number"
                   min={0}
                   value={criteria.maxViews}
-                  onChange={(e) => setCriteria((c) => ({ ...c, maxViews: Number(e.target.value) || 0 }))}
+                  onChange={(e) => setCriteria((c) => ({ ...c, maxViews: Number(e.target.value) ?? 5 }))}
                   className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-zinc-900"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Max Watches</label>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Max Watchers</label>
                 <input
                   type="number"
                   min={0}
