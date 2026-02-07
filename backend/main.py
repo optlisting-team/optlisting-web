@@ -242,22 +242,20 @@ def set_cached_kpi(cache_key: str, data: Dict):
 import re
 
 # Define the allowed exact origins (for production build)
-# CRITICAL: CORS configuration for production API access
-# Required origins as per production requirements - only production domains
+# CRITICAL: CORS configuration for production API access - must include all frontend origins
 allowed_origins = [
-    # 🚨 PRODUCTION CUSTOM DOMAIN - CRITICAL FOR PRODUCTION
+    # Local dev (Vite default)
+    "http://localhost:5173",
+    # Production root domain
     "https://optlisting.com",
+    # Production www subdomain - CRITICAL (fixes CORS for www.optlisting.com)
     "https://www.optlisting.com",
-    
-    # Production Vercel deployment - All variations (CRITICAL for CORS)
+    # Vercel fallback
     "https://optlisting.vercel.app",
+    # Additional Vercel / local variants
     "https://www.optlisting.vercel.app",
-    # Actual deployed Vercel domain
     "https://optlisting-three.vercel.app",
     "https://optlisting-1fev8br9z-optlistings-projects.vercel.app",
-    
-    # Local development environments
-    "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:3000",
 ]
@@ -293,13 +291,13 @@ logging.info(f"   Vercel regex: {vercel_regex}")
 # This middleware automatically handles OPTIONS preflight requests
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,  # Explicit production and local URLs
-    allow_origin_regex=vercel_regex,  # CRITICAL: Regex pattern for all Vercel subdomains
-    allow_credentials=True,  # Enable credentials (cookies/sessions) for authenticated requests
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],  # Explicitly allow required HTTP methods
-    allow_headers=["Content-Type", "Authorization", "X-Request-Id", "Accept", "Origin", "X-Requested-With"],  # Required headers explicitly listed
-    expose_headers=["*"],  # Expose all headers in response
-    max_age=3600,  # Cache preflight OPTIONS requests for 1 hour
+    allow_origins=allowed_origins,
+    allow_origin_regex=vercel_regex,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
 )
 
 # Helper function to get CORS headers based on request origin
