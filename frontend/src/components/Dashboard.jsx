@@ -157,6 +157,7 @@ function Dashboard() {
   const [showDiagnosisResult, setShowDiagnosisResult] = useState(false)
   const [isAnalyzingListings, setIsAnalyzingListings] = useState(false)
   const [isDownloadingShopifyCSV, setIsDownloadingShopifyCSV] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false) // Connect eBay / OAuth in progress
   
   // Result display flag (only shown when Find button is clicked)
   const [showResults, setShowResults] = useState(false)
@@ -1370,6 +1371,7 @@ function Dashboard() {
       showToast('Please log in first.', 'error')
       return
     }
+    setIsSyncing(true)
     try {
       const response = await apiClient.post('/api/ebay/auth/start', {})
       const authUrl = response.data?.url
@@ -1381,6 +1383,8 @@ function Dashboard() {
     } catch (err) {
       const msg = err.response?.data?.detail?.message || err.message || 'Failed to start eBay connection.'
       showToast(msg, 'error')
+    } finally {
+      setIsSyncing(false)
     }
   }
 
@@ -2168,9 +2172,17 @@ function Dashboard() {
               <button
                 type="button"
                 onClick={handleConnectEbay}
-                className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-emerald-500/30 transition-all"
+                disabled={isSyncing}
+                className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-emerald-500/30 transition-all duration-200 flex items-center justify-center gap-2 mx-auto"
               >
-                Connect eBay
+                {isSyncing ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin shrink-0" aria-hidden />
+                    <span>Syncing eBay...</span>
+                  </>
+                ) : (
+                  'Connect eBay'
+                )}
               </button>
             </>
           ) : (
@@ -2236,11 +2248,39 @@ function Dashboard() {
               type="button"
               onClick={handleAnalyze}
               disabled={isAnalyzingListings}
-              className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 duration-200"
             >
-              {isAnalyzingListings && <Loader2 className="w-5 h-5 animate-spin" aria-hidden />}
+              {isAnalyzingListings && <Loader2 className="w-5 h-5 animate-spin shrink-0" aria-hidden />}
               {isAnalyzingListings ? 'Analyzing...' : 'Analyze Listings'}
             </button>
+
+            {/* Skeleton loader - shown while analyzing */}
+            {isAnalyzingListings && (
+              <div className="mt-6 pt-6 border-t border-zinc-200 transition-opacity duration-300 ease-out opacity-100">
+                <div className="h-6 w-48 bg-zinc-200 rounded mb-4 animate-pulse" />
+                <div className="overflow-x-auto border border-zinc-300 rounded-lg bg-white">
+                  <div className="flex flex-col gap-0">
+                    <div className="flex gap-2 p-3 border-b border-zinc-200 bg-zinc-50">
+                      <div className="h-4 w-8 bg-zinc-300 rounded animate-pulse" />
+                      <div className="h-4 flex-1 max-w-[120px] bg-zinc-300 rounded animate-pulse" />
+                      <div className="h-4 flex-1 max-w-[80px] bg-zinc-300 rounded animate-pulse" />
+                      <div className="h-4 flex-1 max-w-[60px] bg-zinc-300 rounded animate-pulse" />
+                      <div className="h-4 flex-1 max-w-[60px] bg-zinc-300 rounded animate-pulse" />
+                    </div>
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                      <div key={i} className="flex gap-2 p-3 border-b border-zinc-100">
+                        <div className="h-4 w-8 bg-zinc-200 rounded animate-pulse" />
+                        <div className="h-10 w-10 bg-zinc-200 rounded animate-pulse shrink-0" />
+                        <div className="h-4 flex-1 max-w-[200px] bg-zinc-200 rounded animate-pulse" />
+                        <div className="h-4 flex-1 max-w-[80px] bg-zinc-200 rounded animate-pulse" />
+                        <div className="h-4 flex-1 max-w-[40px] bg-zinc-200 rounded animate-pulse" />
+                        <div className="h-4 flex-1 max-w-[50px] bg-zinc-200 rounded animate-pulse" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Results - shown after Analyze, smooth appearance */}
             {showDiagnosisResult && (
