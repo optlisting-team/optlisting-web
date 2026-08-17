@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Zap } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
+import BrandLogo from './BrandLogo'
 
 function PrivacyPolicy() {
   return (
@@ -7,18 +8,13 @@ function PrivacyPolicy() {
       {/* Header */}
       <nav className="fixed top-0 left-0 right-0 bg-black/60 backdrop-blur-xl border-b border-zinc-800 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center space-x-3">
-            <div className="p-2 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg shadow-lg shadow-blue-500/20">
-              <Zap className="h-6 w-6 text-white" />
-            </div>
-            <span className="text-2xl font-bold text-white">OptListing</span>
-          </Link>
+          <BrandLogo to="/" size="sm" className="hover:opacity-90 transition-opacity" />
           <Link
             to="/"
             className="flex items-center gap-2 px-4 py-2 text-zinc-300 hover:text-white transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to Home
+            <span className="hidden sm:inline">Back to Home</span>
           </Link>
         </div>
       </nav>
@@ -32,7 +28,7 @@ function PrivacyPolicy() {
           <section className="mb-8">
             <h2 className="text-2xl font-bold mb-4">1. Introduction</h2>
             <p className="text-zinc-300 leading-relaxed mb-4">
-              OptListing ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy 
+              Optlisting ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy
               explains how we collect, use, disclose, and safeguard your information when you use our Service.
             </p>
           </section>

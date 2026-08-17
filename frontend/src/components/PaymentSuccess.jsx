@@ -4,6 +4,7 @@ import { CheckCircle, Loader2, RefreshCw, AlertCircle } from 'lucide-react'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { useAccount } from '../contexts/AccountContext'
+import BrandLogo from './BrandLogo'
 
 // Use environment variable for Railway URL, fallback based on environment
 // CRITICAL: Production MUST use relative path /api (proxied by vercel.json) to avoid CORS issues
@@ -108,7 +109,8 @@ function PaymentSuccess() {
     : 0
 
   return (
-    <div className="min-h-screen bg-zinc-950 dark:bg-zinc-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-zinc-950 dark:bg-zinc-950 flex flex-col items-center justify-center p-4">
+      <BrandLogo to="/" size="sm" className="mb-6 hover:opacity-90 transition-opacity" />
       <Card className="w-full max-w-md bg-zinc-900 dark:bg-zinc-900 border-zinc-800 dark:border-zinc-800">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold text-white dark:text-white">
