@@ -1,633 +1,170 @@
-import { useState, useRef, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { ArrowRight, TrendingDown, Ban, DollarSign, Check, CheckCircle, Zap, TrendingUp, Clock, Puzzle, Table, ChevronDown, User, LayoutDashboard, Settings, LogOut, BarChart3, Target, Users, Star, RefreshCw, Filter, Download } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext'
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from './ui/card'
-import { Button } from './ui/button'
-import { generateProfessionalCheckoutUrl } from '../lib/checkout'
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { BarChart3, Check, ChevronDown, LineChart, LogOut, Settings, Target, TrendingUp, Users } from 'lucide-react'
 import BrandLogo from './BrandLogo'
+import { useAuth } from '../contexts/AuthContext'
+import { generateProfessionalCheckoutUrl } from '../lib/checkout'
 
-const PROFESSIONAL_PLAN = {
-  id: 'professional',
-  name: 'Professional Plan',
-  price: 120,
-  billing: 'month',
-  features: [
-    'Unlimited eBay listings analysis',
-    'Advanced zombie detection algorithms',
-    'CSV export with supplier matching',
-    'Real-time sync with eBay API',
-    'Priority support',
-    'US market optimization',
-    'Asynchronous processing queue',
-    'Account health protection',
-    'Automated inventory cleaning'
-  ]
+const proFeatures = [
+  'Full Inventory Diagnostic Dashboard',
+  'Analytics: Views, Impressions, Watchers & Sales',
+  'Dead stock detection & cleanup recommendations',
+  'Up to 30,000 active listings',
+]
+
+const sampleRows = [
+  { title: 'Wireless Keyboard', impressions: '1,284', views: 5, watchers: 2, sales: 0, days: 90 },
+  { title: 'USB-C Charging Hub', impressions: '946', views: 4, watchers: 1, sales: 0, days: 76 },
+  { title: 'LED Desk Lamp', impressions: '812', views: 3, watchers: 0, sales: 0, days: 64 },
+]
+
+function ProductPreview() {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_70px_-36px_rgba(13,27,61,0.35)]">
+      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
+        <div className="flex items-center gap-2 text-sm font-semibold text-brand-navy">
+          <BarChart3 className="h-4 w-4 text-brand-mint" /> Inventory Optimizer
+        </div>
+        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">90-DAY ANALYSIS</span>
+      </div>
+      <div className="grid gap-3 border-b border-slate-200 p-4 sm:grid-cols-4 sm:p-6">
+        {[
+          ['Impressions', '3,042'], ['Views', '12'], ['Watchers', '3'], ['Sales', '0'],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-xl border border-slate-200 bg-white p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</p>
+            <p className="data-value mt-2 text-2xl text-brand-navy">{value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2 border-b border-slate-200 bg-slate-50/70 px-4 py-3 sm:px-6">
+        {['Views up to 5', 'Watchers up to 2', 'Sales: 0'].map((filter) => (
+          <span key={filter} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">{filter}</span>
+        ))}
+        <span className="ml-auto text-xs text-slate-500">Example thresholds - fully configurable</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[680px] text-left text-sm">
+          <thead className="bg-white text-xs uppercase tracking-wider text-slate-500">
+            <tr>{['Listing', 'Impressions', 'Views', 'Watchers', 'Sales', 'Days', 'Status'].map((item) => <th key={item} className="px-4 py-3 font-semibold">{item}</th>)}</tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {sampleRows.map((row) => (
+              <tr key={row.title} className="text-slate-600">
+                <td className="px-4 py-3 font-semibold text-brand-navy">{row.title}</td>
+                <td className="data-value px-4 py-3">{row.impressions}</td>
+                <td className="data-value px-4 py-3">{row.views}</td>
+                <td className="data-value px-4 py-3">{row.watchers}</td>
+                <td className="data-value px-4 py-3">{row.sales}</td>
+                <td className="data-value px-4 py-3">{row.days}</td>
+                <td className="px-4 py-3"><span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">Review</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
 }
 
 function LandingPage() {
   const { user, isAuthenticated, signOut } = useAuth()
-  const navigate = useNavigate()
-  const [isProfileOpen, setIsProfileOpen] = useState(false)
-  const profileRef = useRef(null)
+  const [profileOpen, setProfileOpen] = useState(false)
   const checkoutUrl = user ? generateProfessionalCheckoutUrl(user) : null
-  const canSubscribe = Boolean(isAuthenticated && user && checkoutUrl)
-
-  const logAndNavigate = (url) => {
-    console.log('🔗 NAVIGATING TO:', url)
-  }
-
-  // Close profile dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (profileRef.current && !profileRef.current.contains(event.target)) {
-        setIsProfileOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  const handleSignOut = async () => {
-    await signOut()
-    setIsProfileOpen(false)
-  }
-
-  const fadeInUp = {
-    initial: { opacity: 0, y: 30 },
-    animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.6 }
-  }
-
-  const staggerContainer = {
-    animate: {
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  }
 
   return (
-    <div className="min-h-screen bg-black dark:bg-black font-sans">
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 bg-black/60 dark:bg-black/60 backdrop-blur-xl border-b border-zinc-800 dark:border-zinc-800 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <BrandLogo to="/" size="sm" className="hover:opacity-90 transition-opacity" />
-          <div className="flex items-center space-x-3 sm:space-x-6">
-            <a href="#features" className="hidden sm:inline text-zinc-300 dark:text-zinc-300 hover:text-white dark:hover:text-white font-medium transition-colors">Features</a>
-            <a href="#pricing" className="hidden sm:inline text-zinc-300 dark:text-zinc-300 hover:text-white dark:hover:text-white font-medium transition-colors">Pricing</a>
-            {isAuthenticated ? (
-              <>
-                <Link to="/dashboard" className="text-zinc-300 dark:text-zinc-300 hover:text-white dark:hover:text-white font-medium transition-colors">Dashboard</Link>
-                <div className="relative" ref={profileRef}>
-                  <button 
-                    onClick={() => setIsProfileOpen(!isProfileOpen)}
-                    className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg transition-all"
-                  >
-                    {user?.user_metadata?.avatar_url ? (
-                      <img src={user.user_metadata.avatar_url} alt="" className="w-7 h-7 rounded-full" />
-                    ) : (
-                      <div className="w-7 h-7 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
-                        <User className="w-4 h-4 text-white" />
-                      </div>
-                    )}
-                    <span className="text-white font-medium text-sm">
-                      {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
-                    </span>
-                    <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`} />
-                  </button>
-
-                {/* Profile Dropdown */}
-                {isProfileOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-56 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl z-[9999] overflow-hidden">
-                    {/* User Info */}
-                    <div className="p-3 border-b border-zinc-800">
-                      <p className="text-sm font-semibold text-white truncate">
-                        {user?.user_metadata?.full_name || 'User'}
-                      </p>
-                      <p className="text-xs text-zinc-500 truncate">{user?.email}</p>
-                    </div>
-
-                    {/* Menu Items */}
-                    <div className="py-1">
-                      <Link
-                        to="/settings"
-                        onClick={() => setIsProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
-                      >
-                        <Settings className="w-4 h-4" />
-                        Settings
-                      </Link>
-                    </div>
-
-                    {/* Logout */}
-                    <div className="border-t border-zinc-800 py-1">
-                      <button
-                        onClick={handleSignOut}
-                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        Sign Out
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              </>
-            ) : (
-              <Link to="/login" className="text-zinc-300 dark:text-zinc-300 hover:text-white dark:hover:text-white font-medium transition-colors">
-                Sign In
-              </Link>
-            )}
+    <div className="min-h-screen overflow-x-hidden bg-white text-brand-navy">
+      <nav className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+          <BrandLogo to="/" size="sm" tone="dark" />
+          <div className="hidden items-center gap-7 md:flex">
+            <a href="#product" className="text-sm font-semibold text-slate-600 hover:text-brand-navy">Product</a>
+            <a href="#how" className="text-sm font-semibold text-slate-600 hover:text-brand-navy">How it works</a>
+            <a href="#pricing" className="text-sm font-semibold text-slate-600 hover:text-brand-navy">Pricing</a>
           </div>
+          {isAuthenticated ? (
+            <div className="relative">
+              <button onClick={() => setProfileOpen(!profileOpen)} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-brand-navy hover:bg-slate-50">
+                <Users className="h-4 w-4" /><span className="hidden sm:inline">{user?.email?.split('@')[0] || 'Account'}</span><ChevronDown className="h-4 w-4" />
+              </button>
+              {profileOpen && (
+                <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+                  <Link to="/dashboard" className="flex items-center gap-2 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50"><BarChart3 className="h-4 w-4" />Dashboard</Link>
+                  <Link to="/settings" className="flex items-center gap-2 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50"><Settings className="h-4 w-4" />Settings</Link>
+                  <button onClick={signOut} className="flex w-full items-center gap-2 border-t border-slate-100 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50"><LogOut className="h-4 w-4" />Sign out</button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 sm:gap-3">
+              <Link to="/login" className="hidden text-sm font-semibold text-slate-600 hover:text-brand-navy sm:block">Sign in</Link>
+              <Link to="/signup" className="rounded-lg bg-brand-navy px-4 py-2.5 text-sm font-bold text-white hover:bg-[#162957]">Start free trial</Link>
+            </div>
+          )}
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative pt-32 pb-20 px-4 overflow-hidden bg-black dark:bg-black">
-        {/* Background Grid Pattern - Enhanced */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f00a_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f00a_1px,transparent_1px)] bg-[size:32px_32px]"></div>
-        
-        {/* Radial Gradient Glow - Soft Blue/Purple Glow */}
-        <div 
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1200px] h-[1200px] rounded-full blur-3xl pointer-events-none opacity-50"
-          style={{
-            background: 'radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, rgba(99, 102, 241, 0.15) 25%, rgba(37, 99, 235, 0.1) 50%, transparent 70%)'
-          }}
-        ></div>
-        
-        <div className="container mx-auto max-w-6xl relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="text-center mb-12"
-          >
-            <h1 className="text-6xl md:text-8xl font-extrabold tracking-tight mb-6 leading-tight font-sans">
-              <span className="text-white dark:text-white">'Zero Sale' </span>
-              <span className="text-white dark:text-white">Cleaner.</span>
-            </h1>
-            <h2 className="text-xl md:text-2xl text-zinc-400 dark:text-zinc-400 font-normal mb-10 max-w-3xl mx-auto leading-relaxed font-sans">
-              Instantly generate a CSV of Low-Performing Listings
-            </h2>
-            
-            {/* CTA Button - Conditional rendering based on login status */}
-            {isAuthenticated ? (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-              >
-                <Link
-                  to="/dashboard"
-                  className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold rounded-xl text-lg transition-all shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transform hover:scale-105"
-                >
-                  <LayoutDashboard className="w-5 h-5" />
-                  Go to Dashboard
-                </Link>
-              </motion.div>
-            ) : (
-              // Do not display button if not logged in (completely removed per previous request)
-              null
-            )}
-          </motion.div>
-
-          {/* Dashboard Screenshot */}
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, delay: 0.3 }}
-            className="mt-20"
-          >
-            <div className="relative">
-              {/* Glow effect behind the image */}
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-cyan-500/20 rounded-2xl blur-3xl -z-10 scale-105"></div>
-              
-              {/* Browser Frame */}
-              <div className="bg-zinc-900 rounded-2xl border border-zinc-700/50 shadow-2xl shadow-black/50 overflow-hidden relative">
-                {/* Browser Top Bar */}
-                <div className="bg-zinc-800/80 px-4 py-3 flex items-center gap-3 border-b border-zinc-700/50">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
-                    <div className="w-3 h-3 rounded-full bg-yellow-500/80"></div>
-                    <div className="w-3 h-3 rounded-full bg-green-500/80"></div>
-                  </div>
-                  <div className="flex-1 flex justify-center">
-                    <div className="bg-zinc-900/80 rounded-lg px-4 py-1.5 text-xs text-zinc-400 flex items-center gap-2">
-                      <span className="text-green-400">🔒</span>
-                      <span>optlisting.com/dashboard</span>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Dashboard Screenshot */}
-                <div className="relative">
-                  <img 
-                    src="/main-screenshot.png" 
-                    alt="Optlisting dashboard - Zombie Listing Finder"
-                    className="w-full h-auto"
-                    loading="lazy"
-                  />
-                  
-                  {/* Privacy Blur Overlays - Top Header (User name, email) */}
-                  <div className="absolute top-[2%] right-[8%] w-[120px] h-[24px] bg-black/60 backdrop-blur-md rounded border border-zinc-700/50"></div>
-                  
-                  {/* Privacy Blur Overlays - Plan Banner */}
-                  <div className="absolute top-[6%] right-[15%] w-[150px] h-[20px] bg-black/60 backdrop-blur-md rounded border border-zinc-700/50"></div>
-                </div>
+      <main>
+        <section className="border-b border-slate-100 bg-gradient-to-b from-[#F7F9FC] to-white px-4 pb-16 pt-16 sm:px-6 sm:pb-24 sm:pt-24 lg:px-8">
+          <div className="mx-auto max-w-7xl">
+            <div className="mx-auto max-w-4xl text-center">
+              <span className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-brand-navy"><span className="h-2 w-2 rounded-full bg-brand-mint" />eBay inventory optimization</span>
+              <h1 className="mt-6 text-4xl font-extrabold leading-tight tracking-[-0.04em] text-brand-navy sm:text-5xl lg:text-6xl">Make every listing earn its place.</h1>
+              <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-slate-600 sm:text-xl">Understand listing performance, detect dead stock, and act on clear cleanup recommendations using your latest 90 days of eBay data.</p>
+              <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+                <Link to="/signup" className="rounded-lg bg-brand-navy px-6 py-3.5 text-sm font-bold text-white hover:bg-[#162957]">Start 7-day free trial</Link>
+                <a href="#product" className="rounded-lg border border-slate-300 bg-white px-6 py-3.5 text-sm font-bold text-brand-navy hover:border-brand-navy">See the optimizer</a>
               </div>
+              <p className="mt-4 text-sm text-slate-500">Built for professional eBay sellers - Up to 30,000 active listings</p>
             </div>
-          </motion.div>
-        </div>
-      </section>
+            <div id="product" className="mx-auto mt-14 max-w-6xl scroll-mt-24"><ProductPreview /></div>
+          </div>
+        </section>
 
-      {/* Features Section */}
-      <section className="py-24 px-4 bg-black dark:bg-black" id="features">
-        <div className="container mx-auto max-w-6xl">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-20"
-          >
-            <h2 className="text-4xl md:text-5xl font-bold text-white dark:text-white mb-4 font-sans">
-              Features
-            </h2>
-          </motion.div>
-
-          <motion.div
-            variants={staggerContainer}
-            initial="initial"
-            whileInView="animate"
-            viewport={{ once: true }}
-            className="grid md:grid-cols-3 gap-10"
-          >
-            <motion.div
-              variants={fadeInUp}
-              className="bg-zinc-900 dark:bg-zinc-900 p-10 rounded-2xl border border-zinc-800 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all"
-            >
-              <div className="w-16 h-16 bg-zinc-800 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-6">
-                <RefreshCw className="h-8 w-8 text-white dark:text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-white dark:text-white mb-4 font-sans">Market Listings Auto-Sync</h3>
-              <p className="text-zinc-400 dark:text-zinc-400 text-lg leading-relaxed font-sans">
-                Automatically fetch and sync your marketplace listings in real-time.
-              </p>
-            </motion.div>
-
-            <motion.div
-              variants={fadeInUp}
-              className="bg-zinc-900 dark:bg-zinc-900 p-10 rounded-2xl border border-zinc-800 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all"
-            >
-              <div className="w-16 h-16 bg-zinc-800 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-6">
-                <Filter className="h-8 w-8 text-white dark:text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-white dark:text-white mb-4 font-sans">Real-Time Low-Performance Filtering</h3>
-              <p className="text-zinc-400 dark:text-zinc-400 text-lg leading-relaxed font-sans">
-                Instantly identify underperforming products based on sales, views, and engagement metrics.
-              </p>
-            </motion.div>
-
-            <motion.div
-              variants={fadeInUp}
-              className="bg-zinc-900 dark:bg-zinc-900 p-10 rounded-2xl border border-zinc-800 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all"
-            >
-              <div className="w-16 h-16 bg-zinc-800 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-6">
-                <Download className="h-8 w-8 text-white dark:text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-white dark:text-white mb-4 font-sans">Supplier-Specific CSV Export</h3>
-              <p className="text-zinc-400 dark:text-zinc-400 text-lg leading-relaxed font-sans">
-                Export official CSV files organized by supplier for easy bulk deletion.
-              </p>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* The "Pain" Section */}
-      <section className="py-24 px-4 bg-zinc-900 dark:bg-zinc-900" id="pain">
-        <div className="container mx-auto max-w-6xl">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-20"
-          >
-            <h2 className="text-4xl md:text-5xl font-bold text-white dark:text-white mb-4 font-sans">
-              Why Your Inventory Needs Optimization
-            </h2>
-            <p className="text-xl text-zinc-400 dark:text-zinc-400 max-w-2xl mx-auto font-sans">
-              Dead stock isn't just taking up space—it's actively hurting your business.
-            </p>
-          </motion.div>
-
-          <motion.div
-            variants={staggerContainer}
-            initial="initial"
-            whileInView="animate"
-            viewport={{ once: true }}
-            className="grid md:grid-cols-3 gap-10"
-          >
-            <motion.div
-              variants={fadeInUp}
-              className="bg-zinc-900 dark:bg-zinc-900 p-10 rounded-2xl border border-zinc-800 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all"
-            >
-              <div className="w-16 h-16 bg-zinc-800 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-6">
-                <TrendingDown className="h-8 w-8 text-white dark:text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-white dark:text-white mb-4 font-sans">Marketplace Algorithms Hate Dead Stock</h3>
-              <p className="text-zinc-400 dark:text-zinc-400 text-lg leading-relaxed font-sans">
-                Old, unsold items drag down your search ranking on every major platform. Clear your dead inventory before it hurts your visibility.
-              </p>
-            </motion.div>
-
-            <motion.div
-              variants={fadeInUp}
-              className="bg-zinc-900 dark:bg-zinc-900 p-10 rounded-2xl border border-zinc-800 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all"
-            >
-              <div className="w-16 h-16 bg-zinc-800 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-6">
-                <Ban className="h-8 w-8 text-white dark:text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-white dark:text-white mb-4 font-sans">Make Room for Winners</h3>
-              <p className="text-zinc-400 dark:text-zinc-400 text-lg leading-relaxed font-sans">
-                Most marketplaces limit your listing slots. Remove dead stock so you can fill those slots with items that actually sell.
-              </p>
-            </motion.div>
-
-            <motion.div
-              variants={fadeInUp}
-              className="bg-zinc-900 dark:bg-zinc-900 p-10 rounded-2xl border border-zinc-800 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all"
-            >
-              <div className="w-16 h-16 bg-zinc-800 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-6">
-                <DollarSign className="h-8 w-8 text-white dark:text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-white dark:text-white mb-4 font-sans">Cut 90% of Your Cleanup Time</h3>
-              <p className="text-zinc-400 dark:text-zinc-400 text-lg leading-relaxed font-sans">
-                Stop deleting listings one by one. Automate the entire process instantly.
-              </p>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* How It Works Section */}
-      <section className="py-24 px-4 bg-zinc-900 dark:bg-zinc-900" id="how-it-works">
-        <div className="container mx-auto max-w-6xl">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-20"
-          >
-            <h2 className="text-4xl md:text-5xl font-bold text-white dark:text-white mb-4 font-sans">
-              How It Works
-            </h2>
-            <p className="text-xl text-zinc-400 dark:text-zinc-400 max-w-2xl mx-auto font-sans">
-              Three simple steps to clean up your inventory
-            </p>
-          </motion.div>
-
-          <motion.div
-            variants={staggerContainer}
-            initial="initial"
-            whileInView="animate"
-            viewport={{ once: true }}
-            className="grid md:grid-cols-3 gap-10"
-          >
-            <motion.div
-              variants={fadeInUp}
-              className="bg-zinc-900 dark:bg-zinc-900 p-10 rounded-2xl border border-zinc-800 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all"
-            >
-              <div className="w-16 h-16 bg-zinc-800 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-6">
-                <span className="text-3xl font-bold text-white dark:text-white font-sans">1</span>
-              </div>
-              <h3 className="text-2xl font-bold text-white dark:text-white mb-4 font-sans">Connect Your Store</h3>
-              <p className="text-zinc-400 dark:text-zinc-400 text-lg leading-relaxed font-sans">
-                Securely link your marketplace account.
-              </p>
-            </motion.div>
-
-            <motion.div
-              variants={fadeInUp}
-              className="bg-zinc-900 dark:bg-zinc-900 p-10 rounded-2xl border border-zinc-800 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all"
-            >
-              <div className="w-16 h-16 bg-zinc-800 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-6">
-                <span className="text-3xl font-bold text-white dark:text-white font-sans">2</span>
-              </div>
-              <h3 className="text-2xl font-bold text-white dark:text-white mb-4 font-sans">Detect Low-Performing Listings</h3>
-              <p className="text-zinc-400 dark:text-zinc-400 text-lg leading-relaxed font-sans">
-                We analyze your listings and flag dead stock, low impressions, and non-performers.
-              </p>
-            </motion.div>
-
-            <motion.div
-              variants={fadeInUp}
-              className="bg-zinc-900 dark:bg-zinc-900 p-10 rounded-2xl border border-zinc-800 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all"
-            >
-              <div className="w-16 h-16 bg-zinc-800 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-6">
-                <span className="text-3xl font-bold text-white dark:text-white font-sans">3</span>
-              </div>
-              <h3 className="text-2xl font-bold text-white dark:text-white mb-4 font-sans">Download & Delete via CSV</h3>
-              <p className="text-zinc-400 dark:text-zinc-400 text-lg leading-relaxed font-sans">
-                Export a ready-to-upload CSV, then bulk-delete inside your marketplace.
-              </p>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
-
-
-
-      {/* Supported Marketplaces & Suppliers */}
-      <section className="py-16 px-4 bg-zinc-900 dark:bg-zinc-900 border-b border-zinc-800 dark:border-zinc-800">
-        <div className="container mx-auto max-w-6xl">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-3xl md:text-4xl font-bold text-white dark:text-white mb-4 font-sans">
-              Supported Platforms
-            </h2>
-          </motion.div>
-
-          {/* Marketplaces */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="mb-12"
-          >
-            <h3 className="text-lg font-semibold text-zinc-300 dark:text-zinc-300 mb-6 text-center">Marketplaces</h3>
-            <div className="flex flex-wrap justify-center items-center gap-8 md:gap-12">
-              <div className="flex flex-col items-center gap-2">
-                <div className="h-14 w-32 bg-white rounded-lg flex items-center justify-center p-2 shadow-lg">
-                  <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/ebay.svg" alt="eBay" className="h-8 w-auto" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class="text-zinc-900 font-bold text-sm">eBay</span>'; }} />
-                </div>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Suppliers */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-          >
-            <h3 className="text-lg font-semibold text-zinc-300 dark:text-zinc-300 mb-6 text-center">Suppliers</h3>
-            <div className="flex flex-wrap justify-center items-center gap-6 md:gap-10">
-              {/* Shopify */}
-              <div className="flex flex-col items-center gap-2">
-                <div className="h-14 w-32 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center p-2 shadow-lg">
-                  <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/shopify.svg" alt="Shopify" className="h-8 w-auto" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span class="text-white font-bold text-sm">Shopify</span>'; }} />
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Pricing Section - Vertical Separation UX */}
-      <section className="py-24 px-4 bg-zinc-900 dark:bg-zinc-900 relative overflow-hidden" id="pricing">
-        {/* Background Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-b from-zinc-900 via-zinc-900 to-black pointer-events-none" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
-        
-        <div className="container mx-auto max-w-6xl relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
-            {/* Header */}
-            <div className="text-center mb-8">
-              <motion.span 
-                initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-sm font-semibold mb-6"
-              >
-                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                Premium Subscription
-              </motion.span>
-              <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
-                1 Hour → 5 Minutes
-              </h2>
-              <p className="text-xl text-zinc-400 max-w-4xl mx-auto">
-                Time is money for sellers. Dramatically reduce your product cleanup time.
-              </p>
-            </div>
-
-            {/* Professional Plan - Single Tier */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 }}
-              className="flex justify-center"
-            >
-              <div className="w-full max-w-2xl border-2 border-emerald-500/50 rounded-3xl p-8 md:p-10 bg-gradient-to-br from-zinc-900 to-zinc-800 shadow-2xl">
-                {/* Professional Badge */}
-                <div className="text-center mb-8">
-                  <div className="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 rounded-full mb-4">
-                    <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-                    <span className="text-base font-bold text-emerald-400">PROFESSIONAL PLAN</span>
-                  </div>
-                  <h3 className="text-3xl font-bold text-white mb-2">{PROFESSIONAL_PLAN.name}</h3>
-                  <div className="mb-4">
-                    <span className="text-6xl font-black text-white">${PROFESSIONAL_PLAN.price}</span>
-                    <span className="text-xl text-zinc-400 ml-2">/{PROFESSIONAL_PLAN.billing}</span>
-                  </div>
-                  <p className="text-zinc-400 text-lg">
-                    Account Health Protection & Automated Inventory Cleaning for US eBay Professionals
-                  </p>
-                </div>
-
-                {/* Features List */}
-                <div className="space-y-4 mb-8">
-                  {PROFESSIONAL_PLAN.features.map((feature, index) => (
-                    <div key={index} className="flex items-start gap-3">
-                      <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
-                      <span className="text-zinc-300">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Subscribe: direct anchor for bulletproof redirect; log URL before navigation */}
-                {canSubscribe ? (
-                  <a
-                    href={checkoutUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => logAndNavigate(checkoutUrl)}
-                    className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl text-center text-lg transition-all shadow-lg shadow-emerald-500/20 hover:shadow-xl hover:scale-[1.02] block"
-                  >
-                    Subscribe to Professional Plan — ${PROFESSIONAL_PLAN.price}/{PROFESSIONAL_PLAN.billing}
-                  </a>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => !isAuthenticated && navigate('/login')}
-                    disabled={!isAuthenticated}
-                    className={`
-                      w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl text-center text-lg transition-all shadow-lg shadow-emerald-500/20 hover:shadow-xl hover:scale-[1.02]
-                      ${!isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''}
-                    `}
-                  >
-                    {!isAuthenticated ? 'Please log in to subscribe' : 'Subscribe to Professional Plan — $' + PROFESSIONAL_PLAN.price + '/' + PROFESSIONAL_PLAN.billing}
-                  </button>
-                )}
-
-                {/* Trust Elements */}
-                <div className="mt-6 text-center text-zinc-400 text-sm">
-                  <p>Secure payment processing through Lemon Squeezy.</p>
-                  <p className="mt-1">Cancel anytime. No long-term commitment.</p>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* FAQ / Trust Elements */}
-            <div className="mt-12 text-center">
-              <p className="text-zinc-500 text-sm">
-                Questions? <a href="#support" className="text-blue-400 hover:text-blue-300 underline">Contact our support team</a>
-              </p>
-              <div className="flex items-center justify-center gap-6 mt-4 text-zinc-600 text-xs">
-                <span>🔒 Secure Payment via Lemon Squeezy</span>
-                <span>•</span>
-                <span>💳 Cancel Anytime</span>
-                <span>•</span>
-                <span>📧 24/7 Email Support</span>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="py-12 px-4 bg-black dark:bg-black border-t border-zinc-800">
-        <div className="container mx-auto max-w-6xl">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="mb-4 md:mb-0">
-              <BrandLogo to="/" size="sm" className="mb-2 hover:opacity-90 transition-opacity" />
-              <p className="text-zinc-400 dark:text-zinc-400 text-sm">© 2026 Optlisting. All rights reserved.</p>
-            </div>
-            <div className="flex gap-6">
-              <a href="#support" className="text-zinc-400 dark:text-zinc-400 hover:text-white dark:hover:text-white transition-colors">Support</a>
-              <Link to="/terms" className="text-zinc-400 dark:text-zinc-400 hover:text-white dark:hover:text-white transition-colors">Terms</Link>
-              <Link to="/privacy" className="text-zinc-400 dark:text-zinc-400 hover:text-white dark:hover:text-white transition-colors">Privacy</Link>
+        <section className="px-4 py-20 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl">
+            <div className="max-w-2xl"><p className="text-sm font-bold uppercase tracking-widest text-emerald-600">One operational view</p><h2 className="mt-3 text-3xl font-bold tracking-tight text-brand-navy sm:text-4xl">Know what is working and what needs attention.</h2><p className="mt-4 text-lg text-slate-600">Move from scattered marketplace data to focused inventory decisions.</p></div>
+            <div className="mt-10 grid gap-5 md:grid-cols-3">
+              {[
+                [LineChart, 'Listing performance analytics', 'Review impressions, views, watchers, sales, and listing age in one precise workspace.'],
+                [Target, 'Dead stock detection', 'Set your own performance thresholds and identify listings that deserve review.'],
+                [TrendingUp, 'Cleanup recommendations', 'Prioritize action with clear, data-informed recommendations you control.'],
+              ].map(([Icon, title, body]) => (
+                <article key={title} className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_8px_30px_-24px_rgba(13,27,61,0.3)]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-brand-navy"><Icon className="h-5 w-5" /></div>
+                  <h3 className="mt-5 text-xl font-bold text-brand-navy">{title}</h3><p className="mt-3 leading-7 text-slate-600">{body}</p>
+                </article>
+              ))}
             </div>
           </div>
-        </div>
-      </footer>
+        </section>
+
+        <section id="how" className="bg-[#F7F9FC] px-4 py-20 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl"><div className="text-center"><h2 className="text-3xl font-bold text-brand-navy sm:text-4xl">From inventory data to focused action</h2></div>
+            <div className="mt-12 grid gap-5 md:grid-cols-3">
+              {[
+                ['01', 'Connect your store', 'Bring your eBay inventory into a secure operational view.'],
+                ['02', 'Define performance criteria', 'Use configurable Views, Watchers, and Sales thresholds for your workflow.'],
+                ['03', 'Review recommendations', 'See which listings need attention and decide the right cleanup action.'],
+              ].map(([number, title, body]) => <div key={number} className="rounded-xl border border-slate-200 bg-white p-6"><span className="data-value text-sm font-bold text-emerald-600">{number}</span><h3 className="mt-4 text-xl font-bold text-brand-navy">{title}</h3><p className="mt-3 leading-7 text-slate-600">{body}</p></div>)}
+            </div>
+          </div>
+        </section>
+
+        <section id="pricing" className="px-4 py-20 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-5xl">
+            <div className="text-center"><h2 className="text-3xl font-bold text-brand-navy sm:text-4xl">Straightforward pricing for serious sellers</h2><p className="mt-4 text-lg text-slate-600">Start with a 7-day free trial.</p></div>
+            <div className="mx-auto mt-10 max-w-2xl rounded-2xl border-2 border-brand-navy bg-white p-6 shadow-[0_18px_50px_-34px_rgba(13,27,61,0.35)] sm:p-9">
+              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start"><div><span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-brand-navy">7-Day Free Trial Included</span><h3 className="mt-5 text-2xl font-bold text-brand-navy">Pro</h3></div><div className="sm:text-right"><span className="data-value text-5xl font-bold text-brand-navy">$49</span><span className="text-slate-500">/month</span></div></div>
+              <ul className="mt-8 grid gap-4 sm:grid-cols-2">{proFeatures.map((feature) => <li key={feature} className="flex gap-3 text-sm leading-6 text-slate-700"><span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-50"><Check className="h-3.5 w-3.5 text-emerald-600" /></span>{feature}</li>)}</ul>
+              {isAuthenticated && checkoutUrl ? <a href={checkoutUrl} target="_blank" rel="noopener noreferrer" className="mt-8 block w-full rounded-lg bg-brand-navy px-6 py-3.5 text-center text-sm font-bold text-white hover:bg-[#162957]">Start free trial</a> : <Link to="/signup" className="mt-8 block w-full rounded-lg bg-brand-navy px-6 py-3.5 text-center text-sm font-bold text-white hover:bg-[#162957]">Start free trial</Link>}
+            </div>
+            <div className="mt-6 flex flex-col items-start justify-between gap-5 rounded-xl border border-slate-200 bg-[#F7F9FC] p-6 sm:flex-row sm:items-center"><div><h3 className="font-bold text-brand-navy">Managing more than 30,000 listings?</h3><p className="mt-1 text-sm text-slate-600">Talk with us about the right setup for your operation.</p></div><a href="mailto:support@optlisting.com?subject=Enterprise%20Access" className="shrink-0 rounded-lg border border-brand-navy bg-white px-5 py-3 text-sm font-bold text-brand-navy hover:bg-blue-50">Request Enterprise Access</a></div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="bg-brand-navy px-4 py-12 text-white sm:px-6 lg:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-8 sm:flex-row sm:items-center sm:justify-between"><div><BrandLogo to="/" size="sm" /><p className="mt-3 text-sm text-slate-300">eBay inventory operations, made precise.</p></div><div className="flex gap-6 text-sm text-slate-300"><Link to="/pricing" className="hover:text-white">Pricing</Link><Link to="/terms" className="hover:text-white">Terms</Link><Link to="/privacy" className="hover:text-white">Privacy</Link></div></div></footer>
     </div>
   )
 }
