@@ -110,6 +110,7 @@ function Dashboard() {
   // Client state only
   // NOTE: Dashboard does not maintain product list state (only manages card numbers)
   const [isStoreConnected, setIsStoreConnected] = useState(false)
+  const [connectionDetails, setConnectionDetails] = useState(null)
   // allListings, zombies removed from Dashboard (only managed in results screen)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -1413,7 +1414,7 @@ function Dashboard() {
       if (list.length === 0) {
         list = await fetchListings()
       }
-      const { minAgeDays, maxViews, maxWatches } = criteria
+      const { minAgeDays, maxSold, maxViews, maxWatches } = criteria
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       const low = list.filter((l) => {
@@ -1424,6 +1425,8 @@ function Dashboard() {
         if (diffDays > minAgeDays) return false
         const views = Number(l.view_count) ?? 0
         const watches = Number(l.watch_count) ?? 0
+        const sold = Number(l.quantity_sold ?? l.total_sales ?? 0)
+        if (sold > maxSold) return false
         if (views > maxViews) return false
         if (watches > maxWatches) return false
         return true
@@ -1677,6 +1680,7 @@ function Dashboard() {
           })
           
           if (isConnected) {
+            setConnectionDetails(response.data)
             console.log('✅ Connection verified - setting state and syncing listings')
             // Mark as processed AFTER successful verification
             sessionStorage.setItem(processedKey, 'connected')
@@ -1823,6 +1827,7 @@ function Dashboard() {
               })
               
               if (isConnected) {
+                setConnectionDetails(response.data)
                 console.log('✅ eBay is already connected - fetching summary stats...')
                 setIsStoreConnected(true)
                 // If connected, only fetch summary stats (do not fetch full listings)
@@ -2149,269 +2154,77 @@ function Dashboard() {
   }
 
 
-  const showConnectEbay = !isStoreConnected || totalListings === 0
+  useEffect(() => {
+    if (isStoreConnected) fetchListings()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStoreConnected])
+
+  const showConnectEbay = !isStoreConnected
+  const sellingItems = listings.filter((item) => Number(item.quantity_sold ?? item.total_sales ?? 0) > 0)
+  const deletingItems = showDiagnosisResult ? lowPerformingItems : []
+  const deletingIds = new Set(deletingItems.map(getLowPerformingItemId))
+  const holdingItems = listings.filter((item) => Number(item.quantity_sold ?? item.total_sales ?? 0) === 0 && !deletingIds.has(getLowPerformingItemId(item)))
+  const resultItems = viewMode === 'selling' ? sellingItems : viewMode === 'holding' ? holdingItems : viewMode === 'deleting' ? deletingItems : listings
+  const statusCounts = {
+    total: totalListings,
+    selling: sellingItems.length,
+    holding: Math.max(totalListings - sellingItems.length - (showDiagnosisResult ? deletingItems.length : totalZombies), 0),
+    deleting: showDiagnosisResult ? deletingItems.length : totalZombies,
+  }
+  const storeId = connectionDetails?.store_id || connectionDetails?.ebay_user_id || connectionDetails?.username || connectionDetails?.account_id || 'Connected account'
+  const resultTitle = viewMode === 'total' ? 'All Products' : `${viewMode.charAt(0).toUpperCase()}${viewMode.slice(1)}`
 
   return (
-    <div className="font-sans bg-black dark:bg-black min-h-full">
-      <div className="px-6 pt-4 flex flex-col items-center justify-center min-h-[60vh]">
-        {isSyncingListings && (
-          <div className="mb-4 p-4 bg-blue-900/20 border border-blue-500/30 rounded-xl">
-            <div className="flex items-center gap-3">
-              <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
-              <span className="text-blue-400 font-medium">Syncing eBay listings...</span>
-            </div>
-          </div>
-        )}
-
-        <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl p-12 flex flex-col items-center justify-center text-center">
-          {summaryLoading && !summaryStats.activeCount && !isStoreConnected ? (
-            <p className="text-zinc-500 text-lg">Loading...</p>
-          ) : showConnectEbay ? (
-            <>
-              <p className="text-zinc-600 text-lg mb-8">Connect your eBay account to see active listings.</p>
-              <button
-                type="button"
-                onClick={handleConnectEbay}
-                disabled={isSyncing}
-                className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-emerald-500/30 transition-all duration-200 flex items-center justify-center gap-2 mx-auto"
-              >
-                {isSyncing ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin shrink-0" aria-hidden />
-                    <span>Syncing eBay...</span>
-                  </>
-                ) : (
-                  'Connect eBay'
-                )}
+    <div className="min-h-full bg-[#F7F9FC] px-4 py-8 sm:px-6 lg:px-8">
+      {showConnectEbay ? (
+        <div className="mx-auto flex min-h-[62vh] max-w-xl items-center justify-center">
+          <div className="w-full rounded-2xl border border-slate-200 bg-white px-6 py-14 text-center shadow-[0_16px_50px_-40px_rgba(13,27,61,0.3)] sm:px-12">
+            {summaryLoading ? <Loader2 className="mx-auto h-6 w-6 animate-spin text-brand-navy" /> : <>
+              <h1 className="text-2xl font-bold text-brand-navy">Connect your eBay store</h1>
+              <button type="button" onClick={handleConnectEbay} disabled={isSyncing} className="mx-auto mt-8 flex items-center justify-center gap-2 rounded-lg bg-brand-navy px-7 py-3.5 text-sm font-bold text-white transition-colors hover:bg-[#162957] disabled:cursor-not-allowed disabled:opacity-50">
+                {isSyncing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{isSyncing ? 'Connecting...' : 'Connect eBay'}
               </button>
-            </>
-          ) : (
-            <>
-              <p className="text-zinc-600 text-sm font-medium uppercase tracking-wider mb-2">Total Active Listings</p>
-              <p className="text-zinc-900 font-bold" style={{ fontSize: '6rem', lineHeight: 1 }}>
-                {totalListings}
-              </p>
-            </>
-          )}
-        </div>
-
-        {/* Diagnosis Zone - only when connected and has listings */}
-        {!showConnectEbay && (
-          <div className="w-full max-w-2xl mt-8 bg-white rounded-2xl shadow-xl p-8">
-            <h3 className="text-lg font-semibold text-zinc-900 mb-4">Diagnosis</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Min Listing Age (Days)</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={criteria.minAgeDays}
-                  onChange={(e) => setCriteria((c) => ({ ...c, minAgeDays: Number(e.target.value) || 7 }))}
-                  className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-zinc-900"
-                />
-                <p className="mt-1 text-sm text-gray-500">
-                  (Items listed on or before: {new Date(Date.now() - (criteria.minAgeDays || 7) * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)})
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Max Quantity Sold</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={criteria.maxSold}
-                  onChange={(e) => setCriteria((c) => ({ ...c, maxSold: Number(e.target.value) || 0 }))}
-                  className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-zinc-900"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Max Total Views</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={criteria.maxViews}
-                  onChange={(e) => setCriteria((c) => ({ ...c, maxViews: Number(e.target.value) ?? 5 }))}
-                  className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-zinc-900"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Max Watchers</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={criteria.maxWatches}
-                  onChange={(e) => setCriteria((c) => ({ ...c, maxWatches: Number(e.target.value) || 0 }))}
-                  className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-zinc-900"
-                />
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={handleAnalyze}
-              disabled={isAnalyzingListings}
-              className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 duration-200"
-            >
-              {isAnalyzingListings && <Loader2 className="w-5 h-5 animate-spin shrink-0" aria-hidden />}
-              {isAnalyzingListings ? 'Analyzing...' : 'Analyze Listings'}
-            </button>
-
-            {/* Skeleton loader - shown while analyzing */}
-            {isAnalyzingListings && (
-              <div className="mt-6 pt-6 border-t border-zinc-200 transition-opacity duration-300 ease-out opacity-100">
-                <div className="h-6 w-48 bg-zinc-200 rounded mb-4 animate-pulse" />
-                <div className="overflow-x-auto border border-zinc-300 rounded-lg bg-white">
-                  <div className="flex flex-col gap-0">
-                    <div className="flex gap-2 p-3 border-b border-zinc-200 bg-zinc-50">
-                      <div className="h-4 w-8 bg-zinc-300 rounded animate-pulse" />
-                      <div className="h-4 flex-1 max-w-[120px] bg-zinc-300 rounded animate-pulse" />
-                      <div className="h-4 flex-1 max-w-[80px] bg-zinc-300 rounded animate-pulse" />
-                      <div className="h-4 flex-1 max-w-[60px] bg-zinc-300 rounded animate-pulse" />
-                      <div className="h-4 flex-1 max-w-[60px] bg-zinc-300 rounded animate-pulse" />
-                    </div>
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                      <div key={i} className="flex gap-2 p-3 border-b border-zinc-100">
-                        <div className="h-4 w-8 bg-zinc-200 rounded animate-pulse" />
-                        <div className="h-10 w-10 bg-zinc-200 rounded animate-pulse shrink-0" />
-                        <div className="h-4 flex-1 max-w-[200px] bg-zinc-200 rounded animate-pulse" />
-                        <div className="h-4 flex-1 max-w-[80px] bg-zinc-200 rounded animate-pulse" />
-                        <div className="h-4 flex-1 max-w-[40px] bg-zinc-200 rounded animate-pulse" />
-                        <div className="h-4 flex-1 max-w-[50px] bg-zinc-200 rounded animate-pulse" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Results - shown after Analyze, smooth appearance */}
-            {showDiagnosisResult && (
-              <div className="mt-6 pt-6 border-t border-zinc-200 transition-opacity duration-300 ease-out opacity-100">
-                <p className="text-red-600 font-bold text-lg mb-4">Low Performing Items: {lowPerformingCount}</p>
-
-                {(lowPerformingCount > 0 || lowPerformingItems.length > 0) && (
-                  <>
-                    <div className="overflow-x-auto border border-zinc-300 rounded-lg mb-4 bg-white">
-                      <table className="w-full border-collapse text-sm text-zinc-900">
-                        <thead>
-                          <tr className="bg-zinc-100 border-b border-zinc-300">
-                            <th className="text-left p-2 sm:p-3 border-r border-zinc-300 last:border-r-0 text-zinc-900 font-medium">
-                              <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={
-                                    lowPerformingItems.length > 0 &&
-                                    selectedLowPerformingIds.length === lowPerformingItems.length
-                                  }
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setSelectedLowPerformingIds(
-                                        lowPerformingItems.map((l) => getLowPerformingItemId(l)).filter(Boolean)
-                                      )
-                                    } else {
-                                      setSelectedLowPerformingIds([])
-                                    }
-                                  }}
-                                  className="rounded border-zinc-400 text-zinc-900"
-                                />
-                                Select All
-                              </label>
-                            </th>
-                            <th className="text-left p-2 sm:p-3 border-r border-zinc-300 text-zinc-900 font-medium">Image</th>
-                            <th className="text-left p-2 sm:p-3 border-r border-zinc-300 text-zinc-900 font-medium">Title</th>
-                            <th className="text-left p-2 sm:p-3 border-r border-zinc-300 text-zinc-900 font-medium">Date</th>
-                            <th className="text-left p-2 sm:p-3 border-r border-zinc-300 text-zinc-900 font-medium">Sold</th>
-                            <th className="text-left p-2 sm:p-3 text-zinc-900 font-medium">Stats</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white">
-                          {lowPerformingItems.length > 0 ? (
-                            lowPerformingItems.map((item, index) => {
-                              const itemId = getLowPerformingItemId(item)
-                              const isSelected = itemId != null && selectedLowPerformingIds.includes(itemId)
-                              const imageUrl = item.image_url || item.picture_url || item.thumbnail_url
-                              const dateStr = item.start_date
-                                ? new Date(item.start_date).toISOString().slice(0, 10)
-                                : null
-                              const views = Number(item.view_count) ?? 0
-                              const watches = Number(item.watch_count) ?? 0
-                              return (
-                                <tr
-                                  key={itemId != null ? itemId : `lp-row-${index}`}
-                                  className="border-b border-zinc-200 hover:bg-zinc-50 bg-white"
-                                >
-                                  <td className="p-2 sm:p-3 border-r border-zinc-200 text-zinc-900">
-                                    <input
-                                      type="checkbox"
-                                      checked={isSelected}
-                                      onChange={() => {
-                                        if (itemId == null) return
-                                        setSelectedLowPerformingIds((prev) =>
-                                          prev.includes(itemId)
-                                            ? prev.filter((id) => id !== itemId)
-                                            : [...prev, itemId]
-                                        )
-                                      }}
-                                      className="rounded border-zinc-400 text-zinc-900"
-                                    />
-                                  </td>
-                                  <td className="p-2 sm:p-3 border-r border-zinc-200 text-zinc-900">
-                                    {imageUrl ? (
-                                      <img
-                                        src={imageUrl}
-                                        alt=""
-                                        className="w-10 h-10 object-cover rounded flex-shrink-0 border border-zinc-200"
-                                      />
-                                    ) : (
-                                      <div className="w-10 h-10 bg-zinc-200 rounded flex-shrink-0 border border-zinc-200" aria-hidden />
-                                    )}
-                                  </td>
-                                  <td className="p-2 sm:p-3 border-r border-zinc-200 text-zinc-900">
-                                    <span className="truncate max-w-[200px] block" title={item.title || ''}>
-                                      {item.title || '—'}
-                                    </span>
-                                  </td>
-                                  <td className="p-2 sm:p-3 border-r border-zinc-200 text-zinc-700">
-                                    {dateStr ?? 'N/A'}
-                                  </td>
-                                  <td className="p-2 sm:p-3 border-r border-zinc-200 text-zinc-900">
-                                    {item.quantity_sold != null ? item.quantity_sold : '—'}
-                                  </td>
-                                  <td className="p-2 sm:p-3 text-zinc-900">
-                                    {views} / {watches}
-                                  </td>
-                                </tr>
-                              )
-                            })
-                          ) : (
-                            <tr>
-                              <td colSpan={6} className="p-4 text-center text-zinc-600 bg-zinc-50 border-b border-zinc-200">
-                                No item rows loaded. Click &quot;Analyze Listings&quot; to load the list.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleDownloadShopifyCSV}
-                      disabled={isDownloadingShopifyCSV || selectedLowPerformingIds.length === 0}
-                      className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all flex items-center gap-2"
-                    >
-                      {isDownloadingShopifyCSV && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
-                      {isDownloadingShopifyCSV
-                        ? 'Preparing...'
-                        : `Download CSV (${selectedLowPerformingIds.length} items)`}
-                    </button>
-                  </>
-                )}
-                {lowPerformingCount === 0 && (
-                  <p className="text-sm text-zinc-500">No low-performing items match the criteria.</p>
-                )}
-              </div>
-            )}
+            </>}
           </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="mx-auto max-w-7xl">
+          {isSyncingListings && <div className="mb-4 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-brand-navy"><Loader2 className="h-4 w-4 animate-spin" />Syncing eBay listings...</div>}
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_40px_-34px_rgba(13,27,61,0.3)]">
+            <div className="flex flex-col gap-6 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
+              <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Optlisting</p><h1 className="mt-2 text-2xl font-bold text-brand-navy">Optimizer</h1></div>
+              <div className="grid flex-1 gap-4 sm:grid-cols-2 lg:max-w-xl">
+                <div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Marketplace</p><p className="mt-1 text-sm font-bold text-brand-navy">eBay</p></div>
+                <div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Store ID</p><p className="mt-1 truncate text-sm font-bold text-brand-navy">{storeId}</p></div>
+              </div>
+              <button type="button" onClick={handleSync} disabled={loading || isSyncingListings} className="flex items-center justify-center gap-2 rounded-lg bg-brand-navy px-5 py-3 text-sm font-bold text-white hover:bg-[#162957] disabled:opacity-50">{(loading || isSyncingListings) && <Loader2 className="h-4 w-4 animate-spin" />}Sync Now</button>
+            </div>
+
+            <div className="grid grid-cols-2 bg-brand-navy sm:grid-cols-4">
+              {['total', 'selling', 'holding', 'deleting'].map((status) => <button key={status} type="button" onClick={() => setViewMode(status)} className={`border-white/10 px-4 py-4 text-left transition-colors sm:border-r ${viewMode === status ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-[11px] font-bold uppercase tracking-wider text-slate-300">{status}</span><span className="data-value mt-1 block text-2xl font-bold text-white">{statusCounts[status]}</span></button>)}
+            </div>
+
+            <div className="border-b border-slate-200 bg-slate-50 p-4 sm:p-5">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]">
+                {[['Views', 'maxViews'], ['Watchers', 'maxWatches'], ['Sales', 'maxSold']].map(([label, key]) => <label key={key} className="text-xs font-bold uppercase tracking-wider text-slate-500">{label} {'<='}<input type="number" min={0} value={criteria[key]} onChange={(e) => setCriteria((current) => ({ ...current, [key]: Number(e.target.value) || 0 }))} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-brand-navy outline-none focus:border-brand-navy" /></label>)}
+                <button type="button" onClick={handleAnalyze} disabled={isAnalyzingListings} className="self-end rounded-lg bg-brand-navy px-6 py-2.5 text-sm font-bold text-white hover:bg-[#162957] disabled:opacity-50">{isAnalyzingListings ? 'Applying...' : 'Apply'}</button>
+              </div>
+              <p className="mt-4 text-xs font-semibold text-slate-500">Data: Last 90 Days</p>
+            </div>
+
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-6"><h2 className="font-bold text-brand-navy">{resultTitle} <span className="text-slate-400">({resultItems.length} items)</span></h2></div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] text-left text-sm">
+                <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500"><tr>{['Image', 'Product Title', 'Impressions', 'Views', 'Watchers', 'Sales', 'Days', 'Market'].map((heading) => <th key={heading} className="px-4 py-3 font-bold">{heading}</th>)}</tr></thead>
+                <tbody className="divide-y divide-slate-100">
+                  {resultItems.map((item, index) => { const itemId = getLowPerformingItemId(item); const imageUrl = item.image_url || item.picture_url || item.thumbnail_url; return <tr key={itemId || index} className="hover:bg-slate-50/70"><td className="px-4 py-3">{imageUrl ? <img src={imageUrl} alt="" className="h-10 w-10 rounded-md border border-slate-200 object-cover" /> : <div className="h-10 w-10 rounded-md border border-slate-200 bg-slate-100" />}</td><td className="max-w-[320px] px-4 py-3"><p className="truncate font-semibold text-brand-navy">{item.title || 'Untitled listing'}</p><p className="mt-0.5 text-xs text-slate-400">{itemId || ''}</p></td><td className="data-value px-4 py-3 text-slate-600">{item.impressions ?? 0}</td><td className="data-value px-4 py-3 text-slate-600">{item.view_count ?? item.views ?? 0}</td><td className="data-value px-4 py-3 text-slate-600">{item.watch_count ?? 0}</td><td className="data-value px-4 py-3 text-slate-600">{item.quantity_sold ?? item.total_sales ?? 0}</td><td className="data-value px-4 py-3 text-slate-600">{item.days_listed ?? 0}</td><td className="px-4 py-3 font-semibold text-brand-navy">eBay</td></tr> })}
+                  {!isAnalyzingListings && resultItems.length === 0 && <tr><td colSpan={8} className="px-6 py-14 text-center text-sm text-slate-500">No listings found.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      )}
 
       {toast && (
         <Toast
