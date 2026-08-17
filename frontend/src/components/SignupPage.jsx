@@ -33,20 +33,19 @@ function SignupPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 flex items-center justify-center">
+      <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center">
         <div className="animate-spin">
-          <Loader2 className="w-8 h-8 text-brand-mint" />
+          <Loader2 className="w-8 h-8 text-brand-navy" />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center p-4 text-brand-navy">
       {/* Background Effects */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+        <div className="absolute inset-x-0 top-0 h-64 bg-blue-50/60" />
       </div>
 
       <motion.div
@@ -58,32 +57,33 @@ function SignupPage() {
         {/* Back to Home */}
         <Link 
           to="/"
-          className="inline-flex items-center gap-2 text-zinc-400 hover:text-white mb-8 transition-colors"
+          className="inline-flex items-center gap-2 text-slate-500 hover:text-brand-navy mb-8 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Home</span>
         </Link>
 
         {/* Signup Card */}
-        <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800 rounded-2xl p-8 shadow-2xl">
+        <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-[0_20px_60px_-40px_rgba(13,27,61,0.35)]">
           {/* Logo */}
-          <BrandLogo size="lg" className="flex justify-center mb-8" />
+          <BrandLogo size="lg" tone="dark" className="flex justify-center mb-8" />
 
-          <h1 className="text-xl font-bold text-white text-center mb-2">
+          <h1 className="text-xl font-bold text-brand-navy text-center mb-2">
             Start Your Free Trial
           </h1>
-          <p className="text-zinc-400 text-center mb-6">
-            30 days free, no credit card required
+          <p className="text-slate-500 text-center mb-6">
+            Try Pro free for 7 days
           </p>
 
           {/* Benefits */}
           <div className="mb-6 space-y-2">
             {[
-              'Find & remove zombie listings instantly',
-              'CSV export for AutoDS, Yaballe, eBay',
-              'Multi-supplier pattern detection',
+              'Up to 30,000 active listings',
+              'Full Inventory Diagnostic Dashboard',
+              'Views, Impressions, Watchers & Sales analytics',
+              'Dead stock detection & cleanup recommendations',
             ].map((benefit, index) => (
-              <div key={index} className="flex items-center gap-2 text-sm text-zinc-300">
+              <div key={index} className="flex items-center gap-2 text-sm text-slate-700">
                 <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                 <span>{benefit}</span>
               </div>
@@ -139,22 +139,22 @@ function SignupPage() {
           <div className="mt-6 text-center">
             <Link
               to="/login"
-              className="text-sm text-zinc-400 hover:text-white transition-colors"
+              className="text-sm text-slate-500 hover:text-brand-navy transition-colors"
             >
-              Already have an account? <span className="text-blue-400">Sign in</span>
+              Already have an account? <span className="font-semibold text-brand-navy">Sign in</span>
             </Link>
           </div>
 
           {/* Info Text */}
-          <p className="mt-4 text-center text-xs text-zinc-500">
+          <p className="mt-4 text-center text-xs text-slate-500">
             By signing up, you agree to our Terms of Service and Privacy Policy
           </p>
         </div>
 
         {/* Trust Badge */}
         <div className="mt-6 text-center">
-          <p className="text-xs text-zinc-500">
-            🔒 Your data is secure with enterprise-grade encryption
+          <p className="text-xs text-slate-500">
+            Your data is secured with enterprise-grade encryption
           </p>
         </div>
       </motion.div>
