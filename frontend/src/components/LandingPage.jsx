@@ -6,10 +6,11 @@ import { useAuth } from '../contexts/AuthContext'
 import { generateProfessionalCheckoutUrl } from '../lib/checkout'
 
 const proFeatures = [
-  'Full Inventory Diagnostic Dashboard',
-  'Analytics: Views, Impressions, Watchers & Sales',
-  'Dead stock detection & cleanup recommendations',
-  'Up to 30,000 active listings',
+  'Inventory Dashboard',
+  'Performance Analytics',
+  'Dead Stock Detection',
+  'Cleanup Recommendations',
+  'Up to 30,000 Listings',
 ]
 
 const sampleRows = [
@@ -41,7 +42,6 @@ function ProductPreview() {
         {['Views up to 5', 'Watchers up to 2', 'Sales: 0'].map((filter) => (
           <span key={filter} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">{filter}</span>
         ))}
-        <span className="ml-auto text-xs text-slate-500">Example thresholds - fully configurable</span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[680px] text-left text-sm">
@@ -108,14 +108,14 @@ function LandingPage() {
         <section className="border-b border-slate-100 bg-gradient-to-b from-[#F7F9FC] to-white px-4 pb-16 pt-16 sm:px-6 sm:pb-24 sm:pt-24 lg:px-8">
           <div className="mx-auto max-w-7xl">
             <div className="mx-auto max-w-4xl text-center">
-              <span className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-brand-navy"><span className="h-2 w-2 rounded-full bg-brand-mint" />eBay inventory optimization</span>
-              <h1 className="mt-6 text-4xl font-extrabold leading-tight tracking-[-0.04em] text-brand-navy sm:text-5xl lg:text-6xl">Make every listing earn its place.</h1>
-              <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-slate-600 sm:text-xl">Understand listing performance, detect dead stock, and act on clear cleanup recommendations using your latest 90 days of eBay data.</p>
+              <span className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-brand-navy"><span className="h-2 w-2 rounded-full bg-brand-mint" />eBay Inventory Optimizer</span>
+              <h1 className="mt-6 text-4xl font-extrabold leading-tight tracking-[-0.04em] text-brand-navy sm:text-5xl lg:text-6xl">Find What Doesn't Sell.</h1>
+              <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-slate-600 sm:text-xl">Analyze. Find. Clean.</p>
               <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-                <Link to="/signup" className="rounded-lg bg-brand-navy px-6 py-3.5 text-sm font-bold text-white hover:bg-[#162957]">Start 7-day free trial</Link>
-                <a href="#product" className="rounded-lg border border-slate-300 bg-white px-6 py-3.5 text-sm font-bold text-brand-navy hover:border-brand-navy">See the optimizer</a>
+                <Link to="/signup" className="rounded-lg bg-brand-navy px-6 py-3.5 text-sm font-bold text-white hover:bg-[#162957]">Start Free Trial</Link>
+                <a href="#how" className="rounded-lg border border-slate-300 bg-white px-6 py-3.5 text-sm font-bold text-brand-navy hover:border-brand-navy">See How It Works</a>
               </div>
-              <p className="mt-4 text-sm text-slate-500">Built for professional eBay sellers - Up to 30,000 active listings</p>
+              <p className="mt-4 text-sm text-slate-500">Up to 30,000 listings</p>
             </div>
             <div id="product" className="mx-auto mt-14 max-w-6xl scroll-mt-24"><ProductPreview /></div>
           </div>
@@ -123,16 +123,16 @@ function LandingPage() {
 
         <section className="px-4 py-20 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-7xl">
-            <div className="max-w-2xl"><p className="text-sm font-bold uppercase tracking-widest text-emerald-600">One operational view</p><h2 className="mt-3 text-3xl font-bold tracking-tight text-brand-navy sm:text-4xl">Know what is working and what needs attention.</h2><p className="mt-4 text-lg text-slate-600">Move from scattered marketplace data to focused inventory decisions.</p></div>
+            <div className="max-w-2xl"><h2 className="text-3xl font-bold tracking-tight text-brand-navy sm:text-4xl">Know What to Cut.</h2></div>
             <div className="mt-10 grid gap-5 md:grid-cols-3">
               {[
-                [LineChart, 'Listing performance analytics', 'Review impressions, views, watchers, sales, and listing age in one precise workspace.'],
-                [Target, 'Dead stock detection', 'Set your own performance thresholds and identify listings that deserve review.'],
-                [TrendingUp, 'Cleanup recommendations', 'Prioritize action with clear, data-informed recommendations you control.'],
-              ].map(([Icon, title, body]) => (
+                [LineChart, 'Performance Analytics'],
+                [Target, 'Dead Stock Detection'],
+                [TrendingUp, 'Cleanup Recommendations'],
+              ].map(([Icon, title]) => (
                 <article key={title} className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_8px_30px_-24px_rgba(13,27,61,0.3)]">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-brand-navy"><Icon className="h-5 w-5" /></div>
-                  <h3 className="mt-5 text-xl font-bold text-brand-navy">{title}</h3><p className="mt-3 leading-7 text-slate-600">{body}</p>
+                  <h3 className="mt-5 text-xl font-bold text-brand-navy">{title}</h3>
                 </article>
               ))}
             </div>
@@ -140,31 +140,31 @@ function LandingPage() {
         </section>
 
         <section id="how" className="bg-[#F7F9FC] px-4 py-20 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-7xl"><div className="text-center"><h2 className="text-3xl font-bold text-brand-navy sm:text-4xl">From inventory data to focused action</h2></div>
+          <div className="mx-auto max-w-7xl"><div className="text-center"><h2 className="text-3xl font-bold text-brand-navy sm:text-4xl">3 Steps. Done.</h2></div>
             <div className="mt-12 grid gap-5 md:grid-cols-3">
               {[
-                ['01', 'Connect your store', 'Bring your eBay inventory into a secure operational view.'],
-                ['02', 'Define performance criteria', 'Use configurable Views, Watchers, and Sales thresholds for your workflow.'],
-                ['03', 'Review recommendations', 'See which listings need attention and decide the right cleanup action.'],
-              ].map(([number, title, body]) => <div key={number} className="rounded-xl border border-slate-200 bg-white p-6"><span className="data-value text-sm font-bold text-emerald-600">{number}</span><h3 className="mt-4 text-xl font-bold text-brand-navy">{title}</h3><p className="mt-3 leading-7 text-slate-600">{body}</p></div>)}
+                ['01', 'Connect eBay'],
+                ['02', 'Set Criteria'],
+                ['03', 'Review & Clean'],
+              ].map(([number, title]) => <div key={number} className="rounded-xl border border-slate-200 bg-white p-6"><span className="data-value text-sm font-bold text-emerald-600">{number}</span><h3 className="mt-4 text-xl font-bold text-brand-navy">{title}</h3></div>)}
             </div>
           </div>
         </section>
 
         <section id="pricing" className="px-4 py-20 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-5xl">
-            <div className="text-center"><h2 className="text-3xl font-bold text-brand-navy sm:text-4xl">Straightforward pricing for serious sellers</h2><p className="mt-4 text-lg text-slate-600">Start with a 7-day free trial.</p></div>
+            <div className="text-center"><h2 className="text-3xl font-bold text-brand-navy sm:text-4xl">Simple Pricing.</h2><p className="mt-4 text-lg text-slate-600">7 days free.</p></div>
             <div className="mx-auto mt-10 max-w-2xl rounded-2xl border-2 border-brand-navy bg-white p-6 shadow-[0_18px_50px_-34px_rgba(13,27,61,0.35)] sm:p-9">
-              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start"><div><span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-brand-navy">7-Day Free Trial Included</span><h3 className="mt-5 text-2xl font-bold text-brand-navy">Pro</h3></div><div className="sm:text-right"><span className="data-value text-5xl font-bold text-brand-navy">$49</span><span className="text-slate-500">/month</span></div></div>
+              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start"><div><h3 className="text-2xl font-bold text-brand-navy">Pro</h3></div><div className="sm:text-right"><span className="data-value text-5xl font-bold text-brand-navy">$49</span><span className="text-slate-500">/month</span></div></div>
               <ul className="mt-8 grid gap-4 sm:grid-cols-2">{proFeatures.map((feature) => <li key={feature} className="flex gap-3 text-sm leading-6 text-slate-700"><span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-50"><Check className="h-3.5 w-3.5 text-emerald-600" /></span>{feature}</li>)}</ul>
-              {isAuthenticated && checkoutUrl ? <a href={checkoutUrl} target="_blank" rel="noopener noreferrer" className="mt-8 block w-full rounded-lg bg-brand-navy px-6 py-3.5 text-center text-sm font-bold text-white hover:bg-[#162957]">Start free trial</a> : <Link to="/signup" className="mt-8 block w-full rounded-lg bg-brand-navy px-6 py-3.5 text-center text-sm font-bold text-white hover:bg-[#162957]">Start free trial</Link>}
+              {isAuthenticated && checkoutUrl ? <a href={checkoutUrl} target="_blank" rel="noopener noreferrer" className="mt-8 block w-full rounded-lg bg-brand-navy px-6 py-3.5 text-center text-sm font-bold text-white hover:bg-[#162957]">Start Free Trial</a> : <Link to="/signup" className="mt-8 block w-full rounded-lg bg-brand-navy px-6 py-3.5 text-center text-sm font-bold text-white hover:bg-[#162957]">Start Free Trial</Link>}
             </div>
-            <div className="mt-6 flex flex-col items-start justify-between gap-5 rounded-xl border border-slate-200 bg-[#F7F9FC] p-6 sm:flex-row sm:items-center"><div><h3 className="font-bold text-brand-navy">Managing more than 30,000 listings?</h3><p className="mt-1 text-sm text-slate-600">Talk with us about the right setup for your operation.</p></div><a href="mailto:support@optlisting.com?subject=Enterprise%20Access" className="shrink-0 rounded-lg border border-brand-navy bg-white px-5 py-3 text-sm font-bold text-brand-navy hover:bg-blue-50">Request Enterprise Access</a></div>
+            <div className="mt-6 flex flex-col items-start justify-between gap-5 rounded-xl border border-slate-200 bg-[#F7F9FC] p-6 sm:flex-row sm:items-center"><div><h3 className="font-bold text-brand-navy">30,000+ listings?</h3></div><a href="mailto:support@optlisting.com?subject=Enterprise%20Access" className="shrink-0 rounded-lg border border-brand-navy bg-white px-5 py-3 text-sm font-bold text-brand-navy hover:bg-blue-50">Request Enterprise Access</a></div>
           </div>
         </section>
       </main>
 
-      <footer className="bg-brand-navy px-4 py-12 text-white sm:px-6 lg:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-8 sm:flex-row sm:items-center sm:justify-between"><div><BrandLogo to="/" size="sm" /><p className="mt-3 text-sm text-slate-300">eBay inventory operations, made precise.</p></div><div className="flex gap-6 text-sm text-slate-300"><Link to="/pricing" className="hover:text-white">Pricing</Link><Link to="/terms" className="hover:text-white">Terms</Link><Link to="/privacy" className="hover:text-white">Privacy</Link></div></div></footer>
+      <footer className="bg-brand-navy px-4 py-12 text-white sm:px-6 lg:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-8 sm:flex-row sm:items-center sm:justify-between"><div><BrandLogo to="/" size="sm" /><p className="mt-3 text-sm text-slate-300">Find what doesn't sell.</p></div><div className="flex gap-6 text-sm text-slate-300"><Link to="/pricing" className="hover:text-white">Pricing</Link><Link to="/terms" className="hover:text-white">Terms</Link><Link to="/privacy" className="hover:text-white">Privacy</Link></div></div></footer>
     </div>
   )
 }
