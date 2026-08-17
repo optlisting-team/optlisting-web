@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from './ui/card'
 import { Button } from './ui/button'
 import { generateProfessionalCheckoutUrl } from '../lib/checkout'
+import BrandLogo from './BrandLogo'
 
 const PROFESSIONAL_PLAN = {
   id: 'professional',
@@ -72,15 +73,10 @@ function LandingPage() {
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 bg-black/60 dark:bg-black/60 backdrop-blur-xl border-b border-zinc-800 dark:border-zinc-800 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg shadow-lg shadow-blue-500/20">
-              <Zap className="h-6 w-6 text-white" />
-            </div>
-            <span className="text-2xl font-bold text-white dark:text-white">OptListing</span>
-          </div>
-          <div className="flex items-center space-x-6">
-            <a href="#features" className="text-zinc-300 dark:text-zinc-300 hover:text-white dark:hover:text-white font-medium transition-colors">Features</a>
-            <a href="#pricing" className="text-zinc-300 dark:text-zinc-300 hover:text-white dark:hover:text-white font-medium transition-colors">Pricing</a>
+          <BrandLogo to="/" size="sm" className="hover:opacity-90 transition-opacity" />
+          <div className="flex items-center space-x-3 sm:space-x-6">
+            <a href="#features" className="hidden sm:inline text-zinc-300 dark:text-zinc-300 hover:text-white dark:hover:text-white font-medium transition-colors">Features</a>
+            <a href="#pricing" className="hidden sm:inline text-zinc-300 dark:text-zinc-300 hover:text-white dark:hover:text-white font-medium transition-colors">Pricing</a>
             {isAuthenticated ? (
               <>
                 <Link to="/dashboard" className="text-zinc-300 dark:text-zinc-300 hover:text-white dark:hover:text-white font-medium transition-colors">Dashboard</Link>
@@ -229,7 +225,7 @@ function LandingPage() {
                 <div className="relative">
                   <img 
                     src="/main-screenshot.png" 
-                    alt="OptListing Dashboard - Zombie Listing Finder" 
+                    alt="Optlisting dashboard - Zombie Listing Finder"
                     className="w-full h-auto"
                     loading="lazy"
                   />
@@ -621,13 +617,8 @@ function LandingPage() {
         <div className="container mx-auto max-w-6xl">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-4 md:mb-0">
-              <div className="flex items-center space-x-3 mb-2">
-                <div className="p-2 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg shadow-lg shadow-blue-500/20">
-                  <Zap className="h-5 w-5 text-white" />
-                </div>
-                <span className="text-xl font-bold text-white dark:text-white">OptListing</span>
-              </div>
-              <p className="text-zinc-400 dark:text-zinc-400 text-sm">© 2026 OptListing. All rights reserved.</p>
+              <BrandLogo to="/" size="sm" className="mb-2 hover:opacity-90 transition-opacity" />
+              <p className="text-zinc-400 dark:text-zinc-400 text-sm">© 2026 Optlisting. All rights reserved.</p>
             </div>
             <div className="flex gap-6">
               <a href="#support" className="text-zinc-400 dark:text-zinc-400 hover:text-white dark:hover:text-white transition-colors">Support</a>

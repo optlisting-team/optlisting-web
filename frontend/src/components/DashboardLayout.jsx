@@ -47,7 +47,7 @@ function DashboardLayout({ children }) {
         <footer className="border-t border-zinc-800/50 py-4 px-6 bg-zinc-950/50 backdrop-blur-sm">
           <div className="flex items-center justify-between text-xs text-zinc-600">
             <div className="flex items-center gap-4">
-              <span>© 2024 OptListing</span>
+              <span>© 2026 Optlisting</span>
               <span>•</span>
               <a href="#" className="hover:text-zinc-400 transition-colors">Terms</a>
               <a href="#" className="hover:text-zinc-400 transition-colors">Privacy</a>

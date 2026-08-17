@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { motion } from 'framer-motion'
-import { Zap, AlertCircle, Loader2, ArrowLeft } from 'lucide-react'
+import { AlertCircle, Loader2, ArrowLeft } from 'lucide-react'
+import BrandLogo from './BrandLogo'
 
 function LoginPage() {
   const navigate = useNavigate()
@@ -34,7 +35,7 @@ function LoginPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 flex items-center justify-center">
         <div className="animate-spin">
-          <Loader2 className="w-8 h-8 text-blue-500" />
+          <Loader2 className="w-8 h-8 text-brand-mint" />
         </div>
       </div>
     )
@@ -66,14 +67,7 @@ function LoginPage() {
         {/* Login Card */}
         <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800 rounded-2xl p-8 shadow-2xl">
           {/* Logo */}
-          <div className="flex items-center justify-center gap-3 mb-8">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
-              <Zap className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-2xl font-black text-white tracking-tight">
-              Opt<span className="text-blue-400">Listing</span>
-            </span>
-          </div>
+          <BrandLogo size="lg" className="flex justify-center mb-8" />
 
           <h1 className="text-xl font-bold text-white text-center mb-2">
             Welcome Back

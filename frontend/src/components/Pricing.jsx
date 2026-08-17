@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useAccount } from '../contexts/AccountContext'
 import { Check } from 'lucide-react'
 import { generateProfessionalCheckoutUrl, getLemonSqueezyConfig } from '../lib/checkout'
+import BrandLogo from './BrandLogo'
 
 const PROFESSIONAL_PLAN = {
   id: 'professional',
@@ -38,6 +39,7 @@ export default function Pricing() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white py-16 px-4">
       <div className="container mx-auto max-w-4xl">
+        <BrandLogo to="/" size="sm" className="mb-12 hover:opacity-90 transition-opacity" />
         {/* Header */}
         <div className="text-center mb-16">
           <h1 className="text-4xl md:text-5xl font-bold mb-4">Premium Pricing</h1>
@@ -113,7 +115,7 @@ export default function Pricing() {
         {/* Additional Info */}
         <div className="mt-16 text-center text-zinc-400 text-sm max-w-2xl mx-auto">
           <p className="mb-4">
-            <strong className="text-white">High-Profit Price Policy:</strong> OptListing is designed for professional sellers who value premium, reliable service.
+            <strong className="text-white">High-Profit Price Policy:</strong> Optlisting is designed for professional sellers who value premium, reliable service.
           </p>
           <p>
             All features are included. No hidden fees. No credit-based limitations.

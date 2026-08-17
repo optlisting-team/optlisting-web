@@ -1,5 +1,5 @@
-/* Premium Fonts - Sora for headings, Inter for body */
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+/* Plus Jakarta Sans for product UI; JetBrains Mono remains for dense data. */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -7,7 +7,10 @@
 
 @layer base {
   :root {
-    /* OptListing Brand Colors */
+    /* Optlisting brand foundation */
+    --brand-navy: 222 65% 15%;
+    --brand-mint: 160 72% 50%;
+    --brand-mint-soft: 160 65% 94%;
     --opt-black: 0 0% 0%;
     --opt-dark: 0 0% 7%;
     --opt-card: 0 0% 10%;
@@ -18,12 +21,12 @@
     /* Status Colors */
     --opt-danger: 0 84% 60%;
     --opt-warning: 38 92% 50%;
-    --opt-success: 142 71% 45%;
+    --opt-success: var(--brand-mint);
     --opt-info: 217 91% 60%;
     
     /* Accent Gradient */
-    --opt-accent-start: 280 100% 70%;
-    --opt-accent-end: 200 100% 60%;
+    --opt-accent-start: var(--brand-mint);
+    --opt-accent-end: 174 72% 42%;
     
     /* Legacy shadcn variables */
     --background: 0 0% 0%;
@@ -44,7 +47,7 @@
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 18%;
     --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+    --ring: var(--brand-mint);
     --radius: 0.75rem;
   }
 }
@@ -60,7 +63,7 @@ html {
 
 body {
   margin: 0;
-  font-family: 'Sora', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: hsl(var(--opt-black));
@@ -68,9 +71,9 @@ body {
   line-height: 1.6;
 }
 
-/* Headings - Sora Bold */
+/* Product hierarchy */
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Sora', sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -342,13 +345,13 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Focus States */
 *:focus-visible {
-  outline: 2px solid hsl(var(--opt-info));
+  outline: 2px solid hsl(var(--brand-mint));
   outline-offset: 2px;
 }
 
 /* Selection */
 ::selection {
-  background: hsl(var(--opt-info) / 0.3);
+  background: hsl(var(--brand-mint) / 0.3);
   color: hsl(var(--opt-text));
 }
 

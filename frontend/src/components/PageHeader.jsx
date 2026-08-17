@@ -1,7 +1,7 @@
-import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import { User, ChevronDown } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import BrandLogo from './BrandLogo'
 
 function PageHeader() {
   const { user, isAuthenticated, signOut } = useAuth()
@@ -17,12 +17,7 @@ function PageHeader() {
       <div className="px-6">
         <div className="flex items-center justify-between">
           {/* Left: Logo */}
-          <Link
-            to="/"
-            className="text-xl font-bold text-white tracking-tight hover:text-zinc-200 transition-colors"
-          >
-            OptListing
-          </Link>
+          <BrandLogo to="/" size="sm" className="hover:opacity-90 transition-opacity" />
 
           {/* Right: User Profile / Logout */}
           {isAuthenticated && (
