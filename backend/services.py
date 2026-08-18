@@ -8,6 +8,55 @@ import pandas as pd
 from io import StringIO
 import re
 import json
+import logging
+
+# Initialize logger for this module
+logger = logging.getLogger(__name__)
+
+
+def detect_shopify_routing(
+    sku: str = "",
+    image_url: str = "",
+    title: str = "",
+    brand: str = ""
+) -> bool:
+    """
+    Detect whether product goes through Shopify.
+    
+    Returns: True if product goes through Shopify, False otherwise
+    
+    Detection Methods:
+    1. SKU pattern: "SHOP-", "SH-", "Shopify-", "SHOPIFY-"
+    2. Image URL: Shopify-related domains (cdn.shopify.com, *.myshopify.com)
+    3. Shopify keywords in Title/Brand
+    """
+    sku_upper = sku.upper() if sku else ""
+    image_url_lower = image_url.lower() if image_url else ""
+    title_lower = title.lower() if title else ""
+    brand_lower = brand.lower() if brand else ""
+    
+    # SKU pattern check
+    shopify_sku_patterns = ["SHOP-", "SH-", "SHOPIFY-", "SHOPIFY", "SHOP"]
+    if any(sku_upper.startswith(pattern) for pattern in shopify_sku_patterns):
+        return True
+    
+    # Image URL pattern check
+    shopify_url_patterns = [
+        "cdn.shopify.com",
+        ".myshopify.com",
+        "shopifycdn.com",
+        "shopify.com"
+    ]
+    if any(pattern in image_url_lower for pattern in shopify_url_patterns):
+        return True
+    
+    # Shopify keywords in Title/Brand
+    search_text = f"{title_lower} {brand_lower}".strip()
+    shopify_keywords = ["shopify", "shopify store", "via shopify"]
+    if any(keyword in search_text for keyword in shopify_keywords):
+        return True
+    
+    return False
 
 
 def extract_supplier_info(
@@ -29,16 +78,60 @@ def extract_supplier_info(
     - Walmart: If SKU has "WM", extract the ID -> save to supplier_id
     - AliExpress/Others: Regex matching logic
     - Fallback: If unknown, set supplier_name="Unverified"
+    
+    Note: Shopify routing is detected by separate function detect_shopify_routing()
     """
     sku_upper = sku.upper() if sku else ""
     image_url_lower = image_url.lower() if image_url else ""
     title_lower = title.lower() if title else ""
     brand_lower = brand.lower() if brand else ""
     
+    # Extract supplier hints from SKU (refined parsing)
+    # SKU pattern examples:
+    # - "AMZ-B08ABC1234" -> Amazon
+    # - "WM-123456" -> Walmart
+    # - "AE-789012" -> AliExpress
+    # - "CJ-345678" -> CJ Dropshipping
+    # - "SHOP-AMZ-B08ABC1234" -> Shopify via Amazon
+    # - "AUTODS-B08ABC1234" -> AutoDS
+    # - "YABALLE-AMZ-123" -> Yaballe
+    # - "B08ABC1234" -> ASIN only -> Amazon
+    
+    # Split SKU by hyphen (-) or underscore (_) for analysis
+    sku_parts = re.split(r'[-_]', sku_upper)
+    
     # Amazon Detection
     # Pattern 1: SKU starts with "AMZ" or contains "B0" (ASIN pattern)
     amazon_asin_pattern = r'B0[0-9A-Z]{8}'  # ASIN format: B + 9 alphanumeric
-    if sku_upper.startswith("AMZ") or re.search(amazon_asin_pattern, sku_upper):
+    
+    # Amazon SKU pattern (extended)
+    amazon_sku_patterns = ["AMZ", "AMAZON", "AUTODS"]  # AutoDS usually Amazon products
+    amazon_in_sku = (
+        sku_upper.startswith("AMZ") or
+        any(part in amazon_sku_patterns for part in sku_parts) or
+        re.search(amazon_asin_pattern, sku_upper)  # ASIN pattern -> Amazon
+    )
+    
+    # Amazon Image URL pattern (enhanced)
+    amazon_url_patterns = [
+        "ssl-images-amazon.com",
+        "images-na.ssl-images-amazon.com",
+        "m.media-amazon.com",
+        "images.amazon.com",
+        "amazon-adsystem.com"
+    ]
+    
+    # Amazon Title/Brand keywords
+    amazon_keywords = ["amazon basics", "solimo", "happy belly"]
+    
+    # Amazon detection (priority: SKU > Image URL > Title/Brand)
+    is_amazon = (
+        amazon_in_sku or
+        any(pattern in image_url_lower for pattern in amazon_url_patterns) or
+        any(keyword in title_lower or keyword in brand_lower for keyword in amazon_keywords)
+    )
+    
+    if is_amazon:
         # Extract ASIN
         asin_match = re.search(amazon_asin_pattern, sku_upper)
         if asin_match:
@@ -57,7 +150,31 @@ def extract_supplier_info(
         return ("Amazon", supplier_id)
     
     # Walmart Detection
-    if sku_upper.startswith("WM") or "WALMART" in image_url_lower:
+    # Walmart SKU pattern (extended)
+    walmart_sku_patterns = ["WM", "WALMART", "WMT"]
+    walmart_in_sku = (
+        sku_upper.startswith("WM") or
+        any(part in walmart_sku_patterns for part in sku_parts)
+    )
+    
+    # Walmart Image URL pattern (enhanced)
+    walmart_url_patterns = [
+        "walmartimages.com",
+        "i5.walmartimages.com",
+        "i.walmartimages.com",
+        "walmart.com/images"
+    ]
+    
+    # Walmart Title/Brand keywords
+    walmart_keywords = ["mainstays", "great value", "equate", "pen+gear", "pen & gear", "hyper tough"]
+    
+    is_walmart = (
+        walmart_in_sku or
+        any(pattern in image_url_lower for pattern in walmart_url_patterns) or
+        any(keyword in title_lower or keyword in brand_lower for keyword in walmart_keywords)
+    )
+    
+    if is_walmart:
         # Extract Walmart ID (usually after "WM-" prefix)
         if sku_upper.startswith("WM"):
             walmart_id = sku_upper.replace("WM", "").strip("-").strip()
@@ -67,7 +184,29 @@ def extract_supplier_info(
         return ("Walmart", supplier_id)
     
     # AliExpress Detection
-    if sku_upper.startswith("AE") or sku_upper.startswith("ALI") or "aliexpress" in image_url_lower or "alicdn" in image_url_lower:
+    # AliExpress SKU pattern (extended)
+    aliexpress_sku_patterns = ["AE", "ALI", "ALIEXPRESS", "ALI-EXPRESS"]
+    aliexpress_in_sku = (
+        sku_upper.startswith("AE") or
+        sku_upper.startswith("ALI") or
+        any(part in aliexpress_sku_patterns for part in sku_parts)
+    )
+    
+    # AliExpress Image URL pattern (enhanced)
+    aliexpress_url_patterns = [
+        "alicdn.com",
+        "ae01.alicdn.com",
+        "ae02.alicdn.com",
+        "ae03.alicdn.com",
+        "aliexpress.com"
+    ]
+    
+    is_aliexpress = (
+        aliexpress_in_sku or
+        any(pattern in image_url_lower for pattern in aliexpress_url_patterns)
+    )
+    
+    if is_aliexpress:
         # Extract AliExpress product ID
         if sku_upper.startswith("AE") or sku_upper.startswith("ALI"):
             ali_id = sku_upper.replace("AE", "").replace("ALI", "").strip("-").strip()
@@ -77,48 +216,244 @@ def extract_supplier_info(
         return ("AliExpress", supplier_id)
     
     # CJ Dropshipping
-    if sku_upper.startswith("CJ") or "cjdropshipping" in image_url_lower:
+    cj_sku_patterns = ["CJ", "CJDROPSHIPPING", "CJ-DROP"]
+    cj_url_patterns = ["cjdropshipping.com", "cjdropshipping"]
+    cj_in_sku = sku_upper.startswith("CJ") or any(part in cj_sku_patterns for part in sku_parts)
+    if cj_in_sku or any(pattern in image_url_lower for pattern in cj_url_patterns):
         cj_id = sku_upper.replace("CJ", "").strip("-").strip() if sku_upper.startswith("CJ") else None
         return ("CJ Dropshipping", cj_id)
     
     # Home Depot
-    if sku_upper.startswith("HD") or "homedepot" in image_url_lower:
+    hd_sku_patterns = ["HD", "HOMEDEPOT", "HOME-DEPOT"]
+    hd_url_patterns = ["homedepot.com", "homedepot"]
+    hd_keywords = ["husky", "hdx", "glacier bay"]
+    hd_in_sku = sku_upper.startswith("HD") or any(part in hd_sku_patterns for part in sku_parts)
+    is_hd = (
+        hd_in_sku or
+        any(pattern in image_url_lower for pattern in hd_url_patterns) or
+        any(keyword in title_lower or keyword in brand_lower for keyword in hd_keywords)
+    )
+    if is_hd:
         hd_id = sku_upper.replace("HD", "").strip("-").strip() if sku_upper.startswith("HD") else None
         return ("Home Depot", hd_id)
     
     # Wayfair
-    if sku_upper.startswith("WF") or "wayfair" in image_url_lower:
+    wf_sku_patterns = ["WF", "WAYFAIR"]
+    wf_url_patterns = ["wayfair.com", "wayfair"]
+    wf_keywords = ["wayfair basics", "mercury row"]
+    wf_in_sku = sku_upper.startswith("WF") or any(part in wf_sku_patterns for part in sku_parts)
+    is_wf = (
+        wf_in_sku or
+        any(pattern in image_url_lower for pattern in wf_url_patterns) or
+        any(keyword in title_lower or keyword in brand_lower for keyword in wf_keywords)
+    )
+    if is_wf:
         wf_id = sku_upper.replace("WF", "").strip("-").strip() if sku_upper.startswith("WF") else None
         return ("Wayfair", wf_id)
     
     # Costco
-    if sku_upper.startswith("CO") or "costco" in image_url_lower:
+    costco_sku_patterns = ["CO", "COSTCO"]
+    costco_keywords = ["kirkland", "kirkland signature"]
+    costco_in_sku = sku_upper.startswith("CO") or any(part in costco_sku_patterns for part in sku_parts)
+    is_costco = (
+        costco_in_sku or
+        "costco.com" in image_url_lower or
+        any(keyword in title_lower or keyword in brand_lower for keyword in costco_keywords)
+    )
+    if is_costco:
         co_id = sku_upper.replace("CO", "").strip("-").strip() if sku_upper.startswith("CO") else None
         return ("Costco", co_id)
     
     # Costway
-    if sku_upper.startswith("CW") or "costway" in image_url_lower:
+    cw_sku_patterns = ["CW", "COSTWAY"]
+    cw_in_sku = sku_upper.startswith("CW") or any(part in cw_sku_patterns for part in sku_parts)
+    if cw_in_sku or "costway" in image_url_lower:
         cw_id = sku_upper.replace("CW", "").strip("-").strip() if sku_upper.startswith("CW") else None
         return ("Costway", cw_id)
     
+    # ============================================
+    # Automation tool detection (AutoDS, Yaballe, etc.)
+    # Priority: automation tool > supplier
+    # ============================================
+    
+    # AutoDS detection
+    # AutoDS SKU pattern: "AUTODS-", "ADS-", "AD-", "AUTODS", "AUTODS-AMZ-", "AUTODS-WM-"
+    autods_sku_patterns = ["AUTODS", "ADS", "AD"]
+    autods_in_sku = (
+        sku_upper.startswith("AUTODS") or
+        sku_upper.startswith("ADS") or
+        sku_upper.startswith("AD-") or
+        any(part in autods_sku_patterns for part in sku_parts)
+    )
+    
+    # AutoDS Image URL pattern
+    autods_url_patterns = ["autods.com", "autods.io"]
+    
+    is_autods = (
+        autods_in_sku or
+        any(pattern in image_url_lower for pattern in autods_url_patterns) or
+        "autods" in title_lower
+    )
+    
+    if is_autods:
+        # Try to extract actual supplier from AutoDS SKU (e.g. "AUTODS-AMZ-B08ABC1234" -> "B08ABC1234")
+        # Pattern: remove AutoDS prefix, extract supplier ID from remainder
+        # Supported: AUTODS-, ADS-, AD-, AL- (AutoDS variants)
+        remaining_sku = None
+        if sku_upper.startswith("AUTODS"):
+            remaining_sku = sku_upper.replace("AUTODS", "", 1).strip("-").strip()
+        elif sku_upper.startswith("ADS-"):
+            remaining_sku = sku_upper.replace("ADS-", "", 1).strip()
+        elif sku_upper.startswith("ADS"):
+            remaining_sku = sku_upper.replace("ADS", "", 1).strip("-").strip()
+        elif sku_upper.startswith("AD-"):
+            remaining_sku = sku_upper.replace("AD-", "", 1).strip()
+        elif sku_upper.startswith("AL-") and not sku_upper.startswith("ALI"):  # AL- = AutoDS, ALI- = AliExpress
+            remaining_sku = sku_upper.replace("AL-", "", 1).strip()
+        
+        # Extract supplier ID from remaining SKU (recursive parsing)
+        supplier_id = None
+        if remaining_sku:
+            # Analyze parts split by hyphen
+            remaining_parts = re.split(r'[-_]', remaining_sku)
+            
+            # Find Amazon ASIN pattern (10 chars starting with B0)
+            amazon_asin_pattern = r'B0[0-9A-Z]{8}'
+            asin_match = re.search(amazon_asin_pattern, remaining_sku)
+            if asin_match:
+                supplier_id = asin_match.group(0)
+            # Find ASIN after removing AMZ prefix
+            elif remaining_parts and remaining_parts[0] == "AMZ" and len(remaining_parts) > 1:
+                # "AMZ-B08ABC1234" → "B08ABC1234"
+                for part in remaining_parts[1:]:
+                    if re.match(amazon_asin_pattern, part):
+                        supplier_id = part
+                        break
+                if not supplier_id:
+                    # If no ASIN pattern, use remainder as ID
+                    supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
+            # Walmart pattern (remove WM prefix)
+            elif remaining_parts and remaining_parts[0] in ["WM", "WMT", "WALMART"]:
+                # "WM-123456" → "123456"
+                supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
+            # AliExpress pattern (remove AE, ALI prefix)
+            elif remaining_parts and remaining_parts[0] in ["AE", "ALI", "ALIEXPRESS"]:
+                # "AE-789012" → "789012"
+                supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
+            # Other supplier patterns
+            elif remaining_parts and remaining_parts[0] in ["CJ", "HD", "WF", "CO", "CW", "BG"]:
+                # "CJ-345678" → "345678"
+                supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
+            else:
+                # If no pattern, use full string as ID (excluding AutoDS prefix)
+                supplier_id = remaining_sku if remaining_sku else None
+        
+        return ("AutoDS", supplier_id)
+    
+    # Yaballe detection
+    # Yaballe SKU pattern: "YAB-", "YB-", "YABALLE-", "YABALLE", "YABALLE-AMZ-"
+    yaballe_sku_patterns = ["YABALLE", "YAB", "YB"]
+    yaballe_in_sku = (
+        sku_upper.startswith("YABALLE") or
+        sku_upper.startswith("YAB-") or
+        sku_upper.startswith("YB-") or
+        any(part in yaballe_sku_patterns for part in sku_parts)
+    )
+    
+    yaballe_url_patterns = ["yaballe.com", "yaballe.io"]
+    
+    is_yaballe = (
+        yaballe_in_sku or
+        any(pattern in image_url_lower for pattern in yaballe_url_patterns) or
+        "yaballe" in title_lower
+    )
+    
+    if is_yaballe:
+        # Try to extract supplier from Yaballe SKU (e.g. "YABALLE-AMZ-B08ABC1234" -> "B08ABC1234")
+        # Pattern: remove Yaballe prefix, extract supplier ID from remainder
+        remaining_sku = None
+        if sku_upper.startswith("YABALLE"):
+            remaining_sku = sku_upper.replace("YABALLE", "", 1).strip("-").strip()
+        elif sku_upper.startswith("YAB-"):
+            remaining_sku = sku_upper.replace("YAB-", "", 1).strip()
+        elif sku_upper.startswith("YB-"):
+            remaining_sku = sku_upper.replace("YB-", "", 1).strip()
+        elif sku_upper.startswith("YAB"):
+            remaining_sku = sku_upper.replace("YAB", "", 1).strip("-").strip()
+        elif sku_upper.startswith("YB"):
+            remaining_sku = sku_upper.replace("YB", "", 1).strip("-").strip()
+        
+        # Extract supplier ID from remaining SKU (recursive parsing)
+        supplier_id = None
+        if remaining_sku:
+            # Analyze parts split by hyphen
+            remaining_parts = re.split(r'[-_]', remaining_sku)
+            
+            # Find Amazon ASIN pattern (10 chars starting with B0)
+            amazon_asin_pattern = r'B0[0-9A-Z]{8}'
+            asin_match = re.search(amazon_asin_pattern, remaining_sku)
+            if asin_match:
+                supplier_id = asin_match.group(0)
+            # Find ASIN after removing AMZ prefix
+            elif remaining_parts and remaining_parts[0] == "AMZ" and len(remaining_parts) > 1:
+                # "AMZ-B08ABC1234" → "B08ABC1234"
+                for part in remaining_parts[1:]:
+                    if re.match(amazon_asin_pattern, part):
+                        supplier_id = part
+                        break
+                if not supplier_id:
+                    # If no ASIN pattern, use remainder as ID
+                    supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
+            # Walmart pattern (remove WM prefix)
+            elif remaining_parts and remaining_parts[0] in ["WM", "WMT", "WALMART"]:
+                # "WM-123456" → "123456"
+                supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
+            # AliExpress pattern (remove AE, ALI prefix)
+            elif remaining_parts and remaining_parts[0] in ["AE", "ALI", "ALIEXPRESS"]:
+                # "AE-789012" → "789012"
+                supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
+            # Other supplier patterns
+            elif remaining_parts and remaining_parts[0] in ["CJ", "HD", "WF", "CO", "CW", "BG"]:
+                # "CJ-345678" → "345678"
+                supplier_id = "-".join(remaining_parts[1:]) if len(remaining_parts) > 1 else None
+            else:
+                # If no pattern, use full string as ID (excluding Yaballe prefix)
+                supplier_id = remaining_sku if remaining_sku else None
+        
+        return ("Yaballe", supplier_id)
+    
     # Pro Aggregators
-    if sku_upper.startswith("W2B") or "wholesale2b" in image_url_lower:
+    w2b_sku_patterns = ["W2B", "WHOLESALE2B", "WHOLESALE-2B"]
+    w2b_in_sku = sku_upper.startswith("W2B") or any(part in w2b_sku_patterns for part in sku_parts)
+    if w2b_in_sku or "wholesale2b" in image_url_lower:
         w2b_id = sku_upper.replace("W2B", "").strip("-").strip() if sku_upper.startswith("W2B") else None
         return ("Wholesale2B", w2b_id)
     
-    if sku_upper.startswith("SPK") or "spocket" in image_url_lower:
+    spk_sku_patterns = ["SPK", "SPOCKET"]
+    spk_in_sku = sku_upper.startswith("SPK") or any(part in spk_sku_patterns for part in sku_parts)
+    if spk_in_sku or "spocket" in image_url_lower:
         spk_id = sku_upper.replace("SPK", "").strip("-").strip() if sku_upper.startswith("SPK") else None
         return ("Spocket", spk_id)
     
-    if sku_upper.startswith("SH") or "salehoo" in image_url_lower:
+    # SaleHoo (note: "SH" may conflict with Shopify; use more specific pattern)
+    salehoo_sku_patterns = ["SH", "SALEHOO", "SALE-HOO"]
+    salehoo_in_sku = (
+        (sku_upper.startswith("SH") and not any(shopify_part in sku_parts for shopify_part in ["SHOP", "SHOPIFY"])) or
+        any(part in salehoo_sku_patterns for part in sku_parts)
+    )
+    if salehoo_in_sku or "salehoo" in image_url_lower:
         sh_id = sku_upper.replace("SH", "").strip("-").strip() if sku_upper.startswith("SH") else None
         return ("SaleHoo", sh_id)
     
-    if sku_upper.startswith("IS") or "inventorysource" in image_url_lower:
+    is_sku_patterns = ["IS", "INVENTORYSOURCE", "INVENTORY-SOURCE"]
+    is_in_sku = sku_upper.startswith("IS") or any(part in is_sku_patterns for part in sku_parts)
+    if is_in_sku or "inventorysource" in image_url_lower:
         is_id = sku_upper.replace("IS", "").strip("-").strip() if sku_upper.startswith("IS") else None
         return ("Inventory Source", is_id)
     
-    if sku_upper.startswith("DF") or "dropified" in image_url_lower:
+    df_sku_patterns = ["DF", "DROPIFIED"]
+    df_in_sku = sku_upper.startswith("DF") or any(part in df_sku_patterns for part in sku_parts)
+    if df_in_sku or "dropified" in image_url_lower:
         df_id = sku_upper.replace("DF", "").strip("-").strip() if sku_upper.startswith("DF") else None
         return ("Dropified", df_id)
     
@@ -293,11 +628,11 @@ def analyze_zombie_listings(
     db: Session,
     user_id: str,
     min_days: int = 7,               # Legacy: analytics_period_days
-    max_sales: int = 0,              # 2. 기간 내 판매 건수
+    max_sales: int = 0,              # 2. Sales in period
     max_watch_count: int = 0,        # Legacy: max_watches
-    max_watches: int = 0,            # 3. 찜하기 (Watch)
-    max_impressions: int = 100,      # 4. 총 노출 횟수
-    max_views: int = 10,             # 5. 총 조회 횟수
+    max_watches: int = 0,            # 3. Watches
+    max_impressions: int = 100,      # 4. Impressions
+    max_views: int = 10,             # 5. Views
     supplier_filter: str = "All",
     platform_filter: str = "eBay",   # MVP Scope: Default to eBay (only eBay and Shopify supported)
     store_id: Optional[str] = None,
@@ -305,15 +640,15 @@ def analyze_zombie_listings(
     limit: int = 100                 # Pagination: limit to N records
 ) -> Tuple[List[Listing], Dict[str, int]]:
     """
-    OptListing 최종 좀비 분석 필터
-    순서: 판매(Sales) → 관심(Watch) → 트래픽(Traffic)
+    OptListing zombie analysis filter.
+    Order: Sales -> Watch -> Traffic.
     
-    필터 순서 (eBay 셀러의 자연스러운 판단 흐름):
-    1. analytics_period_days (min_days): 분석 기준 기간 (기본 7일)
-    2. max_sales: 기간 내 판매 건수 (기본 0건 = No Sale)
-    3. max_watches: 찜하기/Watch (기본 0건)
-    4. max_impressions: 총 노출 횟수 (기본 100회 미만)
-    5. max_views: 총 조회 횟수 (기본 10회 미만)
+    Filter order (eBay seller flow):
+    1. analytics_period_days (min_days): analysis period (default 7 days)
+    2. max_sales: sales in period (default 0 = No Sale)
+    3. max_watches: watches (default 0)
+    4. max_impressions: impressions (default < 100)
+    5. max_views: views (default < 10)
     
     Uses metrics JSONB field for flexible filtering:
     - metrics['sales']['total_sales'] or metrics['sales']
@@ -333,6 +668,8 @@ def analyze_zombie_listings(
     max_impressions = max(0, max_impressions)
     max_views = max(0, max_views)
     
+    # Date filter: include only listings listed at least min_days ago (e.g. 7+ days)
+    # e.g. today Dec 13, min_days=7 -> cutoff_date = Dec 6; date_listed < Dec 6 = listed 7+ days ago
     cutoff_date = date.today() - timedelta(days=min_days)
     
     # Build query with filters
@@ -351,24 +688,24 @@ def analyze_zombie_listings(
     # If store_id is 'all' or None, DO NOT filter by store (return all for user)
     
     # Date filter: use metrics['date_listed'] (JSONB) or fallback to date_listed/last_synced_at
-    # ✅ FIX: JSONB 연산자 안전하게 처리 및 NULL 체크 강화
+    # FIX: safe JSONB ops and NULL checks
     date_filters = []
     
-    # Use metrics JSONB if available (안전한 방식)
-    # ✅ FIX: hasattr 제거 (SQL 쿼리 레벨에서 의미 없음), NULL 체크 강화
+    # Use metrics JSONB if available (safe)
+    # FIX: no hasattr at query level; enforce NULL checks
     date_filters.append(
         and_(
             Listing.metrics.isnot(None),
             Listing.metrics.has_key('date_listed'),
-            # ✅ FIX: jsonb_typeof으로 타입 확인 후 안전하게 추출
+            # FIX: check type with jsonb_typeof then extract safely
             or_(
-                # JSONB 값이 문자열인 경우
+                # JSONB value is string
                 and_(
                     func.jsonb_typeof(Listing.metrics['date_listed']) == 'string',
                     Listing.metrics['date_listed'].astext.isnot(None),
                     cast(Listing.metrics['date_listed'].astext, Date) < cutoff_date
                 ),
-                # JSONB 값이 숫자(타임스탬프)인 경우
+                # JSONB value is number (timestamp)
                 and_(
                     func.jsonb_typeof(Listing.metrics['date_listed']) == 'number',
                     Listing.metrics['date_listed'].astext.isnot(None),
@@ -409,36 +746,35 @@ def analyze_zombie_listings(
         )
     )
     
-    # 날짜 필터가 하나라도 있으면 적용
+    # Apply if any date filter present
     if date_filters:
         query = query.filter(or_(*date_filters))
     
     # Sales filter: use metrics['sales'] (JSONB) with robust casting
-    # ✅ FIX: JSONB 연산자 안전하게 처리 및 타입 검증 추가
+    # FIX: safe JSONB ops and type validation
+    # FIX: when metrics missing, use direct fields (quantity_sold, sold_qty) as fallback
     if max_sales is not None and max_sales >= 0:
         # Use CASE to safely handle NULL metrics or missing keys
-        # ✅ FIX: hasattr 제거, 타입 검증 추가 및 안전한 캐스팅
         sales_value = case(
             (
                 and_(
                     Listing.metrics.isnot(None),
                     Listing.metrics.has_key('sales'),
-                    # ✅ FIX: JSONB 값이 숫자 또는 문자열인지 확인
                     func.jsonb_typeof(Listing.metrics['sales']).in_(['number', 'string']),
-                    # ✅ FIX: NULL 체크 추가
                     Listing.metrics['sales'].astext.isnot(None)
                 ),
-                # ✅ FIX: 안전한 타입 변환 (JSONB ->> 텍스트 추출 후 Integer로 변환)
-                cast(
-                    Listing.metrics['sales'].astext,
-                    Integer
-                )
+                cast(Listing.metrics['sales'].astext, Integer)
             ),
-            else_=0
+            # Fallback to direct fields: quantity_sold or sold_qty
+            else_=func.coalesce(
+                func.coalesce(Listing.quantity_sold, 0),
+                func.coalesce(Listing.sold_qty, 0),
+                0
+            )
         )
         query = query.filter(sales_value <= max_sales)
     
-    # 3. Watch/찜하기 필터: metrics['watches'] or metrics['watches']['total_watches']
+    # 3. Watch filter: metrics['watches'] or metrics['watches']['total_watches']
     if effective_max_watches is not None and effective_max_watches >= 0:
         watches_value = case(
             # Try nested structure first: metrics['watches']['total_watches']
@@ -466,34 +802,37 @@ def analyze_zombie_listings(
         )
         query = query.filter(watches_value <= effective_max_watches)
     
-    # 4. Impressions/노출 필터: metrics['impressions'] or metrics['impressions']['total_impressions']
+    # 4. Impressions filter: metrics['impressions'] or metrics['impressions']['total_impressions']
+    # FIX: if metrics has no impressions, skip filter (include all)
     if max_impressions is not None and max_impressions > 0:
-        impressions_value = case(
-            # Try nested structure first
-            (
-                and_(
-                    Listing.metrics.isnot(None),
-                    Listing.metrics.has_key('impressions'),
-                    func.jsonb_typeof(Listing.metrics['impressions']) == 'object',
-                    Listing.metrics['impressions'].has_key('total_impressions')
-                ),
-                cast(Listing.metrics['impressions']['total_impressions'].astext, Integer)
+        # Filter only items that have impressions in metrics
+        impressions_filter = or_(
+            # Nested structure: metrics['impressions']['total_impressions']
+            and_(
+                Listing.metrics.isnot(None),
+                Listing.metrics.has_key('impressions'),
+                func.jsonb_typeof(Listing.metrics['impressions']) == 'object',
+                Listing.metrics['impressions'].has_key('total_impressions'),
+                cast(Listing.metrics['impressions']['total_impressions'].astext, Integer) < max_impressions
             ),
-            # Then try flat structure
-            (
-                and_(
-                    Listing.metrics.isnot(None),
-                    Listing.metrics.has_key('impressions'),
-                    func.jsonb_typeof(Listing.metrics['impressions']).in_(['number', 'string']),
-                    Listing.metrics['impressions'].astext.isnot(None)
-                ),
-                cast(Listing.metrics['impressions'].astext, Integer)
+            # Flat structure: metrics['impressions']
+            and_(
+                Listing.metrics.isnot(None),
+                Listing.metrics.has_key('impressions'),
+                func.jsonb_typeof(Listing.metrics['impressions']).in_(['number', 'string']),
+                Listing.metrics['impressions'].astext.isnot(None),
+                cast(Listing.metrics['impressions'].astext, Integer) < max_impressions
             ),
-            else_=0
+            # If no impressions in metrics, pass filter (include all)
+            or_(
+                Listing.metrics == None,
+                ~Listing.metrics.has_key('impressions')
+            )
         )
-        query = query.filter(impressions_value < max_impressions)
+        query = query.filter(impressions_filter)
     
-    # 5. Views/조회 필터: metrics['views'] or metrics['views']['total_views']
+    # 5. Views filter: metrics['views'] or metrics['views']['total_views']
+    # FIX: when metrics missing, use direct fields (view_count, views) as fallback
     if max_views is not None and max_views > 0:
         views_value = case(
             # Try nested structure first
@@ -516,14 +855,16 @@ def analyze_zombie_listings(
                 ),
                 cast(Listing.metrics['views'].astext, Integer)
             ),
-            else_=0
+            # Fallback to direct fields: view_count (defined on Listing model)
+            # FIX: use view_count field (defined on Listing model)
+            else_=func.coalesce(Listing.view_count, 0)
         )
         query = query.filter(views_value < max_views)
     
     # Apply platform filter (MVP Scope: Only eBay and Shopify)
-    # ✅ FIX: platform 필드가 없으면 marketplace 사용
+    # FIX: if platform missing use marketplace
     if platform_filter and platform_filter in ["eBay", "Shopify"]:
-        # platform 필드가 있으면 사용, 없으면 marketplace 사용
+        # Use platform if present, else marketplace
         if hasattr(Listing, 'platform'):
             query = query.filter(Listing.platform == platform_filter)
         else:
@@ -544,7 +885,7 @@ def analyze_zombie_listings(
         current_platforms.add(platform_filter)
     else:
         # If filtering all platforms, get all platforms from zombies
-        # ✅ FIX: platform 필드가 없으면 marketplace 사용
+        # FIX: if platform missing use marketplace
         for z in zombies:
             platform = getattr(z, 'platform', None) or getattr(z, 'marketplace', None) or "Unknown"
             current_platforms.add(platform)
@@ -562,7 +903,7 @@ def analyze_zombie_listings(
         is_active_elsewhere = False
         if zombie.supplier_id:
             # Find all other listings with the same supplier_id in OTHER platforms
-            # ✅ FIX: platform 필드가 없으면 marketplace 사용
+            # FIX: if platform missing use marketplace
             zombie_platform = getattr(zombie, 'platform', None) or getattr(zombie, 'marketplace', None)
             if hasattr(Listing, 'platform'):
                 other_listings_query = db.query(Listing).filter(
@@ -634,7 +975,7 @@ def analyze_zombie_listings(
         except Exception as e:
             # If commit fails due to missing columns, rollback and continue
             db.rollback()
-            print(f"Warning: Could not update flags (columns may not exist): {e}")
+            logger.warning(f"Could not update flags (columns may not exist): {e}")
     
     # Sort zombies: Primary by is_active_elsewhere (DESC - True first), Secondary by age (oldest first)
     def sort_key(z):
@@ -668,33 +1009,279 @@ def analyze_zombie_listings(
     # Calculate Store-Level Breakdown: Group zombies by platform
     zombie_breakdown = {}
     for zombie in zombies:
-        # ✅ FIX: platform 필드가 없으면 marketplace 사용
+        # FIX: if platform missing use marketplace
         platform = getattr(zombie, 'platform', None) or getattr(zombie, 'marketplace', None) or "Unknown"
         zombie_breakdown[platform] = zombie_breakdown.get(platform, 0) + 1
     
     return zombies, zombie_breakdown
 
 
-def upsert_listings(db: Session, listings: List[Listing]) -> int:
+def count_low_performing_candidates(
+    db: Session,
+    user_id: str,
+    min_days: int = 7,
+    max_sales: int = 0,
+    max_watch_count: int = 0,
+    max_watches: int = 0,
+    max_impressions: int = 100,
+    max_views: int = 10,
+    supplier_filter: str = "All",
+    platform_filter: str = "eBay",
+    store_id: Optional[str] = None
+) -> int:
+    """
+    Count SKUs matching filter (number of active listings matching filter).
+    Uses same filter logic as analyze_zombie_listings but returns count only.
+    Does not perform analysis; no credit deduction.
+    
+    Returns:
+        int: Number of SKUs matching filter
+    """
+    # Ensure values are non-negative
+    min_days = max(0, min_days)
+    max_sales = max(0, max_sales)
+    effective_max_watches = max(0, max_watches if max_watches > 0 else max_watch_count)
+    max_impressions = max(0, max_impressions)
+    max_views = max(0, max_views)
+    
+    # Date filter
+    cutoff_date = date.today() - timedelta(days=min_days)
+    
+    # Build query with filters (same logic as analyze_zombie_listings)
+    query = db.query(Listing).filter(
+        Listing.user_id == user_id
+    )
+    
+    # Apply store filter if store_id is provided and not 'all'
+    if store_id and store_id != 'all':
+        if hasattr(Listing, 'store_id'):
+            query = query.filter(Listing.store_id == store_id)
+    
+    # Date filter (same logic as analyze_zombie_listings)
+    date_filters = []
+    date_filters.append(
+        and_(
+            Listing.metrics.isnot(None),
+            Listing.metrics.has_key('date_listed'),
+            or_(
+                and_(
+                    func.jsonb_typeof(Listing.metrics['date_listed']) == 'string',
+                    Listing.metrics['date_listed'].astext.isnot(None),
+                    cast(Listing.metrics['date_listed'].astext, Date) < cutoff_date
+                ),
+                and_(
+                    func.jsonb_typeof(Listing.metrics['date_listed']) == 'number',
+                    Listing.metrics['date_listed'].astext.isnot(None),
+                    cast(
+                        func.to_timestamp(cast(Listing.metrics['date_listed'].astext, Integer)),
+                        Date
+                    ) < cutoff_date
+                )
+            )
+        )
+    )
+    date_filters.append(
+        and_(
+            or_(
+                Listing.metrics == None,
+                ~Listing.metrics.has_key('date_listed')
+            ),
+            Listing.date_listed.isnot(None),
+            Listing.date_listed < cutoff_date
+        )
+    )
+    date_filters.append(
+        and_(
+            or_(
+                Listing.metrics == None,
+                ~Listing.metrics.has_key('date_listed')
+            ),
+            or_(
+                Listing.date_listed == None,
+                Listing.date_listed.is_(None)
+            ),
+            Listing.last_synced_at.isnot(None),
+            func.date(Listing.last_synced_at) < cutoff_date
+        )
+    )
+    
+    if date_filters:
+        query = query.filter(or_(*date_filters))
+    
+    # Sales filter
+    if max_sales is not None and max_sales >= 0:
+        sales_value = case(
+            (
+                and_(
+                    Listing.metrics.isnot(None),
+                    Listing.metrics.has_key('sales'),
+                    func.jsonb_typeof(Listing.metrics['sales']).in_(['number', 'string']),
+                    Listing.metrics['sales'].astext.isnot(None)
+                ),
+                cast(Listing.metrics['sales'].astext, Integer)
+            ),
+            else_=func.coalesce(
+                func.coalesce(Listing.quantity_sold, 0),
+                func.coalesce(Listing.sold_qty, 0),
+                0
+            )
+        )
+        query = query.filter(sales_value <= max_sales)
+    
+    # Watch filter
+    if effective_max_watches is not None and effective_max_watches >= 0:
+        watches_value = case(
+            (
+                and_(
+                    Listing.metrics.isnot(None),
+                    Listing.metrics.has_key('watches'),
+                    func.jsonb_typeof(Listing.metrics['watches']) == 'object',
+                    Listing.metrics['watches'].has_key('total_watches')
+                ),
+                cast(Listing.metrics['watches']['total_watches'].astext, Integer)
+            ),
+            (
+                and_(
+                    Listing.metrics.isnot(None),
+                    Listing.metrics.has_key('watches'),
+                    func.jsonb_typeof(Listing.metrics['watches']).in_(['number', 'string']),
+                    Listing.metrics['watches'].astext.isnot(None)
+                ),
+                cast(Listing.metrics['watches'].astext, Integer)
+            ),
+            else_=func.coalesce(Listing.watch_count, 0)
+        )
+        query = query.filter(watches_value <= effective_max_watches)
+    
+    # Impressions filter
+    if max_impressions is not None and max_impressions > 0:
+        impressions_filter = or_(
+            and_(
+                Listing.metrics.isnot(None),
+                Listing.metrics.has_key('impressions'),
+                func.jsonb_typeof(Listing.metrics['impressions']) == 'object',
+                Listing.metrics['impressions'].has_key('total_impressions'),
+                cast(Listing.metrics['impressions']['total_impressions'].astext, Integer) < max_impressions
+            ),
+            and_(
+                Listing.metrics.isnot(None),
+                Listing.metrics.has_key('impressions'),
+                func.jsonb_typeof(Listing.metrics['impressions']).in_(['number', 'string']),
+                Listing.metrics['impressions'].astext.isnot(None),
+                cast(Listing.metrics['impressions'].astext, Integer) < max_impressions
+            ),
+            or_(
+                Listing.metrics == None,
+                ~Listing.metrics.has_key('impressions')
+            )
+        )
+        query = query.filter(impressions_filter)
+    
+    # Views filter
+    if max_views is not None and max_views > 0:
+        views_value = case(
+            (
+                and_(
+                    Listing.metrics.isnot(None),
+                    Listing.metrics.has_key('views'),
+                    func.jsonb_typeof(Listing.metrics['views']) == 'object',
+                    Listing.metrics['views'].has_key('total_views')
+                ),
+                cast(Listing.metrics['views']['total_views'].astext, Integer)
+            ),
+            (
+                and_(
+                    Listing.metrics.isnot(None),
+                    Listing.metrics.has_key('views'),
+                    func.jsonb_typeof(Listing.metrics['views']).in_(['number', 'string']),
+                    Listing.metrics['views'].astext.isnot(None)
+                ),
+                cast(Listing.metrics['views'].astext, Integer)
+            ),
+            else_=0  # Fallback: no views data = 0 views
+        )
+        query = query.filter(views_value < max_views)
+    
+    # Apply platform filter
+    if platform_filter and platform_filter in ["eBay", "Shopify"]:
+        if hasattr(Listing, 'platform'):
+            query = query.filter(Listing.platform == platform_filter)
+        else:
+            query = query.filter(Listing.marketplace == platform_filter)
+    
+    # Apply supplier filter if not "All"
+    if supplier_filter and supplier_filter != "All":
+        query = query.filter(Listing.supplier_name == supplier_filter)
+    
+    # Count only (don't fetch actual listings)
+    count = query.count()
+    return count
+
+
+def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Optional[str] = None) -> int:
     """
     UPSERT listings using PostgreSQL's ON CONFLICT DO UPDATE.
     
     This function handles duplicate key conflicts by updating existing records
-    instead of raising IntegrityError. Uses the unique index 'idx_user_platform_item'
+    instead of raising IntegrityError. Uses the unique constraint 'unique_listing_per_user'
     which is on (user_id, platform, item_id).
+    
+    **Auto-detect supplier**: If supplier_name/supplier_id missing, auto-detect from SKU, image_url, title, brand, upc.
     
     For PostgreSQL: Uses INSERT ... ON CONFLICT DO UPDATE
     For SQLite: Falls back to individual INSERT OR REPLACE (less efficient but compatible)
     
     Args:
-        db: Database session
+        db: Database session (managed by caller)
         listings: List of Listing objects to upsert
+        expected_user_id: Optional user_id to enforce on all listings
         
     Returns:
-        Number of listings processed
+        Number of listings processed successfully
+        
+    Performance:
+        - Processes in batches of 20 to prevent memory spikes
+        - Logs execution time for monitoring
     """
+    from datetime import datetime as dt
+    upsert_start_time = dt.utcnow()
+
     if not listings:
         return 0
+    
+    # Step 2: Enforce user_id - if expected_user_id provided, set all listings' user_id
+    if expected_user_id:
+        logger.info("=" * 60)
+        logger.info(f"🔒 [UPSERT] Enforcing user_id mode")
+        logger.info(f"   - Expected user_id: {expected_user_id}")
+        logger.info(f"   - Total listings: {len(listings)}")
+        logger.info("=" * 60)
+        
+        for listing in listings:
+            current_user_id = getattr(listing, 'user_id', None)
+            if current_user_id != expected_user_id:
+                logger.warning(f"⚠️ [UPSERT] user_id mismatch: '{current_user_id}' -> '{expected_user_id}' (enforcing)")
+                listing.user_id = expected_user_id
+            else:
+                logger.debug(f"✅ [UPSERT] user_id match: {current_user_id}")
+    
+    # Auto-detect supplier when supplier_name missing or "Unverified"/"Unknown"
+    for listing in listings:
+        if not listing.supplier_name or listing.supplier_name == "Unverified" or listing.supplier_name == "Unknown":
+            # Use extract_supplier_info for auto-detect
+            supplier_name, supplier_id = extract_supplier_info(
+                sku=listing.sku or "",
+                image_url=listing.image_url or "",
+                title=listing.title or "",
+                brand=listing.brand or "",
+                upc=listing.upc or ""
+            )
+            listing.supplier_name = supplier_name
+            listing.supplier_id = supplier_id
+            listing.source = supplier_name or 'ebay'
+        # DB NOT NULL: ensure source is always set for every listing
+        if not getattr(listing, 'source', None):
+            listing.source = listing.supplier_name or 'ebay'
     
     # Check if we're using PostgreSQL (has insert().on_conflict_do_update)
     # or SQLite (needs different approach)
@@ -710,25 +1297,84 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
         # Prepare data dictionaries for bulk insert
         values_list = []
         for listing in listings:
-            # Convert Listing object to dictionary
-            # ✅ FIX: platform 필드가 없으면 marketplace 사용
-            platform = getattr(listing, 'platform', None) or getattr(listing, 'marketplace', None) or "eBay"
-            # ✅ FIX: item_id 필드가 없으면 ebay_item_id 사용
-            item_id = getattr(listing, 'item_id', None) or getattr(listing, 'ebay_item_id', None) or ""
+            # Auto-detect supplier when missing or "Unverified"/"Unknown"
+            supplier_name = listing.supplier_name
+            supplier_id = listing.supplier_id
             
+            if not supplier_name or supplier_name in ["Unverified", "Unknown", ""]:
+                # Use extract_supplier_info for auto-detect
+                supplier_name, supplier_id = extract_supplier_info(
+                    sku=listing.sku or "",
+                    image_url=listing.image_url or "",
+                    title=listing.title or "",
+                    brand=listing.brand or "",
+                    upc=listing.upc or ""
+                )
+                # Update Listing object for later use
+                listing.supplier_name = supplier_name
+                listing.supplier_id = supplier_id
+                listing.source = supplier_name or 'ebay'
+            
+            # Auto-detect Shopify routing
+            is_shopify = detect_shopify_routing(
+                sku=listing.sku or "",
+                image_url=listing.image_url or "",
+                title=listing.title or "",
+                brand=listing.brand or ""
+            )
+            
+            # Set management_hub in metrics and analysis_meta
+            metrics = listing.metrics if listing.metrics else {}
+            if not isinstance(metrics, dict):
+                metrics = {}
+            
+            analysis_meta = listing.analysis_meta if listing.analysis_meta else {}
+            if not isinstance(analysis_meta, dict):
+                analysis_meta = {}
+            
+            if is_shopify:
+                metrics["management_hub"] = "Shopify"
+                analysis_meta["management_hub"] = "Shopify"
+            
+            # Convert Listing object to dictionary
+            # CRITICAL: always set platform to "eBay" for eBay sync
+            platform = "eBay"  # Must match exactly (case-sensitive)
+            
+            # ✅ CRITICAL: DB unique constraint is (user_id, platform, item_id) - must populate item_id
+            item_id = getattr(listing, 'item_id', None) or getattr(listing, 'ebay_item_id', None) or ""
+            if not item_id:
+                logger.warning(f"⚠️ [UPSERT] Skipping listing with empty item_id/ebay_item_id: title={getattr(listing, 'title', '')[:50]}")
+                continue
+            
+            # CRITICAL: user_id must not be None or empty (no fallback)
+            listing_user_id = expected_user_id if expected_user_id else getattr(listing, 'user_id', None)
+            
+            if not listing_user_id:
+                logger.error(f"❌ [UPSERT] CRITICAL: user_id is None!")
+                logger.error(f"   - listing.user_id: {listing_user_id}")
+                logger.error(f"   - listing.id: {getattr(listing, 'id', 'N/A')}")
+                logger.error(f"   - listing.title: {getattr(listing, 'title', 'N/A')[:50]}")
+                raise ValueError(f"Invalid user_id: {listing_user_id}. user_id is required.")
+            
+            # ✅ FIX: Never access listing.raw_data - use empty dict directly to avoid AttributeError
+            # source: NOT NULL in DB; use supplier name or "ebay" for eBay-synced listings
+            source_value = supplier_name or 'ebay'
             values = {
-                'user_id': getattr(listing, 'user_id', None) or "default-user",
+                'user_id': listing_user_id,
                 'platform': platform,
                 'item_id': item_id,
+                'ebay_item_id': item_id,  # ✅ NOT NULL; unique_listing_per_user is (user_id, platform, item_id)
                 'title': listing.title,
                 'image_url': listing.image_url,
                 'sku': listing.sku,
-                'supplier_name': listing.supplier_name,
-                'supplier_id': listing.supplier_id,
+                'source': source_value,  # ✅ NOT NULL constraint
+                'supplier_name': supplier_name,  # Auto-detected value
+                'supplier_id': supplier_id,  # Auto-detected value
                 'brand': listing.brand,
                 'upc': listing.upc,
-                'metrics': listing.metrics if listing.metrics else {},
-                'raw_data': listing.raw_data if listing.raw_data else {},
+                'metrics': metrics,  # Includes Shopify routing
+                'raw_data': {},  # Always use empty dict - avoid AttributeError completely
+                'analysis_meta': analysis_meta,  # Includes Shopify routing
                 'last_synced_at': listing.last_synced_at if listing.last_synced_at else datetime.utcnow(),
                 'updated_at': datetime.utcnow(),
                 # Legacy fields
@@ -736,58 +1382,160 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
                 'date_listed': listing.date_listed,
                 'sold_qty': listing.sold_qty if listing.sold_qty is not None else 0,
                 'watch_count': listing.watch_count if listing.watch_count is not None else 0,
+                'view_count': listing.view_count if hasattr(listing, 'view_count') and listing.view_count is not None else 0,
             }
             values_list.append(values)
         
-        # Use PostgreSQL's INSERT ... ON CONFLICT DO UPDATE
-        stmt = insert(table).values(values_list)
+        # ✅ BATCH PROCESSING: Process in chunks of 20 to prevent memory spikes and container crashes
+        BATCH_SIZE = 20
+        total_processed = 0
+        failed_batches = 0
         
-        # On conflict, update these fields (but preserve created_at)
-        # Use excluded table reference for PostgreSQL ON CONFLICT
-        # ✅ FIX: platform 필드가 없으면 marketplace 사용, item_id가 없으면 ebay_item_id 사용
-        conflict_columns = ['user_id']
-        if hasattr(Listing, 'platform'):
-            conflict_columns.append('platform')
-        elif hasattr(Listing, 'marketplace'):
-            conflict_columns.append('marketplace')
-        if hasattr(Listing, 'item_id'):
-            conflict_columns.append('item_id')
-        elif hasattr(Listing, 'ebay_item_id'):
-            conflict_columns.append('ebay_item_id')
+        logger.info(f"💾 [UPSERT] Processing {len(values_list)} listings in batches of {BATCH_SIZE}")
         
-        excluded = stmt.excluded
-        stmt = stmt.on_conflict_do_update(
-            index_elements=conflict_columns,
-            set_={
-                'title': excluded.title,
-                'image_url': excluded.image_url,
-                'sku': excluded.sku,
-                'supplier_name': excluded.supplier_name,
-                'supplier_id': excluded.supplier_id,
-                'brand': excluded.brand,
-                'upc': excluded.upc,
-                'metrics': excluded.metrics,
-                'raw_data': excluded.raw_data,
-                'last_synced_at': excluded.last_synced_at,
-                'updated_at': datetime.utcnow(),
-                # Legacy fields
-                'price': excluded.price,
-                'date_listed': excluded.date_listed,
-                'sold_qty': excluded.sold_qty,
-                'watch_count': excluded.watch_count,
-            }
-        )
+        for i in range(0, len(values_list), BATCH_SIZE):
+            batch = values_list[i:i + BATCH_SIZE]
+            batch_num = (i // BATCH_SIZE) + 1
+            total_batches = (len(values_list) + BATCH_SIZE - 1) // BATCH_SIZE
+            
+            try:
+                logger.info(f"💾 [UPSERT] Processing batch {batch_num}/{total_batches} ({len(batch)} items)")
+                
+                # Use PostgreSQL's INSERT ... ON CONFLICT DO UPDATE
+                # ✅ CRITICAL: DB constraint is unique_listing_per_user (user_id, platform, item_id) - must match exactly
+                stmt = insert(table).values(batch)
+                
+                conflict_columns = ['user_id', 'platform', 'item_id']
+                
+                excluded = stmt.excluded
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=conflict_columns,
+                    set_={
+                        'platform': 'eBay',  # CRITICAL: always "eBay" for eBay sync
+                        'title': excluded.title,
+                        'image_url': excluded.image_url,
+                        'sku': excluded.sku,
+                        'source': excluded.source,  # ✅ NOT NULL
+                        'supplier_name': excluded.supplier_name,
+                        'supplier_id': excluded.supplier_id,
+                        'brand': excluded.brand,
+                        'upc': excluded.upc,
+                        'metrics': excluded.metrics,  # Includes Shopify routing
+                        'raw_data': excluded.raw_data,
+                        'analysis_meta': excluded.analysis_meta,  # Includes Shopify routing
+                        'last_synced_at': excluded.last_synced_at,
+                        'updated_at': datetime.utcnow(),
+                        # Legacy fields
+                        'price': excluded.price,
+                        'date_listed': excluded.date_listed,
+                        'sold_qty': excluded.sold_qty,
+                        'watch_count': excluded.watch_count,
+                        'view_count': excluded.view_count if 'view_count' in [col.name for col in table.columns] else None,
+                    }
+                )
+                
+                # Execute batch
+                result = db.execute(stmt)
+                db.commit()
+                total_processed += len(batch)
+                logger.info(f"✅ [UPSERT] Batch {batch_num}/{total_batches} completed: {len(batch)} items saved")
+                
+            except Exception as batch_err:
+                failed_batches += 1
+                db.rollback()
+                logger.error(f"❌ [UPSERT] Batch {batch_num}/{total_batches} failed: {str(batch_err)}")
+                logger.error(f"   - Batch size: {len(batch)}")
+                logger.error(f"   - Error type: {type(batch_err).__name__}")
+                import traceback
+                logger.error(f"   - Traceback: {traceback.format_exc()}")
+                # Retry batch items individually with same constraint
+                logger.warning(f"⚠️ [UPSERT] Attempting to save batch {batch_num} items individually...")
+                retry_conflict_columns = ['user_id', 'platform', 'item_id']
+                
+                for item_idx, item in enumerate(batch):
+                    try:
+                        # Ensure conflict key columns present for unique_listing_per_user
+                        if 'platform' not in item:
+                            item = {**item, 'platform': 'eBay'}
+                        if 'item_id' not in item and 'ebay_item_id' in item:
+                            item = {**item, 'item_id': item['ebay_item_id']}
+                        stmt_single = insert(table).values(item)
+                        stmt_single = stmt_single.on_conflict_do_update(
+                            index_elements=retry_conflict_columns,
+                            set_=stmt_single.excluded
+                        )
+                        db.execute(stmt_single)
+                        db.commit()
+                        total_processed += 1
+                    except Exception as item_err:
+                        logger.error(f"❌ [UPSERT] Failed to save item {item_idx} in batch {batch_num}: {str(item_err)}")
+                        db.rollback()
+                        continue
+                continue
         
-        # Execute the statement
-        db.execute(stmt)
-        db.commit()
+        upsert_end_time = dt.utcnow()
+        upsert_duration = (upsert_end_time - upsert_start_time).total_seconds()
+        
+        logger.info(f"✅ [UPSERT] Completed: {total_processed}/{len(values_list)} items processed successfully")
+        logger.info(f"⏱️ [UPSERT] Execution time: {upsert_duration:.2f} seconds ({upsert_duration/60:.2f} minutes)")
+        if failed_batches > 0:
+            logger.warning(f"⚠️ [UPSERT] {failed_batches} batches failed but processing continued")
+        
+        # Return total processed count
+        return total_processed
     else:
         # SQLite: Use individual INSERT OR REPLACE (less efficient but compatible)
         for listing in listings:
-            # ✅ FIX: platform 필드가 없으면 marketplace 사용, item_id가 없으면 ebay_item_id 사용
+            # Auto-detect supplier when missing or "Unverified"/"Unknown"
+            supplier_name = listing.supplier_name
+            supplier_id = listing.supplier_id
+            
+            if not supplier_name or supplier_name in ["Unverified", "Unknown", ""]:
+                # Use extract_supplier_info for auto-detect
+                supplier_name, supplier_id = extract_supplier_info(
+                    sku=listing.sku or "",
+                    image_url=listing.image_url or "",
+                    title=listing.title or "",
+                    brand=listing.brand or "",
+                    upc=listing.upc or ""
+                )
+                # Update Listing object
+                listing.supplier_name = supplier_name
+                listing.supplier_id = supplier_id
+                listing.source = supplier_name or 'ebay'
+            
+            # Auto-detect Shopify routing
+            is_shopify = detect_shopify_routing(
+                sku=listing.sku or "",
+                image_url=listing.image_url or "",
+                title=listing.title or "",
+                brand=listing.brand or ""
+            )
+            
+            # Set management_hub in metrics and analysis_meta
+            if is_shopify:
+                if not listing.metrics:
+                    listing.metrics = {}
+                if isinstance(listing.metrics, dict):
+                    listing.metrics["management_hub"] = "Shopify"
+                
+                if not listing.analysis_meta:
+                    listing.analysis_meta = {}
+                if isinstance(listing.analysis_meta, dict):
+                    listing.analysis_meta["management_hub"] = "Shopify"
+            
+            # FIX: if platform missing use marketplace; if item_id missing use ebay_item_id
             platform = getattr(listing, 'platform', None) or getattr(listing, 'marketplace', None) or "eBay"
             item_id = getattr(listing, 'item_id', None) or getattr(listing, 'ebay_item_id', None) or ""
-            user_id = getattr(listing, 'user_id', None) or "default-user"
+            
+            # CRITICAL: user_id must not be None (no fallback)
+            user_id = getattr(listing, 'user_id', None)
+            if not user_id:
+                logger.error(f"❌ [UPSERT SQLite] CRITICAL: user_id is None!")
+                logger.error(f"   - listing.user_id: {user_id}")
+                logger.error(f"   - listing.id: {getattr(listing, 'id', 'N/A')}")
+                logger.error(f"   - listing.title: {getattr(listing, 'title', 'N/A')[:50]}")
+                raise ValueError(f"Invalid user_id: {user_id}. user_id is required.")
             
             # Check if listing exists
             query = db.query(Listing).filter(Listing.user_id == user_id)
@@ -804,15 +1552,24 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
             
             if existing:
                 # Update existing record
+                # CRITICAL: update platform to eBay
+                if hasattr(existing, 'platform'):
+                    existing.platform = platform
+                elif hasattr(existing, 'marketplace'):
+                    existing.marketplace = platform
                 existing.title = listing.title
                 existing.image_url = listing.image_url
                 existing.sku = listing.sku
-                existing.supplier_name = listing.supplier_name
-                existing.supplier_id = listing.supplier_id
+                existing.supplier_name = supplier_name  # Auto-detected value
+                existing.supplier_id = supplier_id  # Auto-detected value
+                existing.source = supplier_name or 'ebay'  # NOT NULL
                 existing.brand = listing.brand
                 existing.upc = listing.upc
-                existing.metrics = listing.metrics if listing.metrics else {}
-                existing.raw_data = listing.raw_data if listing.raw_data else {}
+                existing.metrics = listing.metrics if listing.metrics else {}  # Includes Shopify routing
+                # ✅ FIX: Never access listing.raw_data - use empty dict directly to avoid AttributeError
+                # SQLAlchemy objects may not have raw_data initialized, so always use empty dict
+                existing.raw_data = {}
+                existing.analysis_meta = listing.analysis_meta if listing.analysis_meta else {}  # Includes Shopify routing
                 existing.last_synced_at = listing.last_synced_at if listing.last_synced_at else datetime.utcnow()
                 existing.updated_at = datetime.utcnow()
                 existing.price = listing.price
@@ -831,7 +1588,7 @@ def upsert_listings(db: Session, listings: List[Listing]) -> int:
 
 def extract_csv_fields(listing: Listing) -> Dict[str, any]:
     """
-    CSV 생성을 위한 필수 필드 추출
+    Extract required fields for CSV generation
     - external_id (eBay ItemID)
     - sku
     - is_zombie
@@ -848,7 +1605,7 @@ def extract_csv_fields(listing: Listing) -> Dict[str, any]:
     # sku
     sku = getattr(listing, 'sku', '') or ""
     
-    # is_zombie (metrics 또는 별도 필드에서)
+    # is_zombie (from metrics or separate field)
     is_zombie = False
     if hasattr(listing, 'is_zombie'):
         is_zombie = bool(getattr(listing, 'is_zombie', False))
@@ -856,7 +1613,7 @@ def extract_csv_fields(listing: Listing) -> Dict[str, any]:
         if isinstance(listing.metrics, dict):
             is_zombie = listing.metrics.get('is_zombie', False)
     
-    # zombie_score (metrics 또는 별도 필드에서)
+    # zombie_score (from metrics or separate field)
     zombie_score = None
     if hasattr(listing, 'zombie_score'):
         zombie_score = getattr(listing, 'zombie_score', None)
@@ -865,12 +1622,12 @@ def extract_csv_fields(listing: Listing) -> Dict[str, any]:
             zombie_score = listing.metrics.get('zombie_score', None)
     
     # analysis_meta.recommendation.action
-    # ✅ FIX: JSONB 필드 안전하게 추출 (문자열 파싱 지원)
+    # FIX: safe JSONB extraction (supports string parsing)
     action = None
     try:
         if hasattr(listing, 'analysis_meta') and listing.analysis_meta:
             analysis_meta = listing.analysis_meta
-            # JSONB가 문자열로 저장된 경우 파싱
+            # Parse when JSONB stored as string
             if isinstance(analysis_meta, str):
                 try:
                     analysis_meta = json.loads(analysis_meta)
@@ -883,7 +1640,7 @@ def extract_csv_fields(listing: Listing) -> Dict[str, any]:
                     action = recommendation.get('action', None)
         elif hasattr(listing, 'metrics') and listing.metrics:
             metrics = listing.metrics
-            # JSONB가 문자열로 저장된 경우 파싱
+            # Parse when JSONB stored as string
             if isinstance(metrics, str):
                 try:
                     metrics = json.loads(metrics)
@@ -903,8 +1660,8 @@ def extract_csv_fields(listing: Listing) -> Dict[str, any]:
                     if isinstance(recommendation, dict):
                         action = recommendation.get('action', None)
     except Exception as e:
-        # 안정성: 예외 발생 시 None 반환 (500 에러 방지)
-        print(f"Warning: Failed to extract action from analysis_meta: {e}")
+        # On exception return None (avoid 500)
+        logger.warning(f"Failed to extract action from analysis_meta: {e}")
         action = None
     
     return {
@@ -947,22 +1704,10 @@ def export_zombies_to_csv(zombie_listings: List[Listing]) -> str:
         # Extract supplier_name (uppercase for consistency)
         supplier_name = (listing.supplier_name if hasattr(listing, 'supplier_name') else "Unknown").upper()
         
-        # Generate listing_url: Try to extract from raw_data first, otherwise generate eBay URL
+        # Generate listing_url: Always generate eBay URL (don't access raw_data to avoid AttributeError)
         listing_url = ""
         if item_id:
-            # Try to get URL from raw_data if available
-            if hasattr(listing, 'raw_data') and listing.raw_data:
-                raw_data = listing.raw_data
-                if isinstance(raw_data, dict):
-                    listing_url = raw_data.get('listing_url') or raw_data.get('url') or raw_data.get('viewItemURL') or ""
-                elif isinstance(raw_data, str):
-                    try:
-                        parsed_data = json.loads(raw_data)
-                        listing_url = parsed_data.get('listing_url') or parsed_data.get('url') or parsed_data.get('viewItemURL') or ""
-                    except:
-                        pass
-            
-            # If no URL found in raw_data, generate eBay URL
+            # Always generate eBay URL (raw_data access removed to prevent AttributeError)
             if not listing_url:
                 # Format: https://www.ebay.com/itm/{item_id}
                 listing_url = f"https://www.ebay.com/itm/{item_id}"
@@ -986,41 +1731,78 @@ def export_zombies_to_csv(zombie_listings: List[Listing]) -> str:
     return output.getvalue()
 
 
+def get_csv_format(db: Session, supplier_name: str) -> Optional[dict]:
+    """
+    Get CSV format from DB
+    
+    Args:
+        db: Database session
+        supplier_name: Supplier/tool name (e.g. "autods", "wholesale2b")
+    
+    Returns:
+        CSV format schema or None
+    """
+    from models import CSVFormat
+    
+    csv_format = db.query(CSVFormat).filter(
+        CSVFormat.supplier_name == supplier_name,
+        CSVFormat.is_active == True
+    ).first()
+    
+    if csv_format:
+        return csv_format.format_schema
+    return None
+
+
 def generate_export_csv(
     listings,
     target_tool: str,
     db: Optional[Session] = None,
-    user_id: str = "default-user",
+    user_id: str = None,  # Required; error if None
     mode: str = "delete_list",
-    store_id: Optional[str] = None
+    store_id: Optional[str] = None,
+    platform: Optional[str] = None
 ) -> str:
     """
     CSV Export for Dropshipping Automation Tools Only
     
-    MVP Focus: High-Volume Dropshippers using automation tools.
-    All exports are tool-specific formats - no generic/fallback formats.
+    CSV format is loaded from DB.
+    Data is mapped per supplier official format.
     
-    Supported export formats:
+    Supported export formats (managed in DB):
     1. AutoDS: Headers: "Source ID", "File Action" | Data: supplier_id, "delete"
     2. Wholesale2B: Headers: "SKU", "Action" | Data: sku, "Delete"
     3. Shopify (Matrixify/Excelify): Headers: "ID", "Command" | Data: item_id, "DELETE"
     4. Shopify (Tagging Method): Headers: "Handle", "Tags" | Data: handle/sku, "OptListing_Delete"
     5. eBay File Exchange: Headers: "Action", "ItemID" | Data: "End", item_id
     6. Yaballe: Headers: "Monitor ID", "Action" | Data: supplier_id, "DELETE"
+    7. BigCommerce: Headers: "Product ID", "Action" | Data: item_id/sku, "DELETE"
     
     Args:
         listings: List of Listing objects or dictionaries (items to delete OR items to exclude in full_sync mode)
-        target_tool: Tool name (e.g., "autods", "wholesale2b", "shopify_matrixify", "shopify_tagging", "ebay", "yaballe")
+        target_tool: Tool name (e.g., "autods", "wholesale2b", "shopify_matrixify", "shopify_tagging", "ebay", "yaballe", "bigcommerce")
         db: Optional database session for logging deletions with snapshots and fetching all listings
         user_id: User ID for deletion logging and fetching listings
         mode: Export mode - "delete_list" (default) exports items to delete, "full_sync_list" exports survivors (all items except provided list)
         store_id: Optional store ID filter for full_sync_list mode
+        platform: Optional platform parameter - if provided, overrides target_tool mapping ("shopify" -> "shopify_matrixify", "bigcommerce" -> "bigcommerce")
     
     Returns:
         CSV string in tool-specific format
     
     Note: Assumes 100% of items are from supported Dropshipping Tools (no manual/direct listings).
     """
+    # Platform-based target_tool mapping (if platform is provided)
+    # If platform param provided, map target_tool to platform
+    if platform:
+        platform_to_tool = {
+            'shopify': 'shopify_matrixify',
+            'bigcommerce': 'bigcommerce'
+        }
+        # Override target_tool if platform is recognized
+        if platform.lower() in platform_to_tool:
+            target_tool = platform_to_tool[platform.lower()]
+            logger.info(f"🔄 Platform '{platform}' mapped to target_tool '{target_tool}'")
     # Full Sync Mode: Export all active listings EXCEPT the provided list
     if mode == "full_sync_list" and db:
         # Get all active listings for this user/store
@@ -1053,6 +1835,10 @@ def generate_export_csv(
         listings = survivor_listings
     elif not listings:
         return ""
+    
+    # Validate user_id (required)
+    if not user_id:
+        raise ValueError("user_id is required for CSV export. Cannot export without a valid user_id.")
     
     # Log deletions with snapshots BEFORE generating CSV (only for delete_list mode)
     if db and mode == "delete_list":
@@ -1104,16 +1890,28 @@ def generate_export_csv(
             db.add_all(deletion_logs)
             db.commit()
     
+    # Get CSV format from database
+    if not db:
+        raise ValueError("Database session is required to fetch CSV format")
+    
+    format_schema = get_csv_format(db, target_tool)
+    if not format_schema:
+        raise ValueError(f"CSV format not found for target tool: {target_tool}. Please ensure the format is initialized in the database.")
+    
+    columns = format_schema.get("column_order", format_schema.get("columns", []))
+    mappings = format_schema.get("mappings", {})
+    
     data = []
     
     for listing in listings:
         # Handle both Listing objects and dictionaries
         if isinstance(listing, dict):
-            item_id = listing.get("item_id") or listing.get("ebay_item_id", "")
-            sku = listing.get("sku", "")
-            supplier_id = listing.get("supplier_id", "")
-            supplier_name = listing.get("supplier_name") or listing.get("supplier", "") or "Unknown"
-            platform = listing.get("platform", "")
+            item_id = listing.get("item_id") or listing.get("ebay_item_id") or ""
+            sku = listing.get("sku") or ""
+            # supplier_id: default to empty string safely
+            supplier_id = listing.get("supplier_id") or ""
+            supplier_name = listing.get("supplier_name") or listing.get("supplier") or listing.get("source") or "Unknown"
+            platform = listing.get("platform") or listing.get("marketplace") or ""
             # Try to get handle from raw_data or use SKU as fallback
             raw_data = listing.get("raw_data", {})
             if isinstance(raw_data, str):
@@ -1121,61 +1919,66 @@ def generate_export_csv(
                     raw_data = json.loads(raw_data)
                 except:
                     raw_data = {}
-            handle = raw_data.get("handle") or sku
+            handle = (raw_data.get("handle") if raw_data else None) or sku
         else:
-            item_id = listing.item_id if hasattr(listing, 'item_id') else (listing.ebay_item_id if hasattr(listing, 'ebay_item_id') else "")
-            sku = listing.sku
-            supplier_id = listing.supplier_id if hasattr(listing, 'supplier_id') else None
-            supplier_name = listing.supplier_name if hasattr(listing, 'supplier_name') else (listing.supplier if hasattr(listing, 'supplier') else "Unknown")
-            platform = listing.platform if hasattr(listing, 'platform') else (listing.marketplace if hasattr(listing, 'marketplace') else "")
-            # Try to get handle from raw_data
-            raw_data = listing.raw_data if hasattr(listing, 'raw_data') else {}
-            if isinstance(raw_data, str):
-                try:
-                    raw_data = json.loads(raw_data)
-                except:
-                    raw_data = {}
-            handle = raw_data.get("handle") if raw_data else sku
+            item_id = (listing.item_id if hasattr(listing, 'item_id') and listing.item_id else None) or (listing.ebay_item_id if hasattr(listing, 'ebay_item_id') and listing.ebay_item_id else None) or ""
+            sku = listing.sku if hasattr(listing, 'sku') and listing.sku else ""
+            # supplier_id: default None or empty string safely
+            supplier_id = (listing.supplier_id if hasattr(listing, 'supplier_id') and listing.supplier_id else None) or ""
+            supplier_name = (listing.supplier_name if hasattr(listing, 'supplier_name') and listing.supplier_name else None) or (listing.supplier if hasattr(listing, 'supplier') and listing.supplier else None) or (listing.source if hasattr(listing, 'source') and listing.source else None) or "Unknown"
+            platform = (listing.platform if hasattr(listing, 'platform') and listing.platform else None) or (listing.marketplace if hasattr(listing, 'marketplace') and listing.marketplace else None) or ""
+            # Use SKU as handle (raw_data access removed to prevent AttributeError)
+            handle = sku
         
-        # Use supplier_id if available, otherwise use SKU (both work with automation tools)
-        effective_supplier_id = supplier_id if supplier_id else sku
+        # Build row data based on format schema mappings
+        row = {}
+        for column_name in columns:
+            mapping = mappings.get(column_name, {})
+            
+            # Check if it's a static value
+            if "value" in mapping:
+                row[column_name] = mapping["value"]
+            # Otherwise, get value from listing data
+            elif "source" in mapping:
+                source_field = mapping["source"]
+                value = None
+                
+                # Get value from listing data (safe)
+                if source_field == "item_id":
+                    value = item_id if item_id else ""
+                elif source_field == "sku":
+                    value = sku if sku else ""
+                elif source_field == "supplier_id":
+                    value = supplier_id if supplier_id else ""
+                elif source_field == "handle":
+                    value = handle if handle else ""
+                else:
+                    value = ""
+                
+                # Use fallback if value is empty and fallback is specified
+                if not value and "fallback" in mapping:
+                    fallback_field = mapping["fallback"]
+                    if fallback_field == "sku":
+                        value = sku if sku else ""
+                    elif fallback_field == "supplier_id":
+                        value = supplier_id if supplier_id else ""
+                    elif fallback_field == "item_id":
+                        value = item_id if item_id else ""
+                    else:
+                        value = ""
+                
+                # Ensure empty string fallback
+                row[column_name] = value if value else ""
+            else:
+                row[column_name] = ""
         
-        if target_tool == "autods":
-            data.append({
-                "Source ID": effective_supplier_id,
-                "File Action": "delete"
-            })
-        elif target_tool == "wholesale2b":
-            data.append({
-                "SKU": sku,
-                "Action": "Delete"
-            })
-        elif target_tool == "shopify_matrixify":
-            # Shopify Matrixify/Excelify format
-            data.append({
-                "ID": item_id,
-                "Command": "DELETE"
-            })
-        elif target_tool == "shopify_tagging":
-            # Shopify Tagging Method (users upload to tag items, then filter & delete manually)
-            data.append({
-                "Handle": handle,
-                "Tags": "OptListing_Delete"
-            })
-        elif target_tool == "ebay":
-            data.append({
-                "Action": "End",
-                "ItemID": item_id
-            })
-        elif target_tool == "yaballe":
-            data.append({
-                "Monitor ID": effective_supplier_id,
-                "Action": "DELETE"
-            })
-        else:
-            raise ValueError(f"Unknown target tool: {target_tool}. Supported: autods, wholesale2b, shopify_matrixify, shopify_tagging, ebay, yaballe")
+        data.append(row)
     
     df = pd.DataFrame(data)
+    
+    # Ensure columns are in the correct order
+    if columns:
+        df = df[columns]
     
     # Convert to CSV string
     output = StringIO()

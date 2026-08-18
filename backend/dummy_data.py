@@ -55,7 +55,7 @@ def generate_dummy_listings(db: Session, count: int = 50, user_id: str = "defaul
             # Determine source (diverse suppliers + pro aggregators)
             # Amazon: 15%, Walmart: 12%, AliExpress: 15%, CJ Dropshipping: 12%, 
             # Home Depot: 8%, Wayfair: 6%, Costco: 5%,
-            # Pro Aggregators: Wholesale2B: 8%, Spocket: 6%, SaleHoo: 4%, Inventory Source: 3%, Dropified: 2%, Unverified: 4%
+            # AutoDS: 8% (treated as supplier), Wholesale2B: 8%, Spocket: 6%, SaleHoo: 4%, Inventory Source: 3%, Dropified: 2%, Unverified: 4%
             # Note: Unverified items require manual source identification (strict classification policy)
             source_rand = random.random()
             brand = None
@@ -108,22 +108,26 @@ def generate_dummy_listings(db: Session, count: int = 50, user_id: str = "defaul
                 if random.random() < 0.5:  # 50% chance
                     brand = random.choice(["Kirkland", "Kirkland Signature"])
             elif source_rand < 0.81:
+                source = "AutoDS"  # AutoDS treated as supplier
+                sku = f"ADS{random.randint(100000, 999999)}"
+                image_url = f"https://autods.com/images/{random.randint(100000, 999999)}.jpg"
+            elif source_rand < 0.89:
                 source = "Wholesale2B"
                 sku = f"W2B{random.randint(100000, 999999)}"
                 image_url = f"https://wholesale2b.com/images/{random.randint(100000, 999999)}.jpg"
-            elif source_rand < 0.87:
+            elif source_rand < 0.95:
                 source = "Spocket"
                 sku = f"SPK{random.randint(100000, 999999)}"
                 image_url = f"https://spocket.co/images/{random.randint(100000, 999999)}.jpg"
-            elif source_rand < 0.91:
+            elif source_rand < 0.97:
                 source = "SaleHoo"
                 sku = f"SH{random.randint(100000, 999999)}"
                 image_url = f"https://salehoo.com/images/{random.randint(100000, 999999)}.jpg"
-            elif source_rand < 0.94:
+            elif source_rand < 0.98:
                 source = "Inventory Source"
                 sku = f"IS{random.randint(100000, 999999)}"
                 image_url = f"https://inventorysource.com/images/{random.randint(100000, 999999)}.jpg"
-            elif source_rand < 0.96:
+            elif source_rand < 0.99:
                 source = "Dropified"
                 sku = f"DF{random.randint(100000, 999999)}"
                 image_url = f"https://dropified.com/images/{random.randint(100000, 999999)}.jpg"
@@ -137,8 +141,9 @@ def generate_dummy_listings(db: Session, count: int = 50, user_id: str = "defaul
             price = round(random.uniform(9.99, 199.99), 2)
             
             # Date listed (mix of old and new)
-            # 60% zombies (old), 40% active (recent)
-            is_zombie = random.random() < 0.6
+            # Generate exactly 500 active items and 50 zombies
+            # First 500 items are active, last 50 are zombies
+            is_zombie = i >= 500
             if is_zombie:
                 days_ago = random.randint(61, 180)  # 61-180 days ago
             else:
@@ -162,6 +167,10 @@ def generate_dummy_listings(db: Session, count: int = 50, user_id: str = "defaul
             if brand:
                 title = f"{brand} {title}"
             
+            # Determine if product goes through Shopify (30% chance)
+            # Shopify-routed product: marketplace eBay but management_hub Shopify
+            goes_through_shopify = random.random() < 0.3
+            
             # Build metrics JSONB
             metrics = {
                 "sales": sold_qty,
@@ -169,6 +178,10 @@ def generate_dummy_listings(db: Session, count: int = 50, user_id: str = "defaul
                 "price": price,
                 "date_listed": date_listed.isoformat()
             }
+            
+            # Add management_hub to metrics if product goes through Shopify
+            if goes_through_shopify:
+                metrics["management_hub"] = "Shopify"
             
             # Build analysis_meta JSONB (for CSV export testing)
             analysis_meta = {
@@ -178,6 +191,10 @@ def generate_dummy_listings(db: Session, count: int = 50, user_id: str = "defaul
                 },
                 "zombie_score": random.uniform(0.7, 1.0) if is_zombie else random.uniform(0.0, 0.3)
             }
+            
+            # Add management_hub to analysis_meta as well (for redundancy)
+            if goes_through_shopify:
+                analysis_meta["management_hub"] = "Shopify"
             
             listing = Listing(
                 ebay_item_id=ebay_item_id,

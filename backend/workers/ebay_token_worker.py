@@ -1,11 +1,11 @@
 """
-eBay Token 자동 갱신 Worker v2.0
-- 1시간마다 실행 (APScheduler)
-- 만료 예정(30분 이내) 또는 만료된 Access Token을 Refresh Token으로 갱신
-- 갱신된 토큰을 DB에 저장
-- Retry 로직 (최대 3회)
-- Sentry 에러 트래킹
-- Graceful Shutdown 지원
+eBay Token auto-refresh Worker v2.0.
+- Runs every 1 hour (APScheduler)
+- Refresh expiring (within 30 min) or expired Access Token via Refresh Token
+- Save refreshed token to DB
+- Retry up to 3 times
+- Sentry error tracking
+- Graceful shutdown
 """
 
 import os
@@ -19,24 +19,24 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 from functools import wraps
 
-# 상위 디렉토리 import를 위한 경로 추가
+# Add parent path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 # =====================================================
-# 설정
+# Config
 # =====================================================
 
-# 로깅 설정
+# Logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger('ebay_token_worker')
 
-# Worker 상태
+# Worker status
 worker_status = {
     "started_at": None,
     "last_run": None,
@@ -48,7 +48,7 @@ worker_status = {
     "shutdown_requested": False
 }
 
-# 환경변수
+# Env vars
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 EBAY_CLIENT_ID = os.getenv("EBAY_CLIENT_ID", "")
 EBAY_CLIENT_SECRET = os.getenv("EBAY_CLIENT_SECRET", "")
@@ -65,7 +65,7 @@ EBAY_OAUTH_ENDPOINTS = {
     "PRODUCTION": "https://api.ebay.com/identity/v1/oauth2/token"
 }
 
-# Sentry 초기화 (설정된 경우)
+# Sentry init (if configured)
 sentry_initialized = False
 if SENTRY_DSN:
     try:
@@ -91,7 +91,7 @@ def signal_handler(signum, frame):
     logger.info(f"🛑 Received signal {signum}. Initiating graceful shutdown...")
     worker_status["shutdown_requested"] = True
 
-# SIGTERM, SIGINT 핸들러 등록
+# Register SIGTERM, SIGINT handlers
 signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
 
@@ -140,7 +140,7 @@ def get_db_engine():
     )
 
 def get_db_session():
-    """Database 세션 생성"""
+    """Create database session."""
     engine = get_db_engine()
     Session = sessionmaker(bind=engine)
     return Session()
@@ -161,7 +161,7 @@ class TokenRefreshError(Exception):
 @retry_with_backoff(max_retries=3, delay=5)
 def refresh_ebay_token(refresh_token: str) -> Dict[str, Any]:
     """
-    Refresh Token을 사용하여 새로운 Access Token 획득
+    Get new Access Token using Refresh Token (eBay OAuth 2.0).
     
     eBay OAuth 2.0 Token Refresh Flow:
     POST https://api.ebay.com/identity/v1/oauth2/token
@@ -188,7 +188,7 @@ def refresh_ebay_token(refresh_token: str) -> Dict[str, Any]:
             is_retryable=False
         )
     
-    # OAuth Endpoint 선택
+    # Select OAuth endpoint
     oauth_url = EBAY_OAUTH_ENDPOINTS.get(EBAY_ENVIRONMENT, EBAY_OAUTH_ENDPOINTS["PRODUCTION"])
     
     # Basic Auth Header 생성
@@ -224,7 +224,7 @@ def refresh_ebay_token(refresh_token: str) -> Dict[str, Any]:
             "token_type": token_data.get("token_type", "Bearer")
         }
     
-    # 에러 처리
+    # Error handling
     error_msg = f"Token refresh failed: {response.status_code} - {response.text[:200]}"
     logger.error(f"❌ {error_msg}")
     
@@ -236,7 +236,7 @@ def refresh_ebay_token(refresh_token: str) -> Dict[str, Any]:
         except:
             pass
     
-    # 400/401은 재시도 불가 (잘못된 토큰)
+    # 400/401 not retryable (invalid token)
     is_retryable = response.status_code >= 500
     raise TokenRefreshError(error_msg, response.status_code, is_retryable)
 
@@ -247,12 +247,12 @@ def refresh_ebay_token(refresh_token: str) -> Dict[str, Any]:
 def get_profiles_needing_refresh(session) -> list:
     """
     갱신이 필요한 프로필 조회
-    - 만료 30분 전 또는 이미 만료된 토큰
+    - 만료 1시간 전 또는 이미 만료된 토큰
     - refresh_token이 있는 프로필만
     """
     
-    # 30분 후 시간 계산
-    threshold_time = datetime.utcnow() + timedelta(minutes=30)
+    # 1시간 후 시간 계산 (만료 1시간 전부터 갱신)
+    threshold_time = datetime.utcnow() + timedelta(hours=1)
     
     query = text("""
         SELECT 
@@ -279,10 +279,10 @@ def get_profiles_needing_refresh(session) -> list:
 
 def update_profile_token(session, user_id: str, token_data: Dict[str, Any]) -> bool:
     """
-    프로필의 eBay 토큰 업데이트
+    Update profile eBay token.
     """
     
-    # 만료 시간 계산
+    # Compute expiry time
     expires_at = datetime.utcnow() + timedelta(seconds=token_data.get("expires_in", 7200))
     
     query = text("""
@@ -319,19 +319,16 @@ def mark_token_invalid(session, user_id: str, error_message: str) -> None:
     logger.warning(f"⚠️ Token marked as invalid for user: {user_id[:8]}... - {error_message}")
 
 # =====================================================
-# Worker 메인 로직
+# Worker main logic
 # =====================================================
 
 def run_token_refresh_job() -> Dict[str, Any]:
     """
-    토큰 갱신 작업 실행
-    
-    Returns:
-        Dict with success status, stats, and elapsed time
+    Run token refresh job. Returns dict with success, stats, elapsed time.
     """
     global worker_status
     
-    # Shutdown 요청 확인
+    # Check shutdown request
     if worker_status["shutdown_requested"]:
         logger.info("🛑 Shutdown requested. Skipping job.")
         return {"success": False, "error": "Shutdown requested"}
@@ -370,7 +367,7 @@ def run_token_refresh_job() -> Dict[str, Any]:
         logger.info(f"📋 Found {len(profiles)} profiles needing token refresh")
         
         for profile in profiles:
-            # Shutdown 확인 (루프 중간에도)
+            # Check shutdown mid-loop
             if worker_status["shutdown_requested"]:
                 logger.info("🛑 Shutdown requested. Stopping job.")
                 break
@@ -389,7 +386,7 @@ def run_token_refresh_job() -> Dict[str, Any]:
                 token_data = refresh_ebay_token(refresh_token)
                 
                 if token_data and token_data.get("access_token"):
-                    # DB 업데이트
+                    # Update DB
                     if update_profile_token(session, user_id, token_data):
                         stats["refreshed"] += 1
                         worker_status["total_refreshed"] += 1
@@ -417,7 +414,7 @@ def run_token_refresh_job() -> Dict[str, Any]:
                 worker_status["total_failed"] += 1
                 logger.error(f"❌ Unexpected error for user {user_id[:8]}: {str(e)}")
             
-            # Rate limiting (eBay API 보호)
+            # Rate limiting (eBay API protection)
             time.sleep(0.5)
         
         worker_status["last_success"] = datetime.utcnow().isoformat()
@@ -450,12 +447,12 @@ def run_token_refresh_job() -> Dict[str, Any]:
     return {"success": True, "stats": stats, "elapsed_time": elapsed_time}
 
 # =====================================================
-# Worker Status API (FastAPI에서 호출 가능)
+# Worker Status API (callable from FastAPI)
 # =====================================================
 
 def get_worker_status() -> Dict[str, Any]:
     """
-    Worker 상태 반환 (Health Check용)
+    Return worker status (for health check).
     """
     return {
         **worker_status,
@@ -483,7 +480,7 @@ def start_scheduler():
         
         scheduler = BlockingScheduler()
         
-        # 1시간마다 실행
+        # Run every 1 hour
         scheduler.add_job(
             run_token_refresh_job,
             trigger=IntervalTrigger(hours=1),
@@ -503,10 +500,10 @@ def start_scheduler():
         logger.info("🕐 Schedule: Every 1 hour")
         logger.info("=" * 50)
         
-        # 시작 시 즉시 한 번 실행
+        # Run once on start
         run_token_refresh_job()
         
-        # Graceful shutdown 처리
+        # Graceful shutdown
         try:
             scheduler.start()
         except (KeyboardInterrupt, SystemExit):
@@ -521,13 +518,12 @@ def start_scheduler():
 
 def start_simple_loop():
     """
-    APScheduler 없이 간단한 무한 루프로 실행
-    (Railway/Heroku 등에서 APScheduler 문제 시 대안)
+    Run without APScheduler: simple infinite loop (fallback when APScheduler fails on Railway/Heroku).
     """
     global worker_status
     worker_status["started_at"] = datetime.utcnow().isoformat()
     
-    INTERVAL_SECONDS = 3600  # 1시간
+    INTERVAL_SECONDS = 3600  # 1 hour
     
     logger.info("=" * 50)
     logger.info("🚀 eBay Token Worker Started (Simple Loop Mode)")
@@ -571,13 +567,13 @@ if __name__ == "__main__":
         import json
         print(json.dumps(get_worker_status(), indent=2))
     elif args.once:
-        # 단일 실행
+        # Single run
         result = run_token_refresh_job()
         print(f"Result: {result}")
     elif args.loop:
-        # Simple loop 모드
+        # Simple loop mode
         start_simple_loop()
     else:
-        # 스케줄러로 실행 (기본)
+        # Run with scheduler (default)
         start_scheduler()
 
