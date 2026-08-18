@@ -68,7 +68,13 @@ cd frontend
 npm install
 ```
 
-3. Run the development server:
+3. (Optional) Set up environment variables:
+```bash
+# Copy .env.example to .env.local and modify as needed
+cp .env.example .env.local
+```
+
+4. Run the development server:
 ```bash
 npm run dev
 ```

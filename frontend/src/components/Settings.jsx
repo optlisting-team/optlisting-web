@@ -1,5 +1,15 @@
 import React, { useState } from 'react'
 import { Button } from './ui/button'
+import axios from 'axios'
+import { useAccount } from '../contexts/AccountContext'
+
+// Use environment variable for Railway URL, fallback based on environment
+// CRITICAL: Production MUST use relative path /api (proxied by vercel.json) to avoid CORS issues
+// Only use VITE_API_URL in development if needed, production always uses relative path
+const API_BASE_URL = import.meta.env.DEV 
+  ? (import.meta.env.VITE_API_URL || '')  // Development: use env var or empty for Vite proxy
+  : ''  // Production: ALWAYS use relative path (vercel.json proxy handles routing to Railway)
+// const CURRENT_USER_ID = "default-user" // Removed: get user_id from AuthContext
 
 // Store License Table Component
 function StoreLicenseTable({ 
@@ -157,11 +167,15 @@ function StoreLicenseTable({
 
 // Main Settings Component
 function Settings() {
+  // Debug: Log environment variable in development mode only
+  // Use AccountContext for credits
+  const { credits, plan, refreshCredits } = useAccount()
+  
   // Mock data - replace with actual data from context/API
-  const [userPlan] = useState('PRO')
+  const [userPlan] = useState(plan || 'PRO')
   const [planStoreLimit] = useState(3)
   const [globalStoreLimit] = useState(10)
-  const [userCredits] = useState(8500)
+  const userCredits = credits || 0
   const [usedCredits] = useState(0)
   
   const [connectedStores, setConnectedStores] = useState([
@@ -169,15 +183,18 @@ function Settings() {
     { id: '2', name: 'UK Store', email: 'user@ebay.co.uk', connectedDate: '2025-12-02' },
   ])
 
+  const [error, setError] = useState(null)
+  const [success, setSuccess] = useState(null)
+  
   const handleConnect = () => {
     // TODO: Open OAuth flow
-    alert('Connect Store flow will open here')
+    setError('Connect Store flow will open here soon.')
+    setTimeout(() => setError(null), 5000)
   }
 
   const handleDisconnect = (storeId) => {
-    if (confirm('Are you sure you want to disconnect this store?')) {
-      setConnectedStores(connectedStores.filter(s => s.id !== storeId))
-    }
+    // Direct disconnect without confirmation (removed confirm dialog)
+    setConnectedStores(connectedStores.filter(s => s.id !== storeId))
   }
 
   // Plan info
@@ -244,6 +261,7 @@ function Settings() {
               </Button>
             </div>
           </div>
+          
         </div>
 
         {/* Store Licenses Section */}
@@ -267,12 +285,26 @@ function Settings() {
             onDisconnect={handleDisconnect}
           />
           
+          {/* Error Message */}
+          {error && (
+            <div className="mt-4 p-4 bg-red-900/20 border border-red-500/30 rounded-xl">
+              <p className="text-sm text-red-400">{error}</p>
+            </div>
+          )}
+          
+          {/* Success Message */}
+          {success && (
+            <div className="mt-4 p-4 bg-green-900/20 border border-green-500/30 rounded-xl">
+              <p className="text-sm text-green-400">{success}</p>
+            </div>
+          )}
+          
           {/* Expansion Info */}
           <div className="mt-4 p-4 bg-zinc-800/50 border border-zinc-700 rounded-xl">
             <p className="text-sm text-zinc-400">
-              <strong className="text-white">{userPlan}</strong> 플랜은 <strong className="text-blue-400">{planStoreLimit}개</strong>의 스토어 라이선스를 제공합니다. 
-              추가 스토어 연결은 <strong className="text-amber-400">Global Credit Limit</strong> (현재 {globalStoreLimit}개) 내에서 언제든지 가능합니다. 
-              추가 스토어 라이선스가 필요할 경우, <strong className="text-purple-400">POWER SELLER</strong> 플랜으로 업그레이드하십시오.
+              The <strong className="text-white">{userPlan}</strong> plan provides <strong className="text-blue-400">{planStoreLimit}</strong> store licenses. 
+              Additional store connections are available at any time within the <strong className="text-amber-400">Global Credit Limit</strong> (currently {globalStoreLimit}). 
+              If you need additional store licenses, please upgrade to the <strong className="text-purple-400">POWER SELLER</strong> plan.
             </p>
           </div>
         </div>

@@ -7,12 +7,21 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["'Plus Jakarta Sans'", 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ["'JetBrains Mono'", 'ui-monospace', 'monospace'],
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
       colors: {
+        brand: {
+          navy: "hsl(var(--brand-navy))",
+          mint: "hsl(var(--brand-mint))",
+          "mint-soft": "hsl(var(--brand-mint-soft))",
+        },
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {
