@@ -110,6 +110,7 @@ function Dashboard() {
   // Client state only
   // NOTE: Dashboard does not maintain product list state (only manages card numbers)
   const [isStoreConnected, setIsStoreConnected] = useState(false)
+  const [isCheckingConnection, setIsCheckingConnection] = useState(true)
   const [connectionDetails, setConnectionDetails] = useState(null)
   // allListings, zombies removed from Dashboard (only managed in results screen)
   const [loading, setLoading] = useState(false)
@@ -1734,6 +1735,7 @@ function Dashboard() {
               setIsStoreConnected(false)  // CRITICAL: Set to false based on backend status
               showToast('Connection verification failed. Please reconnect your eBay account.', 'error')
             }
+            setIsCheckingConnection(false)
           }
         } catch (err) {
           console.error(`❌ Failed to verify connection status (attempt ${verificationAttemptCount.current}):`, err)
@@ -1754,6 +1756,7 @@ function Dashboard() {
             sessionStorage.removeItem(processedKey)
             setIsStoreConnected(false)  // CRITICAL: Set to false - backend verification failed
             showToast('Connection verification failed. Please reconnect your eBay account.', 'error')
+            setIsCheckingConnection(false)
           }
         }
       }
@@ -1841,10 +1844,15 @@ function Dashboard() {
             } catch (ebayStatusErr) {
               console.warn('Failed to check eBay connection status on mount:', ebayStatusErr)
               // Don't set connection state on error - let user manually connect
+            } finally {
+              setIsCheckingConnection(false)
             }
           } else {
-            console.log('⏸️ Skipping mount connection check - OAuth verification in progress')
+            console.log('⏳ Skipping mount check - OAuth verification is currently polling')
           }
+        } else {
+          console.log('ℹ️ eBay is not connected yet (checked from localStorage)')
+          setIsCheckingConnection(false)
         }
       } catch (err) {
         console.warn('API Health Check failed (non-critical):', err)
@@ -2185,9 +2193,11 @@ function Dashboard() {
             <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Optlisting</p><h1 className="mt-2 text-2xl font-bold text-brand-navy">Optimizer</h1></div>
             <div className="grid flex-1 gap-4 sm:grid-cols-2 lg:max-w-xl">
               <div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Marketplace</p><p className="mt-1 text-sm font-bold text-brand-navy">eBay</p></div>
-              <div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Store ID</p><p className="mt-1 truncate text-sm font-bold text-brand-navy">{showConnectEbay ? '\u2014' : storeId}</p></div>
+              <div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Store ID</p><p className="mt-1 truncate text-sm font-bold text-brand-navy">{isCheckingConnection ? <span className="inline-block h-4 w-24 animate-pulse rounded bg-slate-200" /> : showConnectEbay ? '\u2014' : storeId}</p></div>
             </div>
-            {showConnectEbay ? (
+            {isCheckingConnection ? (
+              <div className="h-10 w-32 animate-pulse rounded-lg bg-slate-200" />
+            ) : showConnectEbay ? (
               <button type="button" onClick={handleConnectEbay} disabled={isSyncing} className="flex items-center justify-center gap-2 rounded-lg bg-brand-navy px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-[#162957] disabled:cursor-not-allowed disabled:opacity-50">{isSyncing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{isSyncing ? 'Connecting...' : 'Connect eBay'}</button>
             ) : (
               <button type="button" onClick={handleSync} disabled={loading || isSyncingListings} className="flex items-center justify-center gap-2 rounded-lg bg-brand-navy px-5 py-3 text-sm font-bold text-white hover:bg-[#162957] disabled:opacity-50">{(loading || isSyncingListings) && <Loader2 className="h-4 w-4 animate-spin" />}Sync Now</button>
@@ -2196,11 +2206,16 @@ function Dashboard() {
 
           {/* Summary bar — always visible */}
           <div className="grid grid-cols-2 bg-brand-navy sm:grid-cols-4">
-            {['total', 'selling', 'holding', 'deleting'].map((status) => <button key={status} type="button" onClick={() => setViewMode(status)} className={`border-white/10 px-4 py-4 text-left transition-colors sm:border-r ${viewMode === status ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-[11px] font-bold uppercase tracking-wider text-slate-300">{status}</span><span className="data-value mt-1 block text-2xl font-bold text-white">{statusCounts[status]}</span></button>)}
+            {['total', 'selling', 'holding', 'deleting'].map((status) => <button key={status} type="button" onClick={() => setViewMode(status)} className={`border-white/10 px-4 py-4 text-left transition-colors sm:border-r ${viewMode === status ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-[11px] font-bold uppercase tracking-wider text-slate-300">{status}</span><span className="data-value mt-1 block text-2xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-6 w-12 animate-pulse rounded bg-white/20" /> : statusCounts[status]}</span></button>)}
           </div>
 
           {/* Content area — conditional on connection state */}
-          {showConnectEbay ? (
+          {isCheckingConnection ? (
+            <div className="flex flex-col items-center justify-center px-6 py-24 text-center">
+              <Loader2 className="h-8 w-8 animate-spin text-brand-navy" />
+              <p className="mt-4 text-sm font-medium text-slate-500">Checking store connection...</p>
+            </div>
+          ) : showConnectEbay ? (
             <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
               <ShoppingBag className="h-12 w-12 text-slate-300" strokeWidth={1.5} />
               <p className="mt-4 text-sm text-slate-500">Connect your eBay account to start analyzing your listings.</p>
