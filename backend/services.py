@@ -1582,24 +1582,6 @@ def upsert_listings(db: Session, listings: List[Listing], expected_user_id: Opti
                 db.add(listing)
         
         db.commit()
-        
-    # [CLEANUP] Mark listings not in the current sync as 'Ended'
-    if expected_user_id:
-        try:
-            from sqlalchemy import func
-            active_item_ids = [lst.item_id for lst in listings if lst.item_id]
-            if active_item_ids:
-                ended_count = db.query(Listing).filter(
-                    Listing.user_id == expected_user_id,
-                    func.lower(Listing.platform) == func.lower('eBay'),
-                    Listing.item_id.notin_(active_item_ids),
-                    Listing.status != 'Ended'
-                ).update({"status": "Ended"}, synchronize_session=False)
-                db.commit()
-                logger.info(f"✅ [CLEANUP] Marked {ended_count} listings as Ended for user {expected_user_id}")
-        except Exception as e:
-            logger.error(f"❌ [CLEANUP] Failed to cleanup ended listings: {e}")
-            db.rollback()
     
     return len(listings)
 
