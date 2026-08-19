@@ -1474,6 +1474,7 @@ async def _sync_ebay_listings_background(
             total_upserted = 0
             total_pages = 1
             page_stats = []  # Stats per page
+            all_synced_item_ids = []  # Accumulate all item_ids across all pages for cleanup
             
             while page <= total_pages:
                 # Call get_active_listings_trading_api logic directly
@@ -1493,6 +1494,12 @@ async def _sync_ebay_listings_background(
                     total_fetched += fetched_count
                     total_upserted += upserted_count
                     
+                    # Accumulate item_ids from this page for post-sync cleanup
+                    for lst in result.get("listings", []):
+                        iid = lst.get("item_id")
+                        if iid:
+                            all_synced_item_ids.append(iid)
+                    
                     page_stat = {
                         "page": page,
                         "fetched": fetched_count,
@@ -1505,6 +1512,32 @@ async def _sync_ebay_listings_background(
                     page += 1
                 else:
                     break
+            
+            # [CLEANUP] Mark listings NOT in this sync as 'Ended' — runs ONCE after all pages
+            # Safety guard: only runs if we actually fetched listings (prevents full wipe on API failure)
+            if all_synced_item_ids:
+                try:
+                    from .models import get_db, Listing
+                    from sqlalchemy import func, or_
+                    db = next(get_db())
+                    try:
+                        ended_count = db.query(Listing).filter(
+                            Listing.user_id == user_id,
+                            func.lower(Listing.platform) == func.lower('eBay'),
+                            Listing.item_id.notin_(all_synced_item_ids),
+                            Listing.status != 'Ended'
+                        ).update({"status": "Ended"}, synchronize_session=False)
+                        db.commit()
+                        logger.info(f"✅ [CLEANUP] Marked {ended_count} listings as Ended for user {user_id} (synced {len(all_synced_item_ids)} active)")
+                    except Exception as cleanup_err:
+                        db.rollback()
+                        logger.error(f"❌ [CLEANUP] Failed to mark ended listings: {cleanup_err}")
+                    finally:
+                        db.close()
+                except Exception as db_err:
+                    logger.error(f"❌ [CLEANUP] DB connection failed: {db_err}")
+            else:
+                logger.warning("⚠️ [CLEANUP] Skipped: all_synced_item_ids is empty — fetch may have failed")
             
             # 3. Force last_sync_at update: set listings last_synced_at to now and commit
             sync_timestamp = datetime.utcnow()
@@ -2014,7 +2047,7 @@ async def get_active_listings_trading_api_internal(
                     Listing.platform == "eBay"
                 ).count()
                 
-                sync_end_time = dt.utcnow()
+                sync_end_time = datetime.utcnow()
                 sync_duration = (sync_end_time - sync_start_time).total_seconds()
                 
                 logger.info(f"✅ [SYNC] Save complete: upserted={upserted_count}, DB count={after_count} (user_id={user_id}, platform=eBay)")
@@ -2537,10 +2570,12 @@ async def get_ebay_summary(
                     "auto_sync_started": True  # For frontend notification
                 }
             
+            from sqlalchemy import or_
             # Optimized query: use index (user_id, platform)
             active_query = db.query(Listing).filter(
                 Listing.user_id == user_id,
-                func.lower(Listing.platform) == func.lower("eBay")
+                func.lower(Listing.platform) == func.lower("eBay"),
+                or_(Listing.status == 'Active', Listing.status.is_(None))
             )
             active_count = active_query.count()
             
@@ -2594,6 +2629,7 @@ async def get_ebay_summary(
             low_performing_query = db.query(Listing).filter(
                 Listing.user_id == user_id,
                 func.lower(Listing.platform) == func.lower("eBay"),  # Case-insensitive
+                or_(Listing.status == 'Active', Listing.status.is_(None)),
                 Listing.date_listed <= cutoff_date,
                 Listing.sold_qty <= max_sales,
                 Listing.watch_count <= max_watches

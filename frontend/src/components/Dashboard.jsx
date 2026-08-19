@@ -6,7 +6,7 @@ import { useStore } from '../contexts/StoreContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useAccount } from '../contexts/AccountContext'
 import Toast from './Toast'
-import { Loader2 } from 'lucide-react'
+import { Loader2, ShoppingBag } from 'lucide-react'
 
 // API_BASE_URL is imported from api.js
 // Use apiClient for requests requiring JWT authentication, use axios for requests without auth (e.g., health check)
@@ -110,6 +110,7 @@ function Dashboard() {
   // Client state only
   // NOTE: Dashboard does not maintain product list state (only manages card numbers)
   const [isStoreConnected, setIsStoreConnected] = useState(false)
+  const [isCheckingConnection, setIsCheckingConnection] = useState(true)
   const [connectionDetails, setConnectionDetails] = useState(null)
   // allListings, zombies removed from Dashboard (only managed in results screen)
   const [loading, setLoading] = useState(false)
@@ -1734,6 +1735,7 @@ function Dashboard() {
               setIsStoreConnected(false)  // CRITICAL: Set to false based on backend status
               showToast('Connection verification failed. Please reconnect your eBay account.', 'error')
             }
+            setIsCheckingConnection(false)
           }
         } catch (err) {
           console.error(`❌ Failed to verify connection status (attempt ${verificationAttemptCount.current}):`, err)
@@ -1754,6 +1756,7 @@ function Dashboard() {
             sessionStorage.removeItem(processedKey)
             setIsStoreConnected(false)  // CRITICAL: Set to false - backend verification failed
             showToast('Connection verification failed. Please reconnect your eBay account.', 'error')
+            setIsCheckingConnection(false)
           }
         }
       }
@@ -1841,10 +1844,15 @@ function Dashboard() {
             } catch (ebayStatusErr) {
               console.warn('Failed to check eBay connection status on mount:', ebayStatusErr)
               // Don't set connection state on error - let user manually connect
+            } finally {
+              setIsCheckingConnection(false)
             }
           } else {
-            console.log('⏸️ Skipping mount connection check - OAuth verification in progress')
+            console.log('⏳ Skipping mount check - OAuth verification is currently polling')
           }
+        } else {
+          console.log('ℹ️ eBay is not connected yet (checked from localStorage)')
+          setIsCheckingConnection(false)
         }
       } catch (err) {
         console.warn('API Health Check failed (non-critical):', err)
@@ -2176,55 +2184,67 @@ function Dashboard() {
 
   return (
     <div className="min-h-full bg-[#F7F9FC] px-4 py-8 sm:px-6 lg:px-8">
-      {showConnectEbay ? (
-        <div className="mx-auto flex min-h-[62vh] max-w-xl items-center justify-center">
-          <div className="w-full rounded-2xl border border-slate-200 bg-white px-6 py-14 text-center shadow-[0_16px_50px_-40px_rgba(13,27,61,0.3)] sm:px-12">
-            {summaryLoading ? <Loader2 className="mx-auto h-6 w-6 animate-spin text-brand-navy" /> : <>
-              <h1 className="text-2xl font-bold text-brand-navy">Connect your eBay store</h1>
-              <button type="button" onClick={handleConnectEbay} disabled={isSyncing} className="mx-auto mt-8 flex items-center justify-center gap-2 rounded-lg bg-brand-navy px-7 py-3.5 text-sm font-bold text-white transition-colors hover:bg-[#162957] disabled:cursor-not-allowed disabled:opacity-50">
-                {isSyncing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{isSyncing ? 'Connecting...' : 'Connect eBay'}
-              </button>
-            </>}
-          </div>
-        </div>
-      ) : (
-        <div className="mx-auto max-w-7xl">
-          {isSyncingListings && <div className="mb-4 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-brand-navy"><Loader2 className="h-4 w-4 animate-spin" />Syncing eBay listings...</div>}
-          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_40px_-34px_rgba(13,27,61,0.3)]">
-            <div className="flex flex-col gap-6 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
-              <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Optlisting</p><h1 className="mt-2 text-2xl font-bold text-brand-navy">Optimizer</h1></div>
-              <div className="grid flex-1 gap-4 sm:grid-cols-2 lg:max-w-xl">
-                <div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Marketplace</p><p className="mt-1 text-sm font-bold text-brand-navy">eBay</p></div>
-                <div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Store ID</p><p className="mt-1 truncate text-sm font-bold text-brand-navy">{storeId}</p></div>
-              </div>
+      <div className="mx-auto max-w-7xl">
+        {isSyncingListings && <div className="mb-4 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-brand-navy"><Loader2 className="h-4 w-4 animate-spin" />Syncing eBay listings...</div>}
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_40px_-34px_rgba(13,27,61,0.3)]">
+
+          {/* Header bar — always visible */}
+          <div className="flex flex-col gap-6 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
+            <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Optlisting</p><h1 className="mt-2 text-2xl font-bold text-brand-navy">Optimizer</h1></div>
+            <div className="grid flex-1 gap-4 sm:grid-cols-2 lg:max-w-xl">
+              <div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Marketplace</p><p className="mt-1 text-sm font-bold text-brand-navy">eBay</p></div>
+              <div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Store ID</p><p className="mt-1 truncate text-sm font-bold text-brand-navy">{isCheckingConnection ? <span className="inline-block h-4 w-24 animate-pulse rounded bg-slate-200" /> : showConnectEbay ? '\u2014' : storeId}</p></div>
+            </div>
+            {isCheckingConnection ? (
+              <div className="h-10 w-32 animate-pulse rounded-lg bg-slate-200" />
+            ) : showConnectEbay ? (
+              <button type="button" onClick={handleConnectEbay} disabled={isSyncing} className="flex items-center justify-center gap-2 rounded-lg bg-brand-navy px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-[#162957] disabled:cursor-not-allowed disabled:opacity-50">{isSyncing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{isSyncing ? 'Connecting...' : 'Connect eBay'}</button>
+            ) : (
               <button type="button" onClick={handleSync} disabled={loading || isSyncingListings} className="flex items-center justify-center gap-2 rounded-lg bg-brand-navy px-5 py-3 text-sm font-bold text-white hover:bg-[#162957] disabled:opacity-50">{(loading || isSyncingListings) && <Loader2 className="h-4 w-4 animate-spin" />}Sync Now</button>
-            </div>
+            )}
+          </div>
 
-            <div className="grid grid-cols-2 bg-brand-navy sm:grid-cols-4">
-              {['total', 'selling', 'holding', 'deleting'].map((status) => <button key={status} type="button" onClick={() => setViewMode(status)} className={`border-white/10 px-4 py-4 text-left transition-colors sm:border-r ${viewMode === status ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-[11px] font-bold uppercase tracking-wider text-slate-300">{status}</span><span className="data-value mt-1 block text-2xl font-bold text-white">{statusCounts[status]}</span></button>)}
-            </div>
+          {/* Summary bar — always visible */}
+          <div className="grid grid-cols-2 bg-brand-navy sm:grid-cols-4">
+            {['total', 'selling', 'holding', 'deleting'].map((status) => <button key={status} type="button" onClick={() => setViewMode(status)} className={`border-white/10 px-4 py-4 text-left transition-colors sm:border-r ${viewMode === status ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-[11px] font-bold uppercase tracking-wider text-slate-300">{status}</span><span className="data-value mt-1 block text-2xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-6 w-12 animate-pulse rounded bg-white/20" /> : statusCounts[status]}</span></button>)}
+          </div>
 
-            <div className="border-b border-slate-200 bg-slate-50 p-4 sm:p-5">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]">
-                {[['Views', 'maxViews'], ['Watchers', 'maxWatches'], ['Sales', 'maxSold']].map(([label, key]) => <label key={key} className="text-xs font-bold uppercase tracking-wider text-slate-500">{label} {'<='}<input type="number" min={0} value={criteria[key]} onChange={(e) => setCriteria((current) => ({ ...current, [key]: Number(e.target.value) || 0 }))} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-brand-navy outline-none focus:border-brand-navy" /></label>)}
-                <button type="button" onClick={handleAnalyze} disabled={isAnalyzingListings} className="self-end rounded-lg bg-brand-navy px-6 py-2.5 text-sm font-bold text-white hover:bg-[#162957] disabled:opacity-50">{isAnalyzingListings ? 'Applying...' : 'Apply'}</button>
+          {/* Content area — conditional on connection state */}
+          {isCheckingConnection ? (
+            <div className="flex flex-col items-center justify-center px-6 py-24 text-center">
+              <Loader2 className="h-8 w-8 animate-spin text-brand-navy" />
+              <p className="mt-4 text-sm font-medium text-slate-500">Checking store connection...</p>
+            </div>
+          ) : showConnectEbay ? (
+            <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+              <ShoppingBag className="h-12 w-12 text-slate-300" strokeWidth={1.5} />
+              <p className="mt-4 text-sm text-slate-500">Connect your eBay account to start analyzing your listings.</p>
+              <button type="button" onClick={handleConnectEbay} disabled={isSyncing} className="mt-6 flex items-center justify-center gap-2 rounded-lg bg-brand-navy px-7 py-3.5 text-sm font-bold text-white transition-colors hover:bg-[#162957] disabled:cursor-not-allowed disabled:opacity-50">{isSyncing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{isSyncing ? 'Connecting...' : 'Connect eBay'}</button>
+            </div>
+          ) : (
+            <>
+              <div className="border-b border-slate-200 bg-slate-50 p-4 sm:p-5">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]">
+                  {[['Views', 'maxViews'], ['Watchers', 'maxWatches'], ['Sales', 'maxSold']].map(([label, key]) => <label key={key} className="text-xs font-bold uppercase tracking-wider text-slate-500">{label} {'<='}<input type="number" min={0} value={criteria[key]} onChange={(e) => setCriteria((current) => ({ ...current, [key]: Number(e.target.value) || 0 }))} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-brand-navy outline-none focus:border-brand-navy" /></label>)}
+                  <button type="button" onClick={handleAnalyze} disabled={isAnalyzingListings} className="self-end rounded-lg bg-brand-navy px-6 py-2.5 text-sm font-bold text-white hover:bg-[#162957] disabled:opacity-50">{isAnalyzingListings ? 'Applying...' : 'Apply'}</button>
+                </div>
+                <p className="mt-4 text-xs font-semibold text-slate-500">Data: Last 90 Days</p>
               </div>
-              <p className="mt-4 text-xs font-semibold text-slate-500">Data: Last 90 Days</p>
-            </div>
 
-            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-6"><h2 className="font-bold text-brand-navy">{resultTitle} <span className="text-slate-400">({resultItems.length} items)</span></h2></div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-left text-sm">
-                <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500"><tr>{['Image', 'Product Title', 'Impressions', 'Views', 'Watchers', 'Sales', 'Days', 'Market'].map((heading) => <th key={heading} className="px-4 py-3 font-bold">{heading}</th>)}</tr></thead>
-                <tbody className="divide-y divide-slate-100">
-                  {resultItems.map((item, index) => { const itemId = getLowPerformingItemId(item); const imageUrl = item.image_url || item.picture_url || item.thumbnail_url; return <tr key={itemId || index} className="hover:bg-slate-50/70"><td className="px-4 py-3">{imageUrl ? <img src={imageUrl} alt="" className="h-10 w-10 rounded-md border border-slate-200 object-cover" /> : <div className="h-10 w-10 rounded-md border border-slate-200 bg-slate-100" />}</td><td className="max-w-[320px] px-4 py-3"><p className="truncate font-semibold text-brand-navy">{item.title || 'Untitled listing'}</p><p className="mt-0.5 text-xs text-slate-400">{itemId || ''}</p></td><td className="data-value px-4 py-3 text-slate-600">{item.impressions ?? 0}</td><td className="data-value px-4 py-3 text-slate-600">{item.view_count ?? item.views ?? 0}</td><td className="data-value px-4 py-3 text-slate-600">{item.watch_count ?? 0}</td><td className="data-value px-4 py-3 text-slate-600">{item.quantity_sold ?? item.total_sales ?? 0}</td><td className="data-value px-4 py-3 text-slate-600">{item.days_listed ?? 0}</td><td className="px-4 py-3 font-semibold text-brand-navy">eBay</td></tr> })}
-                  {!isAnalyzingListings && resultItems.length === 0 && <tr><td colSpan={8} className="px-6 py-14 text-center text-sm text-slate-500">No listings found.</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </div>
-      )}
+              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-6"><h2 className="font-bold text-brand-navy">{resultTitle} <span className="text-slate-400">({resultItems.length} items)</span></h2></div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px] text-left text-sm">
+                  <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500"><tr>{['Image', 'Product Title', 'Impressions', 'Views', 'Watchers', 'Sales', 'Days', 'Market'].map((heading) => <th key={heading} className="px-4 py-3 font-bold">{heading}</th>)}</tr></thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {resultItems.map((item, index) => { const itemId = getLowPerformingItemId(item); const imageUrl = item.image_url || item.picture_url || item.thumbnail_url; return <tr key={itemId || index} className="hover:bg-slate-50/70"><td className="px-4 py-3">{imageUrl ? <img src={imageUrl} alt="" className="h-10 w-10 rounded-md border border-slate-200 object-cover" /> : <div className="h-10 w-10 rounded-md border border-slate-200 bg-slate-100" />}</td><td className="max-w-[320px] px-4 py-3"><p className="truncate font-semibold text-brand-navy">{item.title || 'Untitled listing'}</p><p className="mt-0.5 text-xs text-slate-400">{itemId || ''}</p></td><td className="data-value px-4 py-3 text-slate-600">{item.impressions ?? 0}</td><td className="data-value px-4 py-3 text-slate-600">{item.view_count ?? item.views ?? 0}</td><td className="data-value px-4 py-3 text-slate-600">{item.watch_count ?? 0}</td><td className="data-value px-4 py-3 text-slate-600">{item.quantity_sold ?? item.total_sales ?? 0}</td><td className="data-value px-4 py-3 text-slate-600">{item.days_listed ?? 0}</td><td className="px-4 py-3 font-semibold text-brand-navy">eBay</td></tr> })}
+                    {!isAnalyzingListings && resultItems.length === 0 && <tr><td colSpan={8} className="px-6 py-14 text-center text-sm text-slate-500">No listings found.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </section>
+      </div>
 
       {toast && (
         <Toast
