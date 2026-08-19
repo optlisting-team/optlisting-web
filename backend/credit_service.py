@@ -252,9 +252,9 @@ def deduct_credits_atomic(
                     "reference_id": reference_id or transaction_id
                 }
             )
-            except SQLAlchemyError:
-                # Ignore if credit_transactions table does not exist
-                pass
+        except SQLAlchemyError:
+            # Ignore if credit_transactions table does not exist
+            pass
         
         db.commit()
         
