@@ -75,8 +75,8 @@ function LandingPage() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-white text-brand-navy">
       <nav className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          <BrandLogo to="/" size="sm" tone="dark" />
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-6 sm:px-6 lg:px-8">
+          <BrandLogo to="/" size="md" tone="dark" />
           <div className="hidden items-center gap-7 md:flex">
             <a href="#product" className="text-sm font-semibold text-slate-600 hover:text-brand-navy">Product</a>
             <a href="#how" className="text-sm font-semibold text-slate-600 hover:text-brand-navy">How it works</a>
@@ -164,7 +164,7 @@ function LandingPage() {
         </section>
       </main>
 
-      <footer className="bg-brand-navy px-4 py-12 text-white sm:px-6 lg:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-8 sm:flex-row sm:items-center sm:justify-between"><div><BrandLogo to="/" size="sm" /><p className="mt-3 text-sm text-slate-300">Find what doesn't sell.</p></div><div className="flex gap-6 text-sm text-slate-300"><Link to="/pricing" className="hover:text-white">Pricing</Link><Link to="/terms" className="hover:text-white">Terms</Link><Link to="/privacy" className="hover:text-white">Privacy</Link></div></div></footer>
+      <footer className="bg-brand-navy px-4 py-12 text-white sm:px-6 lg:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-8 sm:flex-row sm:items-center sm:justify-between"><div><BrandLogo to="/" size="md" /><p className="mt-3 text-sm text-slate-300">Find what doesn't sell.</p></div><div className="flex gap-6 text-sm text-slate-300"><Link to="/pricing" className="hover:text-white">Pricing</Link><Link to="/terms" className="hover:text-white">Terms</Link><Link to="/privacy" className="hover:text-white">Privacy</Link></div></div></footer>
     </div>
   )
 }

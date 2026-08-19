@@ -2537,10 +2537,12 @@ async def get_ebay_summary(
                     "auto_sync_started": True  # For frontend notification
                 }
             
+            from sqlalchemy import or_
             # Optimized query: use index (user_id, platform)
             active_query = db.query(Listing).filter(
                 Listing.user_id == user_id,
-                func.lower(Listing.platform) == func.lower("eBay")
+                func.lower(Listing.platform) == func.lower("eBay"),
+                or_(Listing.status == 'Active', Listing.status.is_(None))
             )
             active_count = active_query.count()
             
@@ -2594,6 +2596,7 @@ async def get_ebay_summary(
             low_performing_query = db.query(Listing).filter(
                 Listing.user_id == user_id,
                 func.lower(Listing.platform) == func.lower("eBay"),  # Case-insensitive
+                or_(Listing.status == 'Active', Listing.status.is_(None)),
                 Listing.date_listed <= cutoff_date,
                 Listing.sold_qty <= max_sales,
                 Listing.watch_count <= max_watches
