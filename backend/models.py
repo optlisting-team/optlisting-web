@@ -43,6 +43,7 @@ class Listing(Base):
     supplier_id = Column(String, nullable=True)
     supplier_name = Column(String, nullable=True)  # Supplier name from CSV matching
     last_synced_at = Column(DateTime, nullable=True)  # Last sync timestamp
+    status = Column(String, default='Active', nullable=True)  # 'Active', 'Ended', etc.
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
