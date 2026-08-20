@@ -2144,7 +2144,7 @@ async def get_active_listings_trading_api_internal(
                 ).count()
                 
                 sync_end_time = datetime.utcnow()
-                sync_duration = (sync_end_time - sync_start_time).total_seconds()
+                sync_duration = (sync_end_time - t0).total_seconds()
                 
                 logger.info(f"✅ [SYNC] Save complete: upserted={upserted_count}, DB count={after_count} (user_id={user_id}, platform=eBay)")
                 logger.info(f"⏱️ [SYNC] Execution time: {sync_duration:.2f} seconds ({sync_duration/60:.2f} minutes)")
