@@ -969,86 +969,92 @@ async def ebay_auth_status(
         from .models import get_db, Profile
         
         db = next(get_db())
-        
-        # Profile lookup and detailed logging
-        logger.info(f"📊 [STATUS] Querying Profile table for user_id: {user_id}")
-        profile = db.query(Profile).filter(Profile.user_id == user_id).first()
-        
-        if not profile:
-            logger.warning(f"⚠️ [STATUS] Profile not found for user_id: {user_id}")
-            logger.info(f"📊 [STATUS] Resolved user_id: {user_id}")
-            logger.info(f"📊 [STATUS] Profile exists: False")
-            logger.info(f"📊 [STATUS] ebay_token row exists: False")
-            logger.info(f"📊 [STATUS] connected decision: False (no profile)")
-            return {
-                "connected": False,
-                "user_id": user_id,
-                "message": "No profile found for user",
-                "token_status": {
-                    "has_valid_token": False,
-                    "is_expired": True,
-                    "has_refresh_token": False,
-                    "expires_at": None,
-                    "needs_refresh": False
+        try:
+            # Profile lookup and detailed logging
+            logger.info(f"📊 [STATUS] Querying Profile table for user_id: {user_id}")
+            profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+            
+            if not profile:
+                logger.warning(f"⚠️ [STATUS] Profile not found for user_id: {user_id}")
+                logger.info(f"📊 [STATUS] Resolved user_id: {user_id}")
+                logger.info(f"📊 [STATUS] Profile exists: False")
+                logger.info(f"📊 [STATUS] ebay_token row exists: False")
+                logger.info(f"📊 [STATUS] connected decision: False (no profile)")
+                return {
+                    "connected": False,
+                    "user_id": user_id,
+                    "message": "No profile found for user",
+                    "token_status": {
+                        "has_valid_token": False,
+                        "is_expired": True,
+                        "has_refresh_token": False,
+                        "expires_at": None,
+                        "needs_refresh": False
+                    }
                 }
-            }
-        
-        logger.info(f"📊 [STATUS] Profile found: id={profile.id}, user_id={profile.user_id}")
-        logger.info(f"📊 [STATUS] ebay_access_token exists: {bool(profile.ebay_access_token)}")
-        logger.info(f"📊 [STATUS] ebay_access_token length: {len(profile.ebay_access_token) if profile.ebay_access_token else 0}")
-        logger.info(f"📊 [STATUS] ebay_refresh_token exists: {bool(profile.ebay_refresh_token)}")
-        logger.info(f"📊 [STATUS] ebay_token_expires_at: {profile.ebay_token_expires_at}")
-        logger.info(f"📊 [STATUS] ebay_user_id: {profile.ebay_user_id}")
-        
-        # Lightweight token status check
-        token_status = check_token_status(user_id, db)
-        
-        logger.info(f"📊 [STATUS] Token status check result:")
-        logger.info(f"   - has_valid_token: {token_status['has_valid_token']}")
-        logger.info(f"   - is_expired: {token_status['is_expired']}")
-        logger.info(f"   - has_refresh_token: {token_status['has_refresh_token']}")
-        logger.info(f"   - expires_at: {token_status['expires_at']}")
-        logger.info(f"   - needs_refresh: {token_status['needs_refresh']}")
-        
-        # connected decision logic
-        has_valid_token = token_status["has_valid_token"]
-        is_expired = token_status["is_expired"]
-        connected = has_valid_token and not is_expired
-        
-        logger.info(f"📊 [STATUS] Connection decision logic:")
-        logger.info(f"   - has_valid_token: {has_valid_token}")
-        logger.info(f"   - is_expired: {is_expired}")
-        logger.info(f"   - connected = has_valid_token && !is_expired = {connected}")
-        
-        if not connected:
-            logger.warning(f"⚠️ [STATUS] No valid token for user: {user_id}")
-            logger.info(f"📊 [STATUS] Reason: has_valid_token={has_valid_token}, is_expired={is_expired}")
-            return {
-                "connected": False,
-                "user_id": user_id,
-                "message": "No valid eBay token found",
-                "token_status": token_status,
-                "debug": {
-                    "profile_exists": True,
-                    "has_access_token": bool(profile.ebay_access_token),
-                    "has_refresh_token": bool(profile.ebay_refresh_token),
-                    "expires_at": profile.ebay_token_expires_at.isoformat() if profile.ebay_token_expires_at else None,
-                    "is_expired": is_expired
+            
+            logger.info(f"📊 [STATUS] Profile found: id={profile.id}, user_id={profile.user_id}")
+            logger.info(f"📊 [STATUS] ebay_access_token exists: {bool(profile.ebay_access_token)}")
+            logger.info(f"📊 [STATUS] ebay_access_token length: {len(profile.ebay_access_token) if profile.ebay_access_token else 0}")
+            logger.info(f"📊 [STATUS] ebay_refresh_token exists: {bool(profile.ebay_refresh_token)}")
+            logger.info(f"📊 [STATUS] ebay_token_expires_at: {profile.ebay_token_expires_at}")
+            logger.info(f"📊 [STATUS] ebay_user_id: {profile.ebay_user_id}")
+            
+            # Lightweight token status check
+            token_status = check_token_status(user_id, db)
+            
+            logger.info(f"📊 [STATUS] Token status check result:")
+            logger.info(f"   - has_valid_token: {token_status['has_valid_token']}")
+            logger.info(f"   - is_expired: {token_status['is_expired']}")
+            logger.info(f"   - has_refresh_token: {token_status['has_refresh_token']}")
+            logger.info(f"   - expires_at: {token_status['expires_at']}")
+            logger.info(f"   - needs_refresh: {token_status['needs_refresh']}")
+            
+            # connected decision logic
+            has_valid_token = token_status["has_valid_token"]
+            is_expired = token_status["is_expired"]
+            connected = has_valid_token and not is_expired
+            
+            logger.info(f"📊 [STATUS] Connection decision logic:")
+            logger.info(f"   - has_valid_token: {has_valid_token}")
+            logger.info(f"   - is_expired: {is_expired}")
+            logger.info(f"   - connected = has_valid_token && !is_expired = {connected}")
+            
+            if not connected:
+                logger.warning(f"⚠️ [STATUS] No valid token for user: {user_id}")
+                logger.info(f"📊 [STATUS] Reason: has_valid_token={has_valid_token}, is_expired={is_expired}")
+                return {
+                    "connected": False,
+                    "user_id": user_id,
+                    "message": "No valid eBay token found",
+                    "token_status": token_status,
+                    "debug": {
+                        "profile_exists": True,
+                        "has_access_token": bool(profile.ebay_access_token),
+                        "has_refresh_token": bool(profile.ebay_refresh_token),
+                        "expires_at": profile.ebay_token_expires_at.isoformat() if profile.ebay_token_expires_at else None,
+                        "is_expired": is_expired
+                    }
                 }
+            
+            logger.info(f"✅ [STATUS] Valid token found for user: {user_id} (expired: {is_expired}, needs_refresh: {token_status['needs_refresh']})")
+            return {
+                "connected": True,
+                "user_id": user_id,
+                "ebay_user_id": profile.ebay_user_id,
+                "token_expires_at": token_status["expires_at"],
+                "is_expired": token_status["is_expired"],
+                "has_refresh_token": token_status["has_refresh_token"],
+                "needs_refresh": token_status["needs_refresh"],
+                "last_updated": profile.ebay_token_updated_at.isoformat() if profile.ebay_token_updated_at else None,
+                "token_status": token_status
             }
-        
-        logger.info(f"✅ [STATUS] Valid token found for user: {user_id} (expired: {is_expired}, needs_refresh: {token_status['needs_refresh']})")
-        return {
-            "connected": True,
-            "user_id": user_id,
-            "ebay_user_id": profile.ebay_user_id,
-            "token_expires_at": token_status["expires_at"],
-            "is_expired": token_status["is_expired"],
-            "has_refresh_token": token_status["has_refresh_token"],
-            "needs_refresh": token_status["needs_refresh"],
-            "last_updated": profile.ebay_token_updated_at.isoformat() if profile.ebay_token_updated_at else None,
-            "token_status": token_status
-        }
+        finally:
+            # FIX: this session was never closed on any of the three return paths above.
+            # /api/ebay/auth/status is one of the most frequently-hit endpoints (dashboard
+            # mount + OAuth verification polling), so leaking one connection per call would
+            # exhaust the pool (pool_size=5 + max_overflow=10 = 15 max) under real traffic.
+            db.close()
         
     except Exception as e:
         error_trace = traceback.format_exc()
