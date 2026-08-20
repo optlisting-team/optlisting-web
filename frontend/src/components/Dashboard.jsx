@@ -347,7 +347,11 @@ function Dashboard() {
       // Distinguish between 202 (background job) and other success codes (200, 201)
       if (response.status === 202) {
         syncAccepted202 = true
-        showToast('Sync in progress... This may take a minute.', 'info')
+        // NOTE: previously also showed a toast here ('Sync in progress...'), but that duplicated
+        // the persistent inline "Syncing eBay listings..." banner already rendered in the dashboard
+        // (driven by isSyncingListings). The toast auto-dismissed after 5s regardless of actual
+        // sync duration, which could mislead users into thinking it had finished. Removed — the
+        // inline banner is the single, accurate indicator now.
         sessionStorage.setItem('last_sync_response', JSON.stringify(response.data))
         
         // ✅ Smooth UI Polling: Poll every 5 seconds until sync completes or timeout
