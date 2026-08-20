@@ -1813,7 +1813,9 @@ function Dashboard() {
       try {
         const isHealthy = await checkApiHealth()
         if (isHealthy) {
-          refreshCredits()
+          // NOTE: credits are already fetched by AccountContext's own mount effect
+          // (fetchSubscription -> fetchCredits) — no need to re-trigger refreshCredits()
+          // here too, that was firing a duplicate /api/credits request on every mount.
           fetchHistory().catch(err => {
             console.error('History fetch error on mount:', err)
           })
