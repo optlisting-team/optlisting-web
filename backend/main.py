@@ -683,7 +683,12 @@ def get_listings(
     db: Session = Depends(get_db)
 ):
     """Get all listings for a specific user"""
-    query = db.query(Listing).filter(Listing.user_id == user_id)
+    from sqlalchemy import or_
+
+    query = db.query(Listing).filter(
+        Listing.user_id == user_id,
+        or_(Listing.status == 'Active', Listing.status.is_(None))  # FIX: exclude Ended listings, matching /api/ebay/summary's active_count logic
+    )
     
     # Apply store filter if store_id is provided and not 'all'
     if store_id and store_id != 'all':
@@ -694,7 +699,10 @@ def get_listings(
     listings = query.offset(skip).limit(limit).all()
     
     # Get total count with store filter applied
-    total_query = db.query(Listing).filter(Listing.user_id == user_id)
+    total_query = db.query(Listing).filter(
+        Listing.user_id == user_id,
+        or_(Listing.status == 'Active', Listing.status.is_(None))
+    )
     if store_id and store_id != 'all':
         if hasattr(Listing, 'store_id'):
             total_query = total_query.filter(Listing.store_id == store_id)
