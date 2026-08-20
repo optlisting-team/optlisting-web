@@ -401,8 +401,11 @@ function Dashboard() {
                 syncCompleted = true
                 syncInProgressRef.current = false
                 setIsSyncingListings(false)
-                // Final refresh
-                await fetchSummaryStats()
+                // Final refresh — summary stats AND the listings table itself (was previously left stale)
+                await Promise.all([
+                  fetchSummaryStats(),
+                  fetchListings().catch(err => console.error('Failed to refresh listings after sync:', err))
+                ])
                 return
               } else {
                 // Still syncing (count is still 0), continue polling
@@ -461,8 +464,11 @@ function Dashboard() {
       } else if (response.status >= 200 && response.status < 300) {
         // Handle other success codes (200, 201) - immediate completion
         showToast('Sync completed successfully', 'success')
-        // Refresh summary stats immediately for non-202 responses
-        await fetchSummaryStats()
+        // Refresh summary stats AND listings table immediately for non-202 responses
+        await Promise.all([
+          fetchSummaryStats(),
+          fetchListings().catch(err => console.error('Failed to refresh listings after sync:', err))
+        ])
       } else {
         // Handle error responses (4xx, 5xx)
         throw new Error(response.data?.message || `Sync failed with status ${response.status}`)
@@ -1390,15 +1396,27 @@ function Dashboard() {
     }
   }
 
-  // Fetch all active listings for diagnosis (paginate if needed)
+  // Fetch all active listings for diagnosis (paginates through the full result set)
   const fetchListings = async () => {
     if (!currentUserId) return []
+    const PAGE_SIZE = 2000
+    const MAX_LISTINGS = 30000 // matches the Pro plan cap; safety ceiling against runaway pagination
     try {
-      const limit = 5000
-      const response = await apiClient.get('/api/listings', { params: { skip: 0, limit } })
-      const list = response.data?.listings || []
-      setListings(list)
-      return list
+      let all = []
+      let skip = 0
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const response = await apiClient.get('/api/listings', { params: { skip, limit: PAGE_SIZE } })
+        const page = response.data?.listings || []
+        all = all.concat(page)
+        const totalReported = response.data?.total ?? all.length
+        skip += PAGE_SIZE
+        if (page.length < PAGE_SIZE || all.length >= totalReported || all.length >= MAX_LISTINGS) {
+          break
+        }
+      }
+      setListings(all)
+      return all
     } catch (err) {
       console.error('Failed to fetch listings:', err)
       showToast(getErrorMessage(err), 'error')
@@ -1688,6 +1706,7 @@ function Dashboard() {
             isVerifyingConnection.current = false
             verificationAttemptCount.current = 0
             setIsStoreConnected(true)
+            setIsCheckingConnection(false) // FIX: was only cleared on the failure branch, leaving the dashboard stuck on "Checking store connection..." after a successful OAuth connect
             
             // Performance mark: OAuth callback completion point
             if (typeof performance !== 'undefined' && performance.mark) {
