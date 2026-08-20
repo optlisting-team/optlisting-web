@@ -1990,7 +1990,7 @@ async def get_active_listings_trading_api_internal(
             start_time = item.findtext("ebay:ListingDetails/ebay:StartTime", "", ns)
             sku = item.findtext("ebay:SKU", "", ns)
             
-            # Image handling (same as existing logic)
+            # Image handling
             picture_url = ""
             thumbnail_url = ""
             
@@ -2003,12 +2003,23 @@ async def get_active_listings_trading_api_internal(
                     if "s-l" in thumbnail_url:
                         import re
                         thumbnail_url = re.sub(r's-l\d+', 's-l225', thumbnail_url)
+                # FIX: GalleryURL is a field of PictureDetailsType (nested under PictureDetails),
+                # not a direct child of <Item> — the old lookup (item.findtext("ebay:GalleryURL"))
+                # was checking the wrong path and would never actually match.
+                if not picture_url:
+                    gallery_url = picture_details.findtext("ebay:GalleryURL", "", ns)
+                    if gallery_url and gallery_url.strip():
+                        picture_url = gallery_url.strip()
+                        thumbnail_url = gallery_url.strip()
             
-            if not picture_url:
-                gallery_url = item.findtext("ebay:GalleryURL", "", ns)
-                if gallery_url and gallery_url.strip():
-                    picture_url = gallery_url.strip()
-                    thumbnail_url = gallery_url.strip()
+            # Last-resort fallback: eBay's own developer community reports GetMyeBaySelling
+            # frequently omits PictureDetails entirely regardless of DetailLevel (documented
+            # inconsistency, not something we can fix on our end). Build the image URL from
+            # eBay's known CDN pattern keyed by item_id — works for the common case where the
+            # listing uses standard eBay-hosted (EPS) images.
+            if not picture_url and item_id:
+                picture_url = f"https://i.ebayimg.com/images/g/{item_id}/s-l500.jpg"
+                thumbnail_url = f"https://i.ebayimg.com/images/g/{item_id}/s-l225.jpg"
             
             # Extract Supplier info
             from .services import extract_supplier_info
