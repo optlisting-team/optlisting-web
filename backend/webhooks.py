@@ -2,7 +2,7 @@
 Lemon Squeezy Webhook Handler
 Stability principle: Log all errors and return 200 OK (prevents LS retries)
 
-Handles subscription events for $120/month Professional Plan
+Handles subscription events for Professional Plan ($49/month, see checkout.js DEFAULT_VARIANT_ID)
 """
 import os
 import hmac
@@ -140,7 +140,7 @@ def get_or_create_profile(db: Session, user_id: str) -> Profile:
 
 def handle_subscription_created(db: Session, event_data: Dict) -> bool:
     """
-    Handle subscription_created event for $120/month Professional Plan
+    Handle subscription_created event for Professional Plan ($49/month, see checkout.js DEFAULT_VARIANT_ID)
     
     Sets subscription_plan to 'professional' and status to 'active'
     Shows "Activation in Progress" state if sync is pending
@@ -193,11 +193,11 @@ def handle_subscription_created(db: Session, event_data: Dict) -> bool:
         # Get or create profile
         profile = get_or_create_profile(db, user_id)
         
-        # Update subscription information for $120/month Professional Plan
+        # Update subscription information for Professional Plan ($49/month, see checkout.js DEFAULT_VARIANT_ID)
         profile.ls_customer_id = str(customer_id) if customer_id else profile.ls_customer_id
         profile.ls_subscription_id = str(subscription_id) if subscription_id else profile.ls_subscription_id
         profile.subscription_status = 'active'
-        profile.subscription_plan = 'professional'  # $120/month Professional Plan
+        profile.subscription_plan = 'professional'  # Professional Plan ($49/month, see checkout.js DEFAULT_VARIANT_ID)
         profile.total_listings_limit = PLAN_LIMITS['pro']
         
         db.commit()
