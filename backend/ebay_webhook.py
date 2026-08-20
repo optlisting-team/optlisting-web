@@ -673,6 +673,20 @@ async def ebay_auth_callback(
             }
             
             user_response = requests.post(trading_url, headers=headers, data=get_user_xml, timeout=30)
+
+            # Record this call too — low frequency (once per connect), but omitting it would
+            # undercount real Trading API usage against eBay's actual daily cap. No blocking gate
+            # here on purpose: an OAuth connect shouldn't fail because of the budget check.
+            try:
+                from .models import get_db as _get_db
+                from . import ebay_rate_limiter as rl
+                _rl_db = next(_get_db())
+                try:
+                    rl.record_call(_rl_db, user_id, "trading", "GetUser", user_response.status_code)
+                finally:
+                    _rl_db.close()
+            except Exception as rl_err:
+                logger.warning(f"⚠️ [RATE LIMIT] Failed to record GetUser call: {rl_err}")
             
             if user_response.status_code == 200:
                 import xml.etree.ElementTree as ET
@@ -1562,6 +1576,25 @@ async def _sync_ebay_listings_background(
                         db.close()
                 except Exception as db_err:
                     pass
+
+            # Mark 24h full-sync cooldown start point (only on a real completed sync)
+            try:
+                from .models import get_db as _get_db
+                from . import ebay_rate_limiter as rl
+                cd_db = next(_get_db())
+                try:
+                    rl.mark_full_sync_complete(cd_db, user_id)
+                finally:
+                    cd_db.close()
+            except Exception as cd_err:
+                logger.warning(f"⚠️ [SYNC] Failed to mark full-sync cooldown: {cd_err}")
+
+            # Kick off traffic (Impressions/Views) refresh as its own background task —
+            # up to 400 listings / 2 Analytics API calls, doesn't block or slow down the listing sync itself
+            try:
+                asyncio.create_task(get_traffic_report_for_user(user_id))
+            except Exception as traffic_err:
+                logger.warning(f"⚠️ [SYNC] Failed to schedule traffic refresh: {traffic_err}")
             
             # Standardized verification log: Only three lines remain
             logger.info(f"[FETCH] Collected {total_fetched} items from eBay.")
@@ -1618,7 +1651,25 @@ async def sync_ebay_listings(
                 "message": "User ID is required. Please log in and try again."
             }
         )
-    
+
+    # 24h full-sync cooldown gate (per store). First-ever connect sync passes through untouched.
+    from .models import get_db
+    from . import ebay_rate_limiter as rl
+    cooldown_db = next(get_db())
+    try:
+        rl.check_full_sync_cooldown(cooldown_db, user_id)
+    except rl.RateLimitBlocked as e:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": "sync_cooldown",
+                "message": e.reason,
+                "retry_after": e.retry_after.isoformat() if e.retry_after else None,
+            }
+        )
+    finally:
+        cooldown_db.close()
+
     # Start sync job in background (Fire and Forget)
     asyncio.create_task(_sync_ebay_listings_background(request, user_id))
     
@@ -1678,6 +1729,18 @@ async def get_active_listings_trading_api_internal(
             detail="eBay not connected or token expired. Please reconnect your eBay account."
         )
     
+    # ---- Rate limit gate: global daily budget + per-store 429 cooldown ----
+    from .models import get_db
+    from . import ebay_rate_limiter as rl
+    rl_db = next(get_db())
+    try:
+        rl.check_global_budget(rl_db, "trading")
+        rl.check_store_cooldown(rl_db, user_id)
+    except rl.RateLimitBlocked as e:
+        rl_db.close()
+        logger.warning(f"⛔ [RATE LIMIT] Blocked GetMyeBaySelling for user {user_id}: {e.reason}")
+        raise HTTPException(status_code=429, detail=e.reason)
+
     # Call eBay Trading API
     env = EBAY_ENVIRONMENT if EBAY_ENVIRONMENT in EBAY_API_ENDPOINTS else "PRODUCTION"
     trading_url = EBAY_API_ENDPOINTS[env]["trading"]
@@ -1729,7 +1792,11 @@ async def get_active_listings_trading_api_internal(
         t2_duration = (datetime.utcnow() - t2).total_seconds() * 1000
         logger.info(f"📡 [t2] Trading API response [RequestId: {request_id}] - Status: {response.status_code}, Duration: {t2_duration:.2f}ms")
         logger.info(f"   - Response length: {len(response.text)} bytes")
-        
+
+        # Record this call for global budget tracking + per-store 429 backoff, regardless of outcome
+        rl.record_call(rl_db, user_id, "trading", "GetMyeBaySelling", response.status_code)
+        rl_db.close()
+
         if response.status_code != 200:
             logger.error(f"❌ [RequestId: {request_id}] Trading API HTTP error: {response.status_code}")
             logger.error(f"   - Response headers: {dict(response.headers)}")
@@ -1737,16 +1804,24 @@ async def get_active_listings_trading_api_internal(
             logger.error(f"   - Full response text: {response.text}")
             raise HTTPException(status_code=response.status_code, detail=f"eBay Trading API error: {response.status_code}")
     except requests.exceptions.Timeout as e:
+        rl_db.close()
         logger.error(f"❌ [RequestId: {request_id}] Trading API timeout error: {e}")
         raise HTTPException(status_code=504, detail=f"eBay Trading API timeout: {str(e)}")
     except requests.exceptions.ConnectionError as e:
+        rl_db.close()
         logger.error(f"❌ [RequestId: {request_id}] Trading API connection error: {e}")
         raise HTTPException(status_code=503, detail=f"eBay Trading API connection error: {str(e)}")
     except requests.exceptions.RequestException as e:
+        rl_db.close()
         logger.error(f"❌ [RequestId: {request_id}] Trading API request error: {e}")
         import traceback
         logger.error(f"   Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"eBay Trading API request error: {str(e)}")
+    except HTTPException:
+        # FIX: HTTPException (e.g. our own status_code != 200 -> HTTPException(response.status_code, ...) raise above)
+        # was previously being swallowed by the bare `except Exception` below and remapped to a generic 500,
+        # losing the real eBay status code (429, 503, etc). Re-raise as-is so callers see the true status.
+        raise
     except Exception as e:
         logger.error(f"❌ [RequestId: {request_id}] Unexpected error during API call: {e}")
         import traceback
@@ -2165,6 +2240,22 @@ async def get_active_listings_trading_api(
         )
     
     try:
+        # TODO: this function duplicates get_active_listings_trading_api_internal() almost entirely
+        # (same GetMyeBaySelling call, same parsing, plus extra image-URL fallback logic and its own
+        # DB upsert path). Left un-merged for now to avoid launch-day regression risk — but it MUST
+        # share the same rate-limit gate below, since without it this route was an untracked bypass
+        # around the global Trading API budget every time LowPerformingResults.jsx loads.
+        from .models import get_db as _get_db
+        from . import ebay_rate_limiter as rl
+        rl_db = next(_get_db())
+        try:
+            rl.check_global_budget(rl_db, "trading")
+            rl.check_store_cooldown(rl_db, user_id)
+        except rl.RateLimitBlocked as e:
+            rl_db.close()
+            logger.warning(f"⛔ [RATE LIMIT] Blocked GetMyeBaySelling (/listings/active) for user {user_id}: {e.reason}")
+            raise HTTPException(status_code=429, detail=e.reason)
+
         env = EBAY_ENVIRONMENT if EBAY_ENVIRONMENT in EBAY_API_ENDPOINTS else "PRODUCTION"
         trading_url = EBAY_API_ENDPOINTS[env]["trading"]
         
@@ -2197,7 +2288,11 @@ async def get_active_listings_trading_api(
         response = requests.post(trading_url, headers=headers, data=xml_request, timeout=60)
         t2_duration = (datetime.utcnow() - t2).total_seconds() * 1000
         logger.info(f"📡 [t2] Trading API response [RequestId: {request_id}] - Status: {response.status_code}, Duration: {t2_duration:.2f}ms")
-        
+
+        # Record this call for global budget tracking + per-store 429 backoff
+        rl.record_call(rl_db, user_id, "trading", "GetMyeBaySelling", response.status_code)
+        rl_db.close()
+
         if response.status_code != 200:
             logger.error(f"❌ [RequestId: {request_id}] Trading API error: {response.status_code}")
             logger.error(f"   [RequestId: {request_id}] Response: {response.text[:500]}")
@@ -2487,6 +2582,146 @@ async def get_active_listings_trading_api(
         import traceback
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# =====================================================
+# eBay Sell Analytics API - traffic_report (Impressions/Views)
+# =====================================================
+
+async def get_traffic_report_for_user(user_id: str) -> dict:
+    """
+    Refresh real Impressions/traffic data for up to TRAFFIC_DAILY_LISTING_CAP (400) listings
+    for this store, via eBay's Sell Analytics API (traffic_report resource, dimension=LISTING).
+
+    Replaces the previous hardcoded `impressions: 0`. Respects:
+      - Global Analytics API daily budget (100 calls/day, app-wide, 90% safety margin)
+      - Per-store 429 cooldown
+      - listing_ids batched at TRAFFIC_ITEMS_PER_CALL (200) per call, so 400 listings = at most 2 calls/store
+
+    Returns a summary dict; never raises for rate-limit conditions (skips gracefully so the
+    rest of a sync/dashboard-load flow isn't blocked by a full Analytics budget).
+    """
+    from .models import get_db
+    from . import ebay_rate_limiter as rl
+
+    db = next(get_db())
+    summary = {"success": False, "listings_updated": 0, "calls_made": 0, "skipped_reason": None}
+
+    try:
+        # 1. Rate-limit gate — fail soft (this is a nice-to-have enrichment, not sync-critical)
+        try:
+            rl.check_global_budget(db, "analytics")
+            rl.check_store_cooldown(db, user_id)
+        except rl.RateLimitBlocked as e:
+            logger.info(f"ℹ️ [TRAFFIC] Skipping traffic refresh for {user_id}: {e.reason}")
+            summary["skipped_reason"] = e.reason
+            return summary
+
+        # 2. Pick up to 400 listings, oldest-refreshed first (rotates through the whole store over time)
+        listings = rl.select_listings_for_traffic_refresh(db, user_id, limit=rl.TRAFFIC_DAILY_LISTING_CAP)
+        if not listings:
+            summary["success"] = True
+            summary["skipped_reason"] = "No listings to refresh"
+            return summary
+
+        access_token = get_user_access_token(user_id)
+        if not access_token:
+            summary["skipped_reason"] = "No valid eBay access token"
+            return summary
+
+        env = EBAY_ENVIRONMENT if EBAY_ENVIRONMENT in EBAY_API_ENDPOINTS else "PRODUCTION"
+        analytics_url = f"{EBAY_API_ENDPOINTS[env]['sell_analytics']}/traffic_report"
+
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        }
+
+        # 90 days back to today, matching the dashboard's "Last 90 Days" window
+        date_to = datetime.utcnow().date()
+        date_from = date_to - timedelta(days=90)
+        date_range = f"[{date_from.strftime('%Y%m%d')}..{date_to.strftime('%Y%m%d')}]"
+
+        item_ids = [l.item_id or l.ebay_item_id for l in listings if (l.item_id or l.ebay_item_id)]
+        by_item_id = {(l.item_id or l.ebay_item_id): l for l in listings}
+
+        updated_count = 0
+        calls_made = 0
+
+        # 3. Batch into chunks of TRAFFIC_ITEMS_PER_CALL — up to 400 listings = at most 2 calls
+        for i in range(0, len(item_ids), rl.TRAFFIC_ITEMS_PER_CALL):
+            chunk = item_ids[i:i + rl.TRAFFIC_ITEMS_PER_CALL]
+            listing_ids_filter = ",".join(chunk)
+
+            filter_str = f"marketplace_ids:{{EBAY_US}},date_range:{date_range},listing_ids:{{{listing_ids_filter}}}"
+            params = {
+                "filter": filter_str,
+                "dimension": "LISTING",
+                "metric": "LISTING_IMPRESSION_SEARCH_RESULTS_PAGE,LISTING_IMPRESSION_STORE,LISTING_VIEWS_TOTAL",
+            }
+
+            try:
+                response = requests.get(analytics_url, headers=headers, params=params, timeout=30)
+            except requests.exceptions.RequestException as req_err:
+                logger.error(f"❌ [TRAFFIC] Request failed for user {user_id}: {req_err}")
+                break
+
+            calls_made += 1
+            rl.record_call(db, user_id, "analytics", "traffic_report", response.status_code)
+
+            if response.status_code == 429:
+                logger.warning(f"⚠️ [TRAFFIC] 429 from eBay for user {user_id}, stopping remaining chunks")
+                break
+            if response.status_code != 200:
+                logger.error(f"❌ [TRAFFIC] traffic_report error {response.status_code} for user {user_id}: {response.text[:500]}")
+                continue
+
+            try:
+                data = response.json()
+            except ValueError:
+                logger.error(f"❌ [TRAFFIC] Non-JSON response for user {user_id}")
+                continue
+
+            for record in data.get("records", []):
+                dim_values = record.get("dimensionValues", [])
+                listing_id = next((d.get("value") for d in dim_values if d.get("dimensionKey") == "LISTING"), None)
+                if not listing_id or listing_id not in by_item_id:
+                    continue
+
+                metric_values = {m.get("metricKey"): m.get("value") for m in record.get("metricValues", [])}
+                impressions = int(metric_values.get("LISTING_IMPRESSION_SEARCH_RESULTS_PAGE", 0) or 0) + \
+                              int(metric_values.get("LISTING_IMPRESSION_STORE", 0) or 0)
+                total_views = metric_values.get("LISTING_VIEWS_TOTAL")
+
+                listing = by_item_id[listing_id]
+                current_metrics = dict(listing.metrics) if listing.metrics else {}
+                current_metrics["impressions"] = impressions
+                if total_views is not None:
+                    current_metrics["views"] = int(total_views)
+                listing.metrics = current_metrics
+                listing.last_traffic_synced_at = datetime.utcnow()
+                updated_count += 1
+
+        db.commit()
+        rl.mark_traffic_sync_complete(db, user_id)
+
+        summary.update({
+            "success": True,
+            "listings_updated": updated_count,
+            "calls_made": calls_made,
+        })
+        logger.info(f"✅ [TRAFFIC] Refreshed {updated_count} listings for user {user_id} in {calls_made} call(s)")
+        return summary
+
+    except Exception as e:
+        logger.error(f"❌ [TRAFFIC] Unexpected error for user {user_id}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        db.rollback()
+        summary["skipped_reason"] = f"Unexpected error: {e}"
+        return summary
+    finally:
+        db.close()
 
 
 # Helper to start background sync
