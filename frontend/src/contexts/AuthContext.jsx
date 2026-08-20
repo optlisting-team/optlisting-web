@@ -17,17 +17,40 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // FIX: if we've just landed back from an OAuth redirect (#access_token=... in the URL),
+    // supabase-js needs a moment to parse that hash and turn it into a session. If our own
+    // getSession() call below resolves first with no session, we'd set loading=false + user=null,
+    // and ProtectedRoute would immediately redirect to /login — replacing the URL and wiping the
+    // #access_token hash before supabase-js ever gets to process it, permanently losing the
+    // session. This was the root cause of both the "flashes back to login" jank on every Google
+    // sign-in and the outright "signs in then bounces back to login" failure.
+    const hasPendingOAuthHash =
+      typeof window !== 'undefined' &&
+      window.location.hash &&
+      window.location.hash.includes('access_token')
+
     // Get current session
     const getSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
         if (error) throw error
-        
-        setSession(session)
-        setUser(session?.user ?? null)
+
+        if (session) {
+          setSession(session)
+          setUser(session.user)
+          setLoading(false)
+        } else if (hasPendingOAuthHash) {
+          // Don't resolve loading yet — an OAuth redirect is still being processed.
+          // onAuthStateChange below will fire (SIGNED_IN) once supabase-js finishes
+          // parsing the hash, and that handler will set loading=false.
+          console.log('⏳ OAuth redirect detected, waiting for session to be established...')
+        } else {
+          setSession(null)
+          setUser(null)
+          setLoading(false)
+        }
       } catch (error) {
         console.error('Failed to get session:', error)
-      } finally {
         setLoading(false)
       }
     }
@@ -44,8 +67,23 @@ export const AuthProvider = ({ children }) => {
       }
     )
 
+    // Safety net: if an OAuth hash was present but no session ever materializes
+    // (e.g. an actually-invalid/expired token), don't leave the app stuck loading forever.
+    let fallbackTimer
+    if (hasPendingOAuthHash) {
+      fallbackTimer = setTimeout(() => {
+        setLoading((current) => {
+          if (current) {
+            console.warn('⚠️ OAuth session did not establish within 5s, giving up wait')
+          }
+          return false
+        })
+      }, 5000)
+    }
+
     return () => {
       subscription?.unsubscribe()
+      if (fallbackTimer) clearTimeout(fallbackTimer)
     }
   }, [])
 

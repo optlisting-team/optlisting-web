@@ -43,12 +43,39 @@ class Listing(Base):
     supplier_id = Column(String, nullable=True)
     supplier_name = Column(String, nullable=True)  # Supplier name from CSV matching
     last_synced_at = Column(DateTime, nullable=True)  # Last sync timestamp
+    last_traffic_synced_at = Column(DateTime, nullable=True)  # Last time this listing's Impressions/traffic data was refreshed via Analytics API (added via migration)
     status = Column(String, default='Active', nullable=True)  # 'Active', 'Ended', etc.
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def __repr__(self):
         return f"<Listing(id={self.id}, title={self.title[:50]}, user_id={self.user_id})>"
+
+
+class EbayApiCallLog(Base):
+    """Append-only log of every eBay API call, tagged by store (user_id).
+    Used to compute the global daily call budget (Trading API 5,000/day, Analytics API 100/day, shared app-wide).
+    """
+    __tablename__ = "ebay_api_call_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, nullable=False, index=True)
+    api_type = Column(String, nullable=False)  # 'trading' | 'analytics'
+    endpoint = Column(String, nullable=True)   # e.g. 'GetMyeBaySelling', 'traffic_report'
+    status_code = Column(Integer, nullable=True)
+    called_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class EbayApiCallState(Base):
+    """One row per store: 429 backoff state + sync cooldown timestamps."""
+    __tablename__ = "ebay_api_calls"
+
+    user_id = Column(String, primary_key=True)
+    backoff_level = Column(Integer, default=0)       # consecutive 429 count, drives exponential cooldown
+    cooldown_until = Column(DateTime, nullable=True)  # this store is blocked from new calls until this time (429 backoff)
+    last_full_sync_at = Column(DateTime, nullable=True)   # last completed Trading API full sync — 24h cooldown basis
+    last_traffic_sync_at = Column(DateTime, nullable=True)  # last completed Analytics API traffic refresh
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class DeletionLog(Base):
