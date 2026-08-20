@@ -401,7 +401,9 @@ function Dashboard() {
               
               // Check if sync completed (REAL count > 0 - this is the critical check)
               if (activeCount > 0) {
-                showToast(`Sync completed: ${activeCount} active listings`, 'success')
+                // NOTE: previously showed a toast here too ('Sync completed: N active listings'),
+                // removed as redundant — the TOTAL count and listings table update on screen
+                // immediately once isSyncingListings clears below.
                 syncCompleted = true
                 syncInProgressRef.current = false
                 setIsSyncingListings(false)
