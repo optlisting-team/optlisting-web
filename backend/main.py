@@ -2342,16 +2342,18 @@ def add_user_credits(
     db: Session = Depends(get_db)
 ):
     """
-    Add credits (post-payment or admin).
-    **Security:** In production use Webhook or Admin API Key verification.
+    Add credits (post-payment or admin). Requires a valid ADMIN_API_KEY — legitimate
+    post-payment credit grants go through the signature-verified Lemon Squeezy webhook
+    (/api/lemonsqueezy/webhook), not this endpoint.
     **Request:** amount, transaction_type, reference_id (optional).
     """
-    # Simple security check (in production use Webhook signature)
+    # SECURITY: fail-closed. Previously a mismatched/missing admin_key fell through to
+    # `pass` and the request was allowed anyway — any authenticated user could grant
+    # themselves unlimited credits. Now: no ADMIN_API_KEY configured, or a mismatch,
+    # both reject the request outright.
     expected_key = os.getenv("ADMIN_API_KEY", "")
-    if expected_key and admin_key != expected_key:
-        # Reject if admin key set and mismatch
-        # Lemon Squeezy Webhook has separate verification
-        pass  # MVP: allow (TODO: strengthen in production)
+    if not expected_key or admin_key != expected_key:
+        raise HTTPException(status_code=403, detail="Admin authorization required")
     
     if request.amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
@@ -2389,12 +2391,22 @@ def refund_user_credits(
     reason: str,
     user_id: str = Depends(get_current_user),  # JWT -> user_id
     reference_id: Optional[str] = None,
+    admin_key: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """
-    Refund credits (e.g. on analysis failure).
+    Refund credits (e.g. on analysis failure). Requires a valid ADMIN_API_KEY —
+    this should only be triggered by internal server-side logic (auto-refund on
+    error) or customer service tooling, not directly by end users.
     Use cases: auto-refund on error, customer service refund.
     """
+    # SECURITY: this endpoint previously had NO admin-key check whatsoever — any
+    # authenticated user could call it to grant themselves arbitrary credits framed
+    # as a "refund". Fail-closed: reject unless ADMIN_API_KEY is configured and matches.
+    expected_key = os.getenv("ADMIN_API_KEY", "")
+    if not expected_key or admin_key != expected_key:
+        raise HTTPException(status_code=403, detail="Admin authorization required")
+
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
     
@@ -2419,12 +2431,15 @@ def refund_user_credits(
 
 @app.post("/api/credits/initialize")
 def initialize_credits(
-    user_id: str,
     plan: str = "free",
+    user_id: str = Depends(get_current_user),  # JWT -> user_id. SECURITY FIX: this endpoint
+    # previously took user_id as a plain unauthenticated parameter, letting anyone initialize
+    # or (re-)grant plan-based credits for ANY account by guessing/supplying its user_id.
+    # Now the caller can only ever affect their own account.
     db: Session = Depends(get_db)
 ):
     """
-    Initialize credits for new user.
+    Initialize credits for new user. Only ever affects the authenticated caller's own account.
     Use cases: on signup, bonus on plan upgrade.
     """
     try:
