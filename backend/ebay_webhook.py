@@ -41,6 +41,14 @@ logger = logging.getLogger('ebay_webhook')
 # Create router
 router = APIRouter(prefix="/api/ebay", tags=["eBay Integration"])
 
+# In-memory debounce for the /summary endpoint's auto-sync trigger: without this, a
+# frontend that polls /summary every few seconds while a store has 0 listings would
+# spawn a brand-new background sync task on every single poll (each one immediately
+# failing fast against the 24h cooldown gate, but still wasteful DB round-trips and
+# log noise). Tracks user_id -> last trigger time; only fires once per debounce window.
+_AUTO_SYNC_DEBOUNCE = {}
+_AUTO_SYNC_DEBOUNCE_SECONDS = 60
+
 # =====================================================
 # eBay OAuth 2.0 Configuration
 # =====================================================
@@ -1583,17 +1591,24 @@ async def _sync_ebay_listings_background(
                 except Exception as db_err:
                     pass
 
-            # Mark 24h full-sync cooldown start point (only on a real completed sync)
-            try:
-                from .models import get_db as _get_db
-                from . import ebay_rate_limiter as rl
-                cd_db = next(_get_db())
+            # Mark 24h full-sync cooldown start point — only when the sync actually
+            # upserted real listings. FIX: this previously ran unconditionally, so a sync
+            # that legitimately found 0 listings (empty store, connected before any listings
+            # existed, or a fetch failure) would still lock the user out of retrying for 24h
+            # with no way to ever get real data in during that window.
+            if total_upserted > 0:
                 try:
-                    rl.mark_full_sync_complete(cd_db, user_id)
-                finally:
-                    cd_db.close()
-            except Exception as cd_err:
-                logger.warning(f"⚠️ [SYNC] Failed to mark full-sync cooldown: {cd_err}")
+                    from .models import get_db as _get_db
+                    from . import ebay_rate_limiter as rl
+                    cd_db = next(_get_db())
+                    try:
+                        rl.mark_full_sync_complete(cd_db, user_id)
+                    finally:
+                        cd_db.close()
+                except Exception as cd_err:
+                    logger.warning(f"⚠️ [SYNC] Failed to mark full-sync cooldown: {cd_err}")
+            else:
+                logger.info(f"ℹ️ [SYNC] Skipping 24h cooldown lock — 0 listings upserted for user {user_id}, allowing retry")
 
             # Kick off traffic (Impressions/Views) refresh as its own background task —
             # up to 400 listings / 2 Analytics API calls, doesn't block or slow down the listing sync itself
@@ -2783,21 +2798,28 @@ async def get_ebay_summary(
             
             if not has_listings:
                 # On first load: if no data, start background sync automatically
-                logger.info(f"🔄 [AUTO-SYNC] No listings found for user {user_id}, starting background sync...")
-                
-                # Start sync in background (no response delay); use get_running_loop() in async
-                try:
-                    import asyncio
-                    loop = asyncio.get_running_loop()
-                    # Fire-and-forget background task
-                    loop.create_task(start_background_sync(request, user_id))
-                    logger.info(f"✅ [AUTO-SYNC] Background sync task created for user {user_id}")
-                except RuntimeError:
-                    # No running loop (uncommon)
-                    logger.warning(f"⚠️ [AUTO-SYNC] No running event loop found, skipping background sync")
-                except Exception as bg_err:
-                    logger.warning(f"⚠️ [AUTO-SYNC] Failed to start background sync: {bg_err}")
-                    # Response still returned even if background task fails
+                # Debounce: skip if we already triggered one for this user within the window
+                now = datetime.utcnow()
+                last_trigger = _AUTO_SYNC_DEBOUNCE.get(user_id)
+                if last_trigger and (now - last_trigger).total_seconds() < _AUTO_SYNC_DEBOUNCE_SECONDS:
+                    logger.info(f"⏳ [AUTO-SYNC] Debounced — already triggered for user {user_id} {(now - last_trigger).total_seconds():.0f}s ago")
+                else:
+                    _AUTO_SYNC_DEBOUNCE[user_id] = now
+                    logger.info(f"🔄 [AUTO-SYNC] No listings found for user {user_id}, starting background sync...")
+                    
+                    # Start sync in background (no response delay); use get_running_loop() in async
+                    try:
+                        import asyncio
+                        loop = asyncio.get_running_loop()
+                        # Fire-and-forget background task
+                        loop.create_task(start_background_sync(request, user_id))
+                        logger.info(f"✅ [AUTO-SYNC] Background sync task created for user {user_id}")
+                    except RuntimeError:
+                        # No running loop (uncommon)
+                        logger.warning(f"⚠️ [AUTO-SYNC] No running event loop found, skipping background sync")
+                    except Exception as bg_err:
+                        logger.warning(f"⚠️ [AUTO-SYNC] Failed to start background sync: {bg_err}")
+                        # Response still returned even if background task fails
                 
                 # Return empty immediately; background sync runs separately
                 return {
