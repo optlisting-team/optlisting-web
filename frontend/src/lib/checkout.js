@@ -40,7 +40,6 @@ export function generateProfessionalCheckoutUrl(user) {
   const params = new URLSearchParams({
     'checkout[variant_id]': variantId,
     'checkout[custom][user_id]': userId,
-    'test_mode': 'true',
   })
   if (userEmail) params.append('checkout[custom][email]', userEmail)
   const fullUrl = `${baseUrl}?${params.toString()}`
