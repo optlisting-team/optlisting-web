@@ -97,7 +97,7 @@ function LandingPage() {
             </div>
           ) : (
             <div className="flex items-center gap-2 sm:gap-3">
-              <Link to="/login" className="hidden text-sm font-semibold text-slate-600 hover:text-brand-navy sm:block">Sign in</Link>
+              <Link to="/login" className="text-sm font-semibold text-slate-600 hover:text-brand-navy">Sign in</Link>
               <Link to="/signup" className="rounded-lg bg-brand-navy px-4 py-2.5 text-sm font-bold text-white hover:bg-[#162957]">Start free trial</Link>
             </div>
           )}
