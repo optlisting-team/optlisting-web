@@ -2264,14 +2264,14 @@ function Dashboard() {
 
           {/* Scan progress bar — skeleton while checking connection (avoids layout shift), real content once connected, hidden if not connected */}
           {isCheckingConnection ? (
-            <div className="p-5 sm:p-6">
-              <div className="rounded-xl p-6 animate-pulse" style={{ backgroundColor: '#0a1628', border: '1px solid #1e3a5f' }}>
+            <div className="p-4">
+              <div className="rounded-xl p-4 animate-pulse" style={{ backgroundColor: '#0a1628', border: '1px solid #1e3a5f' }}>
                 <div className="flex items-baseline justify-between">
                   <span className="inline-block h-3 w-28 rounded bg-white/10" />
-                  <span className="inline-block h-8 w-14 rounded bg-white/10" />
+                  <span className="inline-block h-6 w-12 rounded bg-white/10" />
                 </div>
-                <div className="mt-3 w-full overflow-hidden rounded-full bg-white/5" style={{ height: '10px' }} />
-                <div className="mt-2 flex justify-end"><span className="inline-block h-4 w-16 rounded bg-white/10" /></div>
+                <div className="mt-2 w-full overflow-hidden rounded-full bg-white/5" style={{ height: '8px' }} />
+                <div className="mt-1.5 flex justify-end"><span className="inline-block h-3.5 w-14 rounded bg-white/10" /></div>
               </div>
             </div>
           ) : !showConnectEbay && (() => {
@@ -2279,16 +2279,16 @@ function Dashboard() {
             const total = summaryStats.scanProgress?.total ?? 0
             const percent = total > 0 ? Math.round((scanned / total) * 100) : 0
             return (
-              <div className="p-5 sm:p-6">
-                <div className="rounded-xl p-6" style={{ backgroundColor: '#0a1628', border: '1px solid #1e3a5f' }}>
+              <div className="p-4">
+                <div className="rounded-xl p-4" style={{ backgroundColor: '#0a1628', border: '1px solid #1e3a5f' }}>
                   <div className="flex items-baseline justify-between">
                     <span style={{ color: '#38bdf8', fontSize: '12px', fontWeight: 500, letterSpacing: '0.05em' }} className="uppercase">Scan Progress</span>
-                    <span style={{ color: '#e2e8f0', fontSize: '30px', fontWeight: 500 }}>{percent}%</span>
+                    <span style={{ color: '#e2e8f0', fontSize: '24px', fontWeight: 500 }}>{percent}%</span>
                   </div>
-                  <div className="mt-3 w-full overflow-hidden rounded-full" style={{ backgroundColor: '#071026', height: '10px' }}>
+                  <div className="mt-2 w-full overflow-hidden rounded-full" style={{ backgroundColor: '#071026', height: '8px' }}>
                     <div className="h-full rounded-full transition-all" style={{ backgroundColor: '#38bdf8', width: `${percent}%` }} />
                   </div>
-                  <div className="mt-2 text-right" style={{ color: '#e2e8f0', fontSize: '15px', fontWeight: 500 }}>{scanned.toLocaleString()} / {total.toLocaleString()}</div>
+                  <div className="mt-1.5 text-right" style={{ color: '#e2e8f0', fontSize: '13px', fontWeight: 500 }}>{scanned.toLocaleString()} / {total.toLocaleString()}</div>
                 </div>
               </div>
             )
