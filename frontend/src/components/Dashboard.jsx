@@ -142,7 +142,8 @@ function Dashboard() {
     queueCount: 0,
     lastSyncAt: null,
     scanProgress: { scanned: 0, total: 0 },
-    todayTarget: { scannedToday: 0, dailyCap: 400, resetsAt: null }
+    todayTarget: { scannedToday: 0, dailyCap: 400, resetsAt: null },
+    autoScanEnabled: true
   })
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [isSyncingListings, setIsSyncingListings] = useState(false) // Sync in progress state
@@ -660,6 +661,7 @@ function Dashboard() {
         const scanProgress = response.data.scan_progress || { scanned: 0, total: activeCount }
         const rawTodayTarget = response.data.today_target || { scanned_today: 0, daily_cap: 400, resets_at: null }
         const todayTarget = { scannedToday: rawTodayTarget.scanned_today ?? 0, dailyCap: rawTodayTarget.daily_cap ?? 400, resetsAt: rawTodayTarget.resets_at ?? null }
+        const autoScanEnabled = response.data.auto_scan_enabled ?? true
         
         // Always update state if response data exists (update even if 0)
         setSummaryStats({
@@ -668,7 +670,8 @@ function Dashboard() {
           queueCount: queueCount,
           lastSyncAt: lastSyncAt,
           scanProgress: scanProgress,
-          todayTarget: todayTarget
+          todayTarget: todayTarget,
+          autoScanEnabled: autoScanEnabled
         })
         console.log(`✅ [SUMMARY] UI updated: activeCount=${activeCount}, lowPerformingCount=${lowPerformingCount}`)
       } else {
@@ -1563,7 +1566,9 @@ function Dashboard() {
         lowPerformingCount: 0,
         queueCount: 0,
         lastSyncAt: null,
-        scanProgress: { scanned: 0, total: 0 }
+        scanProgress: { scanned: 0, total: 0 },
+        todayTarget: { scannedToday: 0, dailyCap: 400, resetsAt: null },
+        autoScanEnabled: true
       })
       showToast('eBay account disconnected', 'success')
     } catch (err) {
@@ -1571,6 +1576,20 @@ function Dashboard() {
       showToast('Failed to disconnect. Please try again.', 'error')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleToggleAutoScan = async () => {
+    const nextValue = !summaryStats.autoScanEnabled
+    // Optimistic update
+    setSummaryStats(prev => ({ ...prev, autoScanEnabled: nextValue }))
+    try {
+      await apiClient.post('/api/ebay/auto-scan-setting', { enabled: nextValue })
+      showToast(nextValue ? 'Daily auto-scan enabled' : 'Daily auto-scan disabled', 'success')
+    } catch (err) {
+      console.error('❌ Failed to update auto-scan setting:', err)
+      setSummaryStats(prev => ({ ...prev, autoScanEnabled: !nextValue })) // revert on failure
+      showToast('Failed to update setting', 'error')
     }
   }
 
@@ -2294,6 +2313,22 @@ function Dashboard() {
                     <div className="h-full rounded-full transition-all" style={{ backgroundColor: '#38bdf8', width: `${percent}%` }} />
                   </div>
                   <div className="mt-1.5 text-right" style={{ color: '#e2e8f0', fontSize: '13px', fontWeight: 500 }}>{scanned.toLocaleString()} / {total.toLocaleString()}</div>
+                  <div className="mt-3 flex items-center justify-between border-t pt-3" style={{ borderColor: '#1e3a5f' }}>
+                    <span style={{ color: '#94a3b8', fontSize: '12px' }}>Auto-scan daily (uses today's 400-listing quota automatically)</span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={summaryStats.autoScanEnabled}
+                      onClick={handleToggleAutoScan}
+                      className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+                      style={{ backgroundColor: summaryStats.autoScanEnabled ? '#38bdf8' : '#334155' }}
+                    >
+                      <span
+                        className="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                        style={{ transform: summaryStats.autoScanEnabled ? 'translateX(18px)' : 'translateX(3px)' }}
+                      />
+                    </button>
+                  </div>
                 </div>
               </div>
             )

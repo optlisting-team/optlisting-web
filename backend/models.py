@@ -130,6 +130,7 @@ class Profile(Base):
     ebay_user_id = Column(String, nullable=True)
     ebay_token_updated_at = Column(DateTime, nullable=True)
     ebay_connected = Column(Boolean, default=False)
+    auto_scan_enabled = Column(Boolean, default=True, nullable=False)  # user toggle for the daily automatic traffic-scan job
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
