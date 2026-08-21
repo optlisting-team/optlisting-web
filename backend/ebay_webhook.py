@@ -2965,6 +2965,40 @@ async def get_ebay_summary(
                 Listing.last_traffic_synced_at.isnot(None)
             ).count()
             
+            # Server-side SELLING/HOLDING/DELETING classification (default DELETING RULE:
+            # Views<=5, Watchers=0, Sales=0, within last 90 days) — computed here so the
+            # dashboard shows real numbers immediately on load, no manual 'Apply' click needed.
+            # Mirrors the same metrics-JSONB-first-then-column-fallback priority used when
+            # building the /api/listings response, so numbers stay consistent between the two.
+            from sqlalchemy import cast, Integer as SAInteger
+
+            views_expr = func.coalesce(cast(Listing.metrics['views'].astext, SAInteger), Listing.view_count, 0)
+            watch_expr = func.coalesce(cast(Listing.metrics['watch_count'].astext, SAInteger), Listing.watch_count, 0)
+            sales_expr = func.coalesce(cast(Listing.metrics['sales'].astext, SAInteger), Listing.sold_qty, 0)
+            recency_expr = func.coalesce(Listing.updated_at, Listing.last_synced_at, Listing.created_at)
+
+            DEFAULT_DELETING_MAX_VIEWS = 5
+            DEFAULT_DELETING_MAX_WATCHERS = 0
+            DEFAULT_DELETING_MAX_SALES = 0
+            DEFAULT_DELETING_WINDOW_DAYS = 90
+
+            base_active_filter = [
+                Listing.user_id == user_id,
+                func.lower(Listing.platform) == func.lower("eBay"),
+                or_(Listing.status == 'Active', Listing.status.is_(None)),
+                Listing.last_traffic_synced_at.isnot(None),  # only classify listings that have actually been scanned
+            ]
+
+            selling_count = db.query(Listing).filter(*base_active_filter, sales_expr > 0).count()
+            deleting_count = db.query(Listing).filter(
+                *base_active_filter,
+                sales_expr <= DEFAULT_DELETING_MAX_SALES,
+                views_expr <= DEFAULT_DELETING_MAX_VIEWS,
+                watch_expr <= DEFAULT_DELETING_MAX_WATCHERS,
+                recency_expr >= datetime.utcnow() - timedelta(days=DEFAULT_DELETING_WINDOW_DAYS)
+            ).count()
+            holding_count = max(scanned_count - selling_count - deleting_count, 0)
+            
             # Today's target progress: how many listings have actually been traffic-scanned
             # since eBay's own daily quota reset (midnight US Pacific Time — per eBay's docs,
             # NOT UTC midnight) out of the 400/day rolling cap — feeds "Today Limit: X/400"
@@ -3051,13 +3085,37 @@ async def get_ebay_summary(
             logger.info(f"[DASHBOARD] Active listings count: {active_count}.")
             
             profile_for_setting = db.query(Profile).filter(Profile.user_id == user_id).first()
+
+            # Analysis plan limit — matches the advertised Pro feature ("Up to 30,000 active
+            # listings"). NOTE: this is separate from webhooks.PLAN_LIMITS['pro'] (999999),
+            # which is a different, older listing-limit concept — flagging the inconsistency,
+            # not resolving it here since it's out of scope for this dashboard display change.
+            DASHBOARD_ANALYSIS_LIMIT = 30000
+            total_capped = min(active_count, DASHBOARD_ANALYSIS_LIMIT)
+            over_limit = max(active_count - DASHBOARD_ANALYSIS_LIMIT, 0)
+
             return {
                 "success": True,
                 "user_id": user_id,
                 "active_count": active_count,
+                "plan_limit": DASHBOARD_ANALYSIS_LIMIT,
+                "total_capped": total_capped,
+                "over_limit": over_limit,
                 "scan_progress": {
                     "scanned": scanned_count,
-                    "total": active_count
+                    "total": total_capped
+                },
+                "classification": {
+                    "selling": selling_count,
+                    "holding": holding_count,
+                    "deleting": deleting_count,
+                    "analyzed": scanned_count
+                },
+                "deleting_rule": {
+                    "max_views": DEFAULT_DELETING_MAX_VIEWS,
+                    "max_watchers": DEFAULT_DELETING_MAX_WATCHERS,
+                    "max_sales": DEFAULT_DELETING_MAX_SALES,
+                    "window_days": DEFAULT_DELETING_WINDOW_DAYS
                 },
                 "today_target": {
                     "scanned_today": scanned_today_count,
