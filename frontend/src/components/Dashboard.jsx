@@ -1465,6 +1465,11 @@ function Dashboard() {
         const diffMs = today - lastUpdated
         const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000))
         if (diffDays > minAgeDays) return false
+        // FIX: a listing that's never actually been traffic-scanned defaults to
+        // view_count=0/watch_count=0, which would trivially pass typical low-performer
+        // thresholds (views<=5, watchers<=0, sales<=0) even though we have no real signal
+        // for it yet. Require at least one real scan before it's eligible for Deleting.
+        if (!l.last_traffic_synced_at) return false
         const views = Number(l.view_count) ?? 0
         const watches = Number(l.watch_count) ?? 0
         const sold = Number(l.quantity_sold ?? l.total_sales ?? 0)
