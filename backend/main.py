@@ -764,8 +764,13 @@ def get_listings(
                     )
                 ),
                 "sold_qty": (l.metrics.get('sales') if l.metrics and isinstance(l.metrics, dict) and 'sales' in l.metrics else None) or getattr(l, 'sold_qty', 0) or 0,
+                "total_sales": (l.metrics.get('sales') if l.metrics and isinstance(l.metrics, dict) and 'sales' in l.metrics else None) or getattr(l, 'sold_qty', 0) or 0,
                 "watch_count": (l.metrics.get('watch_count') if l.metrics and isinstance(l.metrics, dict) and 'watch_count' in l.metrics else None) or getattr(l, 'watch_count', 0) or 0,
                 "view_count": (l.metrics.get('views') if l.metrics and isinstance(l.metrics, dict) and 'views' in l.metrics else None) or getattr(l, 'view_count', 0) or 0,
+                "impressions": (l.metrics.get('impressions') if l.metrics and isinstance(l.metrics, dict) else None) or 0,
+                "days_listed": (datetime.utcnow().date() - l.date_listed).days if getattr(l, 'date_listed', None) else None,
+                "copied_at": l.copied_at.isoformat() if getattr(l, 'copied_at', None) else None,
+                "last_traffic_synced_at": l.last_traffic_synced_at.isoformat() if getattr(l, 'last_traffic_synced_at', None) else None,
                 "last_updated": (l.updated_at or l.last_synced_at or l.created_at).isoformat() if (getattr(l, 'updated_at', None) or getattr(l, 'last_synced_at', None) or getattr(l, 'created_at', None)) else None,
                 # Management hub information (for Shopify detection)
                 "management_hub": (
@@ -1764,6 +1769,28 @@ class UpdateListingRequest(BaseModel):
     supplier: Optional[str] = None
     supplier_name: Optional[str] = None
     supplier_id: Optional[str] = None
+
+@app.post("/api/listing/{listing_id}/mark-copied")
+def mark_listing_copied(
+    listing_id: int,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Mark a listing's title as copied (user has started the copy-title ->
+    remove-from-supplier -> delete-listing workflow). Persisted to DB so the
+    COPIED stamp survives page reloads/sessions, and this listing is excluded
+    from the daily traffic re-scan rotation (see ebay_rate_limiter.select_listings_for_traffic_refresh)
+    since re-confirming its traffic numbers has no value once it's already
+    flagged for removal.
+    """
+    listing = db.query(Listing).filter(Listing.id == listing_id, Listing.user_id == user_id).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    listing.copied_at = datetime.utcnow()
+    db.commit()
+    return {"success": True, "id": listing.id, "copied_at": listing.copied_at.isoformat()}
+
 
 @app.patch("/api/listing/{listing_id}")
 def update_listing(
