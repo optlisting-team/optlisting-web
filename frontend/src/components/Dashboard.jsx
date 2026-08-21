@@ -6,7 +6,7 @@ import { useStore } from '../contexts/StoreContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useAccount } from '../contexts/AccountContext'
 import Toast from './Toast'
-import { Loader2, ShoppingBag } from 'lucide-react'
+import { Loader2, ShoppingBag, Copy } from 'lucide-react'
 
 // API_BASE_URL is imported from api.js
 // Use apiClient for requests requiring JWT authentication, use axios for requests without auth (e.g., health check)
@@ -141,7 +141,8 @@ function Dashboard() {
     lowPerformingCount: 0,
     queueCount: 0,
     lastSyncAt: null,
-    scanProgress: { scanned: 0, total: 0 }
+    scanProgress: { scanned: 0, total: 0 },
+    todayTarget: { scannedToday: 0, dailyCap: 400 }
   })
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [isSyncingListings, setIsSyncingListings] = useState(false) // Sync in progress state
@@ -656,6 +657,8 @@ function Dashboard() {
         const queueCount = response.data.queue_count || 0
         const lastSyncAt = response.data.last_sync_at || null
         const scanProgress = response.data.scan_progress || { scanned: 0, total: activeCount }
+        const rawTodayTarget = response.data.today_target || { scanned_today: 0, daily_cap: 400 }
+        const todayTarget = { scannedToday: rawTodayTarget.scanned_today ?? 0, dailyCap: rawTodayTarget.daily_cap ?? 400 }
         
         // Always update state if response data exists (update even if 0)
         setSummaryStats({
@@ -663,7 +666,8 @@ function Dashboard() {
           lowPerformingCount: lowPerformingCount,
           queueCount: queueCount,
           lastSyncAt: lastSyncAt,
-          scanProgress: scanProgress
+          scanProgress: scanProgress,
+          todayTarget: todayTarget
         })
         console.log(`✅ [SUMMARY] UI updated: activeCount=${activeCount}, lowPerformingCount=${lowPerformingCount}`)
       } else {
@@ -2296,7 +2300,7 @@ function Dashboard() {
 
           {/* Summary bar — always visible */}
           <div className="grid grid-cols-2 bg-brand-navy sm:grid-cols-4">
-            {['total', 'selling', 'holding', 'deleting'].map((status) => <button key={status} type="button" onClick={() => setViewMode(status)} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === status ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">{status === 'total' ? 'Today Limit' : status}</span><span className="data-value mt-2 block text-4xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts[status]}</span></button>)}
+            {['total', 'selling', 'holding', 'deleting'].map((status) => <button key={status} type="button" onClick={() => setViewMode(status)} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === status ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">{status === 'total' ? 'Today Limit' : status}</span><span className="data-value mt-2 block text-4xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : status === 'total' ? <>{summaryStats.todayTarget?.scannedToday ?? 0}<span className="text-xl text-slate-400"> / {summaryStats.todayTarget?.dailyCap ?? 400}</span></> : statusCounts[status]}</span></button>)}
           </div>
 
           {/* Content area — conditional on connection state */}
@@ -2326,7 +2330,7 @@ function Dashboard() {
                 <table className="w-full min-w-[900px] text-left text-base">
                   <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500"><tr>{['Image', 'Product Title', 'Impressions', 'Views', 'Watchers', 'Sales', 'Days', 'Market'].map((heading) => <th key={heading} className="px-4 py-4 font-bold">{heading}</th>)}</tr></thead>
                   <tbody className="divide-y divide-slate-100">
-                    {resultItems.map((item, index) => { const itemId = getLowPerformingItemId(item); const imageUrl = item.image_url || item.picture_url || item.thumbnail_url; return <tr key={itemId || index} className="hover:bg-slate-50/70"><td className="px-4 py-5">{imageUrl ? <img src={imageUrl} alt="" className="h-14 w-14 rounded-md border border-slate-200 object-cover" /> : <div className="h-14 w-14 rounded-md border border-slate-200 bg-slate-100" />}</td><td className="max-w-[320px] px-4 py-5"><p className="truncate text-base font-semibold text-brand-navy">{item.title || 'Untitled listing'}</p><p className="mt-1 text-sm text-slate-400">{itemId || ''}</p></td><td className="data-value px-4 py-5 text-base text-slate-600">{item.impressions ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.view_count ?? item.views ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.watch_count ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.quantity_sold ?? item.total_sales ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.days_listed ?? 0}</td><td className="px-4 py-5 text-base font-semibold text-brand-navy">eBay</td></tr> })}
+                    {resultItems.map((item, index) => { const itemId = getLowPerformingItemId(item); const imageUrl = item.image_url || item.picture_url || item.thumbnail_url; const handleCopyTitle = async () => { const title = item.title || ''; if (!title) return; try { await navigator.clipboard.writeText(title); showToast('Title copied — paste it at your supplier to find and remove this item', 'success') } catch (err) { showToast('Failed to copy title', 'error') } }; return <tr key={itemId || index} className="hover:bg-slate-50/70"><td className="px-4 py-5">{imageUrl ? <img src={imageUrl} alt="" className="h-14 w-14 rounded-md border border-slate-200 object-cover" /> : <div className="h-14 w-14 rounded-md border border-slate-200 bg-slate-100" />}</td><td className="max-w-[320px] px-4 py-5"><button type="button" onClick={handleCopyTitle} title="Click to copy title" className="group flex items-center gap-1.5 text-left"><p className="truncate text-base font-semibold text-brand-navy group-hover:text-blue-600">{item.title || 'Untitled listing'}</p><Copy className="h-3.5 w-3.5 shrink-0 text-slate-300 group-hover:text-blue-600" /></button><p className="mt-1 text-sm text-slate-400">{itemId || ''}</p></td><td className="data-value px-4 py-5 text-base text-slate-600">{item.impressions ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.view_count ?? item.views ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.watch_count ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.quantity_sold ?? item.total_sales ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.days_listed ?? 0}</td><td className="px-4 py-5 text-base font-semibold text-brand-navy">eBay</td></tr> })}
                     {!isAnalyzingListings && resultItems.length === 0 && <tr><td colSpan={8} className="px-6 py-14 text-center text-sm text-slate-500">No listings found.</td></tr>}
                   </tbody>
                 </table>
