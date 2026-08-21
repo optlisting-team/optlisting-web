@@ -2917,6 +2917,17 @@ async def get_ebay_summary(
                 Listing.last_traffic_synced_at.isnot(None)
             ).count()
             
+            # Today's target progress: how many listings have actually been traffic-scanned
+            # TODAY (UTC calendar day) out of the 400/day rolling cap — feeds "Today Limit: X/400"
+            from .ebay_rate_limiter import TRAFFIC_DAILY_LISTING_CAP
+            today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            scanned_today_count = db.query(Listing).filter(
+                Listing.user_id == user_id,
+                func.lower(Listing.platform) == func.lower("eBay"),
+                or_(Listing.status == 'Active', Listing.status.is_(None)),
+                Listing.last_traffic_synced_at >= today_start
+            ).count()
+            
             # Last sync timestamp (most recent last_synced_at)
             last_listing = db.query(Listing).filter(
                 Listing.user_id == user_id,
@@ -2988,6 +2999,10 @@ async def get_ebay_summary(
                 "scan_progress": {
                     "scanned": scanned_count,
                     "total": active_count
+                },
+                "today_target": {
+                    "scanned_today": scanned_today_count,
+                    "daily_cap": TRAFFIC_DAILY_LISTING_CAP
                 },
                 "low_performing_count": low_performing_count,
                 "queue_count": queue_count,
