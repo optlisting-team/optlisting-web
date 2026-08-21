@@ -140,7 +140,8 @@ function Dashboard() {
     activeCount: 0,
     lowPerformingCount: 0,
     queueCount: 0,
-    lastSyncAt: null
+    lastSyncAt: null,
+    scanProgress: { scanned: 0, total: 0 }
   })
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [isSyncingListings, setIsSyncingListings] = useState(false) // Sync in progress state
@@ -654,13 +655,15 @@ function Dashboard() {
         const lowPerformingCount = response.data.low_performing_count || 0
         const queueCount = response.data.queue_count || 0
         const lastSyncAt = response.data.last_sync_at || null
+        const scanProgress = response.data.scan_progress || { scanned: 0, total: activeCount }
         
         // Always update state if response data exists (update even if 0)
         setSummaryStats({
           activeCount: activeCount,
           lowPerformingCount: lowPerformingCount,
           queueCount: queueCount,
-          lastSyncAt: lastSyncAt
+          lastSyncAt: lastSyncAt,
+          scanProgress: scanProgress
         })
         console.log(`✅ [SUMMARY] UI updated: activeCount=${activeCount}, lowPerformingCount=${lowPerformingCount}`)
       } else {
@@ -1541,6 +1544,31 @@ function Dashboard() {
     }
   }
 
+  const handleDisconnect = async () => {
+    if (!window.confirm('Disconnect your eBay account? You can reconnect at any time — your synced listing history will be kept.')) {
+      return
+    }
+    try {
+      setLoading(true)
+      await apiClient.post('/api/ebay/disconnect')
+      setIsStoreConnected(false)
+      setListings([])
+      setSummaryStats({
+        activeCount: 0,
+        lowPerformingCount: 0,
+        queueCount: 0,
+        lastSyncAt: null,
+        scanProgress: { scanned: 0, total: 0 }
+      })
+      showToast('eBay account disconnected', 'success')
+    } catch (err) {
+      console.error('❌ Disconnect failed:', err)
+      showToast('Failed to disconnect. Please try again.', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleSourceChange = async (itemId, newSupplier) => {
     try {
       // Step 1: Update in backend database
@@ -2227,7 +2255,10 @@ function Dashboard() {
             ) : showConnectEbay ? (
               <button type="button" onClick={handleConnectEbay} disabled={isSyncing} className="flex items-center justify-center gap-2 rounded-lg bg-brand-navy px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-[#162957] disabled:cursor-not-allowed disabled:opacity-50">{isSyncing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{isSyncing ? 'Connecting...' : 'Connect eBay'}</button>
             ) : (
-              <button type="button" onClick={handleSync} disabled={loading || isSyncingListings} className="flex items-center justify-center gap-2 rounded-lg bg-brand-navy px-5 py-3 text-sm font-bold text-white hover:bg-[#162957] disabled:opacity-50">{(loading || isSyncingListings) && <Loader2 className="h-4 w-4 animate-spin" />}Sync Now</button>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={handleSync} disabled={loading || isSyncingListings} className="flex items-center justify-center gap-2 rounded-lg bg-brand-navy px-5 py-3 text-sm font-bold text-white hover:bg-[#162957] disabled:opacity-50">{(loading || isSyncingListings) && <Loader2 className="h-4 w-4 animate-spin" />}Sync Now</button>
+                <button type="button" onClick={handleDisconnect} disabled={loading || isSyncingListings} className="flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-5 py-3 text-sm font-bold text-red-600 hover:bg-red-50 disabled:opacity-50">Disconnect eBay</button>
+              </div>
             )}
           </div>
 
@@ -2235,6 +2266,27 @@ function Dashboard() {
           <div className="grid grid-cols-2 bg-brand-navy sm:grid-cols-4">
             {['total', 'selling', 'holding', 'deleting'].map((status) => <button key={status} type="button" onClick={() => setViewMode(status)} className={`border-white/10 px-4 py-4 text-left transition-colors sm:border-r ${viewMode === status ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-[11px] font-bold uppercase tracking-wider text-slate-300">{status}</span><span className="data-value mt-1 block text-2xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-6 w-12 animate-pulse rounded bg-white/20" /> : statusCounts[status]}</span></button>)}
           </div>
+
+          {/* Scan progress bar — only when connected, shows how much of the store's total listings have been traffic-scanned */}
+          {!isCheckingConnection && !showConnectEbay && (() => {
+            const scanned = summaryStats.scanProgress?.scanned ?? 0
+            const total = summaryStats.scanProgress?.total ?? 0
+            const percent = total > 0 ? Math.round((scanned / total) * 100) : 0
+            return (
+              <div className="p-5 sm:p-6">
+                <div className="rounded-xl p-6" style={{ backgroundColor: '#0a1628', border: '1px solid #1e3a5f' }}>
+                  <div className="flex items-baseline justify-between">
+                    <span style={{ color: '#38bdf8', fontSize: '12px', fontWeight: 500, letterSpacing: '0.05em' }} className="uppercase">Scan Progress</span>
+                    <span style={{ color: '#e2e8f0', fontSize: '30px', fontWeight: 500 }}>{percent}%</span>
+                  </div>
+                  <div className="mt-3 w-full overflow-hidden rounded-full" style={{ backgroundColor: '#071026', height: '10px' }}>
+                    <div className="h-full rounded-full transition-all" style={{ backgroundColor: '#38bdf8', width: `${percent}%` }} />
+                  </div>
+                  <div className="mt-2 text-right" style={{ color: '#e2e8f0', fontSize: '15px', fontWeight: 500 }}>{scanned.toLocaleString()} / {total.toLocaleString()}</div>
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Content area — conditional on connection state */}
           {isCheckingConnection ? (
