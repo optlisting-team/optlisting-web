@@ -2262,11 +2262,6 @@ function Dashboard() {
             )}
           </div>
 
-          {/* Summary bar — always visible */}
-          <div className="grid grid-cols-2 bg-brand-navy sm:grid-cols-4">
-            {['total', 'selling', 'holding', 'deleting'].map((status) => <button key={status} type="button" onClick={() => setViewMode(status)} className={`border-white/10 px-4 py-4 text-left transition-colors sm:border-r ${viewMode === status ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-[11px] font-bold uppercase tracking-wider text-slate-300">{status}</span><span className="data-value mt-1 block text-2xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-6 w-12 animate-pulse rounded bg-white/20" /> : statusCounts[status]}</span></button>)}
-          </div>
-
           {/* Scan progress bar — only when connected, shows how much of the store's total listings have been traffic-scanned */}
           {!isCheckingConnection && !showConnectEbay && (() => {
             const scanned = summaryStats.scanProgress?.scanned ?? 0
@@ -2287,6 +2282,11 @@ function Dashboard() {
               </div>
             )
           })()}
+
+          {/* Summary bar — always visible */}
+          <div className="grid grid-cols-2 bg-brand-navy sm:grid-cols-4">
+            {['total', 'selling', 'holding', 'deleting'].map((status) => <button key={status} type="button" onClick={() => setViewMode(status)} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === status ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">{status}</span><span className="data-value mt-2 block text-4xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts[status]}</span></button>)}
+          </div>
 
           {/* Content area — conditional on connection state */}
           {isCheckingConnection ? (
