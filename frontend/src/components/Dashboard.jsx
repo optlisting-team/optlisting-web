@@ -2262,22 +2262,33 @@ function Dashboard() {
             )}
           </div>
 
-          {/* Scan progress bar — only when connected, shows how much of the store's total listings have been traffic-scanned */}
-          {!isCheckingConnection && !showConnectEbay && (() => {
+          {/* Scan progress bar — skeleton while checking connection (avoids layout shift), real content once connected, hidden if not connected */}
+          {isCheckingConnection ? (
+            <div className="p-4">
+              <div className="rounded-xl p-4 animate-pulse" style={{ backgroundColor: '#0a1628', border: '1px solid #1e3a5f' }}>
+                <div className="flex items-baseline justify-between">
+                  <span className="inline-block h-3 w-28 rounded bg-white/10" />
+                  <span className="inline-block h-6 w-12 rounded bg-white/10" />
+                </div>
+                <div className="mt-2 w-full overflow-hidden rounded-full bg-white/5" style={{ height: '8px' }} />
+                <div className="mt-1.5 flex justify-end"><span className="inline-block h-3.5 w-14 rounded bg-white/10" /></div>
+              </div>
+            </div>
+          ) : !showConnectEbay && (() => {
             const scanned = summaryStats.scanProgress?.scanned ?? 0
             const total = summaryStats.scanProgress?.total ?? 0
             const percent = total > 0 ? Math.round((scanned / total) * 100) : 0
             return (
-              <div className="p-5 sm:p-6">
-                <div className="rounded-xl p-6" style={{ backgroundColor: '#0a1628', border: '1px solid #1e3a5f' }}>
+              <div className="p-4">
+                <div className="rounded-xl p-4" style={{ backgroundColor: '#0a1628', border: '1px solid #1e3a5f' }}>
                   <div className="flex items-baseline justify-between">
                     <span style={{ color: '#38bdf8', fontSize: '12px', fontWeight: 500, letterSpacing: '0.05em' }} className="uppercase">Scan Progress</span>
-                    <span style={{ color: '#e2e8f0', fontSize: '30px', fontWeight: 500 }}>{percent}%</span>
+                    <span style={{ color: '#e2e8f0', fontSize: '24px', fontWeight: 500 }}>{percent}%</span>
                   </div>
-                  <div className="mt-3 w-full overflow-hidden rounded-full" style={{ backgroundColor: '#071026', height: '10px' }}>
+                  <div className="mt-2 w-full overflow-hidden rounded-full" style={{ backgroundColor: '#071026', height: '8px' }}>
                     <div className="h-full rounded-full transition-all" style={{ backgroundColor: '#38bdf8', width: `${percent}%` }} />
                   </div>
-                  <div className="mt-2 text-right" style={{ color: '#e2e8f0', fontSize: '15px', fontWeight: 500 }}>{scanned.toLocaleString()} / {total.toLocaleString()}</div>
+                  <div className="mt-1.5 text-right" style={{ color: '#e2e8f0', fontSize: '13px', fontWeight: 500 }}>{scanned.toLocaleString()} / {total.toLocaleString()}</div>
                 </div>
               </div>
             )
@@ -2285,7 +2296,7 @@ function Dashboard() {
 
           {/* Summary bar — always visible */}
           <div className="grid grid-cols-2 bg-brand-navy sm:grid-cols-4">
-            {['total', 'selling', 'holding', 'deleting'].map((status) => <button key={status} type="button" onClick={() => setViewMode(status)} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === status ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">{status}</span><span className="data-value mt-2 block text-4xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts[status]}</span></button>)}
+            {['total', 'selling', 'holding', 'deleting'].map((status) => <button key={status} type="button" onClick={() => setViewMode(status)} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === status ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">{status === 'total' ? 'Today Limit' : status}</span><span className="data-value mt-2 block text-4xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts[status]}</span></button>)}
           </div>
 
           {/* Content area — conditional on connection state */}
