@@ -2309,7 +2309,7 @@ function Dashboard() {
                 <div className="mt-1.5 flex justify-end"><span className="inline-block h-3.5 w-14 rounded bg-white/10" /></div>
               </div>
             </div>
-          ) : !showConnectEbay && (() => {
+          ) : (() => {
             const scanned = summaryStats.scanProgress?.scanned ?? 0
             const total = summaryStats.scanProgress?.total ?? 0
             const percent = total > 0 ? Math.round((scanned / total) * 100) : 0
@@ -2331,7 +2331,8 @@ function Dashboard() {
                       role="switch"
                       aria-checked={summaryStats.autoScanEnabled}
                       onClick={handleToggleAutoScan}
-                      className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+                      disabled={showConnectEbay}
+                      className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       style={{ backgroundColor: summaryStats.autoScanEnabled ? '#38bdf8' : '#334155' }}
                     >
                       <span
@@ -2352,24 +2353,18 @@ function Dashboard() {
             {['selling', 'holding', 'deleting'].map((status) => <button key={status} type="button" onClick={() => setViewMode(status)} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === status ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">{status}</span><span className="data-value mt-2 block text-4xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts[status]}</span></button>)}
           </div>
 
-          {/* Content area — conditional on connection state */}
+          {/* Content area — same layout structure whether connected or not; only the empty-row message differs */}
           {isCheckingConnection ? (
             <div className="flex flex-col items-center justify-center px-6 py-24 text-center">
               <Loader2 className="h-8 w-8 animate-spin text-brand-navy" />
               <p className="mt-4 text-sm font-medium text-slate-500">Checking store connection...</p>
             </div>
-          ) : showConnectEbay ? (
-            <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-              <ShoppingBag className="h-12 w-12 text-slate-300" strokeWidth={1.5} />
-              <p className="mt-4 text-sm text-slate-500">Connect your eBay account to start analyzing your listings.</p>
-              <button type="button" onClick={handleConnectEbay} disabled={isSyncing} className="mt-6 flex items-center justify-center gap-2 rounded-lg bg-brand-navy px-7 py-3.5 text-sm font-bold text-white transition-colors hover:bg-[#162957] disabled:cursor-not-allowed disabled:opacity-50">{isSyncing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{isSyncing ? 'Connecting...' : 'Connect eBay'}</button>
-            </div>
           ) : (
             <>
               <div className="border-b border-slate-200 bg-slate-50 p-4 sm:p-5">
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]">
-                  {[['Views', 'maxViews'], ['Watchers', 'maxWatches'], ['Sales', 'maxSold']].map(([label, key]) => <label key={key} className="text-xs font-bold uppercase tracking-wider text-slate-500">{label} {'<='}<input type="number" min={0} value={criteria[key]} onChange={(e) => setCriteria((current) => ({ ...current, [key]: Number(e.target.value) || 0 }))} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-brand-navy outline-none focus:border-brand-navy" /></label>)}
-                  <button type="button" onClick={handleAnalyze} disabled={isAnalyzingListings} className="self-end rounded-lg bg-brand-navy px-6 py-2.5 text-sm font-bold text-white hover:bg-[#162957] disabled:opacity-50">{isAnalyzingListings ? 'Applying...' : 'Apply'}</button>
+                  {[['Views', 'maxViews'], ['Watchers', 'maxWatches'], ['Sales', 'maxSold']].map(([label, key]) => <label key={key} className="text-xs font-bold uppercase tracking-wider text-slate-500">{label} {'<='}<input type="number" min={0} disabled={showConnectEbay} value={criteria[key]} onChange={(e) => setCriteria((current) => ({ ...current, [key]: Number(e.target.value) || 0 }))} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-brand-navy outline-none focus:border-brand-navy disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400" /></label>)}
+                  <button type="button" onClick={handleAnalyze} disabled={isAnalyzingListings || showConnectEbay} className="self-end rounded-lg bg-brand-navy px-6 py-2.5 text-sm font-bold text-white hover:bg-[#162957] disabled:cursor-not-allowed disabled:opacity-50">{isAnalyzingListings ? 'Applying...' : 'Apply'}</button>
                 </div>
                 <p className="mt-4 text-xs font-semibold text-slate-500">Data: Last 90 Days</p>
               </div>
@@ -2379,8 +2374,16 @@ function Dashboard() {
                 <table className="w-full min-w-[900px] text-left text-base">
                   <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500"><tr>{['Image', 'Product Title', 'Impressions', 'Views', 'Watchers', 'Sales', 'Days', 'Market'].map((heading) => <th key={heading} className="px-4 py-4 font-bold">{heading}</th>)}</tr></thead>
                   <tbody className="divide-y divide-slate-100">
-                    {resultItems.map((item, index) => { const itemId = getLowPerformingItemId(item); const imageUrl = item.image_url || item.picture_url || item.thumbnail_url; const isCopied = itemId && copiedItemIds.has(itemId); const scannedLabel = (() => { if (!item.last_traffic_synced_at) return 'Not yet scanned'; const diffMs = Date.now() - new Date(item.last_traffic_synced_at).getTime(); const diffDays = Math.floor(diffMs / 86400000); if (diffDays <= 0) return 'Scanned today'; if (diffDays === 1) return 'Scanned 1 day ago'; return `Scanned ${diffDays} days ago` })(); const handleCopyTitle = async () => { const title = item.title || ''; if (!title) return; try { await navigator.clipboard.writeText(title); showToast('Title copied', 'success'); if (itemId) { setCopiedItemIds(prev => new Set(prev).add(itemId)); if (item.id) { apiClient.post(`/api/listing/${item.id}/mark-copied`).catch(err => console.error('Failed to persist copied state:', err)) } } } catch (err) { showToast('Copy failed', 'error') } }; return <tr key={itemId || index} className={`transition-colors ${isCopied ? 'bg-slate-100/80 opacity-60' : 'hover:bg-slate-50/70'}`}><td className="px-4 py-5">{imageUrl ? <img src={imageUrl} alt="" className="h-14 w-14 rounded-md border border-slate-200 object-cover" /> : <div className="h-14 w-14 rounded-md border border-slate-200 bg-slate-100" />}</td><td className="relative max-w-[320px] px-4 py-5">{isCopied && <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 -rotate-12 select-none rounded border-2 border-slate-400/70 px-2 py-0.5 text-xs font-black uppercase tracking-widest text-slate-400/70">Copied</span>}<button type="button" onClick={handleCopyTitle} title="Click to copy title" className="group flex items-start gap-1.5 text-left"><p className="text-base font-semibold text-brand-navy group-hover:text-blue-600">{item.title || 'Untitled listing'}</p><Copy className="mt-1 h-3.5 w-3.5 shrink-0 text-slate-300 group-hover:text-blue-600" /></button><p className="mt-1 text-sm text-slate-400">{itemId || ''}</p><p className="mt-0.5 text-xs text-slate-400">{scannedLabel}</p></td><td className="data-value px-4 py-5 text-base text-slate-600">{item.impressions ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.view_count ?? item.views ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.watch_count ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.quantity_sold ?? item.total_sales ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.days_listed ?? 0}</td><td className="px-4 py-5 text-base font-semibold text-brand-navy">eBay</td></tr> })}
-                    {!isAnalyzingListings && resultItems.length === 0 && <tr><td colSpan={8} className="px-6 py-14 text-center text-sm text-slate-500">No listings found.</td></tr>}
+                    {!showConnectEbay && resultItems.map((item, index) => { const itemId = getLowPerformingItemId(item); const imageUrl = item.image_url || item.picture_url || item.thumbnail_url; const isCopied = itemId && copiedItemIds.has(itemId); const scannedLabel = (() => { if (!item.last_traffic_synced_at) return 'Not yet scanned'; const diffMs = Date.now() - new Date(item.last_traffic_synced_at).getTime(); const diffDays = Math.floor(diffMs / 86400000); if (diffDays <= 0) return 'Scanned today'; if (diffDays === 1) return 'Scanned 1 day ago'; return `Scanned ${diffDays} days ago` })(); const handleCopyTitle = async () => { const title = item.title || ''; if (!title) return; try { await navigator.clipboard.writeText(title); showToast('Title copied', 'success'); if (itemId) { setCopiedItemIds(prev => new Set(prev).add(itemId)); if (item.id) { apiClient.post(`/api/listing/${item.id}/mark-copied`).catch(err => console.error('Failed to persist copied state:', err)) } } } catch (err) { showToast('Copy failed', 'error') } }; return <tr key={itemId || index} className={`transition-colors ${isCopied ? 'bg-slate-100/80 opacity-60' : 'hover:bg-slate-50/70'}`}><td className="px-4 py-5">{imageUrl ? <img src={imageUrl} alt="" className="h-14 w-14 rounded-md border border-slate-200 object-cover" /> : <div className="h-14 w-14 rounded-md border border-slate-200 bg-slate-100" />}</td><td className="relative max-w-[320px] px-4 py-5">{isCopied && <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 -rotate-12 select-none rounded border-2 border-slate-400/70 px-2 py-0.5 text-xs font-black uppercase tracking-widest text-slate-400/70">Copied</span>}<button type="button" onClick={handleCopyTitle} title="Click to copy title" className="group flex items-start gap-1.5 text-left"><p className="text-base font-semibold text-brand-navy group-hover:text-blue-600">{item.title || 'Untitled listing'}</p><Copy className="mt-1 h-3.5 w-3.5 shrink-0 text-slate-300 group-hover:text-blue-600" /></button><p className="mt-1 text-sm text-slate-400">{itemId || ''}</p><p className="mt-0.5 text-xs text-slate-400">{scannedLabel}</p></td><td className="data-value px-4 py-5 text-base text-slate-600">{item.impressions ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.view_count ?? item.views ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.watch_count ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.quantity_sold ?? item.total_sales ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.days_listed ?? 0}</td><td className="px-4 py-5 text-base font-semibold text-brand-navy">eBay</td></tr> })}
+                    {showConnectEbay ? (
+                      <tr><td colSpan={8} className="px-6 py-16">
+                        <div className="flex flex-col items-center justify-center text-center">
+                          <ShoppingBag className="h-10 w-10 text-slate-300" strokeWidth={1.5} />
+                          <p className="mt-3 text-sm text-slate-500">Connect your eBay account to start analyzing your listings.</p>
+                          <button type="button" onClick={handleConnectEbay} disabled={isSyncing} className="mt-5 flex items-center justify-center gap-2 rounded-lg bg-brand-navy px-7 py-3 text-sm font-bold text-white transition-colors hover:bg-[#162957] disabled:cursor-not-allowed disabled:opacity-50">{isSyncing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{isSyncing ? 'Connecting...' : 'Connect eBay'}</button>
+                        </div>
+                      </td></tr>
+                    ) : !isAnalyzingListings && resultItems.length === 0 && <tr><td colSpan={8} className="px-6 py-14 text-center text-sm text-slate-500">No listings found.</td></tr>}
                   </tbody>
                 </table>
               </div>
