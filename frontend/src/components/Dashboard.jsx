@@ -2296,7 +2296,7 @@ function Dashboard() {
 
           {/* Summary bar — always visible */}
           <div className="grid grid-cols-2 bg-brand-navy sm:grid-cols-4">
-            {['total', 'selling', 'holding', 'deleting'].map((status) => <button key={status} type="button" onClick={() => setViewMode(status)} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === status ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">{status}</span><span className="data-value mt-2 block text-4xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts[status]}</span></button>)}
+            {['total', 'selling', 'holding', 'deleting'].map((status) => <button key={status} type="button" onClick={() => setViewMode(status)} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === status ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">{status === 'total' ? 'Today Limit' : status}</span><span className="data-value mt-2 block text-4xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts[status]}</span></button>)}
           </div>
 
           {/* Content area — conditional on connection state */}
