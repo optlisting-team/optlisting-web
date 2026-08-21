@@ -142,7 +142,7 @@ function Dashboard() {
     queueCount: 0,
     lastSyncAt: null,
     scanProgress: { scanned: 0, total: 0 },
-    todayTarget: { scannedToday: 0, dailyCap: 400 }
+    todayTarget: { scannedToday: 0, dailyCap: 400, resetsAt: null }
   })
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [isSyncingListings, setIsSyncingListings] = useState(false) // Sync in progress state
@@ -658,8 +658,8 @@ function Dashboard() {
         const queueCount = response.data.queue_count || 0
         const lastSyncAt = response.data.last_sync_at || null
         const scanProgress = response.data.scan_progress || { scanned: 0, total: activeCount }
-        const rawTodayTarget = response.data.today_target || { scanned_today: 0, daily_cap: 400 }
-        const todayTarget = { scannedToday: rawTodayTarget.scanned_today ?? 0, dailyCap: rawTodayTarget.daily_cap ?? 400 }
+        const rawTodayTarget = response.data.today_target || { scanned_today: 0, daily_cap: 400, resets_at: null }
+        const todayTarget = { scannedToday: rawTodayTarget.scanned_today ?? 0, dailyCap: rawTodayTarget.daily_cap ?? 400, resetsAt: rawTodayTarget.resets_at ?? null }
         
         // Always update state if response data exists (update even if 0)
         setSummaryStats({
@@ -2301,7 +2301,7 @@ function Dashboard() {
 
           {/* Summary bar — always visible */}
           <div className="grid grid-cols-2 bg-brand-navy sm:grid-cols-4">
-            {['total', 'selling', 'holding', 'deleting'].map((status) => <button key={status} type="button" onClick={() => setViewMode(status)} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === status ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">{status === 'total' ? 'Today Limit' : status}</span><span className="data-value mt-2 block text-4xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : status === 'total' ? <>{summaryStats.todayTarget?.scannedToday ?? 0}<span className="text-xl text-slate-400"> / {summaryStats.todayTarget?.dailyCap ?? 400}</span></> : statusCounts[status]}</span></button>)}
+            {['total', 'selling', 'holding', 'deleting'].map((status) => <button key={status} type="button" onClick={() => setViewMode(status)} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === status ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">{status === 'total' ? 'Today Limit' : status}</span><span className="data-value mt-2 block text-4xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : status === 'total' ? <>{summaryStats.todayTarget?.scannedToday ?? 0}<span className="text-xl text-slate-400"> / {summaryStats.todayTarget?.dailyCap ?? 400}</span></> : statusCounts[status]}</span>{status === 'total' && !isCheckingConnection && summaryStats.todayTarget?.resetsAt && <span className="mt-1 block text-xs font-medium text-slate-400">Resets {new Date(summaryStats.todayTarget.resetsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>}</button>)}
           </div>
 
           {/* Content area — conditional on connection state */}

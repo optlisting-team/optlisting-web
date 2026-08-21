@@ -483,6 +483,38 @@ def startup_event():
         print("Server will continue to start, but database operations may fail.")
         import traceback
         traceback.print_exc()
+
+    # Daily auto-scan scheduler: without this, get_traffic_report_for_user() only ever ran
+    # as a side effect of a full listing sync completing (rate-limited to once/24h/store) —
+    # a user who never clicks "Sync Now" on a given day would never actually use that day's
+    # traffic-scan quota, and SCAN PROGRESS / "Today Limit" would never advance on their own.
+    # Scheduled at 08:15 UTC — always safely after eBay's own daily quota reset at midnight
+    # Pacific Time (07:00 UTC during PDT, 08:00 UTC during PST), regardless of daylight saving.
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.triggers.cron import CronTrigger
+        import asyncio
+
+        def _run_daily_scan_job():
+            from .daily_scan_job import run_daily_traffic_scan_for_all_users
+            try:
+                asyncio.run(run_daily_traffic_scan_for_all_users())
+            except Exception as job_err:
+                logger.error(f"❌ [SCHEDULER] Daily traffic scan job failed: {job_err}")
+
+        scheduler = BackgroundScheduler(timezone="UTC")
+        scheduler.add_job(
+            _run_daily_scan_job,
+            trigger=CronTrigger(hour=8, minute=15),
+            id="daily_traffic_scan",
+            replace_existing=True,
+        )
+        scheduler.start()
+        logger.info("[STARTUP] ✅ Daily traffic-scan scheduler started (08:15 UTC)")
+        print("✅ Daily traffic-scan scheduler started (08:15 UTC)")
+    except Exception as scheduler_err:
+        logger.error(f"[STARTUP] ❌ Failed to start daily-scan scheduler: {scheduler_err}")
+        print(f"⚠️ Failed to start daily-scan scheduler (non-fatal): {scheduler_err}")
         # Server should still start even if database connection fails
 
 

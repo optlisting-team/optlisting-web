@@ -2918,9 +2918,19 @@ async def get_ebay_summary(
             ).count()
             
             # Today's target progress: how many listings have actually been traffic-scanned
-            # TODAY (UTC calendar day) out of the 400/day rolling cap — feeds "Today Limit: X/400"
+            # since eBay's own daily quota reset (midnight US Pacific Time — per eBay's docs,
+            # NOT UTC midnight) out of the 400/day rolling cap — feeds "Today Limit: X/400"
             from .ebay_rate_limiter import TRAFFIC_DAILY_LISTING_CAP
-            today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            from zoneinfo import ZoneInfo
+            pacific = ZoneInfo("America/Los_Angeles")
+            utc = ZoneInfo("UTC")
+            now_pacific = datetime.now(pacific)
+            today_start_pacific = now_pacific.replace(hour=0, minute=0, second=0, microsecond=0)
+            today_start = today_start_pacific.astimezone(utc).replace(tzinfo=None)  # naive UTC, matches datetime.utcnow()-based columns
+            next_reset_utc = (today_start_pacific + timedelta(days=1)).astimezone(utc).replace(tzinfo=None)
+            # Small buffer for display only — eBay's own community guidance is to check "a few
+            # minutes after midnight PT, in case of clock drift" rather than exactly at reset.
+            next_reset_display = next_reset_utc + timedelta(minutes=5)
             scanned_today_count = db.query(Listing).filter(
                 Listing.user_id == user_id,
                 func.lower(Listing.platform) == func.lower("eBay"),
@@ -3002,7 +3012,8 @@ async def get_ebay_summary(
                 },
                 "today_target": {
                     "scanned_today": scanned_today_count,
-                    "daily_cap": TRAFFIC_DAILY_LISTING_CAP
+                    "daily_cap": TRAFFIC_DAILY_LISTING_CAP,
+                    "resets_at": next_reset_display.isoformat() + "Z"
                 },
                 "low_performing_count": low_performing_count,
                 "queue_count": queue_count,
