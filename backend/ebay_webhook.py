@@ -962,6 +962,61 @@ def check_token_status(user_id: str, db: Session = None) -> Dict[str, Any]:
             db.close()
 
 
+@router.post("/disconnect")
+async def ebay_disconnect(
+    user_id: str = Depends(get_current_user)  # user_id from JWT
+):
+    """
+    Disconnect eBay: revoke the token with eBay (best-effort) and clear all
+    eBay OAuth fields on the user's profile. Listings already synced are left
+    in place — only the connection itself is torn down.
+    """
+    from .models import get_db, Profile
+    db = next(get_db())
+    try:
+        profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+        if not profile:
+            raise HTTPException(status_code=404, detail="Profile not found")
+
+        # Best-effort token revocation with eBay — don't block disconnect on this failing
+        if profile.ebay_access_token:
+            try:
+                env = EBAY_ENVIRONMENT if EBAY_ENVIRONMENT in EBAY_API_ENDPOINTS else "PRODUCTION"
+                revoke_url = "https://api.sandbox.ebay.com/identity/v1/oauth2/revoke" if env == "SANDBOX" \
+                    else "https://api.ebay.com/identity/v1/oauth2/revoke"
+                auth_header = base64.b64encode(f"{EBAY_CLIENT_ID}:{EBAY_CLIENT_SECRET}".encode()).decode()
+                requests.post(
+                    revoke_url,
+                    headers={
+                        "Authorization": f"Basic {auth_header}",
+                        "Content-Type": "application/x-www-form-urlencoded",
+                    },
+                    data={"token": profile.ebay_access_token, "token_type_hint": "access_token"},
+                    timeout=10,
+                )
+            except Exception as revoke_err:
+                logger.warning(f"⚠️ [DISCONNECT] eBay token revoke failed (continuing anyway): {revoke_err}")
+
+        profile.ebay_access_token = None
+        profile.ebay_refresh_token = None
+        profile.ebay_token_expires_at = None
+        profile.ebay_user_id = None
+        profile.ebay_token_updated_at = None
+        profile.ebay_connected = False
+        db.commit()
+
+        logger.info(f"✅ [DISCONNECT] eBay disconnected for user {user_id}")
+        return {"success": True, "message": "eBay account disconnected"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ [DISCONNECT] Failed for user {user_id}: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to disconnect: {str(e)}")
+    finally:
+        db.close()
+
+
 @router.get("/auth/status")
 async def ebay_auth_status(
     user_id: str = Depends(get_current_user)  # user_id from JWT
@@ -2853,6 +2908,15 @@ async def get_ebay_summary(
             )
             active_count = active_query.count()
             
+            # Scan progress: how many active listings have real traffic data
+            # (last_traffic_synced_at populated) vs total — feeds the SCAN PROGRESS bar
+            scanned_count = db.query(Listing).filter(
+                Listing.user_id == user_id,
+                func.lower(Listing.platform) == func.lower("eBay"),
+                or_(Listing.status == 'Active', Listing.status.is_(None)),
+                Listing.last_traffic_synced_at.isnot(None)
+            ).count()
+            
             # Last sync timestamp (most recent last_synced_at)
             last_listing = db.query(Listing).filter(
                 Listing.user_id == user_id,
@@ -2921,6 +2985,10 @@ async def get_ebay_summary(
                 "success": True,
                 "user_id": user_id,
                 "active_count": active_count,
+                "scan_progress": {
+                    "scanned": scanned_count,
+                    "total": active_count
+                },
                 "low_performing_count": low_performing_count,
                 "queue_count": queue_count,
                 "last_sync_at": last_sync_at,
