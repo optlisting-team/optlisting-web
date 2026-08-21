@@ -27,16 +27,16 @@ function Toast({ message, type = 'error', duration = 5000, onClose }) {
     : AlertTriangle
 
   return createPortal(
-    <div className="fixed top-4 right-4 z-[9999] animate-in slide-in-from-top-5">
-      <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg ${bgColor} min-w-[300px] max-w-[500px]`}>
-        <Icon className="w-5 h-5 flex-shrink-0" />
-        <p className="text-sm flex-1">{message}</p>
+    <div className="fixed bottom-4 left-1/2 z-[9999] -translate-x-1/2 animate-in slide-in-from-bottom-5">
+      <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border shadow-lg ${bgColor} max-w-[420px]`}>
+        <Icon className="w-4 h-4 flex-shrink-0" />
+        <p className="text-xs flex-1">{message}</p>
         {onClose && (
           <button
             onClick={onClose}
             className="flex-shrink-0 text-current opacity-70 hover:opacity-100 transition-opacity"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         )}
       </div>
