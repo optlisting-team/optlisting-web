@@ -483,6 +483,38 @@ def startup_event():
         print("Server will continue to start, but database operations may fail.")
         import traceback
         traceback.print_exc()
+
+    # Daily auto-scan scheduler: without this, get_traffic_report_for_user() only ever ran
+    # as a side effect of a full listing sync completing (rate-limited to once/24h/store) —
+    # a user who never clicks "Sync Now" on a given day would never actually use that day's
+    # traffic-scan quota, and SCAN PROGRESS / "Today Limit" would never advance on their own.
+    # Scheduled at 08:15 UTC — always safely after eBay's own daily quota reset at midnight
+    # Pacific Time (07:00 UTC during PDT, 08:00 UTC during PST), regardless of daylight saving.
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.triggers.cron import CronTrigger
+        import asyncio
+
+        def _run_daily_scan_job():
+            from .daily_scan_job import run_daily_traffic_scan_for_all_users
+            try:
+                asyncio.run(run_daily_traffic_scan_for_all_users())
+            except Exception as job_err:
+                logger.error(f"❌ [SCHEDULER] Daily traffic scan job failed: {job_err}")
+
+        scheduler = BackgroundScheduler(timezone="UTC")
+        scheduler.add_job(
+            _run_daily_scan_job,
+            trigger=CronTrigger(hour=8, minute=15),
+            id="daily_traffic_scan",
+            replace_existing=True,
+        )
+        scheduler.start()
+        logger.info("[STARTUP] ✅ Daily traffic-scan scheduler started (08:15 UTC)")
+        print("✅ Daily traffic-scan scheduler started (08:15 UTC)")
+    except Exception as scheduler_err:
+        logger.error(f"[STARTUP] ❌ Failed to start daily-scan scheduler: {scheduler_err}")
+        print(f"⚠️ Failed to start daily-scan scheduler (non-fatal): {scheduler_err}")
         # Server should still start even if database connection fails
 
 
@@ -732,8 +764,13 @@ def get_listings(
                     )
                 ),
                 "sold_qty": (l.metrics.get('sales') if l.metrics and isinstance(l.metrics, dict) and 'sales' in l.metrics else None) or getattr(l, 'sold_qty', 0) or 0,
+                "total_sales": (l.metrics.get('sales') if l.metrics and isinstance(l.metrics, dict) and 'sales' in l.metrics else None) or getattr(l, 'sold_qty', 0) or 0,
                 "watch_count": (l.metrics.get('watch_count') if l.metrics and isinstance(l.metrics, dict) and 'watch_count' in l.metrics else None) or getattr(l, 'watch_count', 0) or 0,
                 "view_count": (l.metrics.get('views') if l.metrics and isinstance(l.metrics, dict) and 'views' in l.metrics else None) or getattr(l, 'view_count', 0) or 0,
+                "impressions": (l.metrics.get('impressions') if l.metrics and isinstance(l.metrics, dict) else None) or 0,
+                "days_listed": (datetime.utcnow().date() - l.date_listed).days if getattr(l, 'date_listed', None) else None,
+                "copied_at": l.copied_at.isoformat() if getattr(l, 'copied_at', None) else None,
+                "last_traffic_synced_at": l.last_traffic_synced_at.isoformat() if getattr(l, 'last_traffic_synced_at', None) else None,
                 "last_updated": (l.updated_at or l.last_synced_at or l.created_at).isoformat() if (getattr(l, 'updated_at', None) or getattr(l, 'last_synced_at', None) or getattr(l, 'created_at', None)) else None,
                 # Management hub information (for Shopify detection)
                 "management_hub": (
@@ -1732,6 +1769,28 @@ class UpdateListingRequest(BaseModel):
     supplier: Optional[str] = None
     supplier_name: Optional[str] = None
     supplier_id: Optional[str] = None
+
+@app.post("/api/listing/{listing_id}/mark-copied")
+def mark_listing_copied(
+    listing_id: int,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Mark a listing's title as copied (user has started the copy-title ->
+    remove-from-supplier -> delete-listing workflow). Persisted to DB so the
+    COPIED stamp survives page reloads/sessions, and this listing is excluded
+    from the daily traffic re-scan rotation (see ebay_rate_limiter.select_listings_for_traffic_refresh)
+    since re-confirming its traffic numbers has no value once it's already
+    flagged for removal.
+    """
+    listing = db.query(Listing).filter(Listing.id == listing_id, Listing.user_id == user_id).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    listing.copied_at = datetime.utcnow()
+    db.commit()
+    return {"success": True, "id": listing.id, "copied_at": listing.copied_at.isoformat()}
+
 
 @app.patch("/api/listing/{listing_id}")
 def update_listing(

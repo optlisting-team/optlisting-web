@@ -44,6 +44,7 @@ class Listing(Base):
     supplier_name = Column(String, nullable=True)  # Supplier name from CSV matching
     last_synced_at = Column(DateTime, nullable=True)  # Last sync timestamp
     last_traffic_synced_at = Column(DateTime, nullable=True)  # Last time this listing's Impressions/traffic data was refreshed via Analytics API (added via migration)
+    copied_at = Column(DateTime, nullable=True)  # When the user copied this listing's title to work on removal — persists the COPIED stamp across sessions and excludes it from the daily re-scan rotation
     status = Column(String, default='Active', nullable=True)  # 'Active', 'Ended', etc.
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -130,6 +131,7 @@ class Profile(Base):
     ebay_user_id = Column(String, nullable=True)
     ebay_token_updated_at = Column(DateTime, nullable=True)
     ebay_connected = Column(Boolean, default=False)
+    auto_scan_enabled = Column(Boolean, default=True, nullable=False)  # user toggle for the daily automatic traffic-scan job
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
