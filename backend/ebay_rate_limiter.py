@@ -171,11 +171,17 @@ def mark_traffic_sync_complete(db: Session, user_id: str) -> None:
 
 def select_listings_for_traffic_refresh(db: Session, user_id: str, limit: int = TRAFFIC_DAILY_LISTING_CAP):
     """오늘 트래픽을 갱신할 리스팅 최대 `limit`개를 고른다 — 가장 오래 갱신 안 된 것부터 (회전식),
-    한 번도 갱신 안 된 것(NULL)을 최우선으로.
+    한 번도 갱신 안 된 것(NULL)을 최우선으로. 이미 유저가 '복사'해서 작업 착수한(copied_at 있는)
+    리스팅은 제외 — 이미 삭제 대상으로 확정돼서 처리 중인 항목의 트래픽을 재갱신하는 건 낭비이므로,
+    아직 한 번도 검토 안 된 리스팅에 할당량을 우선 배분한다.
     """
     return (
         db.query(Listing)
-        .filter(Listing.user_id == user_id, Listing.platform.ilike("ebay"))
+        .filter(
+            Listing.user_id == user_id,
+            Listing.platform.ilike("ebay"),
+            Listing.copied_at.is_(None)
+        )
         .order_by(Listing.last_traffic_synced_at.asc().nullsfirst())
         .limit(limit)
         .all()

@@ -142,7 +142,8 @@ function Dashboard() {
     queueCount: 0,
     lastSyncAt: null,
     scanProgress: { scanned: 0, total: 0 },
-    todayTarget: { scannedToday: 0, dailyCap: 400 }
+    todayTarget: { scannedToday: 0, dailyCap: 400, resetsAt: null },
+    autoScanEnabled: true
   })
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [isSyncingListings, setIsSyncingListings] = useState(false) // Sync in progress state
@@ -658,8 +659,9 @@ function Dashboard() {
         const queueCount = response.data.queue_count || 0
         const lastSyncAt = response.data.last_sync_at || null
         const scanProgress = response.data.scan_progress || { scanned: 0, total: activeCount }
-        const rawTodayTarget = response.data.today_target || { scanned_today: 0, daily_cap: 400 }
-        const todayTarget = { scannedToday: rawTodayTarget.scanned_today ?? 0, dailyCap: rawTodayTarget.daily_cap ?? 400 }
+        const rawTodayTarget = response.data.today_target || { scanned_today: 0, daily_cap: 400, resets_at: null }
+        const todayTarget = { scannedToday: rawTodayTarget.scanned_today ?? 0, dailyCap: rawTodayTarget.daily_cap ?? 400, resetsAt: rawTodayTarget.resets_at ?? null }
+        const autoScanEnabled = response.data.auto_scan_enabled ?? true
         
         // Always update state if response data exists (update even if 0)
         setSummaryStats({
@@ -668,7 +670,8 @@ function Dashboard() {
           queueCount: queueCount,
           lastSyncAt: lastSyncAt,
           scanProgress: scanProgress,
-          todayTarget: todayTarget
+          todayTarget: todayTarget,
+          autoScanEnabled: autoScanEnabled
         })
         console.log(`✅ [SUMMARY] UI updated: activeCount=${activeCount}, lowPerformingCount=${lowPerformingCount}`)
       } else {
@@ -1430,6 +1433,12 @@ function Dashboard() {
         }
       }
       setListings(all)
+      // Seed persisted "copied" state from the server (copied_at), so the COPIED stamp
+      // survives reloads/new sessions instead of resetting to empty every time.
+      const serverCopiedIds = all.filter(l => l.copied_at).map(l => getLowPerformingItemId(l)).filter(Boolean)
+      if (serverCopiedIds.length > 0) {
+        setCopiedItemIds(prev => new Set([...prev, ...serverCopiedIds]))
+      }
       return all
     } catch (err) {
       console.error('Failed to fetch listings:', err)
@@ -1456,6 +1465,11 @@ function Dashboard() {
         const diffMs = today - lastUpdated
         const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000))
         if (diffDays > minAgeDays) return false
+        // FIX: a listing that's never actually been traffic-scanned defaults to
+        // view_count=0/watch_count=0, which would trivially pass typical low-performer
+        // thresholds (views<=5, watchers<=0, sales<=0) even though we have no real signal
+        // for it yet. Require at least one real scan before it's eligible for Deleting.
+        if (!l.last_traffic_synced_at) return false
         const views = Number(l.view_count) ?? 0
         const watches = Number(l.watch_count) ?? 0
         const sold = Number(l.quantity_sold ?? l.total_sales ?? 0)
@@ -1563,7 +1577,9 @@ function Dashboard() {
         lowPerformingCount: 0,
         queueCount: 0,
         lastSyncAt: null,
-        scanProgress: { scanned: 0, total: 0 }
+        scanProgress: { scanned: 0, total: 0 },
+        todayTarget: { scannedToday: 0, dailyCap: 400, resetsAt: null },
+        autoScanEnabled: true
       })
       showToast('eBay account disconnected', 'success')
     } catch (err) {
@@ -1571,6 +1587,20 @@ function Dashboard() {
       showToast('Failed to disconnect. Please try again.', 'error')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleToggleAutoScan = async () => {
+    const nextValue = !summaryStats.autoScanEnabled
+    // Optimistic update
+    setSummaryStats(prev => ({ ...prev, autoScanEnabled: nextValue }))
+    try {
+      await apiClient.post('/api/ebay/auto-scan-setting', { enabled: nextValue })
+      showToast(nextValue ? 'Daily auto-scan enabled' : 'Daily auto-scan disabled', 'success')
+    } catch (err) {
+      console.error('❌ Failed to update auto-scan setting:', err)
+      setSummaryStats(prev => ({ ...prev, autoScanEnabled: !nextValue })) // revert on failure
+      showToast('Failed to update setting', 'error')
     }
   }
 
@@ -2294,14 +2324,32 @@ function Dashboard() {
                     <div className="h-full rounded-full transition-all" style={{ backgroundColor: '#38bdf8', width: `${percent}%` }} />
                   </div>
                   <div className="mt-1.5 text-right" style={{ color: '#e2e8f0', fontSize: '13px', fontWeight: 500 }}>{scanned.toLocaleString()} / {total.toLocaleString()}</div>
+                  <div className="mt-3 flex items-center justify-between border-t pt-3" style={{ borderColor: '#1e3a5f' }}>
+                    <span style={{ color: '#94a3b8', fontSize: '12px' }}>Auto-scan daily (uses today's 400-listing quota automatically)</span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={summaryStats.autoScanEnabled}
+                      onClick={handleToggleAutoScan}
+                      className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+                      style={{ backgroundColor: summaryStats.autoScanEnabled ? '#38bdf8' : '#334155' }}
+                    >
+                      <span
+                        className="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                        style={{ transform: summaryStats.autoScanEnabled ? 'translateX(18px)' : 'translateX(3px)' }}
+                      />
+                    </button>
+                  </div>
                 </div>
               </div>
             )
           })()}
 
           {/* Summary bar — always visible */}
-          <div className="grid grid-cols-2 bg-brand-navy sm:grid-cols-4">
-            {['total', 'selling', 'holding', 'deleting'].map((status) => <button key={status} type="button" onClick={() => setViewMode(status)} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === status ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">{status === 'total' ? 'Today Limit' : status}</span><span className="data-value mt-2 block text-4xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : status === 'total' ? <>{summaryStats.todayTarget?.scannedToday ?? 0}<span className="text-xl text-slate-400"> / {summaryStats.todayTarget?.dailyCap ?? 400}</span></> : statusCounts[status]}</span></button>)}
+          <div className="grid grid-cols-2 bg-brand-navy sm:grid-cols-5">
+            <button type="button" onClick={() => setViewMode('total')} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === 'total' ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">Total</span><span className="data-value mt-2 block text-4xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts.total}</span></button>
+            <div className="border-white/10 px-6 py-8 text-left sm:border-r"><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">Today Limit</span><span className="data-value mt-2 block text-4xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : <>{summaryStats.todayTarget?.scannedToday ?? 0}<span className="text-xl text-slate-400"> / {summaryStats.todayTarget?.dailyCap ?? 400}</span></>}</span>{!isCheckingConnection && summaryStats.todayTarget?.resetsAt && <span className="mt-1 block text-xs font-medium text-slate-400">Resets {new Date(summaryStats.todayTarget.resetsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>}</div>
+            {['selling', 'holding', 'deleting'].map((status) => <button key={status} type="button" onClick={() => setViewMode(status)} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === status ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">{status}</span><span className="data-value mt-2 block text-4xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts[status]}</span></button>)}
           </div>
 
           {/* Content area — conditional on connection state */}
@@ -2331,7 +2379,7 @@ function Dashboard() {
                 <table className="w-full min-w-[900px] text-left text-base">
                   <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500"><tr>{['Image', 'Product Title', 'Impressions', 'Views', 'Watchers', 'Sales', 'Days', 'Market'].map((heading) => <th key={heading} className="px-4 py-4 font-bold">{heading}</th>)}</tr></thead>
                   <tbody className="divide-y divide-slate-100">
-                    {resultItems.map((item, index) => { const itemId = getLowPerformingItemId(item); const imageUrl = item.image_url || item.picture_url || item.thumbnail_url; const isCopied = itemId && copiedItemIds.has(itemId); const handleCopyTitle = async () => { const title = item.title || ''; if (!title) return; try { await navigator.clipboard.writeText(title); showToast('Title copied', 'success'); if (itemId) setCopiedItemIds(prev => new Set(prev).add(itemId)) } catch (err) { showToast('Copy failed', 'error') } }; return <tr key={itemId || index} className={`transition-colors ${isCopied ? 'bg-slate-100/80 opacity-60' : 'hover:bg-slate-50/70'}`}><td className="px-4 py-5">{imageUrl ? <img src={imageUrl} alt="" className="h-14 w-14 rounded-md border border-slate-200 object-cover" /> : <div className="h-14 w-14 rounded-md border border-slate-200 bg-slate-100" />}</td><td className="relative max-w-[320px] px-4 py-5">{isCopied && <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 -rotate-12 select-none rounded border-2 border-slate-400/70 px-2 py-0.5 text-xs font-black uppercase tracking-widest text-slate-400/70">Copied</span>}<button type="button" onClick={handleCopyTitle} title="Click to copy title" className="group flex items-start gap-1.5 text-left"><p className="text-base font-semibold text-brand-navy group-hover:text-blue-600">{item.title || 'Untitled listing'}</p><Copy className="mt-1 h-3.5 w-3.5 shrink-0 text-slate-300 group-hover:text-blue-600" /></button><p className="mt-1 text-sm text-slate-400">{itemId || ''}</p></td><td className="data-value px-4 py-5 text-base text-slate-600">{item.impressions ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.view_count ?? item.views ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.watch_count ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.quantity_sold ?? item.total_sales ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.days_listed ?? 0}</td><td className="px-4 py-5 text-base font-semibold text-brand-navy">eBay</td></tr> })}
+                    {resultItems.map((item, index) => { const itemId = getLowPerformingItemId(item); const imageUrl = item.image_url || item.picture_url || item.thumbnail_url; const isCopied = itemId && copiedItemIds.has(itemId); const scannedLabel = (() => { if (!item.last_traffic_synced_at) return 'Not yet scanned'; const diffMs = Date.now() - new Date(item.last_traffic_synced_at).getTime(); const diffDays = Math.floor(diffMs / 86400000); if (diffDays <= 0) return 'Scanned today'; if (diffDays === 1) return 'Scanned 1 day ago'; return `Scanned ${diffDays} days ago` })(); const handleCopyTitle = async () => { const title = item.title || ''; if (!title) return; try { await navigator.clipboard.writeText(title); showToast('Title copied', 'success'); if (itemId) { setCopiedItemIds(prev => new Set(prev).add(itemId)); if (item.id) { apiClient.post(`/api/listing/${item.id}/mark-copied`).catch(err => console.error('Failed to persist copied state:', err)) } } } catch (err) { showToast('Copy failed', 'error') } }; return <tr key={itemId || index} className={`transition-colors ${isCopied ? 'bg-slate-100/80 opacity-60' : 'hover:bg-slate-50/70'}`}><td className="px-4 py-5">{imageUrl ? <img src={imageUrl} alt="" className="h-14 w-14 rounded-md border border-slate-200 object-cover" /> : <div className="h-14 w-14 rounded-md border border-slate-200 bg-slate-100" />}</td><td className="relative max-w-[320px] px-4 py-5">{isCopied && <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 -rotate-12 select-none rounded border-2 border-slate-400/70 px-2 py-0.5 text-xs font-black uppercase tracking-widest text-slate-400/70">Copied</span>}<button type="button" onClick={handleCopyTitle} title="Click to copy title" className="group flex items-start gap-1.5 text-left"><p className="text-base font-semibold text-brand-navy group-hover:text-blue-600">{item.title || 'Untitled listing'}</p><Copy className="mt-1 h-3.5 w-3.5 shrink-0 text-slate-300 group-hover:text-blue-600" /></button><p className="mt-1 text-sm text-slate-400">{itemId || ''}</p><p className="mt-0.5 text-xs text-slate-400">{scannedLabel}</p></td><td className="data-value px-4 py-5 text-base text-slate-600">{item.impressions ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.view_count ?? item.views ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.watch_count ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.quantity_sold ?? item.total_sales ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.days_listed ?? 0}</td><td className="px-4 py-5 text-base font-semibold text-brand-navy">eBay</td></tr> })}
                     {!isAnalyzingListings && resultItems.length === 0 && <tr><td colSpan={8} className="px-6 py-14 text-center text-sm text-slate-500">No listings found.</td></tr>}
                   </tbody>
                 </table>

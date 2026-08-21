@@ -962,6 +962,54 @@ def check_token_status(user_id: str, db: Session = None) -> Dict[str, Any]:
             db.close()
 
 
+@router.get("/auto-scan-setting")
+async def get_auto_scan_setting(
+    user_id: str = Depends(get_current_user)
+):
+    """Get the current auto_scan_enabled setting for the user."""
+    from .models import get_db, Profile
+    db = next(get_db())
+    try:
+        profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+        if not profile:
+            raise HTTPException(status_code=404, detail="Profile not found")
+        return {"auto_scan_enabled": profile.auto_scan_enabled}
+    finally:
+        db.close()
+
+
+@router.post("/auto-scan-setting")
+async def set_auto_scan_setting(
+    request: Request,
+    user_id: str = Depends(get_current_user)
+):
+    """Toggle the daily automatic traffic-scan job on/off for this user. Body: {enabled: bool}."""
+    from .models import get_db, Profile
+    try:
+        body = await request.json()
+        enabled = bool(body.get("enabled", True))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body — expected {enabled: bool}")
+
+    db = next(get_db())
+    try:
+        profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+        if not profile:
+            raise HTTPException(status_code=404, detail="Profile not found")
+        profile.auto_scan_enabled = enabled
+        db.commit()
+        logger.info(f"✅ [AUTO-SCAN] Set auto_scan_enabled={enabled} for user {user_id}")
+        return {"success": True, "auto_scan_enabled": enabled}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ [AUTO-SCAN] Failed to update setting for user {user_id}: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update setting: {str(e)}")
+    finally:
+        db.close()
+
+
 @router.post("/disconnect")
 async def ebay_disconnect(
     user_id: str = Depends(get_current_user)  # user_id from JWT
@@ -2851,7 +2899,7 @@ async def get_ebay_summary(
         }
     
     try:
-        from .models import get_db, Listing
+        from .models import get_db, Listing, Profile
         from datetime import date as date_type
         
         db = next(get_db())
@@ -2918,9 +2966,19 @@ async def get_ebay_summary(
             ).count()
             
             # Today's target progress: how many listings have actually been traffic-scanned
-            # TODAY (UTC calendar day) out of the 400/day rolling cap — feeds "Today Limit: X/400"
+            # since eBay's own daily quota reset (midnight US Pacific Time — per eBay's docs,
+            # NOT UTC midnight) out of the 400/day rolling cap — feeds "Today Limit: X/400"
             from .ebay_rate_limiter import TRAFFIC_DAILY_LISTING_CAP
-            today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            from zoneinfo import ZoneInfo
+            pacific = ZoneInfo("America/Los_Angeles")
+            utc = ZoneInfo("UTC")
+            now_pacific = datetime.now(pacific)
+            today_start_pacific = now_pacific.replace(hour=0, minute=0, second=0, microsecond=0)
+            today_start = today_start_pacific.astimezone(utc).replace(tzinfo=None)  # naive UTC, matches datetime.utcnow()-based columns
+            next_reset_utc = (today_start_pacific + timedelta(days=1)).astimezone(utc).replace(tzinfo=None)
+            # Small buffer for display only — eBay's own community guidance is to check "a few
+            # minutes after midnight PT, in case of clock drift" rather than exactly at reset.
+            next_reset_display = next_reset_utc + timedelta(minutes=5)
             scanned_today_count = db.query(Listing).filter(
                 Listing.user_id == user_id,
                 func.lower(Listing.platform) == func.lower("eBay"),
@@ -2992,6 +3050,7 @@ async def get_ebay_summary(
             # Standard validation log
             logger.info(f"[DASHBOARD] Active listings count: {active_count}.")
             
+            profile_for_setting = db.query(Profile).filter(Profile.user_id == user_id).first()
             return {
                 "success": True,
                 "user_id": user_id,
@@ -3002,8 +3061,10 @@ async def get_ebay_summary(
                 },
                 "today_target": {
                     "scanned_today": scanned_today_count,
-                    "daily_cap": TRAFFIC_DAILY_LISTING_CAP
+                    "daily_cap": TRAFFIC_DAILY_LISTING_CAP,
+                    "resets_at": next_reset_display.isoformat() + "Z"
                 },
+                "auto_scan_enabled": profile_for_setting.auto_scan_enabled if profile_for_setting else True,
                 "low_performing_count": low_performing_count,
                 "queue_count": queue_count,
                 "last_sync_at": last_sync_at,
