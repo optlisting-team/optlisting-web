@@ -2262,8 +2262,19 @@ function Dashboard() {
             )}
           </div>
 
-          {/* Scan progress bar — only when connected, shows how much of the store's total listings have been traffic-scanned */}
-          {!isCheckingConnection && !showConnectEbay && (() => {
+          {/* Scan progress bar — skeleton while checking connection (avoids layout shift), real content once connected, hidden if not connected */}
+          {isCheckingConnection ? (
+            <div className="p-5 sm:p-6">
+              <div className="rounded-xl p-6 animate-pulse" style={{ backgroundColor: '#0a1628', border: '1px solid #1e3a5f' }}>
+                <div className="flex items-baseline justify-between">
+                  <span className="inline-block h-3 w-28 rounded bg-white/10" />
+                  <span className="inline-block h-8 w-14 rounded bg-white/10" />
+                </div>
+                <div className="mt-3 w-full overflow-hidden rounded-full bg-white/5" style={{ height: '10px' }} />
+                <div className="mt-2 flex justify-end"><span className="inline-block h-4 w-16 rounded bg-white/10" /></div>
+              </div>
+            </div>
+          ) : !showConnectEbay && (() => {
             const scanned = summaryStats.scanProgress?.scanned ?? 0
             const total = summaryStats.scanProgress?.total ?? 0
             const percent = total > 0 ? Math.round((scanned / total) * 100) : 0
