@@ -34,7 +34,8 @@ async def run_daily_traffic_scan_for_all_users():
     try:
         connected_profiles = db.query(Profile).filter(
             Profile.ebay_connected == True,  # noqa: E712
-            Profile.ebay_access_token.isnot(None)
+            Profile.ebay_access_token.isnot(None),
+            Profile.auto_scan_enabled == True  # noqa: E712 — user-controlled opt-out
         ).all()
         user_ids = [p.user_id for p in connected_profiles]
     except Exception as e:
