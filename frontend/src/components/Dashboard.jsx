@@ -143,7 +143,7 @@ function Dashboard() {
     queueCount: 0,
     lastSyncAt: null,
     scanProgress: { scanned: 0, total: 0 },
-    todayTarget: { scannedToday: 0, dailyCap: 400, resetsAt: null },
+    todayTarget: { scannedToday: 0, dailyCap: 400, resetsAt: null, lastTrafficScanAt: null, nextTrafficScanAt: null },
     autoScanEnabled: true,
     planLimit: 30000,
     totalCapped: 0,
@@ -673,7 +673,7 @@ function Dashboard() {
         const rawDeletingRule = response.data.deleting_rule || { max_views: 5, max_watchers: 0, max_sales: 0, window_days: 90 }
         const deletingRule = { maxViews: rawDeletingRule.max_views ?? 5, maxWatchers: rawDeletingRule.max_watchers ?? 0, maxSales: rawDeletingRule.max_sales ?? 0, windowDays: rawDeletingRule.window_days ?? 90 }
         const rawTodayTarget = response.data.today_target || { scanned_today: 0, daily_cap: 400, resets_at: null }
-        const todayTarget = { scannedToday: rawTodayTarget.scanned_today ?? 0, dailyCap: rawTodayTarget.daily_cap ?? 400, resetsAt: rawTodayTarget.resets_at ?? null }
+        const todayTarget = { scannedToday: rawTodayTarget.scanned_today ?? 0, dailyCap: rawTodayTarget.daily_cap ?? 400, resetsAt: rawTodayTarget.resets_at ?? null, lastTrafficScanAt: rawTodayTarget.last_traffic_scan_at ?? null, nextTrafficScanAt: rawTodayTarget.next_traffic_scan_at ?? null }
         const autoScanEnabled = response.data.auto_scan_enabled ?? true
         
         // Always update state if response data exists (update even if 0)
@@ -1509,6 +1509,29 @@ function Dashboard() {
 
   const getLowPerformingItemId = (item) => item.id || item.item_id || item.ebay_item_id
 
+  const formatRelativeAgo = (isoString) => {
+    if (!isoString) return null
+    const diffMs = Date.now() - new Date(isoString).getTime()
+    if (diffMs < 0) return 'just now'
+    const mins = Math.floor(diffMs / 60000)
+    if (mins < 1) return 'just now'
+    if (mins < 60) return `${mins}m ago`
+    const hours = Math.floor(mins / 60)
+    if (hours < 24) return `${hours}h ago`
+    const days = Math.floor(hours / 24)
+    return `${days}d ago`
+  }
+
+  const formatRelativeIn = (isoString) => {
+    if (!isoString) return null
+    const diffMs = new Date(isoString).getTime() - Date.now()
+    if (diffMs <= 0) return 'soon'
+    const mins = Math.round(diffMs / 60000)
+    if (mins < 60) return `${mins}m`
+    const hours = Math.round(mins / 60)
+    return `${hours}h`
+  }
+
   // Generate Shopify bulk CSV from selected low-performing items and trigger download
   const handleDownloadShopifyCSV = () => {
     const itemsToExport = lowPerformingItems.filter((l) =>
@@ -1596,7 +1619,7 @@ function Dashboard() {
         queueCount: 0,
         lastSyncAt: null,
         scanProgress: { scanned: 0, total: 0 },
-        todayTarget: { scannedToday: 0, dailyCap: 400, resetsAt: null },
+        todayTarget: { scannedToday: 0, dailyCap: 400, resetsAt: null, lastTrafficScanAt: null, nextTrafficScanAt: null },
         autoScanEnabled: true
       })
       showToast('eBay account disconnected', 'success')
@@ -2326,7 +2349,7 @@ function Dashboard() {
             )}
           </div>
 
-          {/* Analysis Progress + Plan Limit — skeleton while checking connection (avoids layout shift) */}
+          {/* Scan Progress + Store Listings — skeleton while checking connection (avoids layout shift) */}
           {isCheckingConnection ? (
             <div className="grid gap-4 p-4 sm:grid-cols-[2fr_1fr]">
               <div className="rounded-xl p-4 animate-pulse" style={{ backgroundColor: '#0a1628', border: '1px solid #1e3a5f' }}>
@@ -2340,27 +2363,35 @@ function Dashboard() {
             const scanned = summaryStats.scanProgress?.scanned ?? 0
             const total = summaryStats.scanProgress?.total ?? 0
             const percent = total > 0 ? Math.round((scanned / total) * 100) : 0
-            const remaining = Math.max(total - scanned, 0)
+            const todayDone = summaryStats.todayTarget?.scannedToday ?? 0
+            const todayCap = summaryStats.todayTarget?.dailyCap ?? 400
+            const todayComplete = todayCap > 0 && todayDone >= todayCap
+            const lastScanAgo = formatRelativeAgo(summaryStats.todayTarget?.lastTrafficScanAt)
+            const nextScanIn = formatRelativeIn(summaryStats.todayTarget?.nextTrafficScanAt)
             const overLimit = summaryStats.overLimit || 0
-            const overLimitPercent = summaryStats.planLimit > 0 ? Math.min(Math.round((overLimit / summaryStats.planLimit) * 100), 100) : 0
             return (
               <div className="grid gap-4 p-4 sm:grid-cols-[2fr_1fr]">
-                {/* Analysis Progress card */}
+                {/* Scan Progress card */}
                 <div className="rounded-xl p-4" style={{ backgroundColor: '#0a1628', border: '1px solid #1e3a5f' }}>
                   <div className="flex items-baseline justify-between">
-                    <span style={{ color: '#38bdf8', fontSize: '12px', fontWeight: 500, letterSpacing: '0.05em' }} className="uppercase">Analysis Progress</span>
+                    <span style={{ color: '#38bdf8', fontSize: '12px', fontWeight: 500, letterSpacing: '0.05em' }} className="uppercase">Scan Progress</span>
                     <span style={{ color: '#e2e8f0', fontSize: '24px', fontWeight: 500 }}>{percent}%</span>
                   </div>
+                  <div style={{ color: '#e2e8f0', fontSize: '14px', fontWeight: 600 }}>{scanned.toLocaleString()} / {total.toLocaleString()} scanned</div>
                   <div className="mt-2 w-full overflow-hidden rounded-full" style={{ backgroundColor: '#071026', height: '8px' }}>
                     <div className="h-full rounded-full transition-all" style={{ backgroundColor: '#38bdf8', width: `${percent}%` }} />
                   </div>
-                  <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1" style={{ color: '#e2e8f0', fontSize: '14px', fontWeight: 600 }}>
-                    <span>{scanned.toLocaleString()} / {total.toLocaleString()} analyzed</span>
+                  <div className="mt-2 flex items-center gap-1.5" style={{ color: todayComplete ? '#4ade80' : '#94a3b8', fontSize: '12px' }}>
+                    {todayComplete ? (
+                      <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" /></svg>
+                    ) : (
+                      <span className="inline-block h-3.5 w-3.5 shrink-0 rounded-full border" style={{ borderColor: '#475569' }} />
+                    )}
+                    {todayDone.toLocaleString()} / {todayCap.toLocaleString()} today
                   </div>
-                  <div className="mt-1" style={{ color: '#94a3b8', fontSize: '12px' }}>
-                    Today <span style={{ color: '#38bdf8', fontWeight: 700 }}>{(summaryStats.todayTarget?.scannedToday ?? 0).toLocaleString()} / {(summaryStats.todayTarget?.dailyCap ?? 400).toLocaleString()}</span>
-                    {' · '}{remaining.toLocaleString()} remaining
-                    {summaryStats.todayTarget?.resetsAt && <> · Resets {new Date(summaryStats.todayTarget.resetsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</>}
+                  <div className="mt-1 flex items-center gap-1.5" style={{ color: '#94a3b8', fontSize: '12px' }}>
+                    <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a.75.75 0 01.75.75v5.638l4.108 2.35a.75.75 0 01-.744 1.303l-4.47-2.557A.75.75 0 019.25 10V3.75A.75.75 0 0110 3z" clipRule="evenodd" /><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm0-1.5a6.5 6.5 0 100-13 6.5 6.5 0 000 13z" clipRule="evenodd" /></svg>
+                    {lastScanAgo ? `Synced ${lastScanAgo}` : 'Not yet synced'}{nextScanIn && <> · Next in {nextScanIn}</>}
                   </div>
                   <div className="mt-3 flex items-center justify-between border-t pt-3" style={{ borderColor: '#1e3a5f' }}>
                     <span style={{ color: '#94a3b8', fontSize: '12px' }}>Auto-scan daily (uses today's 400-listing quota automatically)</span>
@@ -2378,35 +2409,26 @@ function Dashboard() {
                   </div>
                 </div>
 
-                {/* Plan Limit card */}
-                <div className="rounded-xl p-4" style={{ backgroundColor: '#0a1628', border: '1px solid #1e3a5f' }}>
-                  <span style={{ color: '#e2e8f0', fontSize: '12px', fontWeight: 700, letterSpacing: '0.05em' }} className="uppercase">Plan Limit</span>
-                  <div className="mt-2 flex items-center gap-1.5" style={{ color: '#4ade80', fontSize: '13px', fontWeight: 500 }}>
-                    <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" /></svg>
-                    Plan limit: {summaryStats.planLimit.toLocaleString()} listings
-                  </div>
-                  <div className="mt-4 flex items-center justify-center">
-                    <div className="relative flex h-24 w-24 items-center justify-center rounded-full" style={{ background: overLimit > 0 ? `conic-gradient(#f87171 ${overLimitPercent}%, #1e3a5f ${overLimitPercent}%)` : '#1e3a5f' }}>
-                      <div className="flex h-[76px] w-[76px] flex-col items-center justify-center rounded-full" style={{ backgroundColor: '#0a1628' }}>
-                        <span style={{ color: overLimit > 0 ? '#f87171' : '#e2e8f0', fontSize: '22px', fontWeight: 700 }}>{overLimit > 0 ? overLimit.toLocaleString() : '0'}</span>
-                        {overLimit > 0 && <span style={{ color: '#94a3b8', fontSize: '10px' }}>over limit</span>}
-                      </div>
-                    </div>
+                {/* Store Listings card */}
+                <div className="flex flex-col rounded-xl p-4" style={{ backgroundColor: '#0a1628', border: '1px solid #1e3a5f' }}>
+                  <span style={{ color: '#e2e8f0', fontSize: '12px', fontWeight: 700, letterSpacing: '0.05em' }} className="uppercase">Store Listings</span>
+                  <div className="mt-auto flex items-end justify-end gap-2">
+                    {overLimit > 0 && <span style={{ color: '#f87171', fontSize: '13px', fontWeight: 600 }}>+{overLimit.toLocaleString()}</span>}
+                    <span style={{ color: '#e2e8f0', fontSize: '28px', fontWeight: 700 }}>{summaryStats.activeCount.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
             )
           })()}
 
-          {/* Summary bar — always visible. TOTAL(MAX)/ANALYZED/SELLING/HOLDING/DELETING, with SELLING+HOLDING+DELETING=ANALYZED always holding by construction (server-computed) */}
-          <div className="grid grid-cols-2 bg-brand-navy sm:grid-cols-5">
-            <button type="button" onClick={() => setViewMode('total')} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === 'total' ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">Total (Max)</span><span className="data-value mt-2 block text-4xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts.total.toLocaleString()}</span><span className="mt-1 block text-xs text-slate-400">Analysis limit</span></button>
-            <div className="border-white/10 px-6 py-8 text-left sm:border-r"><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">Analyzed</span><span className="data-value mt-2 block text-4xl font-bold text-sky-400">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : (summaryStats.classification?.analyzed ?? 0).toLocaleString()}</span><span className="mt-1 block text-xs text-slate-400">Analyzed listings</span></div>
-            <button type="button" onClick={() => setViewMode('selling')} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === 'selling' ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">Selling</span><span className="data-value mt-2 block text-4xl font-bold text-emerald-400">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts.selling.toLocaleString()}</span><span className="mt-1 block text-xs text-slate-400">With sales ({'≥'}1)</span></button>
-            <button type="button" onClick={() => setViewMode('holding')} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === 'holding' ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">Holding</span><span className="data-value mt-2 block text-4xl font-bold text-amber-400">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts.holding.toLocaleString()}</span><span className="mt-1 block text-xs text-slate-400">Keep monitoring</span></button>
-            <button type="button" onClick={() => setViewMode('deleting')} className={`border-white/10 px-6 py-8 text-left transition-colors ${viewMode === 'deleting' ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">Deleting</span><span className="data-value mt-2 block text-4xl font-bold text-red-400">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts.deleting.toLocaleString()}</span><span className="mt-1 block text-xs text-slate-400">Remove recommended</span></button>
+          {/* Summary bar — always visible. SCANNED/SELLING/HOLDING/DELETING, with SELLING+HOLDING+DELETING=SCANNED always holding by construction (server-computed) */}
+          <div className="grid grid-cols-2 bg-brand-navy sm:grid-cols-4">
+            <button type="button" onClick={() => setViewMode('total')} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === 'total' ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">Scanned</span><span className="data-value mt-2 block text-4xl font-bold text-sky-400">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : (summaryStats.classification?.analyzed ?? 0).toLocaleString()}</span></button>
+            <button type="button" onClick={() => setViewMode('selling')} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === 'selling' ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">Selling</span><span className="data-value mt-2 block text-4xl font-bold text-emerald-400">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts.selling.toLocaleString()}</span></button>
+            <button type="button" onClick={() => setViewMode('holding')} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === 'holding' ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">Holding</span><span className="data-value mt-2 block text-4xl font-bold text-amber-400">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts.holding.toLocaleString()}</span></button>
+            <button type="button" onClick={() => setViewMode('deleting')} className={`border-white/10 px-6 py-8 text-left transition-colors ${viewMode === 'deleting' ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">Deleting</span><span className="data-value mt-2 block text-4xl font-bold text-red-400">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts.deleting.toLocaleString()}</span></button>
           </div>
-          {!isCheckingConnection && <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-center text-xs text-slate-400 sm:px-6">SELLING + HOLDING + DELETING = ANALYZED</div>}
+          {!isCheckingConnection && <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-center text-xs text-slate-400 sm:px-6">SELLING + HOLDING + DELETING = SCANNED</div>}
 
           {/* Content area — same layout structure whether connected or not; only the empty-row message differs */}
           {isCheckingConnection ? (
