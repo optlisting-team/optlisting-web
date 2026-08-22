@@ -745,8 +745,8 @@ async def ebay_auth_callback(
                 # Create new profile (raw SQL so it works without free_tier_count)
                 insert_query = text("""
                     INSERT INTO profiles (user_id, ebay_access_token, ebay_refresh_token, 
-                                          ebay_token_expires_at, ebay_token_updated_at, ebay_user_id)
-                    VALUES (:user_id, :access_token, :refresh_token, :expires_at, :updated_at, :ebay_user_id)
+                                          ebay_token_expires_at, ebay_token_updated_at, ebay_user_id, ebay_connected)
+                    VALUES (:user_id, :access_token, :refresh_token, :expires_at, :updated_at, :ebay_user_id, true)
                 """)
                 db.execute(insert_query, {
                     "user_id": user_id,
@@ -765,7 +765,8 @@ async def ebay_auth_callback(
                         ebay_refresh_token = :refresh_token,
                         ebay_token_expires_at = :expires_at,
                         ebay_token_updated_at = :updated_at,
-                        ebay_user_id = :ebay_user_id
+                        ebay_user_id = :ebay_user_id,
+                        ebay_connected = true
                     WHERE user_id = :user_id
                 """)
                 db.execute(update_query, {
@@ -2772,8 +2773,13 @@ async def get_traffic_report_for_user(user_id: str) -> dict:
             "Content-Type": "application/json",
         }
 
-        # 90 days back to today, matching the dashboard's "Last 90 Days" window
-        date_to = datetime.utcnow().date()
+        # 90 days back to today, matching the dashboard's "Last 90 Days" window.
+        # FIX: eBay's Analytics API rejects date ranges extending past its own PT-based
+        # "today" — using UTC date directly could be a day ahead of PT (e.g. 06:00 UTC is
+        # still the previous day in Pacific Time), causing every call to fail with
+        # 'Neither the start date nor the end date can be in the future.'
+        from zoneinfo import ZoneInfo
+        date_to = datetime.now(ZoneInfo("America/Los_Angeles")).date()
         date_from = date_to - timedelta(days=90)
         date_range = f"[{date_from.strftime('%Y%m%d')}..{date_to.strftime('%Y%m%d')}]"
 
