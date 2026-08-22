@@ -118,8 +118,9 @@ function Dashboard() {
   const [selectedIds, setSelectedIds] = useState([])
   const [queue, setQueue] = useState([]) // Queue maintained as local state
   const [viewMode, setViewModeRaw] = useState('total')
+  const [tablePage, setTablePage] = useState(1)
   
-  const setViewMode = setViewModeRaw
+  const setViewMode = (mode) => { setViewModeRaw(mode); setTablePage(1) }
   const [historyLogs, setHistoryLogs] = useState(DEMO_MODE ? [
     { id: '1', title: 'Wireless Earbuds TWS - Model X1', sku: 'B012345678', supplier: 'Amazon', price: 29.99, deleted_at: '2024-12-05T10:30:00Z', reason: 'Zero sales in 30 days' },
     { id: '2', title: 'LED Strip Lights RGB', sku: 'WM87654321', supplier: 'Walmart', price: 15.99, deleted_at: '2024-12-05T09:15:00Z', reason: 'Low impressions' },
@@ -143,14 +144,19 @@ function Dashboard() {
     lastSyncAt: null,
     scanProgress: { scanned: 0, total: 0 },
     todayTarget: { scannedToday: 0, dailyCap: 400, resetsAt: null },
-    autoScanEnabled: true
+    autoScanEnabled: true,
+    planLimit: 30000,
+    totalCapped: 0,
+    overLimit: 0,
+    classification: { selling: 0, holding: 0, deleting: 0, analyzed: 0 },
+    deletingRule: { maxViews: 5, maxWatchers: 0, maxSales: 0, windowDays: 90 }
   })
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [isSyncingListings, setIsSyncingListings] = useState(false) // Sync in progress state
 
   // Diagnosis zone: filter criteria and results
   const [criteria, setCriteria] = useState({
-    minAgeDays: 7,
+    minAgeDays: 90,
     maxSold: 0,
     maxViews: 5,
     maxWatches: 0
@@ -658,7 +664,14 @@ function Dashboard() {
         const lowPerformingCount = response.data.low_performing_count || 0
         const queueCount = response.data.queue_count || 0
         const lastSyncAt = response.data.last_sync_at || null
-        const scanProgress = response.data.scan_progress || { scanned: 0, total: activeCount }
+        const planLimit = response.data.plan_limit ?? 30000
+        const totalCapped = response.data.total_capped ?? Math.min(activeCount, planLimit)
+        const overLimit = response.data.over_limit ?? Math.max(activeCount - planLimit, 0)
+        const scanProgress = response.data.scan_progress || { scanned: 0, total: totalCapped }
+        const rawClassification = response.data.classification || { selling: 0, holding: 0, deleting: 0, analyzed: 0 }
+        const classification = { selling: rawClassification.selling ?? 0, holding: rawClassification.holding ?? 0, deleting: rawClassification.deleting ?? 0, analyzed: rawClassification.analyzed ?? 0 }
+        const rawDeletingRule = response.data.deleting_rule || { max_views: 5, max_watchers: 0, max_sales: 0, window_days: 90 }
+        const deletingRule = { maxViews: rawDeletingRule.max_views ?? 5, maxWatchers: rawDeletingRule.max_watchers ?? 0, maxSales: rawDeletingRule.max_sales ?? 0, windowDays: rawDeletingRule.window_days ?? 90 }
         const rawTodayTarget = response.data.today_target || { scanned_today: 0, daily_cap: 400, resets_at: null }
         const todayTarget = { scannedToday: rawTodayTarget.scanned_today ?? 0, dailyCap: rawTodayTarget.daily_cap ?? 400, resetsAt: rawTodayTarget.resets_at ?? null }
         const autoScanEnabled = response.data.auto_scan_enabled ?? true
@@ -671,7 +684,12 @@ function Dashboard() {
           lastSyncAt: lastSyncAt,
           scanProgress: scanProgress,
           todayTarget: todayTarget,
-          autoScanEnabled: autoScanEnabled
+          autoScanEnabled: autoScanEnabled,
+          planLimit: planLimit,
+          totalCapped: totalCapped,
+          overLimit: overLimit,
+          classification: classification,
+          deletingRule: deletingRule
         })
         console.log(`✅ [SUMMARY] UI updated: activeCount=${activeCount}, lowPerformingCount=${lowPerformingCount}`)
       } else {
@@ -2257,17 +2275,28 @@ function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStoreConnected])
 
+  useEffect(() => {
+    if (listings.length > 0) handleAnalyze()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings])
+
   const showConnectEbay = !isStoreConnected
-  const sellingItems = listings.filter((item) => Number(item.quantity_sold ?? item.total_sales ?? 0) > 0)
+  const sellingItems = listings.filter((item) => item.last_traffic_synced_at && Number(item.quantity_sold ?? item.total_sales ?? 0) > 0)
   const deletingItems = showDiagnosisResult ? lowPerformingItems : []
   const deletingIds = new Set(deletingItems.map(getLowPerformingItemId))
-  const holdingItems = listings.filter((item) => Number(item.quantity_sold ?? item.total_sales ?? 0) === 0 && !deletingIds.has(getLowPerformingItemId(item)))
-  const resultItems = viewMode === 'selling' ? sellingItems : viewMode === 'holding' ? holdingItems : viewMode === 'deleting' ? deletingItems : listings
+  const holdingItems = listings.filter((item) => item.last_traffic_synced_at && Number(item.quantity_sold ?? item.total_sales ?? 0) === 0 && !deletingIds.has(getLowPerformingItemId(item)))
+  const resultItemsAll = viewMode === 'selling' ? sellingItems : viewMode === 'holding' ? holdingItems : viewMode === 'deleting' ? deletingItems : listings
+  const PAGE_SIZE = 200
+  const pageCount = Math.max(Math.ceil(resultItemsAll.length / PAGE_SIZE), 1)
+  const resultItems = resultItemsAll.slice((tablePage - 1) * PAGE_SIZE, tablePage * PAGE_SIZE)
+  // Server-computed classification is the source of truth for the count badges (guarantees
+  // SELLING + HOLDING + DELETING = ANALYZED exactly, per spec) — not the client-side arrays
+  // above, which only reflect whatever page of `listings` happened to load into the browser.
   const statusCounts = {
-    total: totalListings,
-    selling: sellingItems.length,
-    holding: Math.max(totalListings - sellingItems.length - (showDiagnosisResult ? deletingItems.length : totalZombies), 0),
-    deleting: showDiagnosisResult ? deletingItems.length : totalZombies,
+    total: summaryStats.totalCapped || 0,
+    selling: summaryStats.classification?.selling ?? sellingItems.length,
+    holding: summaryStats.classification?.holding ?? holdingItems.length,
+    deleting: summaryStats.classification?.deleting ?? deletingItems.length,
   }
   const storeId = connectionDetails?.store_id || connectionDetails?.ebay_user_id || connectionDetails?.username || connectionDetails?.account_id || 'Connected account'
   const resultTitle = viewMode === 'total' ? 'All Products' : `${viewMode.charAt(0).toUpperCase()}${viewMode.slice(1)}`
@@ -2297,33 +2326,42 @@ function Dashboard() {
             )}
           </div>
 
-          {/* Scan progress bar — skeleton while checking connection (avoids layout shift), real content once connected, hidden if not connected */}
+          {/* Analysis Progress + Plan Limit — skeleton while checking connection (avoids layout shift) */}
           {isCheckingConnection ? (
-            <div className="p-4">
+            <div className="grid gap-4 p-4 sm:grid-cols-[2fr_1fr]">
               <div className="rounded-xl p-4 animate-pulse" style={{ backgroundColor: '#0a1628', border: '1px solid #1e3a5f' }}>
-                <div className="flex items-baseline justify-between">
-                  <span className="inline-block h-3 w-28 rounded bg-white/10" />
-                  <span className="inline-block h-6 w-12 rounded bg-white/10" />
-                </div>
+                <div className="flex items-baseline justify-between"><span className="inline-block h-3 w-32 rounded bg-white/10" /><span className="inline-block h-6 w-12 rounded bg-white/10" /></div>
                 <div className="mt-2 w-full overflow-hidden rounded-full bg-white/5" style={{ height: '8px' }} />
-                <div className="mt-1.5 flex justify-end"><span className="inline-block h-3.5 w-14 rounded bg-white/10" /></div>
+                <div className="mt-2 h-3 w-40 rounded bg-white/10" />
               </div>
+              <div className="rounded-xl p-4 animate-pulse" style={{ backgroundColor: '#0a1628', border: '1px solid #1e3a5f' }}><div className="h-3 w-24 rounded bg-white/10" /></div>
             </div>
-          ) : !showConnectEbay && (() => {
+          ) : (() => {
             const scanned = summaryStats.scanProgress?.scanned ?? 0
             const total = summaryStats.scanProgress?.total ?? 0
             const percent = total > 0 ? Math.round((scanned / total) * 100) : 0
+            const remaining = Math.max(total - scanned, 0)
+            const overLimit = summaryStats.overLimit || 0
+            const overLimitPercent = summaryStats.planLimit > 0 ? Math.min(Math.round((overLimit / summaryStats.planLimit) * 100), 100) : 0
             return (
-              <div className="p-4">
+              <div className="grid gap-4 p-4 sm:grid-cols-[2fr_1fr]">
+                {/* Analysis Progress card */}
                 <div className="rounded-xl p-4" style={{ backgroundColor: '#0a1628', border: '1px solid #1e3a5f' }}>
                   <div className="flex items-baseline justify-between">
-                    <span style={{ color: '#38bdf8', fontSize: '12px', fontWeight: 500, letterSpacing: '0.05em' }} className="uppercase">Scan Progress</span>
+                    <span style={{ color: '#38bdf8', fontSize: '12px', fontWeight: 500, letterSpacing: '0.05em' }} className="uppercase">Analysis Progress</span>
                     <span style={{ color: '#e2e8f0', fontSize: '24px', fontWeight: 500 }}>{percent}%</span>
                   </div>
                   <div className="mt-2 w-full overflow-hidden rounded-full" style={{ backgroundColor: '#071026', height: '8px' }}>
                     <div className="h-full rounded-full transition-all" style={{ backgroundColor: '#38bdf8', width: `${percent}%` }} />
                   </div>
-                  <div className="mt-1.5 text-right" style={{ color: '#e2e8f0', fontSize: '13px', fontWeight: 500 }}>{scanned.toLocaleString()} / {total.toLocaleString()}</div>
+                  <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1" style={{ color: '#e2e8f0', fontSize: '14px', fontWeight: 600 }}>
+                    <span>{scanned.toLocaleString()} / {total.toLocaleString()} analyzed</span>
+                  </div>
+                  <div className="mt-1" style={{ color: '#94a3b8', fontSize: '12px' }}>
+                    Today <span style={{ color: '#38bdf8', fontWeight: 700 }}>{(summaryStats.todayTarget?.scannedToday ?? 0).toLocaleString()} / {(summaryStats.todayTarget?.dailyCap ?? 400).toLocaleString()}</span>
+                    {' · '}{remaining.toLocaleString()} remaining
+                    {summaryStats.todayTarget?.resetsAt && <> · Resets {new Date(summaryStats.todayTarget.resetsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</>}
+                  </div>
                   <div className="mt-3 flex items-center justify-between border-t pt-3" style={{ borderColor: '#1e3a5f' }}>
                     <span style={{ color: '#94a3b8', fontSize: '12px' }}>Auto-scan daily (uses today's 400-listing quota automatically)</span>
                     <button
@@ -2331,47 +2369,60 @@ function Dashboard() {
                       role="switch"
                       aria-checked={summaryStats.autoScanEnabled}
                       onClick={handleToggleAutoScan}
-                      className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+                      disabled={showConnectEbay}
+                      className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       style={{ backgroundColor: summaryStats.autoScanEnabled ? '#38bdf8' : '#334155' }}
                     >
-                      <span
-                        className="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
-                        style={{ transform: summaryStats.autoScanEnabled ? 'translateX(18px)' : 'translateX(3px)' }}
-                      />
+                      <span className="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform" style={{ transform: summaryStats.autoScanEnabled ? 'translateX(18px)' : 'translateX(3px)' }} />
                     </button>
+                  </div>
+                </div>
+
+                {/* Plan Limit card */}
+                <div className="rounded-xl p-4" style={{ backgroundColor: '#0a1628', border: '1px solid #1e3a5f' }}>
+                  <span style={{ color: '#e2e8f0', fontSize: '12px', fontWeight: 700, letterSpacing: '0.05em' }} className="uppercase">Plan Limit</span>
+                  <div className="mt-2 flex items-center gap-1.5" style={{ color: '#4ade80', fontSize: '13px', fontWeight: 500 }}>
+                    <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" /></svg>
+                    Plan limit: {summaryStats.planLimit.toLocaleString()} listings
+                  </div>
+                  <div className="mt-4 flex items-center justify-center">
+                    <div className="relative flex h-24 w-24 items-center justify-center rounded-full" style={{ background: overLimit > 0 ? `conic-gradient(#f87171 ${overLimitPercent}%, #1e3a5f ${overLimitPercent}%)` : '#1e3a5f' }}>
+                      <div className="flex h-[76px] w-[76px] flex-col items-center justify-center rounded-full" style={{ backgroundColor: '#0a1628' }}>
+                        <span style={{ color: overLimit > 0 ? '#f87171' : '#e2e8f0', fontSize: '22px', fontWeight: 700 }}>{overLimit > 0 ? overLimit.toLocaleString() : '0'}</span>
+                        {overLimit > 0 && <span style={{ color: '#94a3b8', fontSize: '10px' }}>over limit</span>}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             )
           })()}
 
-          {/* Summary bar — always visible */}
+          {/* Summary bar — always visible. TOTAL(MAX)/ANALYZED/SELLING/HOLDING/DELETING, with SELLING+HOLDING+DELETING=ANALYZED always holding by construction (server-computed) */}
           <div className="grid grid-cols-2 bg-brand-navy sm:grid-cols-5">
-            <button type="button" onClick={() => setViewMode('total')} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === 'total' ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">Total</span><span className="data-value mt-2 block text-4xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts.total}</span></button>
-            <div className="border-white/10 px-6 py-8 text-left sm:border-r"><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">Today Limit</span><span className="data-value mt-2 block text-4xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : <>{summaryStats.todayTarget?.scannedToday ?? 0}<span className="text-xl text-slate-400"> / {summaryStats.todayTarget?.dailyCap ?? 400}</span></>}</span>{!isCheckingConnection && summaryStats.todayTarget?.resetsAt && <span className="mt-1 block text-xs font-medium text-slate-400">Resets {new Date(summaryStats.todayTarget.resetsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>}</div>
-            {['selling', 'holding', 'deleting'].map((status) => <button key={status} type="button" onClick={() => setViewMode(status)} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === status ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">{status}</span><span className="data-value mt-2 block text-4xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts[status]}</span></button>)}
+            <button type="button" onClick={() => setViewMode('total')} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === 'total' ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">Total (Max)</span><span className="data-value mt-2 block text-4xl font-bold text-white">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts.total.toLocaleString()}</span><span className="mt-1 block text-xs text-slate-400">Analysis limit</span></button>
+            <div className="border-white/10 px-6 py-8 text-left sm:border-r"><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">Analyzed</span><span className="data-value mt-2 block text-4xl font-bold text-sky-400">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : (summaryStats.classification?.analyzed ?? 0).toLocaleString()}</span><span className="mt-1 block text-xs text-slate-400">Analyzed listings</span></div>
+            <button type="button" onClick={() => setViewMode('selling')} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === 'selling' ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">Selling</span><span className="data-value mt-2 block text-4xl font-bold text-emerald-400">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts.selling.toLocaleString()}</span><span className="mt-1 block text-xs text-slate-400">With sales ({'≥'}1)</span></button>
+            <button type="button" onClick={() => setViewMode('holding')} className={`border-white/10 px-6 py-8 text-left transition-colors sm:border-r ${viewMode === 'holding' ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">Holding</span><span className="data-value mt-2 block text-4xl font-bold text-amber-400">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts.holding.toLocaleString()}</span><span className="mt-1 block text-xs text-slate-400">Keep monitoring</span></button>
+            <button type="button" onClick={() => setViewMode('deleting')} className={`border-white/10 px-6 py-8 text-left transition-colors ${viewMode === 'deleting' ? 'bg-white/[0.14]' : 'hover:bg-white/[0.08]'}`}><span className="block text-sm font-bold uppercase tracking-wider text-slate-300">Deleting</span><span className="data-value mt-2 block text-4xl font-bold text-red-400">{isCheckingConnection ? <span className="inline-block h-9 w-16 animate-pulse rounded bg-white/20" /> : statusCounts.deleting.toLocaleString()}</span><span className="mt-1 block text-xs text-slate-400">Remove recommended</span></button>
           </div>
+          {!isCheckingConnection && <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-center text-xs text-slate-400 sm:px-6">SELLING + HOLDING + DELETING = ANALYZED</div>}
 
-          {/* Content area — conditional on connection state */}
+          {/* Content area — same layout structure whether connected or not; only the empty-row message differs */}
           {isCheckingConnection ? (
             <div className="flex flex-col items-center justify-center px-6 py-24 text-center">
               <Loader2 className="h-8 w-8 animate-spin text-brand-navy" />
               <p className="mt-4 text-sm font-medium text-slate-500">Checking store connection...</p>
             </div>
-          ) : showConnectEbay ? (
-            <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-              <ShoppingBag className="h-12 w-12 text-slate-300" strokeWidth={1.5} />
-              <p className="mt-4 text-sm text-slate-500">Connect your eBay account to start analyzing your listings.</p>
-              <button type="button" onClick={handleConnectEbay} disabled={isSyncing} className="mt-6 flex items-center justify-center gap-2 rounded-lg bg-brand-navy px-7 py-3.5 text-sm font-bold text-white transition-colors hover:bg-[#162957] disabled:cursor-not-allowed disabled:opacity-50">{isSyncing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{isSyncing ? 'Connecting...' : 'Connect eBay'}</button>
-            </div>
           ) : (
             <>
               <div className="border-b border-slate-200 bg-slate-50 p-4 sm:p-5">
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]">
-                  {[['Views', 'maxViews'], ['Watchers', 'maxWatches'], ['Sales', 'maxSold']].map(([label, key]) => <label key={key} className="text-xs font-bold uppercase tracking-wider text-slate-500">{label} {'<='}<input type="number" min={0} value={criteria[key]} onChange={(e) => setCriteria((current) => ({ ...current, [key]: Number(e.target.value) || 0 }))} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-brand-navy outline-none focus:border-brand-navy" /></label>)}
-                  <button type="button" onClick={handleAnalyze} disabled={isAnalyzingListings} className="self-end rounded-lg bg-brand-navy px-6 py-2.5 text-sm font-bold text-white hover:bg-[#162957] disabled:opacity-50">{isAnalyzingListings ? 'Applying...' : 'Apply'}</button>
+                <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Deleting Rule</p>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+                  {[['Views ≤', 'maxViews'], ['Watchers =', 'maxWatches'], ['Sales =', 'maxSold'], ['Last N Days', 'minAgeDays']].map(([label, key]) => <label key={key} className="text-xs font-bold uppercase tracking-wider text-slate-500">{label}<input type="number" min={0} disabled={showConnectEbay} value={criteria[key]} onChange={(e) => setCriteria((current) => ({ ...current, [key]: Number(e.target.value) || 0 }))} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-brand-navy outline-none focus:border-brand-navy disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400" /></label>)}
+                  <button type="button" onClick={handleAnalyze} disabled={isAnalyzingListings || showConnectEbay} className="self-end rounded-lg bg-brand-navy px-6 py-2.5 text-sm font-bold text-white hover:bg-[#162957] disabled:cursor-not-allowed disabled:opacity-50">{isAnalyzingListings ? 'Applying...' : 'Apply'}</button>
                 </div>
-                <p className="mt-4 text-xs font-semibold text-slate-500">Data: Last 90 Days</p>
+                <p className="mt-3 text-xs text-slate-400">A listing is flagged Deleting when it meets all of the above within the last {criteria.minAgeDays} days.</p>
               </div>
 
               <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-6"><h2 className="text-lg font-bold text-brand-navy">{resultTitle} <span className="text-slate-400">({resultItems.length} items)</span></h2></div>
@@ -2379,11 +2430,29 @@ function Dashboard() {
                 <table className="w-full min-w-[900px] text-left text-base">
                   <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500"><tr>{['Image', 'Product Title', 'Impressions', 'Views', 'Watchers', 'Sales', 'Days', 'Market'].map((heading) => <th key={heading} className="px-4 py-4 font-bold">{heading}</th>)}</tr></thead>
                   <tbody className="divide-y divide-slate-100">
-                    {resultItems.map((item, index) => { const itemId = getLowPerformingItemId(item); const imageUrl = item.image_url || item.picture_url || item.thumbnail_url; const isCopied = itemId && copiedItemIds.has(itemId); const scannedLabel = (() => { if (!item.last_traffic_synced_at) return 'Not yet scanned'; const diffMs = Date.now() - new Date(item.last_traffic_synced_at).getTime(); const diffDays = Math.floor(diffMs / 86400000); if (diffDays <= 0) return 'Scanned today'; if (diffDays === 1) return 'Scanned 1 day ago'; return `Scanned ${diffDays} days ago` })(); const handleCopyTitle = async () => { const title = item.title || ''; if (!title) return; try { await navigator.clipboard.writeText(title); showToast('Title copied', 'success'); if (itemId) { setCopiedItemIds(prev => new Set(prev).add(itemId)); if (item.id) { apiClient.post(`/api/listing/${item.id}/mark-copied`).catch(err => console.error('Failed to persist copied state:', err)) } } } catch (err) { showToast('Copy failed', 'error') } }; return <tr key={itemId || index} className={`transition-colors ${isCopied ? 'bg-slate-100/80 opacity-60' : 'hover:bg-slate-50/70'}`}><td className="px-4 py-5">{imageUrl ? <img src={imageUrl} alt="" className="h-14 w-14 rounded-md border border-slate-200 object-cover" /> : <div className="h-14 w-14 rounded-md border border-slate-200 bg-slate-100" />}</td><td className="relative max-w-[320px] px-4 py-5">{isCopied && <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 -rotate-12 select-none rounded border-2 border-slate-400/70 px-2 py-0.5 text-xs font-black uppercase tracking-widest text-slate-400/70">Copied</span>}<button type="button" onClick={handleCopyTitle} title="Click to copy title" className="group flex items-start gap-1.5 text-left"><p className="text-base font-semibold text-brand-navy group-hover:text-blue-600">{item.title || 'Untitled listing'}</p><Copy className="mt-1 h-3.5 w-3.5 shrink-0 text-slate-300 group-hover:text-blue-600" /></button><p className="mt-1 text-sm text-slate-400">{itemId || ''}</p><p className="mt-0.5 text-xs text-slate-400">{scannedLabel}</p></td><td className="data-value px-4 py-5 text-base text-slate-600">{item.impressions ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.view_count ?? item.views ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.watch_count ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.quantity_sold ?? item.total_sales ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.days_listed ?? 0}</td><td className="px-4 py-5 text-base font-semibold text-brand-navy">eBay</td></tr> })}
-                    {!isAnalyzingListings && resultItems.length === 0 && <tr><td colSpan={8} className="px-6 py-14 text-center text-sm text-slate-500">No listings found.</td></tr>}
+                    {!showConnectEbay && resultItems.map((item, index) => { const itemId = getLowPerformingItemId(item); const imageUrl = item.image_url || item.picture_url || item.thumbnail_url; const isCopied = itemId && copiedItemIds.has(itemId); const scannedLabel = (() => { if (!item.last_traffic_synced_at) return 'Not yet scanned'; const diffMs = Date.now() - new Date(item.last_traffic_synced_at).getTime(); const diffDays = Math.floor(diffMs / 86400000); if (diffDays <= 0) return 'Scanned today'; if (diffDays === 1) return 'Scanned 1 day ago'; return `Scanned ${diffDays} days ago` })(); const handleCopyTitle = async () => { const title = item.title || ''; if (!title) return; try { await navigator.clipboard.writeText(title); showToast('Title copied', 'success'); if (itemId) { setCopiedItemIds(prev => new Set(prev).add(itemId)); if (item.id) { apiClient.post(`/api/listing/${item.id}/mark-copied`).catch(err => console.error('Failed to persist copied state:', err)) } } } catch (err) { showToast('Copy failed', 'error') } }; return <tr key={itemId || index} className={`transition-colors ${isCopied ? 'bg-slate-100/80 opacity-60' : 'hover:bg-slate-50/70'}`}><td className="px-4 py-5">{imageUrl ? <img src={imageUrl} alt="" className="h-14 w-14 rounded-md border border-slate-200 object-cover" /> : <div className="h-14 w-14 rounded-md border border-slate-200 bg-slate-100" />}</td><td className="relative max-w-[320px] px-4 py-5">{isCopied && <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 -rotate-12 select-none rounded border-2 border-slate-400/70 px-2 py-0.5 text-xs font-black uppercase tracking-widest text-slate-400/70">Copied</span>}<button type="button" onClick={handleCopyTitle} title="Click to copy title" className="group flex items-start gap-1.5 text-left"><p className="text-base font-semibold text-brand-navy group-hover:text-blue-600">{item.title || 'Untitled listing'}</p><Copy className="mt-1 h-3.5 w-3.5 shrink-0 text-slate-300 group-hover:text-blue-600" /></button><p className="mt-1 text-sm text-slate-400">{itemId || ''}</p><p className="mt-0.5 text-xs text-slate-400">{scannedLabel}</p></td><td className="data-value px-4 py-5 text-base text-slate-600">{item.impressions ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.view_count ?? item.views ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.watch_count ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.quantity_sold ?? item.total_sales ?? 0}</td><td className="data-value px-4 py-5 text-base text-slate-600">{item.days_listed ?? 0}</td><td className="px-4 py-5 text-base font-semibold text-brand-navy">eBay</td></tr> })}
+                    {showConnectEbay ? (
+                      <tr><td colSpan={8} className="px-6 py-16">
+                        <div className="flex flex-col items-center justify-center text-center">
+                          <ShoppingBag className="h-10 w-10 text-slate-300" strokeWidth={1.5} />
+                          <p className="mt-3 text-sm text-slate-500">Connect your eBay account to start analyzing your listings.</p>
+                          <button type="button" onClick={handleConnectEbay} disabled={isSyncing} className="mt-5 flex items-center justify-center gap-2 rounded-lg bg-brand-navy px-7 py-3 text-sm font-bold text-white transition-colors hover:bg-[#162957] disabled:cursor-not-allowed disabled:opacity-50">{isSyncing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{isSyncing ? 'Connecting...' : 'Connect eBay'}</button>
+                        </div>
+                      </td></tr>
+                    ) : !isAnalyzingListings && resultItems.length === 0 && <tr><td colSpan={8} className="px-6 py-14 text-center text-sm text-slate-500">No listings found.</td></tr>}
                   </tbody>
                 </table>
               </div>
+              {!showConnectEbay && resultItemsAll.length > PAGE_SIZE && (
+                <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 sm:px-6">
+                  <span className="text-xs text-slate-500">Showing {((tablePage - 1) * PAGE_SIZE + 1).toLocaleString()}–{Math.min(tablePage * PAGE_SIZE, resultItemsAll.length).toLocaleString()} of {resultItemsAll.length.toLocaleString()}</span>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => setTablePage((p) => Math.max(p - 1, 1))} disabled={tablePage <= 1} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-bold text-brand-navy hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">Prev</button>
+                    <span className="text-xs font-semibold text-slate-500">Page {tablePage} / {pageCount}</span>
+                    <button type="button" onClick={() => setTablePage((p) => Math.min(p + 1, pageCount))} disabled={tablePage >= pageCount} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-bold text-brand-navy hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </section>
