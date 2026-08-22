@@ -2869,6 +2869,23 @@ class AdminGrantCreditsRequest(BaseModel):
     description: Optional[str] = None
 
 
+@app.post("/api/admin/trigger-daily-scan")
+async def admin_trigger_daily_scan(
+    admin_key: str = Query(None, description="Admin API Key")
+):
+    """
+    Admin-only: manually trigger the daily auto-scan job (normally runs on its own at
+    08:15 UTC) right now, for verification/testing purposes without waiting for the schedule.
+    """
+    expected_admin_key = os.getenv("ADMIN_API_KEY", "")
+    if not expected_admin_key or admin_key != expected_admin_key:
+        raise HTTPException(status_code=403, detail="Admin authorization required")
+
+    from .daily_scan_job import run_daily_traffic_scan_for_all_users
+    await run_daily_traffic_scan_for_all_users()
+    return {"success": True, "message": "Daily scan job triggered — check logs for [DAILY-SCAN] entries"}
+
+
 @app.post("/api/admin/credits/grant")
 def admin_grant_credits(
     request: AdminGrantCreditsRequest,
