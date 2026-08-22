@@ -2792,7 +2792,10 @@ async def get_traffic_report_for_user(user_id: str) -> dict:
         # 3. Batch into chunks of TRAFFIC_ITEMS_PER_CALL — up to 400 listings = at most 2 calls
         for i in range(0, len(item_ids), rl.TRAFFIC_ITEMS_PER_CALL):
             chunk = item_ids[i:i + rl.TRAFFIC_ITEMS_PER_CALL]
-            listing_ids_filter = ",".join(chunk)
+            # FIX: eBay's traffic_report API requires listing_ids pipe-separated (|), not
+            # comma-separated — confirmed via live API error ('Listing Id must be encoded
+            # and be separated by |'). This alone was enough to make every single call fail.
+            listing_ids_filter = "|".join(chunk)
 
             filter_str = f"marketplace_ids:{{EBAY_US}},date_range:{date_range},listing_ids:{{{listing_ids_filter}}}"
             params = {
