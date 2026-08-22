@@ -3094,6 +3094,17 @@ async def get_ebay_summary(
             total_capped = min(active_count, DASHBOARD_ANALYSIS_LIMIT)
             over_limit = max(active_count - DASHBOARD_ANALYSIS_LIMIT, 0)
 
+            # Daily auto-scan status — 'Synced X ago · Next in Y'. Reflects the scheduled
+            # daily traffic-scan job (daily_scan_job.py, registered at 08:15 UTC in main.py's
+            # startup), not the full listing Sync Now (which has its own 24h cooldown, separate).
+            from .models import EbayApiCallState
+            call_state = db.query(EbayApiCallState).filter(EbayApiCallState.user_id == user_id).first()
+            last_traffic_scan_at = call_state.last_traffic_sync_at if call_state else None
+            now_utc = datetime.utcnow()
+            next_run = now_utc.replace(hour=8, minute=15, second=0, microsecond=0)
+            if next_run <= now_utc:
+                next_run += timedelta(days=1)
+
             return {
                 "success": True,
                 "user_id": user_id,
@@ -3120,7 +3131,9 @@ async def get_ebay_summary(
                 "today_target": {
                     "scanned_today": scanned_today_count,
                     "daily_cap": TRAFFIC_DAILY_LISTING_CAP,
-                    "resets_at": next_reset_display.isoformat() + "Z"
+                    "resets_at": next_reset_display.isoformat() + "Z",
+                    "last_traffic_scan_at": last_traffic_scan_at.isoformat() + "Z" if last_traffic_scan_at else None,
+                    "next_traffic_scan_at": next_run.isoformat() + "Z"
                 },
                 "auto_scan_enabled": profile_for_setting.auto_scan_enabled if profile_for_setting else True,
                 "low_performing_count": low_performing_count,
