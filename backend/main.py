@@ -488,8 +488,12 @@ def startup_event():
     # as a side effect of a full listing sync completing (rate-limited to once/24h/store) —
     # a user who never clicks "Sync Now" on a given day would never actually use that day's
     # traffic-scan quota, and SCAN PROGRESS / "Today Limit" would never advance on their own.
-    # Scheduled at 08:15 UTC — always safely after eBay's own daily quota reset at midnight
-    # Pacific Time (07:00 UTC during PDT, 08:00 UTC during PST), regardless of daylight saving.
+    # Scheduled at 01:30 America/Los_Angeles — ~1.5h after eBay's own daily quota reset at
+    # midnight Pacific Time. eBay doesn't publish an exact data-refresh time (each
+    # getTrafficReport response does include its own 'last updated' timestamp we could use
+    # to refine this further later), but batch-processed analytics like this typically land
+    # shortly after the provider's own day boundary. Using a PT-timezone-aware CronTrigger
+    # (not a fixed UTC hour) means this correctly follows PST/PDT automatically.
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
         from apscheduler.triggers.cron import CronTrigger
@@ -505,13 +509,13 @@ def startup_event():
         scheduler = BackgroundScheduler(timezone="UTC")
         scheduler.add_job(
             _run_daily_scan_job,
-            trigger=CronTrigger(hour=8, minute=15),
+            trigger=CronTrigger(hour=1, minute=30, timezone="America/Los_Angeles"),
             id="daily_traffic_scan",
             replace_existing=True,
         )
         scheduler.start()
-        logger.info("[STARTUP] ✅ Daily traffic-scan scheduler started (08:15 UTC)")
-        print("✅ Daily traffic-scan scheduler started (08:15 UTC)")
+        logger.info("[STARTUP] ✅ Daily traffic-scan scheduler started (01:30 America/Los_Angeles)")
+        print("✅ Daily traffic-scan scheduler started (01:30 America/Los_Angeles)")
     except Exception as scheduler_err:
         logger.error(f"[STARTUP] ❌ Failed to start daily-scan scheduler: {scheduler_err}")
         print(f"⚠️ Failed to start daily-scan scheduler (non-fatal): {scheduler_err}")

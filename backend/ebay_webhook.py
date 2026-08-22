@@ -3101,15 +3101,20 @@ async def get_ebay_summary(
             over_limit = max(active_count - DASHBOARD_ANALYSIS_LIMIT, 0)
 
             # Daily auto-scan status — 'Synced X ago · Next in Y'. Reflects the scheduled
-            # daily traffic-scan job (daily_scan_job.py, registered at 08:15 UTC in main.py's
-            # startup), not the full listing Sync Now (which has its own 24h cooldown, separate).
+            # daily traffic-scan job (daily_scan_job.py, registered at 01:30 America/Los_Angeles
+            # in main.py's startup — ~1.5h after eBay's own PT day boundary), not the full
+            # listing Sync Now (which has its own 24h cooldown, separate).
             from .models import EbayApiCallState
+            from zoneinfo import ZoneInfo as _ZoneInfo
             call_state = db.query(EbayApiCallState).filter(EbayApiCallState.user_id == user_id).first()
             last_traffic_scan_at = call_state.last_traffic_sync_at if call_state else None
             now_utc = datetime.utcnow()
-            next_run = now_utc.replace(hour=8, minute=15, second=0, microsecond=0)
-            if next_run <= now_utc:
-                next_run += timedelta(days=1)
+            _pacific = _ZoneInfo("America/Los_Angeles")
+            _now_pacific = datetime.now(_pacific)
+            _next_run_pacific = _now_pacific.replace(hour=1, minute=30, second=0, microsecond=0)
+            if _next_run_pacific <= _now_pacific:
+                _next_run_pacific += timedelta(days=1)
+            next_run = _next_run_pacific.astimezone(_ZoneInfo("UTC")).replace(tzinfo=None)
 
             return {
                 "success": True,
