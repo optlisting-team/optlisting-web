@@ -9,16 +9,14 @@
  * correct UUID for a product from its "Share" panel in the LS dashboard, or
  * from the `buy_now_url` field on GET /v1/products/{id} via the LS API.
  *
- * NOTE (2026-08-20): the UUID below is the store's TEST-mode "Pro Test" product.
- * Before real launch this MUST be swapped for the LIVE-mode product's UUID
- * (a separate object — LS does not auto-copy test-mode products to live).
- * Also confirm the live product's price is actually $49/month — the "Pro Test"
- * product was found configured at $120/month, which doesn't match the site's
- * advertised pricing.
+ * NOTE (2026-08-28): the UUID below is the store's LIVE-mode "Pro" product —
+ * $49.00/month subscription with a 7-day free trial, confirmed matching the
+ * site's advertised pricing. Replaces the earlier TEST-mode "Pro Test"
+ * product (which was misconfigured at $120/month).
  */
 
 const DEFAULT_STORE = 'https://optlisting.lemonsqueezy.com'
-const DEFAULT_CHECKOUT_UUID = '01f530ea-81d9-4623-b714-9f252cc1c161' // TEST MODE — replace with live product's UUID before launch
+const DEFAULT_CHECKOUT_UUID = '011d437f-9241-47ed-8319-79b9c0251d67' // LIVE — Pro, $49/mo, 7-day trial
 
 /**
  * Returns Lemon Squeezy config. Store is always absolute (https). UUID falls back to the
