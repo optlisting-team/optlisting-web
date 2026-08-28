@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BarChart3, Check, ChevronDown, LineChart, LogOut, Settings, Target, TrendingUp, Users } from 'lucide-react'
+import { BarChart3, Check, ChevronDown, LogOut, Settings, Users } from 'lucide-react'
 import BrandLogo from './BrandLogo'
 import { useAuth } from '../contexts/AuthContext'
 import { generateProfessionalCheckoutUrl } from '../lib/checkout'
@@ -121,31 +121,14 @@ function LandingPage() {
           </div>
         </section>
 
-        <section className="px-4 py-20 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-7xl">
-            <div className="max-w-2xl"><h2 className="text-3xl font-bold tracking-tight text-brand-navy sm:text-4xl">Know What to Cut.</h2></div>
-            <div className="mt-10 grid gap-5 md:grid-cols-3">
-              {[
-                [LineChart, 'Performance Analytics'],
-                [Target, 'Dead Stock Detection'],
-                [TrendingUp, 'Cleanup Recommendations'],
-              ].map(([Icon, title]) => (
-                <article key={title} className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_8px_30px_-24px_rgba(13,27,61,0.3)]">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-brand-navy"><Icon className="h-5 w-5" /></div>
-                  <h3 className="mt-5 text-xl font-bold text-brand-navy">{title}</h3>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
         <section id="how" className="bg-[#F7F9FC] px-4 py-20 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-7xl"><div className="text-center"><h2 className="text-3xl font-bold text-brand-navy sm:text-4xl">3 Steps. Done.</h2></div>
-            <div className="mt-12 grid gap-5 md:grid-cols-3">
+          <div className="mx-auto max-w-7xl"><div className="text-center"><h2 className="text-3xl font-bold text-brand-navy sm:text-4xl">4 Steps. Done.</h2></div>
+            <div className="mt-12 grid gap-5 md:grid-cols-4">
               {[
                 ['01', 'Connect eBay'],
-                ['02', 'Set Criteria'],
-                ['03', 'Review & Clean'],
+                ['02', 'Flag Low Performers'],
+                ['03', 'Copy Title'],
+                ['04', 'Paste to Supplier & Delete'],
               ].map(([number, title]) => <div key={number} className="rounded-xl border border-slate-200 bg-white p-6"><span className="data-value text-sm font-bold text-emerald-600">{number}</span><h3 className="mt-4 text-xl font-bold text-brand-navy">{title}</h3></div>)}
             </div>
           </div>
