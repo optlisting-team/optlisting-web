@@ -122,13 +122,14 @@ function LandingPage() {
         </section>
 
         <section id="how" className="bg-[#F7F9FC] px-4 py-20 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-7xl"><div className="text-center"><h2 className="text-3xl font-bold text-brand-navy sm:text-4xl">4 Steps. Done.</h2></div>
-            <div className="mt-12 grid gap-5 md:grid-cols-4">
+          <div className="mx-auto max-w-7xl"><div className="text-center"><h2 className="text-3xl font-bold text-brand-navy sm:text-4xl">5 Steps. Done.</h2></div>
+            <div className="mt-12 grid gap-5 md:grid-cols-3 lg:grid-cols-5">
               {[
                 ['01', 'Connect eBay'],
-                ['02', 'Flag Low Performers'],
-                ['03', 'Copy Title'],
-                ['04', 'Paste to Supplier & Delete'],
+                ['02', 'Auto-Classify Listings'],
+                ['03', 'Copy Title in Deleting Box'],
+                ['04', 'Paste & Delete at Supplier'],
+                ['05', 'Synced Automatically Next Scan'],
               ].map(([number, title]) => <div key={number} className="rounded-xl border border-slate-200 bg-white p-6"><span className="data-value text-sm font-bold text-emerald-600">{number}</span><h3 className="mt-4 text-xl font-bold text-brand-navy">{title}</h3></div>)}
             </div>
           </div>
