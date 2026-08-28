@@ -9,11 +9,7 @@ const AccountContext = createContext({
   connectionError: null,
   showPlanModal: false,
   setShowPlanModal: () => {},
-  refreshSubscription: () => {},
-  credits: null,
-  refreshCredits: () => {},
-  showCreditModal: false,
-  setShowCreditModal: () => {}
+  refreshSubscription: () => {}
 })
 
 export const AccountProvider = ({ children }) => {
@@ -22,23 +18,6 @@ export const AccountProvider = ({ children }) => {
   const [apiStatus, setApiStatus] = useState('checking')
   const [connectionError, setConnectionError] = useState(null)
   const [showPlanModal, setShowPlanModal] = useState(false)
-  const [showCreditModal, setShowCreditModal] = useState(false)
-  const [credits, setCredits] = useState(null)
-
-  // Fetch credits (for Dashboard/Sidebar - prevents "r is not a function" TypeError)
-  const fetchCredits = async () => {
-    try {
-      const response = await apiClient.get('/api/credits', { timeout: 15000 })
-      if (response.data && typeof response.data.available_credits === 'number') {
-        setCredits(response.data.available_credits)
-      }
-    } catch (err) {
-      if (err.response?.status !== 401) {
-        console.warn('Failed to fetch credits:', err.message)
-      }
-      setCredits(0)
-    }
-  }
 
   // Subscription request with extended timeout (single attempt)
   const SUBSCRIPTION_TIMEOUT_MS = 90000 // 90 seconds - ensure backend/DB is ready before giving up
@@ -61,7 +40,6 @@ export const AccountProvider = ({ children }) => {
           setPlan(response.data.plan || 'FREE')
           setApiStatus('connected')
           setConnectionError(null)
-          await fetchCredits()
           return
         }
         setApiStatus('error')
@@ -82,7 +60,6 @@ export const AccountProvider = ({ children }) => {
                 setPlan(retryResponse.data.plan || 'FREE')
                 setApiStatus('connected')
                 setConnectionError(null)
-                await fetchCredits()
                 return
               }
             }
@@ -120,11 +97,7 @@ export const AccountProvider = ({ children }) => {
         connectionError,
         showPlanModal,
         setShowPlanModal,
-        refreshSubscription: fetchSubscription,
-        credits,
-        refreshCredits: fetchCredits,
-        showCreditModal,
-        setShowCreditModal
+        refreshSubscription: fetchSubscription
       }}
     >
       {children}

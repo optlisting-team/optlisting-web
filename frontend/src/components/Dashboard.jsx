@@ -100,7 +100,7 @@ const DUMMY_STORE = {
 function Dashboard() {
   const { selectedStore } = useStore()
   const { user } = useAuth()
-  const { credits, refreshCredits } = useAccount()  // Use global credits from AccountContext
+  const { refreshSubscription } = useAccount()  // Refresh $49/mo Pro subscription status (not credits — billing is flat subscription, not per-scan credits)
   const [searchParams] = useSearchParams()
   const viewParam = searchParams.get('view')
   
@@ -178,13 +178,6 @@ function Dashboard() {
   // Analysis result state
   const [analysisResult, setAnalysisResult] = useState(null) // { count, items, requestId, filters }
   
-  // Confirm Modal state (credit consumption confirmation)
-  const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [pendingAnalysisFilters, setPendingAnalysisFilters] = useState(null)
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [requiredCredits, setRequiredCredits] = useState(1)  // Value received from quote
-  const [isFetchingQuote, setIsFetchingQuote] = useState(false)  // Flag for quote call in progress
-  
   // OAuth callback verification guard - prevent multiple simultaneous verifications
   const isVerifyingConnection = useRef(false)
   const verificationAttemptCount = useRef(0)
@@ -218,9 +211,9 @@ function Dashboard() {
       return 'Please reconnect your eBay account.'
     }
     if (err.response?.status === 402) {
-      // Insufficient credits
+      // Subscription required (flat $49/mo Pro plan, not per-scan credits)
       const errorData = err.response?.data?.detail || {}
-      return errorData.message || 'Insufficient credits. Please purchase more credits.'
+      return errorData.message || 'An active Pro subscription is required to use this feature.'
     }
     if (err.response?.status >= 500) {
       return 'Server error. Try again later.'
@@ -242,8 +235,8 @@ function Dashboard() {
   const [isFiltering, setIsFiltering] = useState(false)
   const [pendingFiltersForModal, setPendingFiltersForModal] = useState(null)
   
-  // User Credits & Plan State (from AccountContext)
-  const [usedCredits, setUsedCredits] = useState(0)
+  // NOTE: usedCredits (legacy per-scan credit tracking) removed 2026-08-28 — billing is
+  // the flat $49/mo Pro subscription (see AccountContext.subscriptionStatus), not credits.
   const [userPlan, setUserPlan] = useState('FREE')
   const [connectedStoresCount, setConnectedStoresCount] = useState(1)
   
@@ -311,7 +304,7 @@ function Dashboard() {
     return false
   }
   
-  // Credits are now managed by AccountContext - no local fetchUserCredits needed
+  // Subscription status is managed by AccountContext (no local fetch needed here)
 
   // Sync eBay listings (automatically called after OAuth connection)
   const syncEbayListings = async () => {
@@ -1177,196 +1170,12 @@ function Dashboard() {
     }
   }
 
-  // Apply filter - Show Confirm modal
-  const handleApplyFilter = async (newFilters) => {
-    console.log('🔍 handleApplyFilter: Fetching quote...')
-    console.log('📋 Request details:', {
-      url: `${API_BASE_URL}/api/analysis/low-performing/quote`,
-      method: 'POST',
-      user_id: currentUserId,
-      filters: {
-        days: newFilters.analytics_period_days || newFilters.min_days || 7,
-        sales_lte: newFilters.max_sales || 0,
-        watch_lte: newFilters.max_watches || newFilters.max_watch_count || 0,
-        imp_lte: newFilters.max_impressions || 100,
-        views_lte: newFilters.max_views || 10,
-      },
-      store_id: selectedStore?.id || null
-    })
-    
-    setIsFetchingQuote(true)
-    setPendingAnalysisFilters(newFilters)
-    
-    try {
-      // Step 1: Call Quote (preflight) - calculate requiredCredits
-      const requestBody = {
-        days: newFilters.analytics_period_days || newFilters.min_days || 7,
-        sales_lte: newFilters.max_sales || 0,
-        watch_lte: newFilters.max_watches || newFilters.max_watch_count || 0,
-        imp_lte: newFilters.max_impressions || 100,
-        views_lte: newFilters.max_views || 10,
-      }
-      
-      // Use apiClient for requests requiring JWT authentication (Authorization header automatically added)
-      const quoteResponse = await apiClient.post(`/api/analysis/low-performing/quote`, requestBody, {
-        params: {
-          store_id: selectedStore?.id || null
-        },
-        timeout: 30000
-      })
-      
-      console.log('✅ Quote response received:', quoteResponse.data)
-      
-      if (quoteResponse.data) {
-        const { estimatedCandidates, requiredCredits: quoteRequiredCredits, remainingCredits } = quoteResponse.data
-        
-        console.log(`📊 Quote received: estimatedCandidates=${estimatedCandidates}, requiredCredits=${quoteRequiredCredits}, remainingCredits=${remainingCredits}`)
-        
-        // Set requiredCredits (display in modal)
-        setRequiredCredits(quoteRequiredCredits)
-        
-        // Credits updated via AccountContext refreshCredits() after operations
-        
-        // Step 2: Show Confirm modal
-        setShowConfirmModal(true)
-      } else {
-        throw new Error('Invalid quote response')
-      }
-    } catch (err) {
-      console.error('❌ Quote fetch failed:', {
-        status: err.response?.status,
-        statusText: err.response?.statusText,
-        data: err.response?.data,
-        message: err.message,
-        request: {
-          url: err.config?.url,
-          method: err.config?.method,
-          params: err.config?.params,
-          data: err.config?.data
-        }
-      })
-      
-      let errorMessage = 'Failed to calculate required credits. Please try again.'
-      
-      if (err.response?.status === 401 || err.response?.status === 403) {
-        errorMessage = 'Authentication failed. Please log in again.'
-      } else if (err.response?.status === 400) {
-        const errorData = err.response?.data?.detail || err.response?.data || {}
-        errorMessage = errorData.message || 'Invalid request. Please check your filter settings.'
-      } else if (err.response?.status === 402) {
-        const errorData = err.response?.data?.detail || {}
-        errorMessage = errorData.message || 'Insufficient credits. Please purchase more credits.'
-      } else if (err.response?.status === 500) {
-        const errorData = err.response?.data?.detail || {}
-        errorMessage = errorData.message || 'Server error. Please try again later.'
-      } else if (err.code === 'ERR_NETWORK' || err.code === 'ECONNABORTED') {
-        errorMessage = 'Network error. Please check your connection and try again.'
-      }
-      
-      showToast(errorMessage, 'error')
-      setPendingAnalysisFilters(null)
-    } finally {
-      setIsFetchingQuote(false)
-    }
-  }
-  
-  // Execute actual analysis when Confirm modal is clicked
-  const handleConfirmAnalysis = async () => {
-    if (!pendingAnalysisFilters || isAnalyzing) return
-    
-    // Generate Idempotency-Key (used in execute)
-    const idempotencyKey = `execute_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    
-    try {
-      setIsAnalyzing(true)
-      setShowConfirmModal(false)
-      
-      console.log(`📊 [${idempotencyKey}] Starting Low-Performing analysis execution...`, pendingAnalysisFilters)
-      
-      // Step 3: Call Execute - deduct credits + perform analysis
-      // Use apiClient for requests requiring JWT authentication (Authorization header automatically added)
-      const response = await apiClient.post(`/api/analysis/low-performing/execute`, {
-        days: pendingAnalysisFilters.analytics_period_days || pendingAnalysisFilters.min_days || 7,
-        sales_lte: pendingAnalysisFilters.max_sales || 0,
-        watch_lte: pendingAnalysisFilters.max_watches || pendingAnalysisFilters.max_watch_count || 0,
-        imp_lte: pendingAnalysisFilters.max_impressions || 100,
-        views_lte: pendingAnalysisFilters.max_views || 10,
-        idempotency_key: idempotencyKey
-      }, {
-        headers: {
-          'Idempotency-Key': idempotencyKey  // Also include in header (standard practice)
-        },
-        timeout: 120000
-      })
-      
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Analysis failed')
-      }
-      
-      const { count, items, remainingCredits, chargedCredits, requestId: returnedRequestId, filters: returnedFilters } = response.data
-      
-      console.log(`✅ [${idempotencyKey}] Analysis completed: count=${count}, chargedCredits=${chargedCredits}, remainingCredits=${remainingCredits}`)
-      
-      // Save analysis results
-      setAnalysisResult({
-        count,
-        items,
-        requestId: returnedRequestId || idempotencyKey,
-        filters: returnedFilters || pendingAnalysisFilters
-      })
-      
-      // Confirm filter state
-      setFilters(pendingAnalysisFilters)
-      setResultsFilters(pendingAnalysisFilters)
-      setSelectedIds([])
-      
-      // Credits updated via AccountContext refreshCredits() after operations
-      
-      // Show results in Dashboard
-      setResultsMode('low')
-      setShowResults(true)
-      
-      // Scroll to results section
-      setTimeout(() => {
-        const resultsSection = document.getElementById('results-section')
-        if (resultsSection) {
-          resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        }
-      }, 100)
-      
-      setPendingAnalysisFilters(null)
-      
-    } catch (err) {
-      console.error(`❌ [${idempotencyKey}] Analysis execution failed:`, err)
-      
-      let errorMessage = 'Analysis failed. Please try again.'
-      let showRetry = true
-      
-      if (err.response?.status === 402) {
-        // Insufficient credits
-        const errorData = err.response?.data?.detail || {}
-        errorMessage = errorData.message || 'Insufficient credits. Please purchase more credits.'
-        showRetry = false
-        // Credits will be refreshed via AccountContext after error handling
-      } else if (err.response?.status === 500) {
-        errorMessage = err.response?.data?.detail?.message || 'Server error. Please try again later.'
-      } else if (err.code === 'ECONNABORTED') {
-        errorMessage = 'Request timeout. Please try again.'
-      } else if (err.code === 'ERR_NETWORK') {
-        errorMessage = 'Network error. Please check your connection.'
-      }
-      
-      setErrorModalMessage(errorMessage)
-      setShowErrorModal(true)
-      
-      // Only maintain pendingAnalysisFilters if not insufficient credits (allows retry)
-      if (!showRetry) {
-        setPendingAnalysisFilters(null)
-      }
-    } finally {
-      setIsAnalyzing(false)
-    }
-  }
+  // NOTE: legacy per-scan credit-based quote/confirm/execute flow (handleApplyFilter /
+  // handleConfirmAnalysis, calling /api/analysis/low-performing/quote + /execute) was
+  // removed here on 2026-08-28. It was dead code — nothing in the UI called it. The real
+  // "Apply" button uses handleAnalyze below, which filters already-synced listings
+  // client-side. Billing is the flat $49/mo Pro subscription (gated once at the account
+  // level via AccountContext.subscriptionStatus), not per-scan credits.
 
   const handleSelect = (id, checked) => {
     if (checked) {
@@ -1680,8 +1489,8 @@ function Dashboard() {
     
     // Handle payment success/cancel redirects
     if (paymentStatus === 'success') {
-      // Refetch credits to show updated balance
-      refreshCredits()
+      // Refetch subscription status so the Pro plan shows as active immediately
+      refreshSubscription()
       // Clean up URL parameter
       urlParams.delete('payment')
       const newUrl = window.location.pathname + (urlParams.toString() ? `?${urlParams.toString()}` : '')
@@ -1923,9 +1732,9 @@ function Dashboard() {
       try {
         const isHealthy = await checkApiHealth()
         if (isHealthy) {
-          // NOTE: credits are already fetched by AccountContext's own mount effect
-          // (fetchSubscription -> fetchCredits) — no need to re-trigger refreshCredits()
-          // here too, that was firing a duplicate /api/credits request on every mount.
+          // NOTE: subscription status is already fetched by AccountContext's own mount
+          // effect (fetchSubscription) — no need to re-trigger refreshSubscription() here
+          // too, that was firing a duplicate request on every mount.
           fetchHistory().catch(err => {
             console.error('History fetch error on mount:', err)
           })
@@ -1987,7 +1796,7 @@ function Dashboard() {
         }
       } catch (err) {
         console.warn('API Health Check failed (non-critical):', err)
-        refreshCredits()
+        refreshSubscription()
         fetchHistory().catch(err => {
           console.error('History fetch error on mount:', err)
         })

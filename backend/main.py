@@ -903,7 +903,7 @@ def analyze_zombies(
     # Get total count using SQL COUNT
     total_count = base_query.count()
     
-    # Validate active Professional subscription ($120/month)
+    # Validate active Pro subscription ($49/month)
     try:
         require_active_subscription(db, user_id)
         logger.info(f"✅ Professional subscription validated for user {user_id}")

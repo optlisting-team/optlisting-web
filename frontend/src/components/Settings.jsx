@@ -29,11 +29,11 @@ function StoreLicenseTable({
     availableSlots.push({ slot: i + 1, type: 'plan' })
   }
   
-  // Credit expansion slots (if plan limit reached but under global limit)
-  const creditSlots = []
+  // Expansion slots beyond the plan's included limit, up to the account's global cap
+  const expansionSlots = []
   if (usedSlots >= planStoreLimit && usedSlots < globalStoreLimit) {
     for (let i = Math.max(usedSlots, planStoreLimit); i < globalStoreLimit; i++) {
-      creditSlots.push({ slot: i + 1, type: 'credit' })
+      expansionSlots.push({ slot: i + 1, type: 'expansion' })
     }
   }
 
@@ -77,7 +77,7 @@ function StoreLicenseTable({
                     ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
                     : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                 }`}>
-                  {index < planStoreLimit ? userPlan : 'CREDIT'}
+                  {index < planStoreLimit ? userPlan : 'EXTRA'}
                   <span className="opacity-70">({index + 1}/{index < planStoreLimit ? planStoreLimit : globalStoreLimit})</span>
                 </span>
               </td>
@@ -133,17 +133,17 @@ function StoreLicenseTable({
             </tr>
           ))}
           
-          {/* Credit Expansion Slots (shown when plan limit reached) */}
+          {/* Expansion Slots (shown when plan limit reached, within global limit) */}
           {stores.length >= planStoreLimit && stores.length < globalStoreLimit && (
             <tr className="border-b border-zinc-800/50 bg-amber-500/5">
               <td colSpan="5" className="px-6 py-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <span className="text-xl">💰</span>
+                    <span className="text-xl">🏪</span>
                     <div>
-                      <div className="font-semibold text-amber-400">Credit Store Expansion</div>
+                      <div className="font-semibold text-amber-400">Additional Store Slot</div>
                       <div className="text-xs text-zinc-500">
-                        {globalStoreLimit - stores.length} additional slot(s) available with credits
+                        {globalStoreLimit - stores.length} additional slot(s) available on your plan
                       </div>
                     </div>
                   </div>
@@ -153,7 +153,7 @@ function StoreLicenseTable({
                     onClick={() => onConnect && onConnect()}
                     className="text-amber-400 border-amber-500/30 hover:bg-amber-500/10"
                   >
-                    + Add with Credits
+                    + Connect Store
                   </Button>
                 </div>
               </td>
@@ -167,16 +167,15 @@ function StoreLicenseTable({
 
 // Main Settings Component
 function Settings() {
-  // Debug: Log environment variable in development mode only
-  // Use AccountContext for credits
-  const { credits, plan, refreshCredits } = useAccount()
+  // Real subscription status from AccountContext ($49/mo Pro plan — flat subscription,
+  // not a per-scan credit balance)
+  const { subscriptionStatus, plan } = useAccount()
+  const isSubscriptionActive = subscriptionStatus === 'active'
   
   // Mock data - replace with actual data from context/API
   const [userPlan] = useState(plan || 'PRO')
   const [planStoreLimit] = useState(3)
   const [globalStoreLimit] = useState(10)
-  const userCredits = credits || 0
-  const [usedCredits] = useState(0)
   
   const [connectedStores, setConnectedStores] = useState([
     { id: '1', name: 'US Store', email: 'user@ebay.com', connectedDate: '2025-12-01' },
@@ -215,7 +214,9 @@ function Settings() {
           </div>
         </div>
 
-        {/* Current Plan Card */}
+        {/* Current Plan / Subscription Card — reflects the real $49/mo flat subscription,
+            not per-scan credits. Status badge uses the real subscriptionStatus from
+            AccountContext (fetched from /api/subscription/status). */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -225,43 +226,25 @@ function Settings() {
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-xl font-bold text-white">{userPlan} Plan</h2>
-                  <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded text-xs font-bold text-emerald-400">
-                    Active
-                  </span>
+                  {isSubscriptionActive ? (
+                    <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded text-xs font-bold text-emerald-400">
+                      Active
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 bg-red-500/10 border border-red-500/20 rounded text-xs font-bold text-red-400">
+                      Inactive
+                    </span>
+                  )}
                 </div>
                 <p className="text-zinc-400 text-sm mt-1">
-                  ${planInfo[userPlan]?.price}/month • {planStoreLimit} Store License{planStoreLimit > 1 ? 's' : ''}
+                  $49/month • {planStoreLimit} Store License{planStoreLimit > 1 ? 's' : ''}
                 </p>
               </div>
             </div>
             <Button className="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400">
-              Upgrade Plan
+              {isSubscriptionActive ? 'Manage Subscription' : 'Subscribe — $49/mo'}
             </Button>
           </div>
-        </div>
-
-        {/* Credits Card */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-gradient-to-br from-emerald-600/30 to-emerald-600/10 border border-emerald-500/30 rounded-2xl flex items-center justify-center">
-                <span className="text-2xl">💰</span>
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-white">{(userCredits - usedCredits).toLocaleString()} Credits</h2>
-                <p className="text-zinc-400 text-sm mt-1">
-                  {usedCredits > 0 ? `${usedCredits.toLocaleString()} used this month` : 'All credits rollover to next month'}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded">✨ 100% Rollover</span>
-              <Button variant="outline" className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10">
-                Buy Credits
-              </Button>
-            </div>
-          </div>
-          
         </div>
 
         {/* Store Licenses Section */}
@@ -303,7 +286,7 @@ function Settings() {
           <div className="mt-4 p-4 bg-zinc-800/50 border border-zinc-700 rounded-xl">
             <p className="text-sm text-zinc-400">
               The <strong className="text-white">{userPlan}</strong> plan provides <strong className="text-blue-400">{planStoreLimit}</strong> store licenses. 
-              Additional store connections are available at any time within the <strong className="text-amber-400">Global Credit Limit</strong> (currently {globalStoreLimit}). 
+              Additional store connections are available at any time within the <strong className="text-amber-400">Global Store Limit</strong> (currently {globalStoreLimit}). 
               If you need additional store licenses, please upgrade to the <strong className="text-purple-400">POWER SELLER</strong> plan.
             </p>
           </div>
