@@ -1,6 +1,12 @@
 # OptListing Web (노드4) — STATUS
 
-_Last updated: 2026-10-07 (라이브 사이트 분석, 코드 수정 없음 — 상세: docs/ANALYSIS_WEB.md)_
+_Last updated: 2026-10-07 (최우선 미션 주입, 코드 수정 없음 — 미션은 루트 CLAUDE.md)_
+
+## 0. 미션 요약 (2026-10-07)
+- 북극성: 가입 후 첫 최적화 성공 사용자 비율 + 결제 전환.
+- 2주 목표(10/18까지): (1) /api/health ebay_worker 오류인데 healthy 반환 원인 읽기 전용 조사→docs 기록 (2) 가입 흐름 마찰(결제 선행, 6~7단계)을 노드3과 같은 기준으로 정리 (3) 회귀 방지(타입체크/스모크 테스트) 도입안 제안.
+- 마스터 몫(MASTER_TODO.md 참고): Python 설치, 웹 가입/결제 지표, 노드3 비교 정보.
+- 원칙: 배포·main 병합 금지, 키/토큰 커밋 금지, 실패는 docs/FAILURES.md 기록.
 
 ## 1. 기술 스택 / 폴더 구조
 - **Frontend**: React 18 + Vite 5 + Tailwind 3 + Radix/shadcn 스타일 컴포넌트, react-router-dom 7, axios, Supabase JS (auth). v1.3.8. 호스팅: Vercel.
