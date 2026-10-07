@@ -1,6 +1,6 @@
 # OptListing Web (노드4) — STATUS
 
-_Last updated: 2026-10-07 (상태 파악 작업, 코드 수정 없음)_
+_Last updated: 2026-10-07 (라이브 사이트 분석, 코드 수정 없음 — 상세: docs/ANALYSIS_WEB.md)_
 
 ## 1. 기술 스택 / 폴더 구조
 - **Frontend**: React 18 + Vite 5 + Tailwind 3 + Radix/shadcn 스타일 컴포넌트, react-router-dom 7, axios, Supabase JS (auth). v1.3.8. 호스팅: Vercel.
@@ -42,7 +42,7 @@ _Last updated: 2026-10-07 (상태 파악 작업, 코드 수정 없음)_
 - 로컬 실행: 프론트 `npm run dev`(vite), 백엔드 `pip install -r requirements.txt` 후 `backend/start_server.bat` 등.
 
 ## 4. 프로덕션 / 헬스체크 (2026-10-07)
-- 프론트: https://optlisting.com → 307 → https://www.optlisting.com/ → **200 OK**
+- **프로덕션 URL (공식): https://www.optlisting.com/** (optlisting.com → 307 → www) → **200 OK**, 응답 ~0.17s. 상세 분석: `docs/ANALYSIS_WEB.md`
 - 백엔드: https://optlisting-production.up.railway.app
   - `/` → 200, `/api/health` → **200** (정의: `backend/main.py` `health_check`), `/health` → 404(해당 경로 없음, 정상)
 - Lemon Squeezy 체크아웃: optlisting.lemonsqueezy.com (코드 내 Pro 상품 UUID 사용)
