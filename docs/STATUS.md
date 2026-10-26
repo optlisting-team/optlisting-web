@@ -8,6 +8,10 @@ _Last updated: 2026-10-07 (최우선 미션 주입, 코드 수정 없음 — 미
 - 마스터 몫(MASTER_TODO.md 참고): Python 설치, 웹 가입/결제 지표, 노드3 비교 정보.
 - 원칙: 배포·main 병합 금지, 키/토큰 커밋 금지, 실패는 docs/FAILURES.md 기록.
 
+## 0-1. 진행 (2026-10-26)
+- 목표 1 완료(읽기 전용): `docs/HEALTH_INVESTIGATION.md` — 원인 = 워커 모듈의 import 시점 `signal.signal`이 FastAPI 스레드풀에서 실패 + 워커 오류가 status에 미반영 + web 프로세스는 별도 worker 프로세스 상태를 볼 수 없음. 코드 수정은 마스터 확인 대기.
+- 남은 목표: 2(가입 흐름 마찰 정리), 3(회귀 방지 도입안). 레포에 MASTER_TODO.md/FAILURES.md 없음.
+
 ## 1. 기술 스택 / 폴더 구조
 - **Frontend**: React 18 + Vite 5 + Tailwind 3 + Radix/shadcn 스타일 컴포넌트, react-router-dom 7, axios, Supabase JS (auth). v1.3.8. 호스팅: Vercel.
 - **Backend**: Python 3.11 FastAPI (`backend/main.py`), gunicorn+uvicorn. 호스팅: Railway (`railway.json`, `Procfile`; `render.yaml`도 존재). DB: Supabase(Postgres).
