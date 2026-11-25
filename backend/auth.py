@@ -93,3 +93,15 @@ def get_current_user(request: Request) -> str:
             status_code=401,
             detail=f"Token verification failed: {str(e)}"
         )
+
+
+def verify_admin_key(provided: str) -> bool:
+    """
+    Fail-closed admin key check: False if ADMIN_API_KEY is unset/empty or does not match.
+    Constant-time comparison.
+    """
+    import hmac
+    expected = os.getenv("ADMIN_API_KEY", "")
+    if not expected or not provided:
+        return False
+    return hmac.compare_digest(provided.encode("utf-8"), expected.encode("utf-8"))
