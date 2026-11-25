@@ -91,9 +91,14 @@ def signal_handler(signum, frame):
     logger.info(f"🛑 Received signal {signum}. Initiating graceful shutdown...")
     worker_status["shutdown_requested"] = True
 
-# Register SIGTERM, SIGINT handlers
-signal.signal(signal.SIGTERM, signal_handler)
-signal.signal(signal.SIGINT, signal_handler)
+# Register SIGTERM, SIGINT handlers. signal.signal() raises ValueError outside the main
+# thread (e.g. when imported lazily from a FastAPI request thread), so don't let that
+# break the import.
+try:
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+except ValueError:
+    logger.debug("Not in main thread; skipping signal handler registration")
 
 
 # =====================================================
