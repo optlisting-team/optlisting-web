@@ -581,10 +581,11 @@ def health_check():
         }
     except ImportError:
         health["services"]["ebay_worker"] = "not_loaded"
+        health["status"] = "degraded"
     except Exception as e:
-        # Worker check failure does not affect overall health
         health["services"]["ebay_worker"] = f"error: {str(e)[:50]}"
-    
+        health["status"] = "degraded"
+
     return health
 
 
@@ -597,10 +598,11 @@ async def trigger_token_refresh(
     Note: This endpoint runs separately from Worker. Worker performs the actual refresh.
     """
     # Simple security check (use stronger auth in production)
-    expected_key = os.getenv("ADMIN_API_KEY", "")
-    if expected_key and admin_key != expected_key:
+    # SECURITY: fail-closed. Previously an unset ADMIN_API_KEY left this endpoint open.
+    from .auth import verify_admin_key
+    if not verify_admin_key(admin_key):
         raise HTTPException(status_code=403, detail="Invalid admin key")
-    
+
     try:
         from .workers.ebay_token_worker import run_token_refresh_job
         result = run_token_refresh_job()
