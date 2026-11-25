@@ -1,9 +1,7 @@
 """
 OptListing Subscription Service
 ===============================
-Premium subscription validation service for $120/month Professional Plan
-
-Core Philosophy: High-Profit Price Policy - Premium service for professional sellers
+Subscription validation service for the $49/month Pro Plan
 """
 
 import logging
@@ -48,7 +46,7 @@ def get_subscription_status(db: Session, user_id: str) -> Dict[str, Any]:
         subscription_status = profile.subscription_status or 'inactive'
         subscription_plan = profile.subscription_plan or 'free'
         
-        # Professional plan is $120/month
+        # Professional plan is $49/month
         is_professional = (
             subscription_status == 'active' and 
             subscription_plan.lower() in ['professional', 'pro', 'premium']
@@ -98,8 +96,8 @@ def validate_active_subscription(db: Session, user_id: str) -> Tuple[bool, str]:
         
         if not is_active:
             return False, (
-                "Active Professional subscription required. "
-                "Please subscribe to the $120/month Professional Plan to access this feature."
+                "Active Pro subscription required. "
+                "Please subscribe to the $49/month Pro Plan to access this feature."
             )
         
         return True, ""

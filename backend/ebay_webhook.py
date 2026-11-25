@@ -32,7 +32,8 @@ from fastapi import APIRouter, Request, HTTPException, Query, Depends
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from starlette.requests import Request as StarletteRequest
-from .auth import get_current_user
+from .auth import get_current_user, verify_admin_key
+import hmac
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -74,6 +75,46 @@ EBAY_AUTH_ENDPOINTS = {
         "token": "https://api.ebay.com/identity/v1/oauth2/token"
     }
 }
+
+# OAuth state: signed (HMAC-SHA256) and time-limited so the callback cannot be forged
+# to bind an eBay account to an arbitrary user_id.
+OAUTH_STATE_TTL_SECONDS = 600  # 10 minutes
+
+
+def _oauth_state_key() -> bytes:
+    # Dedicated secret preferred; falls back to the eBay client secret (already required).
+    secret = os.getenv("OAUTH_STATE_SECRET", "") or EBAY_CLIENT_SECRET
+    if not secret:
+        raise RuntimeError("No secret configured for OAuth state signing")
+    return b"optlisting-oauth-state:" + secret.encode("utf-8")
+
+
+def sign_oauth_state(user_id: str, now: Optional[float] = None) -> str:
+    """Return "<b64url(user_id|issued_at)>.<hex hmac-sha256>"."""
+    issued_at = int(now if now is not None else time_module.time())
+    payload = base64.urlsafe_b64encode(f"{user_id}|{issued_at}".encode("utf-8")).decode("ascii").rstrip("=")
+    sig = hmac.new(_oauth_state_key(), payload.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"{payload}.{sig}"
+
+
+def verify_oauth_state(state: Optional[str], now: Optional[float] = None) -> Optional[str]:
+    """Return the user_id if state has a valid signature and is under 10 minutes old, else None."""
+    if not state or state.count(".") != 1:
+        return None
+    try:
+        payload, sig = state.split(".")
+        expected = hmac.new(_oauth_state_key(), payload.encode("ascii"), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected):
+            return None
+        decoded = base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)).decode("utf-8")
+        user_id, issued_at = decoded.rsplit("|", 1)
+        age = (now if now is not None else time_module.time()) - int(issued_at)
+        if not user_id or age < 0 or age > OAUTH_STATE_TTL_SECONDS:
+            return None
+        return user_id
+    except Exception:
+        return None
+
 
 # OAuth Scopes (required permissions)
 EBAY_SCOPES = [
@@ -479,8 +520,6 @@ async def ebay_auth_start(
     logger.info("=" * 60)
     logger.info("🚀 eBay OAuth Start Request")
     logger.info(f"   user_id: {user_id} (from JWT)")
-    logger.info(f"   state: {state}")
-    logger.info(f"   Request headers: {dict(request.headers)}")
     
     # Check env vars
     if not EBAY_CLIENT_ID:
@@ -497,8 +536,12 @@ async def ebay_auth_start(
     env = EBAY_ENVIRONMENT if EBAY_ENVIRONMENT in EBAY_AUTH_ENDPOINTS else "PRODUCTION"
     auth_url_base = EBAY_AUTH_ENDPOINTS[env]["authorize"]
     
-    # Build state param (include user_id)
-    state_value = state or f"user_{user_id}_{datetime.now().timestamp()}"
+    # Signed, expiring state bound to the JWT user. Any client-supplied `state` is ignored.
+    try:
+        state_value = sign_oauth_state(user_id)
+    except RuntimeError:
+        logger.error("❌ OAuth state signing secret not configured!")
+        raise HTTPException(status_code=500, detail="OAuth state signing not configured")
     
     # Scope string
     scope_string = " ".join(EBAY_SCOPES)
@@ -549,9 +592,9 @@ async def ebay_auth_callback(
     logger.info("=" * 60)
     logger.info("🔐 eBay OAuth Callback Received")
     logger.info(f"   Request URL: {str(request.url)}")
-    logger.info(f"   Query params: {dict(request.query_params)}")
-    logger.info(f"   code: {code[:20] if code else 'None'}...")
-    logger.info(f"   state: {state}")
+    logger.info(f"   Query param keys: {list(request.query_params.keys())}")
+    logger.info(f"   code present: {bool(code)}")
+    logger.info(f"   state present: {bool(state)}")
     logger.info(f"   error: {error}")
     logger.info(f"   error_description: {error_description}")
     
@@ -570,32 +613,11 @@ async def ebay_auth_callback(
     # Extract user_id from state
     # State format: "user_{user_id}_{timestamp}"
     # CRITICAL: never use 'default-user' - only allow actual logged-in user ID
-    user_id = None
-    if state:
-        logger.info(f"   Raw state parameter: {state}")
-        if state.startswith("user_"):
-            try:
-                # "user_{user_id}_{timestamp}" -> ["user", "{user_id}", "{timestamp}"]
-                parts = state.split("_")
-                logger.info(f"   State parts: {parts}")
-                if len(parts) >= 2:
-                    extracted_user_id = parts[1]  # actual user_id
-                    if extracted_user_id:
-                        user_id = extracted_user_id
-                        logger.info(f"   ✅ Extracted valid user_id from state: {user_id}")
-                    else:
-                        logger.error(f"   ❌ Invalid user_id extracted: '{extracted_user_id}' (must be valid UUID)")
-                else:
-                    logger.warning(f"   State format unexpected, parts count: {len(parts)}")
-            except Exception as e:
-                logger.error(f"   Error parsing state: {e}")
-        else:
-            logger.warning(f"   State does not start with 'user_': {state[:50]}")
-    
-    # Validate user_id - return error if None
+    # State is HMAC-signed and expires after 10 minutes; reject anything else.
+    user_id = verify_oauth_state(state)
     if not user_id:
-        logger.error(f"❌ Invalid user_id: '{user_id}' - Cannot save token without valid user_id")
-        error_redirect = f"{FRONTEND_URL}/dashboard?ebay_error=invalid_user&message=User ID is required. Please log in and try again."
+        logger.error("❌ Invalid or expired OAuth state - rejecting callback")
+        error_redirect = f"{FRONTEND_URL}/dashboard?ebay_error=invalid_state&message=Invalid or expired authorization request. Please try connecting again."
         return RedirectResponse(url=error_redirect, status_code=302)
     
     logger.info(f"   ✅ Final user_id to use: {user_id} (validated)")
@@ -1203,25 +1225,25 @@ async def ebay_oauth_config():
 
 @router.get("/debug/tokens")
 async def debug_tokens(
-    user_id: str = Depends(get_current_user)  # user_id from JWT
+    user_id: str = Depends(get_current_user),  # user_id from JWT
+    admin_key: Optional[str] = Query(None, description="Admin API Key")
 ):
     """
-    Debug: full token info (emergency debugging)
+    Debug: token status for the caller. Requires ADMIN_API_KEY (fail-closed).
+    Only the last 4 characters of the access token are shown; no cross-user data.
     """
+    if not verify_admin_key(admin_key):
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+    db = None
     try:
         from .models import get_db, Profile
-        
+
         db = next(get_db())
-        
-        # Get all profiles
-        all_profiles = db.query(Profile).all()
-        
+
         # Profile for given user_id
         profile = db.query(Profile).filter(Profile.user_id == user_id).first()
-        
+
         result = {
-            "total_profiles": len(all_profiles),
-            "all_user_ids": [p.user_id for p in all_profiles],
             "requested_user_id": user_id,
             "profile_found": bool(profile),
         }
@@ -1234,20 +1256,19 @@ async def debug_tokens(
                 "token_expires_at": profile.ebay_token_expires_at.isoformat() if profile.ebay_token_expires_at else None,
                 "token_updated_at": profile.ebay_token_updated_at.isoformat() if profile.ebay_token_updated_at else None,
                 "is_expired": profile.ebay_token_expires_at < datetime.utcnow() if profile.ebay_token_expires_at else None,
-                "token_preview": profile.ebay_access_token[:20] + "..." if profile.ebay_access_token else None
+                "token_preview": "..." + profile.ebay_access_token[-4:] if profile.ebay_access_token else None
             })
         else:
             result["message"] = f"No profile found for user_id: {user_id}"
-        
-        db.close()
+
         return result
-        
+
     except Exception as e:
-        import traceback
-        return {
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }
+        logger.error(f"debug_tokens failed: {e}")
+        return {"error": "debug_tokens failed"}
+    finally:
+        if db is not None:
+            db.close()
 
 
 # =====================================================
